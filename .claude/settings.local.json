@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet:*)",
+      "Bash(taskkill:*)",
+      "WebSearch",
+      "Bash(cmd:*)"
     ]
   }
 }

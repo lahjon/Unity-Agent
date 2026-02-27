@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>UnityAgent</AssemblyName>
     <RootNamespace>UnityAgent</RootNamespace>
     <Nullable>enable</Nullable>

@@ -3,22 +3,192 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:UnityAgent"
         Title="Unity Agent" Width="1280" Height="820"
-        Background="#1E1E2E" WindowStartupLocation="CenterScreen">
+        Background="#191919" WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded">
 
     <Window.Resources>
-        <!-- Tab header style (no chrome, just content) -->
-        <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="#CDD6F4"/>
+        <local:StringToBrushConverter x:Key="StringToBrush"/>
+
+        <!-- ═══ COLORS ═══ -->
+        <SolidColorBrush x:Key="BgDeep" Color="#191919"/>
+        <SolidColorBrush x:Key="BgSurface" Color="#222222"/>
+        <SolidColorBrush x:Key="BgElevated" Color="#2C2C2C"/>
+        <SolidColorBrush x:Key="BgHover" Color="#353535"/>
+        <SolidColorBrush x:Key="BorderSubtle" Color="#333333"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#E8E8E8"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#999999"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#666666"/>
+        <SolidColorBrush x:Key="Accent" Color="#DA7756"/>
+        <SolidColorBrush x:Key="AccentHover" Color="#E89B7E"/>
+        <SolidColorBrush x:Key="Success" Color="#5CB85C"/>
+        <SolidColorBrush x:Key="Danger" Color="#A15252"/>
+        <SolidColorBrush x:Key="Info" Color="#C46A4B"/>
+
+        <!-- ═══ SCROLLBAR ═══ -->
+        <Style x:Key="ScrollThumb" TargetType="Thumb">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="IsTabStop" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="Border" Background="#313244"
-                                CornerRadius="4,4,0,0" Padding="6,5" Margin="1,0">
-                            <ContentPresenter ContentSource="Header"/>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="Bg" Background="#383838" CornerRadius="4" Margin="2" SnapsToDevicePixels="True"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#505050"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#606060"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="MinWidth" Value="10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Border Background="Transparent" CornerRadius="4">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.Thumb><Thumb Style="{StaticResource ScrollThumb}"/></Track.Thumb>
+                            </Track>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Height" Value="10"/>
+                    <Setter Property="MinHeight" Value="10"/>
+                    <Setter Property="Width" Value="Auto"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Border Background="Transparent" CornerRadius="4">
+                                    <Track x:Name="PART_Track" IsDirectionReversed="False">
+                                        <Track.Thumb><Thumb Style="{StaticResource ScrollThumb}"/></Track.Thumb>
+                                    </Track>
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ═══ COMBOBOX ═══ -->
+        <Style TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Background" Value="{StaticResource BgDeep}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderSubtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6" SnapsToDevicePixels="True">
+                                <Border.BorderBrush>
+                                    <SolidColorBrush x:Name="CbBorder" Color="#333333"/>
+                                </Border.BorderBrush>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                        ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                        Margin="{TemplateBinding Padding}" VerticalAlignment="Center"
+                                        HorizontalAlignment="Left" IsHitTestVisible="False"/>
+                                    <ToggleButton Grid.ColumnSpan="2"
+                                        IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                        Focusable="False" ClickMode="Press">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                    <Path Grid.Column="1" Data="M0,0 L4,4 L8,0" Stroke="#888"
+                                          StrokeThickness="1.5" HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                </Grid>
+                            </Border>
+                            <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
+                                   AllowsTransparency="True" PopupAnimation="Fade">
+                                <Border Background="#252525" BorderBrush="#3A3A3A" BorderThickness="1"
+                                        CornerRadius="6" Margin="0,4,0,0" Padding="4"
+                                        MinWidth="{TemplateBinding ActualWidth}" MaxHeight="300">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="12" Opacity="0.4" ShadowDepth="4"/>
+                                    </Border.Effect>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel IsItemsHost="True"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="CbBorder" Storyboard.TargetProperty="Color"
+                                                            To="#4A4A4A" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="CbBorder" Storyboard.TargetProperty="Color"
+                                                            To="#333333" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="#CCC"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Padding="{TemplateBinding Padding}" CornerRadius="4">
+                            <Border.Background>
+                                <SolidColorBrush x:Name="CbiItemBg" Color="#00000000"/>
+                            </Border.Background>
+                            <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#45475A"/>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="CbiItemBg" Storyboard.TargetProperty="Color"
+                                                            To="#353535" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="CbiItemBg" Storyboard.TargetProperty="Color"
+                                                            To="#00000000" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -26,81 +196,579 @@
             </Setter>
         </Style>
 
-        <!-- Small button style for task list -->
-        <Style x:Key="SmallBtn" TargetType="Button">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="Margin" Value="0,0,4,0"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="#1E1E2E"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+        <!-- ═══ TAB ═══ -->
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="#AAA"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd" CornerRadius="6,6,0,0"
+                                Padding="8,6" Margin="1,0" SnapsToDevicePixels="True">
+                            <Border.Background>
+                                <SolidColorBrush x:Name="TabBg" Color="#00000000"/>
+                            </Border.Background>
+                            <Border.BorderBrush>
+                                <SolidColorBrush x:Name="TabBorder" Color="#00000000"/>
+                            </Border.BorderBrush>
+                            <Border.BorderThickness>
+                                <Thickness Bottom="2" Left="0" Right="0" Top="0"/>
+                            </Border.BorderThickness>
+                            <ContentPresenter ContentSource="Header"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TabBg" Storyboard.TargetProperty="Color"
+                                                            To="#2C2C2C" Duration="0:0:0.15"/>
+                                            <ColorAnimation Storyboard.TargetName="TabBorder" Storyboard.TargetProperty="Color"
+                                                            To="#DA7756" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TabBg" Storyboard.TargetProperty="Color"
+                                                            To="#00000000" Duration="0:0:0.2"/>
+                                            <ColorAnimation Storyboard.TargetName="TabBorder" Storyboard.TargetProperty="Color"
+                                                            To="#00000000" Duration="0:0:0.25"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TabBg" Storyboard.TargetProperty="Color"
+                                                            To="#252525" Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TabBg" Storyboard.TargetProperty="Color"
+                                                            To="#00000000" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <!-- Active task template -->
-        <DataTemplate x:Key="ActiveTaskTemplate">
-            <Border Background="#313244" CornerRadius="4" Padding="8" Margin="0,2">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <Ellipse Width="8" Height="8" Margin="0,0,6,0">
-                            <Ellipse.Fill><SolidColorBrush Color="#89B4FA"/></Ellipse.Fill>
-                        </Ellipse>
-                        <TextBlock Text="{Binding StatusText}" Foreground="#89B4FA"
-                                   FontSize="11" FontWeight="Bold"/>
-                    </StackPanel>
-                    <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
-                               Foreground="#CDD6F4" FontSize="12"
-                               TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
-                    <DockPanel Grid.Row="2" Margin="0,5,0,0">
-                        <TextBlock Text="{Binding TimeInfo}" Foreground="#6C7086"
-                                   FontSize="10" VerticalAlignment="Center"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="Done" Click="Complete_Click"
-                                    Background="#A6E3A1" Style="{StaticResource SmallBtn}"/>
-                            <Button Content="Cancel" Click="Cancel_Click"
-                                    Background="#F38BA8" Style="{StaticResource SmallBtn}" Margin="0"/>
+        <!-- ═══ MODERN BUTTON ═══ -->
+        <Style x:Key="Btn" TargetType="Button">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="#111"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="BdScale" ScaleX="1" ScaleY="1"/>
+                            </Border.RenderTransform>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="Opacity"
+                                                             To="0.88" Duration="0:0:0.15"/>
+                                            <DoubleAnimation Storyboard.TargetName="BdScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="1.02" Duration="0:0:0.15"/>
+                                            <DoubleAnimation Storyboard.TargetName="BdScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="1.02" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="Opacity"
+                                                             To="1.0" Duration="0:0:0.2"/>
+                                            <DoubleAnimation Storyboard.TargetName="BdScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="1.0" Duration="0:0:0.2"/>
+                                            <DoubleAnimation Storyboard.TargetName="BdScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="1.0" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="BdScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="0.96" Duration="0:0:0.06"/>
+                                            <DoubleAnimation Storyboard.TargetName="BdScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="0.96" Duration="0:0:0.06"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="BdScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="1.02" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetName="BdScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="1.02" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Small task button -->
+        <Style x:Key="SmallBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+        </Style>
+
+        <!-- Toolbar button -->
+        <Style x:Key="ToolbarBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="12,5"/>
+        </Style>
+
+        <!-- Ghost button (transparent bg) -->
+        <Style x:Key="GhostBtn" TargetType="Button">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="#888"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="4" Padding="{TemplateBinding Padding}"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.Background>
+                                <SolidColorBrush x:Name="BdBg" Color="#00000000"/>
+                            </Border.Background>
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="GhostScale" ScaleX="1" ScaleY="1"/>
+                            </Border.RenderTransform>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="BdBg" Storyboard.TargetProperty="Color"
+                                                            To="#2C2C2C" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="BdBg" Storyboard.TargetProperty="Color"
+                                                            To="#00000000" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                                <Setter Property="Foreground" Value="#CCC"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="GhostScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="0.95" Duration="0:0:0.06"/>
+                                            <DoubleAnimation Storyboard.TargetName="GhostScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="0.95" Duration="0:0:0.06"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="GhostScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="1.0" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetName="GhostScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="1.0" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══ MODERN TOGGLE SWITCH ═══ -->
+        <Style x:Key="ToggleSwitch" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="36" Height="20" Margin="0,0,8,0">
+                                <Border x:Name="Track" CornerRadius="10" SnapsToDevicePixels="True">
+                                    <Border.Background>
+                                        <SolidColorBrush x:Name="TrackBg" Color="#3A3A3A"/>
+                                    </Border.Background>
+                                </Border>
+                                <Border x:Name="Thumb" Width="16" Height="16" CornerRadius="8"
+                                        HorizontalAlignment="Left" Margin="2,0,0,0"
+                                        SnapsToDevicePixels="True">
+                                    <Border.Background>
+                                        <SolidColorBrush x:Name="ThumbBg" Color="#888888"/>
+                                    </Border.Background>
+                                </Border>
+                            </Grid>
+                            <ContentPresenter VerticalAlignment="Center"/>
                         </StackPanel>
-                    </DockPanel>
-                </Grid>
-            </Border>
-        </DataTemplate>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TrackBg" Storyboard.TargetProperty="Color"
+                                                            To="#DA7756" Duration="0:0:0.2"/>
+                                            <ColorAnimation Storyboard.TargetName="ThumbBg" Storyboard.TargetProperty="Color"
+                                                            To="#FFFFFF" Duration="0:0:0.15"/>
+                                            <ThicknessAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="Margin"
+                                                                To="18,0,0,0" Duration="0:0:0.2">
+                                                <ThicknessAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </ThicknessAnimation.EasingFunction>
+                                            </ThicknessAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TrackBg" Storyboard.TargetProperty="Color"
+                                                            To="#3A3A3A" Duration="0:0:0.2"/>
+                                            <ColorAnimation Storyboard.TargetName="ThumbBg" Storyboard.TargetProperty="Color"
+                                                            To="#888888" Duration="0:0:0.15"/>
+                                            <ThicknessAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="Margin"
+                                                                To="2,0,0,0" Duration="0:0:0.2">
+                                                <ThicknessAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </ThicknessAnimation.EasingFunction>
+                                            </ThicknessAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="Opacity"
+                                                             To="0.85" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="Opacity"
+                                                             To="1.0" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-        <!-- History task template -->
-        <DataTemplate x:Key="HistoryTaskTemplate">
-            <Border Background="#313244" CornerRadius="4" Padding="8" Margin="0,2">
+        <!-- ═══ TEXTBOX WITH FOCUS GLOW ═══ -->
+        <Style TargetType="TextBox">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="SelectionBrush" Value="{StaticResource Accent}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="TbBd"
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6" SnapsToDevicePixels="True">
+                            <Border.BorderBrush>
+                                <SolidColorBrush x:Name="TbBorderBrush" Color="#333333"/>
+                            </Border.BorderBrush>
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Padding="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TbBorderBrush"
+                                                            Storyboard.TargetProperty="Color"
+                                                            To="#4A4A4A" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TbBorderBrush"
+                                                            Storyboard.TargetProperty="Color"
+                                                            To="#333333" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TbBorderBrush"
+                                                            Storyboard.TargetProperty="Color"
+                                                            To="#DA7756" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="TbBorderBrush"
+                                                            Storyboard.TargetProperty="Color"
+                                                            To="#333333" Duration="0:0:0.25"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══ ACTIVE TASK ═══ -->
+        <DataTemplate x:Key="ActiveTaskTemplate">
+            <Border x:Name="Card" CornerRadius="8" Padding="10" Margin="0,2"
+                    BorderThickness="1"
+                    MouseUp="TaskCard_MouseUp">
+                <Border.Background>
+                    <SolidColorBrush x:Name="CardBg" Color="#222222"/>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <SolidColorBrush x:Name="CardBorder" Color="#2C2C2C"/>
+                </Border.BorderBrush>
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="CardBg" Storyboard.TargetProperty="Color"
+                                                To="#2A2A2A" Duration="0:0:0.15"/>
+                                <ColorAnimation Storyboard.TargetName="CardBorder" Storyboard.TargetProperty="Color"
+                                                To="#3A3A3A" Duration="0:0:0.15"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="CardBg" Storyboard.TargetProperty="Color"
+                                                To="#222222" Duration="0:0:0.2"/>
+                                <ColorAnimation Storyboard.TargetName="CardBorder" Storyboard.TargetProperty="Color"
+                                                To="#2C2C2C" Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
+                    <!-- Close X button top-right -->
+                    <Button Grid.Row="0" Content="&#xE8BB;" Click="Cancel_Click"
+                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                            FontFamily="Segoe MDL2 Assets" FontSize="10"
+                            Foreground="#666" Cursor="Hand" Margin="0,-2,-2,0"
+                            ToolTip="Close task">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" Background="Transparent" CornerRadius="4"
+                                        Width="20" Height="20">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#3A2020"/>
+                                        <Setter Property="Foreground" Value="#E05555"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <Ellipse Width="8" Height="8" Margin="0,0,6,0">
-                            <Ellipse.Fill><SolidColorBrush Color="#A6E3A1"/></Ellipse.Fill>
+                        <Ellipse x:Name="StatusDot" Width="8" Height="8" Margin="0,0,6,0"
+                                 Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="PulseStoryboard">
+                                                    <Storyboard RepeatBehavior="Forever">
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                         From="1.0" To="0.35" Duration="0:0:1.2"
+                                                                         AutoReverse="True">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <SineEase EasingMode="EaseInOut"/>
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="PulseStoryboard"/>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
                         </Ellipse>
-                        <TextBlock Text="{Binding StatusText}" Foreground="#6C7086"
-                                   FontSize="11" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding StatusText}"
+                                   Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
+                                   FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"/>
+                        <TextBlock Text=" | " Foreground="#444" FontSize="11" FontFamily="Segoe UI"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ProjectName}" Foreground="#888"
+                                   FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="100"
+                                   ToolTip="{Binding ProjectPath}"/>
+                        <TextBlock Text="{Binding Id, StringFormat='#{0}'}" Foreground="#555"
+                                   FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
-                               Foreground="#A6ADC8" FontSize="12"
-                               TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
-                    <DockPanel Grid.Row="2" Margin="0,5,0,0">
-                        <TextBlock Text="{Binding TimeInfo}" Foreground="#6C7086"
-                                   FontSize="10" VerticalAlignment="Center"/>
-                        <Button Content="Restart" Click="Restart_Click"
-                                Background="#89B4FA" Style="{StaticResource SmallBtn}"
+                               Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"
+                               TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                    <Grid Grid.Row="2" Margin="0,6,0,0">
+                        <TextBlock Text="{Binding TimeInfo}" Foreground="#666"
+                                   FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
+                        <Button Content="Done" Click="Complete_Click"
+                                Background="#5CB85C" Style="{StaticResource SmallBtn}"
                                 HorizontalAlignment="Right" Margin="0"/>
-                    </DockPanel>
+                    </Grid>
                 </Grid>
             </Border>
         </DataTemplate>
 
-        <!-- ListBox style -->
+        <!-- ═══ HISTORY TASK ═══ -->
+        <DataTemplate x:Key="HistoryTaskTemplate">
+            <Border CornerRadius="8" Padding="10" Margin="0,2"
+                    BorderThickness="1">
+                <Border.Background>
+                    <SolidColorBrush x:Name="HistCardBg" Color="#222222"/>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <SolidColorBrush x:Name="HistCardBorder" Color="#2C2C2C"/>
+                </Border.BorderBrush>
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="HistCardBg" Storyboard.TargetProperty="Color"
+                                                To="#282828" Duration="0:0:0.15"/>
+                                <ColorAnimation Storyboard.TargetName="HistCardBorder" Storyboard.TargetProperty="Color"
+                                                To="#383838" Duration="0:0:0.15"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="HistCardBg" Storyboard.TargetProperty="Color"
+                                                To="#222222" Duration="0:0:0.2"/>
+                                <ColorAnimation Storyboard.TargetName="HistCardBorder" Storyboard.TargetProperty="Color"
+                                                To="#2C2C2C" Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <!-- Close X button top-right -->
+                    <Button Grid.Row="0" Content="&#xE8BB;" Click="RemoveHistoryTask_Click"
+                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                            FontFamily="Segoe MDL2 Assets" FontSize="10"
+                            Foreground="#555" Cursor="Hand" Margin="0,-2,-2,0"
+                            ToolTip="Remove from history">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" Background="Transparent" CornerRadius="4"
+                                        Width="20" Height="20">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#3A2020"/>
+                                        <Setter Property="Foreground" Value="#E05555"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8" Margin="0,0,6,0"
+                                 Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}"/>
+                        <TextBlock Text="{Binding StatusText}" Foreground="#666"
+                                   FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"/>
+                        <TextBlock Text=" | " Foreground="#444" FontSize="11" FontFamily="Segoe UI"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ProjectName}" Foreground="#666"
+                                   FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="100"
+                                   ToolTip="{Binding ProjectPath}"/>
+                        <TextBlock Text="{Binding Id, StringFormat='#{0}'}" Foreground="#444"
+                                   FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
+                               Foreground="#888" FontSize="12" FontFamily="Segoe UI"
+                               TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                    <Grid Grid.Row="2" Margin="0,6,0,0">
+                        <TextBlock Text="{Binding TimeInfo}" Foreground="#555"
+                                   FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
+                        <Button Content="Resume" Click="Resume_Click"
+                                Background="#DA7756" Style="{StaticResource SmallBtn}"
+                                HorizontalAlignment="Right" Margin="0"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- ═══ LISTBOX ═══ -->
         <Style x:Key="TaskListStyle" TargetType="ListBox">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -124,52 +792,137 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="10">
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="180"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Input Section -->
-        <Border Grid.Row="0" Background="#2D2D44" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+        <!-- ═══ INPUT SECTION ═══ -->
+        <Border Grid.Row="0" Background="#222222" CornerRadius="8" Padding="14" Margin="0,0,0,8"
+                BorderThickness="1">
+            <Border.BorderBrush>
+                <SolidColorBrush x:Name="InputSectionBorder" Color="#2C2C2C"/>
+            </Border.BorderBrush>
+            <Border.Triggers>
+                <EventTrigger RoutedEvent="MouseEnter">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <ColorAnimation Storyboard.TargetName="InputSectionBorder"
+                                            Storyboard.TargetProperty="Color"
+                                            To="#3A3A3A" Duration="0:0:0.2"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+                <EventTrigger RoutedEvent="MouseLeave">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <ColorAnimation Storyboard.TargetName="InputSectionBorder"
+                                            Storyboard.TargetProperty="Color"
+                                            To="#2C2C2C" Duration="0:0:0.3"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Border.Triggers>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
-                         MinHeight="80" MaxHeight="150"
-                         VerticalScrollBarVisibility="Auto"
-                         Background="#1E1E2E" Foreground="#CDD6F4"
-                         CaretBrush="#CDD6F4" BorderBrush="#45475A"
-                         FontSize="14" FontFamily="Consolas" Padding="8"
-                         KeyDown="TaskInput_KeyDown"/>
-                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Width="200">
-                    <CheckBox x:Name="SkipPermissionsToggle" IsChecked="True"
-                              Foreground="#CDD6F4" Margin="0,0,0,10">
-                        <TextBlock Text="Dangerously Skip Permissions"
-                                   TextWrapping="Wrap" Foreground="#CDD6F4" FontSize="12"/>
-                    </CheckBox>
+                <DockPanel>
+                    <!-- Quick project selector -->
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                        <TextBlock Text="PROJECT" Foreground="#DA7756" FontWeight="Bold" FontSize="10"
+                                   FontFamily="Segoe UI" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="ProjectCombo" SelectionChanged="ProjectCombo_Changed"
+                                  FontSize="12" Padding="8,5"/>
+                    </DockPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock x:Name="ImageIndicator" Foreground="#DA7756" FontSize="11"
+                                   FontFamily="Segoe UI" VerticalAlignment="Center" Visibility="Collapsed"/>
+                        <Button x:Name="ClearImagesBtn" Content="Clear" Click="ClearImages_Click"
+                                Style="{StaticResource GhostBtn}" Foreground="#A15252"
+                                Margin="6,0,0,0" Visibility="Collapsed"/>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="PROMPT" Foreground="#DA7756" FontWeight="Bold"
+                               FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
+                             MinHeight="80" MaxHeight="150"
+                             VerticalScrollBarVisibility="Auto"
+                             Background="#191919" Foreground="#E8E8E8"
+                             CaretBrush="#E8E8E8" BorderBrush="#333333" BorderThickness="1"
+                             FontSize="13" FontFamily="Consolas" Padding="10"
+                             PreviewKeyDown="TaskInput_PreviewKeyDown"
+                             AllowDrop="True" PreviewDragOver="TaskInput_DragOver"
+                             Drop="TaskInput_Drop"/>
+                </DockPanel>
+                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center" Width="210">
+                    <ToggleButton x:Name="SkipPermissionsToggle" IsChecked="True"
+                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
+                        <TextBlock Text="Skip Permissions" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
+                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
+                        <TextBlock Text="Remote Session" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="HeadlessToggle" IsChecked="False"
+                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
+                        <TextBlock Text="Headless (Terminal)" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="False"
+                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
+                        <TextBlock Text="Ignore File Locks" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="OvernightToggle" IsChecked="False"
+                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,12"
+                                  Checked="OvernightToggle_Changed" Unchecked="OvernightToggle_Changed">
+                        <TextBlock Text="Overnight Task" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                    </ToggleButton>
                     <Button x:Name="ExecuteButton" Content="Execute Task" Click="Execute_Click"
-                            Background="#89B4FA" Foreground="#1E1E2E"
-                            FontWeight="Bold" FontSize="14"
-                            Padding="14,10" Cursor="Hand" BorderThickness="0"/>
-                    <TextBlock Text="Ctrl+Enter to execute" Foreground="#6C7086"
+                            Background="#DA7756" Foreground="#FFF" Style="{StaticResource Btn}"
+                            FontSize="13" Padding="14,10"/>
+                    <TextBlock Text="Ctrl+Enter to execute" Foreground="#555" FontFamily="Segoe UI"
                                FontSize="10" Margin="0,6,0,0" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Main Content -->
+        <!-- ═══ MAIN CONTENT ═══ -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280"/>
+                <ColumnDefinition Width="270"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="300"/>
             </Grid.ColumnDefinitions>
 
             <!-- Left: Task Lists -->
-            <Border Background="#2D2D44" CornerRadius="6" Padding="8" Margin="0,0,8,0">
+            <Border Background="#222222" CornerRadius="8" Padding="10" Margin="0,0,8,0"
+                    BorderThickness="1">
+                <Border.BorderBrush>
+                    <SolidColorBrush x:Name="SidebarBorder" Color="#2C2C2C"/>
+                </Border.BorderBrush>
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="SidebarBorder"
+                                                Storyboard.TargetProperty="Color"
+                                                To="#3A3A3A" Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="SidebarBorder"
+                                                Storyboard.TargetProperty="Color"
+                                                To="#2C2C2C" Duration="0:0:0.3"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -177,16 +930,27 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Text="ACTIVE TASKS"
-                               Foreground="#89B4FA" FontWeight="Bold" FontSize="13"
-                               Margin="4,0,0,6"/>
+                    <DockPanel Grid.Row="0" Margin="4,0,0,8">
+                        <TextBlock Text="ACTIVE" Foreground="#DA7756"
+                                   FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox x:Name="ActiveFilterCombo" SelectionChanged="ActiveFilter_Changed"
+                                  FontSize="10" Padding="6,3" Margin="8,0,0,0"
+                                  HorizontalAlignment="Right"/>
+                    </DockPanel>
                     <ListBox x:Name="ActiveTasksList" Grid.Row="1"
                              Style="{StaticResource TaskListStyle}"
                              ItemTemplate="{StaticResource ActiveTaskTemplate}"
                              SelectionChanged="ActiveTask_Selected"/>
-                    <TextBlock Grid.Row="2" Text="HISTORY (25h)"
-                               Foreground="#A6ADC8" FontWeight="Bold" FontSize="13"
-                               Margin="4,10,0,6"/>
+                    <DockPanel Grid.Row="2" Margin="4,12,0,8">
+                        <TextBlock Text="HISTORY" Foreground="#666" FontWeight="Bold"
+                                   FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                        <Button Content="Clear" Click="ClearHistory_Click"
+                                Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"/>
+                        <ComboBox x:Name="HistoryFilterCombo" SelectionChanged="HistoryFilter_Changed"
+                                  FontSize="10" Padding="6,3" Margin="8,0,4,0"
+                                  HorizontalAlignment="Right"/>
+                    </DockPanel>
                     <ListBox x:Name="HistoryTasksList" Grid.Row="3"
                              Style="{StaticResource TaskListStyle}"
                              ItemTemplate="{StaticResource HistoryTaskTemplate}"
@@ -194,15 +958,328 @@
                 </Grid>
             </Border>
 
-            <!-- Right: Output Tabs -->
-            <Border Grid.Column="1" Background="#2D2D44" CornerRadius="6" Padding="4">
-                <TabControl x:Name="OutputTabs" Background="Transparent" BorderThickness="0"/>
+            <!-- Center: Output -->
+            <Border Grid.Column="1" Background="#222222" CornerRadius="8" Padding="4" Margin="0,0,8,0"
+                    BorderThickness="1">
+                <Border.BorderBrush>
+                    <SolidColorBrush x:Name="MainContentBorder" Color="#2C2C2C"/>
+                </Border.BorderBrush>
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="MainContentBorder"
+                                                Storyboard.TargetProperty="Color"
+                                                To="#3A3A3A" Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="MainContentBorder"
+                                                Storyboard.TargetProperty="Color"
+                                                To="#2C2C2C" Duration="0:0:0.3"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="OUTPUT" Foreground="#DA7756" FontWeight="Bold"
+                               FontSize="10" FontFamily="Segoe UI" Margin="8,6,0,4"/>
+                    <TabControl x:Name="OutputTabs" Background="Transparent" BorderThickness="0"/>
+                </DockPanel>
+            </Border>
+
+            <!-- Right: File Locks + Projects + Options -->
+            <Border Grid.Column="2" Background="#222222" CornerRadius="8" Padding="4"
+                    BorderThickness="1">
+                <Border.BorderBrush>
+                    <SolidColorBrush x:Name="RightPanelBorder" Color="#2C2C2C"/>
+                </Border.BorderBrush>
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="RightPanelBorder"
+                                                Storyboard.TargetProperty="Color"
+                                                To="#3A3A3A" Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="RightPanelBorder"
+                                                Storyboard.TargetProperty="Color"
+                                                To="#2C2C2C" Duration="0:0:0.3"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
+                <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0">
+                    <!-- File Locks tab -->
+                    <TabItem x:Name="FileLocksTabHeader">
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="File Locks" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                                <TextBlock x:Name="FileLockBadge" Text="0" Visibility="Collapsed"
+                                           Foreground="#CC8800" FontSize="10" FontWeight="Bold"
+                                           FontFamily="Segoe UI" Margin="4,0,0,0"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <DockPanel Margin="8">
+                            <TextBlock DockPanel.Dock="Top" Text="Active file locks across all tasks"
+                                       Foreground="#666" FontSize="11" FontFamily="Segoe UI"
+                                       Margin="4,6,4,8"/>
+                            <!-- Header row -->
+                            <Grid DockPanel.Dock="Top" Margin="0,0,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="70"/>
+                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="70"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="FILE" Foreground="#666" FontSize="10"
+                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                <TextBlock Grid.Column="1" Text="PATH" Foreground="#666" FontSize="10"
+                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                <TextBlock Grid.Column="2" Text="TASK" Foreground="#666" FontSize="10"
+                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                <TextBlock Grid.Column="3" Text="TOOL" Foreground="#666" FontSize="10"
+                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                <TextBlock Grid.Column="4" Text="SINCE" Foreground="#666" FontSize="10"
+                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                            </Grid>
+                            <Border DockPanel.Dock="Top" Height="1" Background="#2C2C2C" Margin="0,0,0,4"/>
+                            <!-- Lock rows -->
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl x:Name="FileLocksListView">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="8,5" Margin="0,1" CornerRadius="4"
+                                                    Background="#1E1E1E">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="160"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="70"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                        <ColumnDefinition Width="70"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding FileName}"
+                                                               Foreground="#CCC" FontSize="11" FontFamily="Consolas"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding OriginalPath}"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding OriginalPath}"
+                                                               Foreground="#777" FontSize="11" FontFamily="Consolas"
+                                                               TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
+                                                               Foreground="#DA7756" FontSize="11" FontFamily="Consolas"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding ToolName}"
+                                                               Foreground="#999" FontSize="11" FontFamily="Consolas"/>
+                                                    <TextBlock Grid.Column="4" Text="{Binding TimeText}"
+                                                               Foreground="#666" FontSize="11" FontFamily="Consolas"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </TabItem>
+                    <!-- Projects tab -->
+                    <TabItem x:Name="ProjectsTabHeader">
+                        <TabItem.Header>
+                            <TextBlock Text="Projects" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                        </TabItem.Header>
+                        <DockPanel>
+                            <!-- Add Project form -->
+                            <Border DockPanel.Dock="Bottom" Background="#222222" CornerRadius="8"
+                                    BorderBrush="#333333" BorderThickness="1" Margin="12,8,12,12" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="ADD PROJECT" Foreground="#DA7756" FontWeight="Bold"
+                                               FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                    <DockPanel Margin="0,0,0,6">
+                                        <TextBlock Text="Name:" Foreground="#999" FontSize="12"
+                                                   FontFamily="Segoe UI" VerticalAlignment="Center"
+                                                   Width="40"/>
+                                        <TextBox x:Name="AddProjectName"
+                                                 Background="#191919" Foreground="#E8E8E8"
+                                                 CaretBrush="#E8E8E8" BorderBrush="#333333"
+                                                 BorderThickness="1" FontSize="12"
+                                                 FontFamily="Segoe UI" Padding="8,5"/>
+                                    </DockPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <TextBlock Text="Path:" Foreground="#999" FontSize="12"
+                                                   FontFamily="Segoe UI" VerticalAlignment="Center"
+                                                   Width="40"/>
+                                        <Button Content="Browse" Click="BrowseProjectPath_Click"
+                                                Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"
+                                                Margin="6,0,0,0" Padding="10,5" FontSize="11"/>
+                                        <TextBox x:Name="AddProjectPath"
+                                                 Background="#191919" Foreground="#E8E8E8"
+                                                 CaretBrush="#E8E8E8" BorderBrush="#333333"
+                                                 BorderThickness="1" FontSize="12"
+                                                 FontFamily="Segoe UI" Padding="8,5"/>
+                                    </DockPanel>
+                                    <Button Content="Add Project" Click="AddProject_Click"
+                                            Background="#DA7756" Style="{StaticResource Btn}"
+                                            HorizontalAlignment="Left" Padding="16,7"/>
+                                </StackPanel>
+                            </Border>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                                <StackPanel x:Name="ProjectListPanel" Margin="8"/>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </TabItem>
+                    <!-- Options tab -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <TextBlock Text="Options" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                            <StackPanel MaxWidth="600">
+                                <TextBlock Text="System Prompt" Foreground="#DA7756" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <TextBox x:Name="SystemPromptBox" AcceptsReturn="True" TextWrapping="Wrap"
+                                         MinHeight="160" MaxHeight="300"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Background="#191919" Foreground="#CCC"
+                                         CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                         FontSize="12" FontFamily="Consolas" Padding="10"
+                                         TextChanged="SystemPromptBox_Changed"/>
+                                <TextBlock Text="This prompt is prepended to every task." Foreground="#555"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,6,0,0"/>
+
+                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+
+                                <TextBlock Text="Defaults" Foreground="#DA7756" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,12"/>
+                                <ToggleButton x:Name="DefaultSkipPermsToggle" IsChecked="True"
+                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,14"
+                                              Checked="DefaultToggle_Changed" Unchecked="DefaultToggle_Changed">
+                                    <TextBlock Text="Skip Permissions by default" Foreground="#CCC"
+                                               FontSize="12" FontFamily="Segoe UI"/>
+                                </ToggleButton>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBlock Text="History retention" Foreground="#CCC"
+                                               FontSize="12" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <ComboBox x:Name="HistoryRetentionCombo" Width="120"
+                                              SelectionChanged="HistoryRetention_Changed">
+                                        <ComboBoxItem Content="6 hours" Tag="6"/>
+                                        <ComboBoxItem Content="12 hours" Tag="12"/>
+                                        <ComboBoxItem Content="24 hours" Tag="24" IsSelected="True"/>
+                                        <ComboBoxItem Content="3 days" Tag="72"/>
+                                        <ComboBoxItem Content="7 days" Tag="168"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <Border Height="1" Background="#2C2C2C" Margin="0,10,0,20"/>
+
+                                <TextBlock Text="About" Foreground="#666" FontSize="11" FontFamily="Segoe UI"/>
+                                <TextBlock Text="Unity Agent - Claude Code Task Manager" Foreground="#555"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
             </Border>
         </Grid>
 
-        <!-- Status Bar -->
-        <Border Grid.Row="2" Background="#2D2D44" CornerRadius="4" Padding="10,6" Margin="0,8,0,0">
-            <TextBlock x:Name="StatusText" Foreground="#6C7086" FontSize="12"/>
+        <!-- ═══ TERMINAL (always visible) ═══ -->
+        <Border Grid.Row="2" Background="#222222" CornerRadius="8" Padding="4" Margin="0,8,0,0"
+                BorderThickness="1">
+            <Border.BorderBrush>
+                <SolidColorBrush x:Name="TerminalPanelBorder" Color="#2C2C2C"/>
+            </Border.BorderBrush>
+            <Border.Triggers>
+                <EventTrigger RoutedEvent="MouseEnter">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <ColorAnimation Storyboard.TargetName="TerminalPanelBorder"
+                                            Storyboard.TargetProperty="Color"
+                                            To="#3A3A3A" Duration="0:0:0.2"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+                <EventTrigger RoutedEvent="MouseLeave">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <ColorAnimation Storyboard.TargetName="TerminalPanelBorder"
+                                            Storyboard.TargetProperty="Color"
+                                            To="#2C2C2C" Duration="0:0:0.3"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Border.Triggers>
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Bottom" Margin="4,2,4,4">
+                    <Button Content="Send" DockPanel.Dock="Right"
+                            Background="{StaticResource Accent}" Foreground="#0D0D0D"
+                            FontWeight="Bold" FontSize="12" FontFamily="Segoe UI"
+                            Padding="14,4" BorderThickness="0" Cursor="Hand" Margin="4,0,0,0"
+                            Click="TerminalSend_Click"/>
+                    <TextBox x:Name="TerminalInput"
+                             Background="#141414" Foreground="#B0B0B0" CaretBrush="#B0B0B0"
+                             BorderBrush="#2A2A2A" BorderThickness="1"
+                             FontFamily="Consolas" FontSize="12"
+                             Padding="8,4" VerticalContentAlignment="Center"
+                             PreviewKeyDown="TerminalInput_PreviewKeyDown"/>
+                </DockPanel>
+                <Border DockPanel.Dock="Bottom" Background="#141414"
+                        CornerRadius="4" Padding="8,2" Margin="4,0,4,0">
+                    <TextBlock x:Name="TerminalCwd" Foreground="#DA7756"
+                               FontFamily="Consolas" FontSize="11"
+                               TextTrimming="CharacterEllipsis">
+                        <TextBlock.ToolTip>
+                            <TextBlock x:Name="TerminalCwdTooltip"/>
+                        </TextBlock.ToolTip>
+                    </TextBlock>
+                </Border>
+                <DockPanel DockPanel.Dock="Top" Margin="8,4,8,2">
+                    <TextBlock Text="TERMINAL" Foreground="#DA7756" FontWeight="Bold"
+                               FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBox x:Name="TerminalOutput" IsReadOnly="True" TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         Background="#0A0A0A" Foreground="#B0B0B0"
+                         FontFamily="Consolas" FontSize="12"
+                         BorderThickness="0" Padding="8,4"/>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══ STATUS BAR ═══ -->
+        <Border Grid.Row="3" Background="#222222" CornerRadius="6" Padding="12,7" Margin="0,8,0,0"
+                BorderThickness="1">
+            <Border.BorderBrush>
+                <SolidColorBrush x:Name="StatusBarBorder" Color="#2C2C2C"/>
+            </Border.BorderBrush>
+            <Border.Triggers>
+                <EventTrigger RoutedEvent="MouseEnter">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <ColorAnimation Storyboard.TargetName="StatusBarBorder"
+                                            Storyboard.TargetProperty="Color"
+                                            To="#3A3A3A" Duration="0:0:0.2"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+                <EventTrigger RoutedEvent="MouseLeave">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <ColorAnimation Storyboard.TargetName="StatusBarBorder"
+                                            Storyboard.TargetProperty="Color"
+                                            To="#2C2C2C" Duration="0:0:0.3"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Border.Triggers>
+            <TextBlock x:Name="StatusText" Foreground="#666" FontSize="11" FontFamily="Segoe UI"/>
         </Border>
     </Grid>
 </Window>
