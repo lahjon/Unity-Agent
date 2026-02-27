@@ -27,6 +27,9 @@ namespace UnityAgent
         public bool Headless { get; set; }
         public bool IsOvernight { get; set; }
         public bool IgnoreFileLocks { get; set; }
+        public bool UseMcp { get; set; }
+        public bool SpawnTeam { get; set; }
+        public bool ExtendedPlanning { get; set; }
         public int MaxIterations { get; set; } = 50;
 
         private int _currentIteration;
@@ -39,6 +42,13 @@ namespace UnityAgent
         public string ProjectPath { get; set; } = "";
         public List<string> ImagePaths { get; set; } = new();
         public StringBuilder OutputBuilder { get; } = new();
+
+        private string _summary = "";
+        public string Summary
+        {
+            get => _summary;
+            set { _summary = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShortDescription)); }
+        }
 
         // Used by overnight mode to store the retry timer so it can be cancelled
         [System.Text.Json.Serialization.JsonIgnore]
@@ -91,12 +101,13 @@ namespace UnityAgent
             string.IsNullOrEmpty(ProjectPath) ? "" : Path.GetFileName(ProjectPath);
 
         public string ShortDescription =>
+            !string.IsNullOrWhiteSpace(Summary) ? Summary :
             Description.Length > 45 ? Description[..45] + "..." : Description;
 
         public string StatusText => Status switch
         {
             AgentTaskStatus.Running => IsOvernight ? $"Running ({CurrentIteration}/{MaxIterations})" : "Running",
-            AgentTaskStatus.Completed => "Completed",
+            AgentTaskStatus.Completed => "Finished",
             AgentTaskStatus.Cancelled => "Cancelled",
             AgentTaskStatus.Failed => "Failed",
             AgentTaskStatus.Queued => "Queued",
@@ -149,9 +160,11 @@ namespace UnityAgent
         public string OwnerTaskId { get; set; } = "";
         public string ToolName { get; set; } = "";
         public DateTime AcquiredAt { get; set; } = DateTime.Now;
+        public bool IsIgnored { get; set; }
 
         public string FileName => Path.GetFileName(OriginalPath);
         public string TimeText => AcquiredAt.ToString("HH:mm:ss");
+        public string StatusText => IsIgnored ? "Ignored" : "Active";
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public void OnPropertyChanged([CallerMemberName] string? name = null)

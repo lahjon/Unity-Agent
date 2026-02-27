@@ -10,6 +10,7 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -37,7 +38,9 @@ namespace UnityAgent
         public string Path { get; set; } = "";
         public McpStatus McpStatus { get; set; } = McpStatus.Disabled;
 
+        [JsonIgnore]
         public string FolderName => string.IsNullOrEmpty(Path) ? "" : System.IO.Path.GetFileName(Path);
+        [JsonIgnore]
         public string DisplayName => string.IsNullOrWhiteSpace(Name) ? FolderName : Name;
     }
 
@@ -59,6 +62,15 @@ namespace UnityAgent
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => throw new NotImplementedException();
+    }
+
+    public class InvertBoolConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is bool b ? !b : value;
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is bool b ? !b : value;
     }
 
     public partial class MainWindow : Window
@@ -190,42 +202,63 @@ namespace UnityAgent
 
         // ── System Prompt Persistence ────────────────────────────────
 
+        private string SystemPromptFile => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "UnityAgent", "system_prompt.txt");
+
         private void LoadSystemPrompt()
         {
             try
             {
-                var appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "UnityAgent");
-                var file = Path.Combine(appDataDir, "system_prompt.txt");
-                if (File.Exists(file))
+                if (File.Exists(SystemPromptFile))
                 {
-                    SystemPrompt = File.ReadAllText(file);
+                    var text = File.ReadAllText(SystemPromptFile);
+                    // Strip legacy baked-in MCP block (now added dynamically via toggle)
+                    if (text.Contains("# MCP VERIFICATION"))
+                    {
+                        text = text.Replace(TaskLauncher.McpPromptBlock, "");
+                        File.WriteAllText(SystemPromptFile, text);
+                    }
+                    SystemPrompt = text;
                     SystemPromptBox.Text = SystemPrompt;
                 }
             }
             catch { }
         }
 
-        private void SaveSystemPrompt()
+        private void EditSystemPromptToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            var editing = EditSystemPromptToggle.IsChecked == true;
+            SystemPromptBox.IsReadOnly = !editing;
+            SystemPromptBox.Opacity = editing ? 1.0 : 0.6;
+            PromptEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void SavePrompt_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "UnityAgent");
-                Directory.CreateDirectory(appDataDir);
-                var file = Path.Combine(appDataDir, "system_prompt.txt");
-                File.WriteAllText(file, SystemPrompt);
+                SystemPrompt = SystemPromptBox.Text;
+                Directory.CreateDirectory(Path.GetDirectoryName(SystemPromptFile)!);
+                File.WriteAllText(SystemPromptFile, SystemPrompt);
             }
             catch { }
+
+            EditSystemPromptToggle.IsChecked = false;
         }
 
-        private void SystemPromptBox_Changed(object sender, TextChangedEventArgs e)
+        private void ResetPrompt_Click(object sender, RoutedEventArgs e)
         {
-            if (SystemPromptBox == null) return;
-            SystemPrompt = SystemPromptBox.Text;
-            SaveSystemPrompt();
+            try
+            {
+                if (File.Exists(SystemPromptFile))
+                    File.Delete(SystemPromptFile);
+            }
+            catch { }
+
+            SystemPrompt = DefaultSystemPrompt;
+            SystemPromptBox.Text = SystemPrompt;
+            EditSystemPromptToggle.IsChecked = false;
         }
 
         private void DefaultToggle_Changed(object sender, RoutedEventArgs e)
@@ -261,6 +294,8 @@ namespace UnityAgent
 
                 if (dict.TryGetValue("historyRetentionHours", out var val))
                     _historyRetentionHours = val.GetInt32();
+                if (dict.TryGetValue("selectedProject", out var sp))
+                    _lastSelectedProject = sp.GetString();
             }
             catch { }
         }
@@ -271,7 +306,8 @@ namespace UnityAgent
             {
                 var dict = new Dictionary<string, object>
                 {
-                    ["historyRetentionHours"] = _historyRetentionHours
+                    ["historyRetentionHours"] = _historyRetentionHours,
+                    ["selectedProject"] = _projectPath ?? ""
                 };
                 File.WriteAllText(_settingsFile,
                     JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true }));
@@ -279,80 +315,7 @@ namespace UnityAgent
             catch { }
         }
 
-        private const string DefaultSystemPrompt =
-            "# STRICT RULE " +
-            "Never access, read, write, or reference any files outside the project root directory. " +
-            "All operations must stay within ./ " +
-            "# MCP VERIFICATION " +
-            "Before starting the task, verify the MCP server is running and responding. " +
-            "The MCP server is mcp-for-unity-server on http://127.0.0.1:8080/mcp. " +
-            "Confirm it is reachable before proceeding. " +
-            "# MCP USAGE " +
-            "Use the MCP server when the task requires interacting with Unity directly. " +
-            "This includes modifying prefabs, accessing scenes, taking screenshots, " +
-            "inspecting GameObjects, and any other Unity Editor operations that cannot be " +
-            "done through file edits alone. " +
-            "# TASK: ";
-
-        private const string OvernightInitialTemplate =
-            "You are running as an OVERNIGHT AUTONOMOUS TASK. This means you will be called repeatedly " +
-            "to iterate on the work until it is complete. Follow these instructions carefully:\n\n" +
-            "## CRITICAL RESTRICTIONS\n" +
-            "These rules are ABSOLUTE and must NEVER be violated:\n" +
-            "- **NO GIT COMMANDS.** Do not run git init, git add, git commit, git push, git checkout, " +
-            "git branch, git merge, git rebase, git stash, git reset, git clone, or ANY other git command. " +
-            "Git operations are forbidden in overnight mode.\n" +
-            "- **NO OS-LEVEL MODIFICATIONS.** Do not modify system files, registry, environment variables, " +
-            "PATH, system services, scheduled tasks, firewall rules, or anything outside the project directory. " +
-            "Do not install, uninstall, or update system-wide packages, tools, or software.\n" +
-            "- **STAY INSIDE THE PROJECT.** All file reads, writes, and edits must be within the project root. " +
-            "Never access, create, or modify files outside of ./ under any circumstances.\n" +
-            "- **NO DESTRUCTIVE OPERATIONS.** Do not delete directories recursively, reformat drives, " +
-            "kill system processes, or perform any action that cannot be easily undone.\n\n" +
-            "## Step 1: Create .overnight_log.md\n" +
-            "Create a file called `.overnight_log.md` in the project root with:\n" +
-            "- A **Checklist** of all sub-tasks needed to complete the work\n" +
-            "- **Exit Criteria** that define when the task is truly done\n" +
-            "- A **Progress Log** section where you append a dated entry each iteration\n\n" +
-            "## Step 2: Implement\n" +
-            "Work through the checklist step by step. Do as much as you can this iteration.\n\n" +
-            "## Step 3: Investigate for flaws\n" +
-            "After implementing, review your work critically. Look for bugs, edge cases, " +
-            "missing error handling, incomplete features, and anything that doesn't match the requirements.\n\n" +
-            "## Step 4: Verify checklist\n" +
-            "Go through each checklist item and verify it is truly complete. " +
-            "Update `.overnight_log.md` with your findings.\n\n" +
-            "## Step 5: Status\n" +
-            "End your response with EXACTLY one of these markers on its own line:\n" +
-            "STATUS: COMPLETE\n" +
-            "STATUS: NEEDS_MORE_WORK\n\n" +
-            "Use COMPLETE only when ALL checklist items are done AND all exit criteria are met.\n\n" +
-            "## THE TASK:\n";
-
-        private const string OvernightContinuationTemplate =
-            "You are continuing an OVERNIGHT AUTONOMOUS TASK (iteration {0}/{1}).\n\n" +
-            "## CRITICAL RESTRICTIONS (REMINDER)\n" +
-            "- **NO GIT COMMANDS** — git is completely forbidden in overnight mode.\n" +
-            "- **NO OS-LEVEL MODIFICATIONS** — do not touch system files, registry, environment variables, " +
-            "PATH, services, or install/uninstall any system-wide software.\n" +
-            "- **STAY INSIDE THE PROJECT** — all operations must remain within the project root directory.\n" +
-            "- **NO DESTRUCTIVE OPERATIONS** — no recursive deletes, no killing processes, nothing irreversible.\n\n" +
-            "## Step 1: Read context\n" +
-            "Read `.overnight_log.md` to understand what has been done and what remains.\n\n" +
-            "## Step 2: Investigate\n" +
-            "Review the current implementation for flaws, bugs, incomplete work, " +
-            "and anything that doesn't match the original requirements.\n\n" +
-            "## Step 3: Fix and improve\n" +
-            "Address the issues you found. Continue working through unchecked items.\n\n" +
-            "## Step 4: Verify all checklist items\n" +
-            "Go through every checklist item and exit criterion. " +
-            "Update `.overnight_log.md` with your progress.\n\n" +
-            "## Step 5: Status\n" +
-            "End your response with EXACTLY one of these markers on its own line:\n" +
-            "STATUS: COMPLETE\n" +
-            "STATUS: NEEDS_MORE_WORK\n\n" +
-            "Use COMPLETE only when ALL checklist items are done AND all exit criteria are met.\n\n" +
-            "Continue working on the task now.";
+        private const string DefaultSystemPrompt = TaskLauncher.DefaultSystemPrompt;
 
         private string SystemPrompt;
 
@@ -362,6 +325,7 @@ namespace UnityAgent
         private readonly Dictionary<string, TextBox> _outputBoxes = new();
         private readonly DispatcherTimer _statusTimer;
         private string _projectPath;
+        private string? _lastSelectedProject;
         private readonly string _historyFile;
         private readonly string _scriptDir;
         private readonly string _projectsFile;
@@ -383,11 +347,7 @@ namespace UnityAgent
         private readonly Dictionary<string, StreamingToolState> _streamingToolState = new();
 
         // Terminal
-        private Process? _terminalProcess;
-        private readonly List<string> _terminalHistory = new();
-        private int _terminalHistoryIndex = -1;
-        private string _terminalCwd = "";
-        private const string CwdMarker = "__CWDM__";
+        private TerminalTabManager? _terminalManager;
 
         public MainWindow()
         {
@@ -410,7 +370,9 @@ namespace UnityAgent
 
             LoadSettings();
             LoadProjects();
-            _projectPath = _savedProjects.Count > 0 ? _savedProjects[0].Path : Directory.GetCurrentDirectory();
+            var restored = _lastSelectedProject != null && _savedProjects.Any(p => p.Path == _lastSelectedProject);
+            _projectPath = restored ? _lastSelectedProject! :
+                           _savedProjects.Count > 0 ? _savedProjects[0].Path : Directory.GetCurrentDirectory();
 
             _activeView = CollectionViewSource.GetDefaultView(_activeTasks);
             _historyView = CollectionViewSource.GetDefaultView(_historyTasks);
@@ -435,7 +397,12 @@ namespace UnityAgent
 
             Closing += OnWindowClosing;
             UpdateStatus();
-            StartTerminal();
+
+            _terminalManager = new TerminalTabManager(
+                TerminalTabBar, TerminalOutput, TerminalInput,
+                TerminalSendBtn, TerminalInterruptBtn,
+                Dispatcher, _projectPath);
+            _terminalManager.AddTerminal();
         }
 
         // ── Project Management ───────────────────────────────────────
@@ -464,6 +431,7 @@ namespace UnityAgent
             catch { _savedProjects = new(); }
 
             RefreshProjectCombo();
+            UpdateMcpToggleForProject();
         }
 
         private void SaveProjects()
@@ -482,24 +450,11 @@ namespace UnityAgent
 
         private void RefreshProjectCombo()
         {
-            ProjectCombo.SelectionChanged -= ProjectCombo_Changed;
-            ProjectCombo.Items.Clear();
-            foreach (var p in _savedProjects)
-            {
-                ProjectCombo.Items.Add(new ComboBoxItem
-                {
-                    Content = $"{p.DisplayName}  \u2014  {p.Path}",
-                    Tag = p.Path
-                });
-            }
-
-            var idx = _savedProjects.FindIndex(p => p.Path == _projectPath);
-            if (idx >= 0)
-                ProjectCombo.SelectedIndex = idx;
-            else if (_savedProjects.Count > 0)
-                ProjectCombo.SelectedIndex = 0;
-
-            ProjectCombo.SelectionChanged += ProjectCombo_Changed;
+            var proj = _savedProjects.Find(p => p.Path == _projectPath);
+            ActiveProjectLabel.Text = proj != null
+                ? $"{proj.DisplayName}  \u2014  {proj.Path}"
+                : _projectPath;
+            ActiveProjectLabel.ToolTip = _projectPath;
         }
 
         private void BrowseProjectPath_Click(object sender, RoutedEventArgs e)
@@ -543,6 +498,8 @@ namespace UnityAgent
             _savedProjects.Add(new ProjectEntry { Name = name, Path = path });
             SaveProjects();
             _projectPath = path;
+            _terminalManager?.UpdateWorkingDirectory(path);
+            SaveSettings();
             RefreshProjectCombo();
             RefreshProjectList();
             RefreshFilterCombos();
@@ -560,6 +517,7 @@ namespace UnityAgent
             _savedProjects.RemoveAll(p => p.Path == projectPath);
             SaveProjects();
             _projectPath = _savedProjects.Count > 0 ? _savedProjects[0].Path : Directory.GetCurrentDirectory();
+            _terminalManager?.UpdateWorkingDirectory(_projectPath);
             RefreshProjectCombo();
             RefreshProjectList();
             RefreshFilterCombos();
@@ -568,12 +526,13 @@ namespace UnityAgent
 
         private void ProjectCombo_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (ProjectCombo.SelectedItem is ComboBoxItem item && item.Tag is string selected)
-            {
-                _projectPath = selected;
-                RefreshProjectList();
-                UpdateStatus();
-            }
+            // Legacy handler kept for compatibility - no longer used
+        }
+
+        private void UpdateMcpToggleForProject()
+        {
+            var proj = _savedProjects.Find(p => p.Path == _projectPath);
+            UseMcpToggle.IsChecked = proj?.McpStatus == McpStatus.Enabled;
         }
 
         // ── Execute ────────────────────────────────────────────────
@@ -681,11 +640,7 @@ namespace UnityAgent
             }
         }
 
-        private static bool IsImageFile(string path)
-        {
-            var ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp";
-        }
+        private static bool IsImageFile(string path) => TaskLauncher.IsImageFile(path);
 
         private void UpdateImageIndicator()
         {
@@ -705,37 +660,49 @@ namespace UnityAgent
             UpdateImageIndicator();
         }
 
-        private void Execute_Click(object sender, RoutedEventArgs e)
+        private async void Execute_Click(object sender, RoutedEventArgs e)
         {
             var desc = TaskInput.Text?.Trim();
-            if (string.IsNullOrEmpty(desc)) return;
+            if (!TaskLauncher.ValidateTaskInput(desc)) return;
 
-            var task = new AgentTask
-            {
-                Description = desc,
-                SkipPermissions = SkipPermissionsToggle.IsChecked == true,
-                RemoteSession = RemoteSessionToggle.IsChecked == true,
-                Headless = HeadlessToggle.IsChecked == true,
-                IsOvernight = OvernightToggle.IsChecked == true,
-                IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true,
-                MaxIterations = 50,
-                ProjectPath = _projectPath
-            };
-            task.ImagePaths.AddRange(_attachedImages);
+            var task = TaskLauncher.CreateTask(
+                desc!,
+                _projectPath,
+                SkipPermissionsToggle.IsChecked == true,
+                RemoteSessionToggle.IsChecked == true,
+                HeadlessToggle.IsChecked == true,
+                OvernightToggle.IsChecked == true,
+                IgnoreFileLocksToggle.IsChecked == true,
+                UseMcpToggle.IsChecked == true,
+                SpawnTeamToggle.IsChecked == true,
+                ExtendedPlanningToggle.IsChecked == true,
+                _attachedImages.Count > 0 ? new List<string>(_attachedImages) : null);
             _attachedImages.Clear();
             UpdateImageIndicator();
+            TaskInput.Clear();
+
+            // Generate summary before starting
+            ExecuteButton.IsEnabled = false;
+            ExecuteButton.Content = "Summarizing...";
+            try
+            {
+                var summary = await TaskLauncher.GenerateSummaryAsync(desc!);
+                if (!string.IsNullOrWhiteSpace(summary))
+                    task.Summary = summary;
+            }
+            catch { }
+            ExecuteButton.Content = task.IsOvernight ? "Start Overnight Task" : "Execute Task";
+            ExecuteButton.IsEnabled = true;
 
             if (task.Headless)
             {
                 LaunchHeadless(task);
-                TaskInput.Clear();
                 return;
             }
 
             _activeTasks.Add(task);
             CreateTab(task);
             StartProcess(task);
-            TaskInput.Clear();
             RefreshFilterCombos();
             UpdateStatus();
         }
@@ -830,6 +797,7 @@ namespace UnityAgent
             _tabs[task.Id] = tabItem;
             OutputTabs.Items.Add(tabItem);
             OutputTabs.SelectedItem = tabItem;
+            UpdateOutputTabWidths();
 
         }
 
@@ -846,16 +814,6 @@ namespace UnityAgent
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            var idLabel = new TextBlock
-            {
-                Text = $"#{task.Id}",
-                FontSize = 10,
-                FontFamily = new FontFamily("Consolas"),
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
-                Margin = new Thickness(0, 0, 5, 0)
-            };
-
             var label = new TextBlock
             {
                 Text = task.ShortDescription,
@@ -867,21 +825,40 @@ namespace UnityAgent
 
             var closeBtn = new Button
             {
-                Content = "\u00D7",
+                Content = "\uE8BB",
                 Background = Brushes.Transparent,
                 Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
                 BorderThickness = new Thickness(0),
-                FontSize = 14,
-                FontWeight = FontWeights.Bold,
-                Padding = new Thickness(4, 0, 2, 0),
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 9,
+                Padding = new Thickness(0),
                 Margin = new Thickness(6, 0, 0, 0),
                 Cursor = Cursors.Hand,
                 VerticalAlignment = VerticalAlignment.Center
             };
+
+            // Hover template: monochrome highlight
+            var bdFactory = new FrameworkElementFactory(typeof(Border));
+            bdFactory.Name = "Bd";
+            bdFactory.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            bdFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+            bdFactory.SetValue(FrameworkElement.WidthProperty, 18.0);
+            bdFactory.SetValue(FrameworkElement.HeightProperty, 18.0);
+            var cpFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            cpFactory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            cpFactory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            bdFactory.AppendChild(cpFactory);
+
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)), "Bd"));
+            hoverTrigger.Setters.Add(new Setter(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC))));
+
+            var closeBtnTemplate = new ControlTemplate(typeof(Button)) { VisualTree = bdFactory };
+            closeBtnTemplate.Triggers.Add(hoverTrigger);
+            closeBtn.Template = closeBtnTemplate;
             closeBtn.Click += (_, _) => CloseTab(task);
 
             panel.Children.Add(dot);
-            panel.Children.Add(idLabel);
             panel.Children.Add(label);
             panel.Children.Add(closeBtn);
             return panel;
@@ -891,12 +868,23 @@ namespace UnityAgent
         {
             if (task.Status == AgentTaskStatus.Running || task.Status == AgentTaskStatus.Queued)
             {
-                if (!ShowDarkConfirm("This task is still running. Closing will terminate it.\n\nAre you sure?", "Task Running"))
-                    return;
+                // If the process has already exited, treat as completed — no warning needed
+                var processAlreadyDone = task.Process == null || task.Process.HasExited;
+                if (processAlreadyDone)
+                {
+                    task.Status = AgentTaskStatus.Completed;
+                    task.EndTime ??= DateTime.Now;
+                }
+                else
+                {
+                    if (!ShowDarkConfirm("This task is still running. Closing will terminate it.\n\nAre you sure?", "Task Running"))
+                        return;
 
-                task.Status = AgentTaskStatus.Cancelled;
-                task.EndTime = DateTime.Now;
-                KillProcess(task);
+                    task.Status = AgentTaskStatus.Cancelled;
+                    task.EndTime = DateTime.Now;
+                    KillProcess(task);
+                }
+
                 ReleaseTaskLocks(task.Id);
                 _queuedTaskInfo.Remove(task.Id);
                 _streamingToolState.Remove(task.Id);
@@ -905,6 +893,17 @@ namespace UnityAgent
                 SaveHistory();
                 CheckQueuedTasks();
             }
+            else if (_activeTasks.Contains(task))
+            {
+                // Task is done/failed but still in active list — move to history without warning
+                task.EndTime ??= DateTime.Now;
+                ReleaseTaskLocks(task.Id);
+                _queuedTaskInfo.Remove(task.Id);
+                _streamingToolState.Remove(task.Id);
+                _activeTasks.Remove(task);
+                _historyTasks.Insert(0, task);
+                SaveHistory();
+            }
 
             if (_tabs.TryGetValue(task.Id, out var tab))
             {
@@ -912,6 +911,7 @@ namespace UnityAgent
                 _tabs.Remove(task.Id);
             }
             _outputBoxes.Remove(task.Id);
+            UpdateOutputTabWidths();
             UpdateStatus();
         }
 
@@ -930,6 +930,42 @@ namespace UnityAgent
                     _ => Color.FromRgb(0x55, 0x55, 0x55)
                 };
                 dot.Fill = new SolidColorBrush(color);
+
+                // Update label text with summary if available
+                if (sp.Children.Count > 1 && sp.Children[1] is TextBlock label)
+                    label.Text = task.ShortDescription;
+
+                // Update close button: checkmark for done/failed, X otherwise
+                if (sp.Children.Count > 2 && sp.Children[2] is Button closeBtn)
+                {
+                    var isDone = task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
+                    closeBtn.Content = isDone ? "\uE73E" : "\uE8BB"; // CheckMark vs ChromeClose
+                    closeBtn.Foreground = isDone
+                        ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
+                        : new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+                }
+            }
+        }
+
+        private void OutputTabs_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateOutputTabWidths();
+
+        private void UpdateOutputTabWidths()
+        {
+            const double maxWidth = 200.0;
+            const double minWidth = 60.0;
+
+            int count = OutputTabs.Items.Count;
+            if (count == 0) return;
+
+            double available = OutputTabs.ActualWidth;
+            if (available <= 0) available = 500;
+
+            double tabWidth = Math.Max(minWidth, Math.Min(maxWidth, available / count));
+
+            foreach (var item in OutputTabs.Items)
+            {
+                if (item is TabItem tab)
+                    tab.Width = tabWidth;
             }
         }
 
@@ -937,32 +973,19 @@ namespace UnityAgent
 
         private void LaunchHeadless(AgentTask task)
         {
-            var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
-            var remoteFlag = task.RemoteSession ? " --remote" : "";
-            var fullPrompt = BuildPromptWithImages(SystemPrompt + task.Description, task.ImagePaths);
+            var fullPrompt = TaskLauncher.BuildFullPrompt(SystemPrompt, task);
             var projectPath = task.ProjectPath;
 
             var promptFile = Path.Combine(_scriptDir, $"prompt_{task.Id}.txt");
             File.WriteAllText(promptFile, fullPrompt, Encoding.UTF8);
 
-            // Write a script that the terminal will run
             var ps1File = Path.Combine(_scriptDir, $"headless_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                "$env:CLAUDECODE = $null\n" +
-                $"Set-Location -LiteralPath '{projectPath}'\n" +
-                $"$prompt = Get-Content -Raw -LiteralPath '{promptFile}'\n" +
-                $"claude -p{skipFlag}{remoteFlag} $prompt\n" +
-                "Write-Host \"`n[UnityAgent] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
-                "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n",
+                TaskLauncher.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, task.RemoteSession, task.SpawnTeam),
                 Encoding.UTF8);
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -NoExit -File \"{ps1File}\"",
-                UseShellExecute = true,
-                WorkingDirectory = projectPath
-            };
+            var psi = TaskLauncher.BuildProcessStartInfo(ps1File, headless: true);
+            psi.WorkingDirectory = projectPath;
             try
             {
                 Process.Start(psi);
@@ -975,58 +998,34 @@ namespace UnityAgent
         }
 
         private static string BuildPromptWithImages(string basePrompt, List<string> imagePaths)
-        {
-            if (imagePaths.Count == 0)
-                return basePrompt;
-
-            var sb = new StringBuilder(basePrompt);
-            sb.Append("\n\n# ATTACHED IMAGES\n");
-            sb.Append("The user has attached the following image(s). ");
-            sb.Append("Use the Read tool to view each image file before proceeding with the task.\n");
-            foreach (var img in imagePaths)
-                sb.Append($"- {img}\n");
-            return sb.ToString();
-        }
+            => TaskLauncher.BuildPromptWithImages(basePrompt, imagePaths);
 
         private void StartProcess(AgentTask task)
         {
-            // Overnight mode forces skip-permissions — nobody is there to approve prompts
             if (task.IsOvernight)
-                task.SkipPermissions = true;
+                TaskLauncher.PrepareTaskForOvernightStart(task);
 
-            var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
-            var basePrompt = SystemPrompt + task.Description;
-            if (task.IsOvernight)
-            {
-                task.CurrentIteration = 1;
-                task.ConsecutiveFailures = 0;
-                task.LastIterationOutputStart = 0;
-                basePrompt = OvernightInitialTemplate + task.Description;
-            }
-            var fullPrompt = BuildPromptWithImages(basePrompt, task.ImagePaths);
+            var fullPrompt = TaskLauncher.BuildFullPrompt(SystemPrompt, task);
             var projectPath = task.ProjectPath;
 
-            // Write prompt to a temp file to avoid all escaping headaches
             var promptFile = Path.Combine(_scriptDir, $"prompt_{task.Id}.txt");
             File.WriteAllText(promptFile, fullPrompt, Encoding.UTF8);
 
-            // Build the claude command with stream-json for real-time output
-            var remoteFlag = task.RemoteSession ? " --remote" : "";
-            var claudeCmd = $"claude -p{skipFlag}{remoteFlag} --verbose --output-format stream-json $prompt";
+            var claudeCmd = TaskLauncher.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, task.SpawnTeam);
 
-            // PowerShell script reads prompt from file, passes to claude -p
             var ps1File = Path.Combine(_scriptDir, $"task_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                "$env:CLAUDECODE = $null\n" +
-                $"Set-Location -LiteralPath '{projectPath}'\n" +
-                $"$prompt = Get-Content -Raw -LiteralPath '{promptFile}'\n" +
-                $"{claudeCmd}\n",
+                TaskLauncher.BuildPowerShellScript(projectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
             AppendOutput(task.Id, $"[UnityAgent] Task #{task.Id} starting...\n");
+            if (!string.IsNullOrWhiteSpace(task.Summary))
+                AppendOutput(task.Id, $"[UnityAgent] Summary: {task.Summary}\n");
             AppendOutput(task.Id, $"[UnityAgent] Project: {projectPath}\n");
             AppendOutput(task.Id, $"[UnityAgent] Skip permissions: {task.SkipPermissions}\n");
             AppendOutput(task.Id, $"[UnityAgent] Remote session: {task.RemoteSession}\n");
+            if (task.ExtendedPlanning)
+                AppendOutput(task.Id, $"[UnityAgent] Extended planning: ON\n");
             if (task.IsOvernight)
             {
                 AppendOutput(task.Id, $"[UnityAgent] Overnight mode: ON (max {task.MaxIterations} iterations, 12h cap)\n");
@@ -1034,17 +1033,7 @@ namespace UnityAgent
             }
             AppendOutput(task.Id, $"[UnityAgent] Connecting to Claude...\n\n");
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -File \"{ps1File}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
+            var psi = TaskLauncher.BuildProcessStartInfo(ps1File, headless: false);
 
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
@@ -1502,33 +1491,9 @@ namespace UnityAgent
             MoveToHistory(task);
         }
 
-        private static bool IsTokenLimitError(string output)
-        {
-            // Check the last portion of output for common token/rate limit indicators
-            var tail = output.Length > 3000 ? output[^3000..] : output;
-            var lower = tail.ToLowerInvariant();
-            return lower.Contains("rate limit") ||
-                   lower.Contains("token limit") ||
-                   lower.Contains("overloaded") ||
-                   lower.Contains("529") ||
-                   lower.Contains("capacity") ||
-                   lower.Contains("too many requests");
-        }
+        private static bool IsTokenLimitError(string output) => TaskLauncher.IsTokenLimitError(output);
 
-        private static bool CheckOvernightComplete(string output)
-        {
-            // Scan last ~50 lines for STATUS markers
-            var lines = output.Split('\n');
-            var start = Math.Max(0, lines.Length - 50);
-            for (var i = lines.Length - 1; i >= start; i--)
-            {
-                var trimmed = lines[i].Trim();
-                if (trimmed == "STATUS: COMPLETE") return true;
-                // If we find NEEDS_MORE_WORK, that's explicit — not complete
-                if (trimmed == "STATUS: NEEDS_MORE_WORK") return false;
-            }
-            return false;
-        }
+        private static bool CheckOvernightComplete(string output) => TaskLauncher.CheckOvernightComplete(output);
 
         private void StartOvernightContinuation(AgentTask task)
         {
@@ -1537,32 +1502,21 @@ namespace UnityAgent
             // Mark where this iteration's output starts (for scoped error detection)
             task.LastIterationOutputStart = task.OutputBuilder.Length;
 
-            var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
-            var remoteFlag = task.RemoteSession ? " --remote" : "";
-            var continuationPrompt = string.Format(OvernightContinuationTemplate, task.CurrentIteration, task.MaxIterations);
+            var continuationPrompt = TaskLauncher.BuildOvernightContinuationPrompt(task.CurrentIteration, task.MaxIterations);
 
             var promptFile = Path.Combine(_scriptDir, $"overnight_{task.Id}_{task.CurrentIteration}.txt");
             File.WriteAllText(promptFile, continuationPrompt, Encoding.UTF8);
 
+            var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
+            var remoteFlag = task.RemoteSession ? " --remote" : "";
+            var claudeCmd = $"claude -p{skipFlag}{remoteFlag} --verbose --continue --output-format stream-json $prompt";
+
             var ps1File = Path.Combine(_scriptDir, $"overnight_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                "$env:CLAUDECODE = $null\n" +
-                $"Set-Location -LiteralPath '{task.ProjectPath}'\n" +
-                $"$prompt = Get-Content -Raw -LiteralPath '{promptFile}'\n" +
-                $"claude -p{skipFlag}{remoteFlag} --verbose --continue --output-format stream-json $prompt\n",
+                TaskLauncher.BuildPowerShellScript(task.ProjectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -File \"{ps1File}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
+            var psi = TaskLauncher.BuildProcessStartInfo(ps1File, headless: false);
 
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
@@ -1738,11 +1692,20 @@ namespace UnityAgent
             _historyTasks.Remove(task);
             SaveHistory();
             RefreshFilterCombos();
+            UpdateOutputTabWidths();
             UpdateStatus();
         }
 
         private void ClearHistory_Click(object sender, RoutedEventArgs e)
         {
+            var result = System.Windows.MessageBox.Show(
+                $"Are you sure you want to clear all {_historyTasks.Count} history entries? This cannot be undone.",
+                "Clear History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
             foreach (var task in _historyTasks.ToList())
             {
                 if (_tabs.TryGetValue(task.Id, out var tab))
@@ -1755,6 +1718,7 @@ namespace UnityAgent
             _historyTasks.Clear();
             SaveHistory();
             RefreshFilterCombos();
+            UpdateOutputTabWidths();
             UpdateStatus();
         }
 
@@ -1841,6 +1805,11 @@ namespace UnityAgent
                 }
             }
 
+            // Persist projects and settings before exit
+            SaveProjects();
+            SaveSettings();
+            SaveHistory();
+
             foreach (var task in _activeTasks)
                 KillProcess(task);
 
@@ -1850,7 +1819,7 @@ namespace UnityAgent
             _queuedTaskInfo.Clear();
             _streamingToolState.Clear();
 
-            try { _terminalProcess?.Kill(true); } catch { }
+            _terminalManager?.DisposeAll();
         }
 
         // ── History Persistence ────────────────────────────────────
@@ -1929,179 +1898,28 @@ namespace UnityAgent
                 }
                 _outputBoxes.Remove(task.Id);
             }
-            if (stale.Count > 0) SaveHistory();
+            if (stale.Count > 0)
+            {
+                SaveHistory();
+                UpdateOutputTabWidths();
+            }
         }
 
         // ── Terminal ───────────────────────────────────────────────
 
-        private void StartTerminal()
-        {
-            try
-            {
-                _terminalProcess?.Kill(true);
-            }
-            catch { }
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = "/Q",
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                WorkingDirectory = _projectPath,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-            psi.Environment.Remove("CLAUDECODE");
-
-            var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                // Intercept CWD marker lines
-                if (e.Data.Contains(CwdMarker))
-                {
-                    var start = e.Data.IndexOf(CwdMarker) + CwdMarker.Length;
-                    var end = e.Data.IndexOf(CwdMarker, start);
-                    if (end > start)
-                    {
-                        var cwd = e.Data[start..end];
-                        Dispatcher.BeginInvoke(() => UpdateTerminalCwd(cwd));
-                    }
-                    return; // suppress marker from output
-                }
-                Dispatcher.BeginInvoke(() =>
-                {
-                    TerminalOutput.AppendText(e.Data + "\n");
-                    TerminalOutput.ScrollToEnd();
-                });
-            };
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                Dispatcher.BeginInvoke(() =>
-                {
-                    TerminalOutput.AppendText(e.Data + "\n");
-                    TerminalOutput.ScrollToEnd();
-                });
-            };
-
-            process.Exited += (_, _) =>
-            {
-                Dispatcher.BeginInvoke(() =>
-                {
-                    TerminalOutput.AppendText("\n[Terminal closed]\n");
-                    TerminalOutput.ScrollToEnd();
-                });
-            };
-
-            try
-            {
-                process.Start();
-                _terminalProcess = process;
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                // Set initial CWD display
-                UpdateTerminalCwd(_projectPath);
-                // Query actual CWD via marker
-                _terminalProcess.StandardInput.WriteLine($"@echo {CwdMarker}%CD%{CwdMarker}");
-            }
-            catch (Exception ex)
-            {
-                TerminalOutput.AppendText($"[Failed to start terminal: {ex.Message}]\n");
-            }
-        }
-
         private void TerminalSend_Click(object sender, RoutedEventArgs e)
         {
-            SendTerminalCommand();
+            _terminalManager?.SendCommand();
         }
 
         private void TerminalInput_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter)
-            {
-                SendTerminalCommand();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Up)
-            {
-                if (_terminalHistory.Count > 0)
-                {
-                    if (_terminalHistoryIndex < _terminalHistory.Count - 1)
-                        _terminalHistoryIndex++;
-                    TerminalInput.Text = _terminalHistory[_terminalHistory.Count - 1 - _terminalHistoryIndex];
-                    TerminalInput.CaretIndex = TerminalInput.Text.Length;
-                }
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Down)
-            {
-                if (_terminalHistoryIndex > 0)
-                {
-                    _terminalHistoryIndex--;
-                    TerminalInput.Text = _terminalHistory[_terminalHistory.Count - 1 - _terminalHistoryIndex];
-                    TerminalInput.CaretIndex = TerminalInput.Text.Length;
-                }
-                else
-                {
-                    _terminalHistoryIndex = -1;
-                    TerminalInput.Clear();
-                }
-                e.Handled = true;
-            }
+            _terminalManager?.HandleKeyDown(e);
         }
 
-        private void SendTerminalCommand()
+        private void TerminalInterrupt_Click(object sender, RoutedEventArgs e)
         {
-            var cmd = TerminalInput.Text;
-            if (cmd == null) return;
-            TerminalInput.Clear();
-            _terminalHistoryIndex = -1;
-
-            if (!string.IsNullOrWhiteSpace(cmd))
-                _terminalHistory.Add(cmd);
-
-            // Handle cls locally
-            if (cmd.Trim().Equals("cls", StringComparison.OrdinalIgnoreCase) ||
-                cmd.Trim().Equals("clear", StringComparison.OrdinalIgnoreCase))
-            {
-                TerminalOutput.Clear();
-            }
-
-            if (_terminalProcess is not { HasExited: false })
-            {
-                TerminalOutput.AppendText("[Terminal not running, restarting...]\n");
-                StartTerminal();
-                return;
-            }
-
-            try
-            {
-                // Echo the command like a real terminal
-                TerminalOutput.AppendText($"> {cmd}\n");
-                TerminalOutput.ScrollToEnd();
-                // Send the actual command, then query CWD via marker
-                _terminalProcess!.StandardInput.WriteLine(cmd);
-                _terminalProcess.StandardInput.WriteLine($"@echo {CwdMarker}%CD%{CwdMarker}");
-            }
-            catch
-            {
-                TerminalOutput.AppendText("[Failed to send command, restarting terminal...]\n");
-                StartTerminal();
-            }
-        }
-
-        private void UpdateTerminalCwd(string cwd)
-        {
-            _terminalCwd = cwd;
-            TerminalCwd.Text = cwd;
-            TerminalCwdTooltip.Text = cwd;
+            _terminalManager?.SendInterrupt();
         }
 
         // ── Projects Tab ──────────────────────────────────────────
@@ -2181,19 +1999,43 @@ namespace UnityAgent
                     FontSize = 11,
                     FontFamily = new FontFamily("Segoe UI"),
                     TextTrimming = TextTrimming.CharacterEllipsis,
-                    Margin = new Thickness(0, 2, 0, 0)
+                    Margin = new Thickness(0, 2, 0, 0),
+                    ToolTip = proj.Path
                 });
 
                 Grid.SetColumn(infoPanel, 0);
                 grid.Children.Add(infoPanel);
 
-                // Right: buttons
+                // Right: X button (top) + MCP button
                 var btnPanel = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    VerticalAlignment = VerticalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Top,
                     Margin = new Thickness(8, 0, 0, 0)
                 };
+
+                // X close button
+                var closeBtn = new Button
+                {
+                    Content = "\u2715",
+                    Background = Brushes.Transparent,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                    FontFamily = new FontFamily("Segoe UI"),
+                    FontSize = 14,
+                    Padding = new Thickness(4, 0, 4, 0),
+                    BorderThickness = new Thickness(0),
+                    Cursor = Cursors.Hand,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Tag = proj.Path,
+                    ToolTip = "Remove project"
+                };
+                closeBtn.Click += (s, ev) =>
+                {
+                    ev.Handled = true;
+                    if (s is Button b && b.Tag is string path)
+                        RemoveProject_Click(path);
+                };
+                btnPanel.Children.Add(closeBtn);
 
                 if (proj.McpStatus == McpStatus.Investigating)
                 {
@@ -2208,10 +2050,10 @@ namespace UnityAgent
                         Padding = new Thickness(10, 4, 10, 4),
                         BorderThickness = new Thickness(0),
                         Cursor = Cursors.Hand,
-                        Margin = new Thickness(0, 0, 0, 4),
+                        Margin = new Thickness(0, 4, 0, 0),
                         Tag = proj.Path
                     };
-                    cancelMcpBtn.Click += CancelMcp_Click;
+                    cancelMcpBtn.Click += (s, ev) => { ev.Handled = true; CancelMcp_Click(s, ev); };
                     btnPanel.Children.Add(cancelMcpBtn);
                 }
                 else
@@ -2229,32 +2071,12 @@ namespace UnityAgent
                         Padding = new Thickness(10, 4, 10, 4),
                         BorderThickness = new Thickness(0),
                         Cursor = Cursors.Hand,
-                        Margin = new Thickness(0, 0, 0, 4),
+                        Margin = new Thickness(0, 4, 0, 0),
                         Tag = proj.Path
                     };
-                    connectBtn.Click += ConnectMcp_Click;
+                    connectBtn.Click += (s, ev) => { ev.Handled = true; ConnectMcp_Click(s, ev); };
                     btnPanel.Children.Add(connectBtn);
                 }
-
-                var removeBtn = new Button
-                {
-                    Content = "Remove",
-                    Background = new SolidColorBrush(Color.FromRgb(0xA1, 0x52, 0x52)),
-                    Foreground = Brushes.White,
-                    FontFamily = new FontFamily("Segoe UI"),
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 11,
-                    Padding = new Thickness(10, 4, 10, 4),
-                    BorderThickness = new Thickness(0),
-                    Cursor = Cursors.Hand,
-                    Tag = proj.Path
-                };
-                removeBtn.Click += (s, _) =>
-                {
-                    if (s is Button b && b.Tag is string path)
-                        RemoveProject_Click(path);
-                };
-                btnPanel.Children.Add(removeBtn);
 
                 Grid.SetColumn(btnPanel, 1);
                 grid.Children.Add(btnPanel);
@@ -2266,8 +2088,11 @@ namespace UnityAgent
                 card.MouseLeftButtonUp += (_, _) =>
                 {
                     _projectPath = projPath;
+                    _terminalManager?.UpdateWorkingDirectory(projPath);
+                    SaveSettings();
                     RefreshProjectCombo();
                     RefreshProjectList();
+                    UpdateMcpToggleForProject();
                     UpdateStatus();
                 };
 
@@ -2303,6 +2128,7 @@ namespace UnityAgent
                 entry.McpStatus = McpStatus.Enabled;
                 SaveProjects();
                 RefreshProjectList();
+                UpdateMcpToggleForProject();
                 return;
             }
 
@@ -2321,6 +2147,7 @@ namespace UnityAgent
                     entry.McpStatus = McpStatus.Enabled;
                     SaveProjects();
                     RefreshProjectList();
+                    UpdateMcpToggleForProject();
                     return;
                 }
             }
@@ -2370,6 +2197,7 @@ namespace UnityAgent
             entry.McpStatus = McpStatus.Disabled;
             SaveProjects();
             RefreshProjectList();
+            UpdateMcpToggleForProject();
         }
 
         private async System.Threading.Tasks.Task<bool> CheckMcpHealth(string url)
@@ -2481,22 +2309,10 @@ namespace UnityAgent
         // ── File Locking ──────────────────────────────────────────
 
         private static string NormalizePath(string path, string? basePath = null)
-        {
-            path = path.Replace('/', '\\');
-            if (!Path.IsPathRooted(path) && !string.IsNullOrEmpty(basePath))
-                path = Path.Combine(basePath, path);
-            try { path = Path.GetFullPath(path); } catch { }
-            return path.ToLowerInvariant();
-        }
+            => TaskLauncher.NormalizePath(path, basePath);
 
         private static bool IsFileModifyTool(string? toolName)
-        {
-            if (string.IsNullOrEmpty(toolName)) return false;
-            return toolName.Equals("Write", StringComparison.OrdinalIgnoreCase) ||
-                   toolName.Equals("Edit", StringComparison.OrdinalIgnoreCase) ||
-                   toolName.Equals("MultiEdit", StringComparison.OrdinalIgnoreCase) ||
-                   toolName.Equals("NotebookEdit", StringComparison.OrdinalIgnoreCase);
-        }
+            => TaskLauncher.IsFileModifyTool(toolName);
 
         private static string? TryExtractFilePathFromPartial(string partialJson)
         {
@@ -2519,7 +2335,7 @@ namespace UnityAgent
             var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
             if (task?.IgnoreFileLocks == true)
             {
-                TryAcquireFileLock(taskId, filePath, toolName); // best-effort, ignore result
+                TryAcquireFileLock(taskId, filePath, toolName, isIgnored: true); // best-effort, ignore result
                 return true;
             }
             if (!TryAcquireFileLock(taskId, filePath, toolName))
@@ -2530,7 +2346,7 @@ namespace UnityAgent
             return true;
         }
 
-        private bool TryAcquireFileLock(string taskId, string filePath, string toolName)
+        private bool TryAcquireFileLock(string taskId, string filePath, string toolName, bool isIgnored = false)
         {
             var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
             var basePath = task?.ProjectPath;
@@ -2542,8 +2358,10 @@ namespace UnityAgent
                 {
                     existing.ToolName = toolName;
                     existing.AcquiredAt = DateTime.Now;
+                    existing.IsIgnored = isIgnored;
                     existing.OnPropertyChanged(nameof(FileLock.ToolName));
                     existing.OnPropertyChanged(nameof(FileLock.TimeText));
+                    existing.OnPropertyChanged(nameof(FileLock.StatusText));
                     return true;
                 }
                 return false; // locked by another task
@@ -2555,7 +2373,8 @@ namespace UnityAgent
                 OriginalPath = filePath,
                 OwnerTaskId = taskId,
                 ToolName = toolName,
-                AcquiredAt = DateTime.Now
+                AcquiredAt = DateTime.Now,
+                IsIgnored = isIgnored
             };
             _fileLocks[normalized] = fileLock;
             _fileLocksView.Add(fileLock);
@@ -2709,15 +2528,13 @@ namespace UnityAgent
             var cancelled = _historyTasks.Count(t => t.Status == AgentTaskStatus.Cancelled);
             var failed = _historyTasks.Count(t => t.Status == AgentTaskStatus.Failed);
             var locks = _fileLocks.Count;
-            StatusText.Text = $"Running: {running}  |  Queued: {queued}  |  Completed: {completed}  |  " +
-                              $"Cancelled: {cancelled}  |  Failed: {failed}  |  Locks: {locks}  |  " +
-                              $"Project: {_projectPath}";
+            var projectName = Path.GetFileName(_projectPath);
+            StatusText.Text = $"{projectName}  |  Running: {running}  |  Queued: {queued}  |  " +
+                              $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
+                              $"Locks: {locks}  |  {_projectPath}";
         }
 
-        private static string StripAnsi(string text)
-        {
-            return Regex.Replace(text, @"\x1B(?:\[[0-9;]*[a-zA-Z]|\].*?(?:\x07|\x1B\\))", "");
-        }
+        private static string StripAnsi(string text) => TaskLauncher.StripAnsi(text);
 
         private class TaskHistoryEntry
         {
