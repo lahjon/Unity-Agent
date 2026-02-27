@@ -141,6 +141,9 @@ namespace UnityAgent
         public List<string> CommandHistory { get; } = new();
         public int HistoryIndex { get; set; } = -1;
 
+        /// <summary>True once the user has sent at least one command.</summary>
+        public bool HasBeenUsed { get; set; }
+
         public bool HasExited
         {
             get

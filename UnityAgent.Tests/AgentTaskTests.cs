@@ -73,12 +73,21 @@ namespace UnityAgent.Tests
             Assert.Equal("Queued", task.StatusText);
         }
 
+        [Fact]
+        public void StatusText_Ongoing()
+        {
+            var task = new AgentTask();
+            task.Status = AgentTaskStatus.Ongoing;
+            Assert.Equal("Ongoing", task.StatusText);
+        }
+
         [Theory]
-        [InlineData(AgentTaskStatus.Running, "#4CAF50")]
+        [InlineData(AgentTaskStatus.Running, "#E8D44D")]
         [InlineData(AgentTaskStatus.Completed, "#2E7D32")]
         [InlineData(AgentTaskStatus.Cancelled, "#E0A030")]
         [InlineData(AgentTaskStatus.Failed, "#E05555")]
         [InlineData(AgentTaskStatus.Queued, "#CC8800")]
+        [InlineData(AgentTaskStatus.Ongoing, "#E8D44D")]
         public void StatusColor_MatchesStatus(AgentTaskStatus status, string expectedColor)
         {
             var task = new AgentTask();
@@ -159,6 +168,14 @@ namespace UnityAgent.Tests
         }
 
         [Fact]
+        public void IsRunning_TrueWhenOngoing()
+        {
+            var task = new AgentTask();
+            task.Status = AgentTaskStatus.Ongoing;
+            Assert.True(task.IsRunning);
+        }
+
+        [Fact]
         public void IsRunning_FalseWhenCompleted()
         {
             var task = new AgentTask();
@@ -171,6 +188,32 @@ namespace UnityAgent.Tests
         {
             var task = new AgentTask();
             Assert.Equal(50, task.MaxIterations);
+        }
+
+        [Fact]
+        public void GitStartHash_DefaultIsNull()
+        {
+            var task = new AgentTask();
+            Assert.Null(task.GitStartHash);
+        }
+
+        [Fact]
+        public void CompletionSummary_DefaultIsEmpty()
+        {
+            var task = new AgentTask();
+            Assert.Equal("", task.CompletionSummary);
+        }
+
+        [Fact]
+        public void PropertyChanged_Fires_WhenCompletionSummaryChanges()
+        {
+            var task = new AgentTask();
+            var changedProperties = new List<string>();
+            task.PropertyChanged += (_, e) => changedProperties.Add(e.PropertyName!);
+
+            task.CompletionSummary = "test summary";
+
+            Assert.Contains("CompletionSummary", changedProperties);
         }
     }
 }

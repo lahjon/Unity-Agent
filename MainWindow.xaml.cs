@@ -37,7 +37,11 @@ namespace UnityAgent
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
         public McpStatus McpStatus { get; set; } = McpStatus.Disabled;
+        public string ShortDescription { get; set; } = "";
+        public string LongDescription { get; set; } = "";
 
+        [JsonIgnore]
+        public bool IsInitializing { get; set; }
         [JsonIgnore]
         public string FolderName => string.IsNullOrEmpty(Path) ? "" : System.IO.Path.GetFileName(Path);
         [JsonIgnore]
@@ -101,6 +105,28 @@ namespace UnityAgent
                     HistoryRetentionCombo.SelectedItem = item;
                     break;
                 }
+            }
+        }
+
+        private void ProjectsResize_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            var newHeight = ProjectsPanelRow.Height.Value + e.VerticalChange;
+            if (newHeight >= ProjectsPanelRow.MinHeight)
+            {
+                ProjectsPanelRow.Height = new GridLength(newHeight);
+                if (newHeight >= PromptPanelRow.MinHeight)
+                    PromptPanelRow.Height = new GridLength(newHeight);
+            }
+        }
+
+        private void PromptResize_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            var newHeight = PromptPanelRow.Height.Value + e.VerticalChange;
+            if (newHeight >= PromptPanelRow.MinHeight)
+            {
+                PromptPanelRow.Height = new GridLength(newHeight);
+                if (newHeight >= ProjectsPanelRow.MinHeight)
+                    ProjectsPanelRow.Height = new GridLength(newHeight);
             }
         }
 
@@ -200,6 +226,83 @@ namespace UnityAgent
             return result;
         }
 
+        private static void ShowDarkAlert(string message, string title)
+        {
+            var dlg = new Window
+            {
+                Title = title,
+                Width = 420,
+                Height = 170,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                Background = Brushes.Transparent,
+                WindowStyle = WindowStyle.None,
+                AllowsTransparency = true
+            };
+
+            var outerBorder = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0x22, 0x22, 0x22)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12)
+            };
+            outerBorder.MouseLeftButtonDown += (_, me) => { if (me.ClickCount == 1) dlg.DragMove(); };
+
+            var stack = new StackPanel { Margin = new Thickness(24) };
+
+            var titleBlock = new TextBlock
+            {
+                Text = title,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                FontFamily = new FontFamily("Segoe UI"),
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+
+            var msgBlock = new TextBlock
+            {
+                Text = message,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                FontSize = 13,
+                FontFamily = new FontFamily("Segoe UI"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 20)
+            };
+
+            var btnPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            var okBtn = new Button
+            {
+                Content = "OK",
+                Background = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF)),
+                FontFamily = new FontFamily("Segoe UI"),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 12,
+                Padding = new Thickness(24, 8, 24, 8),
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
+            };
+            okBtn.Click += (_, _) => dlg.Close();
+
+            btnPanel.Children.Add(okBtn);
+
+            stack.Children.Add(titleBlock);
+            stack.Children.Add(msgBlock);
+            stack.Children.Add(btnPanel);
+
+            outerBorder.Child = stack;
+            dlg.Content = outerBorder;
+            dlg.Owner = Application.Current.MainWindow;
+            dlg.ShowDialog();
+        }
+
         // ── System Prompt Persistence ────────────────────────────────
 
         private string SystemPromptFile => Path.Combine(
@@ -259,6 +362,139 @@ namespace UnityAgent
             SystemPrompt = DefaultSystemPrompt;
             SystemPromptBox.Text = SystemPrompt;
             EditSystemPromptToggle.IsChecked = false;
+        }
+
+        // ── Settings Sync on Project Switch ───────────────────────
+
+        private void SyncSettingsForProject()
+        {
+            RefreshProjectCombo();          // Updates active label + descriptions
+            RefreshProjectList();           // Rebuilds project cards
+            UpdateMcpToggleForProject();    // Syncs MCP toggle
+            RefreshFilterCombos();          // Rebuilds task list filters
+
+            // Auto-select current project in both task list filter combos
+            SelectProjectInFilterCombo(ActiveFilterCombo, _projectPath, ActiveFilter_Changed);
+            SelectProjectInFilterCombo(HistoryFilterCombo, _projectPath, HistoryFilter_Changed);
+
+            // Reset system prompt edit toggle (discard unsaved edits)
+            if (EditSystemPromptToggle.IsChecked == true)
+            {
+                EditSystemPromptToggle.IsChecked = false;
+                SystemPromptBox.Text = SystemPrompt;
+            }
+
+            UpdateStatus();
+        }
+
+        private void SelectProjectInFilterCombo(ComboBox combo, string projectPath,
+            SelectionChangedEventHandler handler)
+        {
+            combo.SelectionChanged -= handler;
+            foreach (ComboBoxItem item in combo.Items)
+            {
+                if (item.Tag as string == projectPath)
+                {
+                    combo.SelectedItem = item;
+                    combo.SelectionChanged += handler;
+                    handler(combo, null!);
+                    return;
+                }
+            }
+            // Fallback: keep "All Projects" selected
+            combo.SelectedIndex = 0;
+            combo.SelectionChanged += handler;
+            handler(combo, null!);
+        }
+
+        // ── Project Description Editing ────────────────────────────
+
+        private void RefreshDescriptionBoxes()
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+            var initializing = entry?.IsInitializing == true;
+
+            if (initializing)
+            {
+                ShortDescBox.Text = "Initializing...";
+                LongDescBox.Text = "Initializing...";
+                ShortDescBox.FontStyle = FontStyles.Italic;
+                LongDescBox.FontStyle = FontStyles.Italic;
+            }
+            else
+            {
+                ShortDescBox.Text = entry?.ShortDescription ?? "";
+                LongDescBox.Text = entry?.LongDescription ?? "";
+                ShortDescBox.FontStyle = FontStyles.Normal;
+                LongDescBox.FontStyle = FontStyles.Normal;
+            }
+
+            // Reset edit state and disable toggles while initializing
+            EditShortDescToggle.IsChecked = false;
+            EditLongDescToggle.IsChecked = false;
+            EditShortDescToggle.IsEnabled = !initializing;
+            EditLongDescToggle.IsEnabled = !initializing;
+        }
+
+        private void EditShortDescToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            var editing = EditShortDescToggle.IsChecked == true;
+            ShortDescBox.IsReadOnly = !editing;
+            ShortDescBox.Opacity = editing ? 1.0 : 0.6;
+            ShortDescEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void EditLongDescToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            var editing = EditLongDescToggle.IsChecked == true;
+            LongDescBox.IsReadOnly = !editing;
+            LongDescBox.Opacity = editing ? 1.0 : 0.6;
+            LongDescEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void SaveShortDesc_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+            if (entry != null)
+            {
+                entry.ShortDescription = ShortDescBox.Text;
+                SaveProjects();
+            }
+            EditShortDescToggle.IsChecked = false;
+        }
+
+        private void SaveLongDesc_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+            if (entry != null)
+            {
+                entry.LongDescription = LongDescBox.Text;
+                SaveProjects();
+            }
+            EditLongDescToggle.IsChecked = false;
+        }
+
+        private async void RegenerateDescriptions_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+            if (entry == null) return;
+
+            entry.IsInitializing = true;
+            entry.ShortDescription = "";
+            entry.LongDescription = "";
+            SaveProjects();
+            RefreshProjectCombo();
+            RefreshProjectList();
+            RefreshDescriptionBoxes();
+
+            RegenerateDescBtn.IsEnabled = false;
+            RegenerateDescBtn.Content = "Regenerating...";
+
+            await GenerateProjectDescriptionInBackground(entry);
+
+            RegenerateDescBtn.Content = "Regenerate Descriptions";
+            RegenerateDescBtn.IsEnabled = true;
+            RefreshDescriptionBoxes();
         }
 
         private void DefaultToggle_Changed(object sender, RoutedEventArgs e)
@@ -323,6 +559,7 @@ namespace UnityAgent
         private readonly ObservableCollection<AgentTask> _historyTasks = new();
         private readonly Dictionary<string, TabItem> _tabs = new();
         private readonly Dictionary<string, TextBox> _outputBoxes = new();
+        private Button? _overflowBtn;
         private readonly DispatcherTimer _statusTimer;
         private string _projectPath;
         private string? _lastSelectedProject;
@@ -400,12 +637,18 @@ namespace UnityAgent
 
             _terminalManager = new TerminalTabManager(
                 TerminalTabBar, TerminalOutput, TerminalInput,
-                TerminalSendBtn, TerminalInterruptBtn,
+                TerminalSendBtn, TerminalInterruptBtn, TerminalRootPath,
                 Dispatcher, _projectPath);
             _terminalManager.AddTerminal();
         }
 
         // ── Project Management ───────────────────────────────────────
+
+        private static readonly JsonSerializerOptions _projectJsonOptions = new()
+        {
+            WriteIndented = true,
+            Converters = { new JsonStringEnumConverter() }
+        };
 
         private void LoadProjects()
         {
@@ -417,7 +660,7 @@ namespace UnityAgent
                     // Try new format (List<ProjectEntry>) first
                     try
                     {
-                        _savedProjects = JsonSerializer.Deserialize<List<ProjectEntry>>(json) ?? new();
+                        _savedProjects = JsonSerializer.Deserialize<List<ProjectEntry>>(json, _projectJsonOptions) ?? new();
                     }
                     catch
                     {
@@ -439,11 +682,7 @@ namespace UnityAgent
             try
             {
                 File.WriteAllText(_projectsFile,
-                    JsonSerializer.Serialize(_savedProjects, new JsonSerializerOptions
-                    {
-                        WriteIndented = true,
-                        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
-                    }));
+                    JsonSerializer.Serialize(_savedProjects, _projectJsonOptions));
             }
             catch { }
         }
@@ -451,13 +690,14 @@ namespace UnityAgent
         private void RefreshProjectCombo()
         {
             var proj = _savedProjects.Find(p => p.Path == _projectPath);
-            ActiveProjectLabel.Text = proj != null
-                ? $"{proj.DisplayName}  \u2014  {proj.Path}"
-                : _projectPath;
+            ActiveProjectLabel.Text = proj?.DisplayName ?? System.IO.Path.GetFileName(_projectPath);
             ActiveProjectLabel.ToolTip = _projectPath;
+            RefreshDescriptionBoxes();
         }
 
-        private void BrowseProjectPath_Click(object sender, RoutedEventArgs e)
+        private string _addProjectSelectedPath = "";
+
+        private void AddProjectPath_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             var dialog = new System.Windows.Forms.FolderBrowserDialog
             {
@@ -466,47 +706,76 @@ namespace UnityAgent
             };
 
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                _addProjectSelectedPath = dialog.SelectedPath;
                 AddProjectPath.Text = dialog.SelectedPath;
+                AddProjectPath.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E8E8E8"));
+            }
         }
 
         private void AddProject_Click(object sender, RoutedEventArgs e)
         {
-            var name = AddProjectName.Text.Trim();
-            var path = AddProjectPath.Text.Trim();
+            var path = _addProjectSelectedPath;
 
-            if (string.IsNullOrEmpty(name))
-            {
-                MessageBox.Show("Please enter a project name.", "Missing Name", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
             if (string.IsNullOrEmpty(path))
             {
-                MessageBox.Show("Please enter a project path.", "Missing Path", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowDarkAlert("Please select a project folder.", "No Folder Selected");
                 return;
             }
             if (!Directory.Exists(path))
             {
-                MessageBox.Show("The specified path does not exist.", "Invalid Path", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowDarkAlert("The selected path does not exist or is invalid.", "Invalid Path");
+                _addProjectSelectedPath = "";
+                AddProjectPath.Text = "Click to select project folder...";
+                AddProjectPath.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#666"));
                 return;
             }
             if (_savedProjects.Any(p => p.Path == path))
             {
-                MessageBox.Show("This project path is already added.", "Duplicate", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowDarkAlert("This project path is already added.", "Duplicate");
                 return;
             }
 
-            _savedProjects.Add(new ProjectEntry { Name = name, Path = path });
+            var name = System.IO.Path.GetFileName(path);
+            var entry = new ProjectEntry { Name = name, Path = path, IsInitializing = true };
+            _savedProjects.Add(entry);
             SaveProjects();
             _projectPath = path;
             _terminalManager?.UpdateWorkingDirectory(path);
             SaveSettings();
-            RefreshProjectCombo();
-            RefreshProjectList();
-            RefreshFilterCombos();
-            UpdateStatus();
+            SyncSettingsForProject();
 
-            AddProjectName.Text = "";
-            AddProjectPath.Text = "";
+            _addProjectSelectedPath = "";
+            AddProjectPath.Text = "Click to select project folder...";
+            AddProjectPath.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#666"));
+
+            // Generate project description in background
+            _ = GenerateProjectDescriptionInBackground(entry);
+        }
+
+        private async System.Threading.Tasks.Task GenerateProjectDescriptionInBackground(ProjectEntry entry)
+        {
+            try
+            {
+                var (shortDesc, longDesc) = await TaskLauncher.GenerateProjectDescriptionAsync(entry.Path);
+                Dispatcher.Invoke(() =>
+                {
+                    entry.ShortDescription = shortDesc;
+                    entry.LongDescription = longDesc;
+                    entry.IsInitializing = false;
+                    SaveProjects();
+                    RefreshProjectCombo();
+                    RefreshProjectList();
+                });
+            }
+            catch
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    entry.IsInitializing = false;
+                    RefreshProjectList();
+                });
+            }
         }
 
         private void RemoveProject_Click(string projectPath)
@@ -518,10 +787,8 @@ namespace UnityAgent
             SaveProjects();
             _projectPath = _savedProjects.Count > 0 ? _savedProjects[0].Path : Directory.GetCurrentDirectory();
             _terminalManager?.UpdateWorkingDirectory(_projectPath);
-            RefreshProjectCombo();
-            RefreshProjectList();
-            RefreshFilterCombos();
-            UpdateStatus();
+            SaveSettings();
+            SyncSettingsForProject();
         }
 
         private void ProjectCombo_Changed(object sender, SelectionChangedEventArgs e)
@@ -660,7 +927,7 @@ namespace UnityAgent
             UpdateImageIndicator();
         }
 
-        private async void Execute_Click(object sender, RoutedEventArgs e)
+        private void Execute_Click(object sender, RoutedEventArgs e)
         {
             var desc = TaskInput.Text?.Trim();
             if (!TaskLauncher.ValidateTaskInput(desc)) return;
@@ -676,23 +943,11 @@ namespace UnityAgent
                 UseMcpToggle.IsChecked == true,
                 SpawnTeamToggle.IsChecked == true,
                 ExtendedPlanningToggle.IsChecked == true,
+                DefaultNoGitWriteToggle.IsChecked == true,
                 _attachedImages.Count > 0 ? new List<string>(_attachedImages) : null);
             _attachedImages.Clear();
             UpdateImageIndicator();
             TaskInput.Clear();
-
-            // Generate summary before starting
-            ExecuteButton.IsEnabled = false;
-            ExecuteButton.Content = "Summarizing...";
-            try
-            {
-                var summary = await TaskLauncher.GenerateSummaryAsync(desc!);
-                if (!string.IsNullOrWhiteSpace(summary))
-                    task.Summary = summary;
-            }
-            catch { }
-            ExecuteButton.Content = task.IsOvernight ? "Start Overnight Task" : "Execute Task";
-            ExecuteButton.IsEnabled = true;
 
             if (task.Headless)
             {
@@ -700,11 +955,30 @@ namespace UnityAgent
                 return;
             }
 
+            // Create tab immediately with placeholder
+            task.Summary = "Processing Task...";
             _activeTasks.Add(task);
             CreateTab(task);
             StartProcess(task);
+
+            // Generate summary asynchronously in background
+            _ = GenerateSummaryInBackground(task, desc!);
             RefreshFilterCombos();
             UpdateStatus();
+        }
+
+        private async System.Threading.Tasks.Task GenerateSummaryInBackground(AgentTask task, string description)
+        {
+            try
+            {
+                var summary = await TaskLauncher.GenerateSummaryAsync(description);
+                if (!string.IsNullOrWhiteSpace(summary))
+                {
+                    task.Summary = summary;
+                    UpdateTabHeader(task);
+                }
+            }
+            catch { }
         }
 
         // ── Tab Management ─────────────────────────────────────────
@@ -752,6 +1026,20 @@ namespace UnityAgent
                 Margin = new Thickness(4, 0, 0, 0)
             };
 
+            var cancelBtn = new Button
+            {
+                Content = "Cancel",
+                Background = new SolidColorBrush(Color.FromRgb(0xA1, 0x52, 0x52)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF)),
+                FontWeight = FontWeights.Bold,
+                FontSize = 12,
+                Padding = new Thickness(14, 6, 14, 6),
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(4, 0, 0, 0),
+                ToolTip = "Immediately cancel this task (Escape)"
+            };
+
             // Send handler: writes to stdin
             sendBtn.Click += (_, _) => SendInput(task, inputBox);
             inputBox.KeyDown += (_, ke) =>
@@ -763,8 +1051,13 @@ namespace UnityAgent
                 }
             };
 
+            // Cancel handler: immediately kills the task with no confirmation
+            cancelBtn.Click += (_, _) => CancelTaskImmediate(task);
+
             var inputPanel = new DockPanel { Margin = new Thickness(0, 4, 0, 0) };
+            DockPanel.SetDock(cancelBtn, Dock.Right);
             DockPanel.SetDock(sendBtn, Dock.Right);
+            inputPanel.Children.Add(cancelBtn);
             inputPanel.Children.Add(sendBtn);
             inputPanel.Children.Add(inputBox);
 
@@ -809,7 +1102,7 @@ namespace UnityAgent
             {
                 Width = 8,
                 Height = 8,
-                Fill = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50)),
+                Fill = new SolidColorBrush(Color.FromRgb(0xE8, 0xD4, 0x4D)),
                 Margin = new Thickness(0, 0, 5, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -866,7 +1159,7 @@ namespace UnityAgent
 
         private void CloseTab(AgentTask task)
         {
-            if (task.Status == AgentTaskStatus.Running || task.Status == AgentTaskStatus.Queued)
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Ongoing || task.Status == AgentTaskStatus.Queued)
             {
                 // If the process has already exited, treat as completed — no warning needed
                 var processAlreadyDone = task.Process == null || task.Process.HasExited;
@@ -922,11 +1215,12 @@ namespace UnityAgent
             {
                 var color = task.Status switch
                 {
-                    AgentTaskStatus.Running => Color.FromRgb(0x4C, 0xAF, 0x50),
+                    AgentTaskStatus.Running => Color.FromRgb(0xE8, 0xD4, 0x4D),
                     AgentTaskStatus.Completed => Color.FromRgb(0x2E, 0x7D, 0x32),
                     AgentTaskStatus.Cancelled => Color.FromRgb(0xE0, 0xA0, 0x30),
                     AgentTaskStatus.Failed => Color.FromRgb(0xE0, 0x55, 0x55),
                     AgentTaskStatus.Queued => Color.FromRgb(0xCC, 0x88, 0x00),
+                    AgentTaskStatus.Ongoing => Color.FromRgb(0xE8, 0xD4, 0x4D),
                     _ => Color.FromRgb(0x55, 0x55, 0x55)
                 };
                 dot.Fill = new SolidColorBrush(color);
@@ -949,31 +1243,182 @@ namespace UnityAgent
 
         private void OutputTabs_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateOutputTabWidths();
 
+        private void EnsureOverflowButton()
+        {
+            if (_overflowBtn != null) return;
+            OutputTabs.ApplyTemplate();
+            _overflowBtn = OutputTabs.Template.FindName("PART_OverflowButton", OutputTabs) as Button;
+            if (_overflowBtn != null)
+                _overflowBtn.Click += TabOverflow_Click;
+        }
+
         private void UpdateOutputTabWidths()
         {
+            EnsureOverflowButton();
+
             const double maxWidth = 200.0;
             const double minWidth = 60.0;
+            // Overhead inside each tab: border padding (8+8) + dot (8+5) + close btn (18+6) + margin slack
+            const double headerOverhead = 55.0;
+            const double overflowBtnWidth = 28.0;
 
             int count = OutputTabs.Items.Count;
-            if (count == 0) return;
+            if (count == 0)
+            {
+                if (_overflowBtn != null) _overflowBtn.Visibility = Visibility.Collapsed;
+                return;
+            }
 
             double available = OutputTabs.ActualWidth;
             if (available <= 0) available = 500;
 
-            double tabWidth = Math.Max(minWidth, Math.Min(maxWidth, available / count));
+            bool overflow = count * minWidth > available;
+            if (_overflowBtn != null)
+                _overflowBtn.Visibility = overflow ? Visibility.Visible : Visibility.Collapsed;
+
+            double tabAvailable = overflow ? available - overflowBtnWidth : available;
+            double tabWidth = Math.Max(minWidth, Math.Min(maxWidth, tabAvailable / count));
+            double labelMax = Math.Max(20, tabWidth - headerOverhead);
 
             foreach (var item in OutputTabs.Items)
             {
                 if (item is TabItem tab)
+                {
                     tab.Width = tabWidth;
+                    // Update the label MaxWidth inside the header so text truncates properly
+                    if (tab.Header is StackPanel sp)
+                    {
+                        foreach (var child in sp.Children)
+                        {
+                            if (child is TextBlock tb)
+                            {
+                                tb.MaxWidth = labelMax;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
+        }
+
+        private void TabOverflow_Click(object sender, RoutedEventArgs e)
+        {
+            var popup = new Popup
+            {
+                PlacementTarget = _overflowBtn,
+                Placement = PlacementMode.Bottom,
+                StaysOpen = false,
+                AllowsTransparency = true
+            };
+
+            var border = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0x25, 0x25, 0x25)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(4),
+                MinWidth = 150,
+                MaxHeight = 300
+            };
+
+            var scroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+
+            var stack = new StackPanel();
+
+            foreach (var item in OutputTabs.Items)
+            {
+                if (item is TabItem tab)
+                {
+                    string text = "Tab";
+                    if (tab.Header is StackPanel sp)
+                    {
+                        foreach (var child in sp.Children)
+                        {
+                            if (child is TextBlock tb)
+                            {
+                                text = tb.Text;
+                                break;
+                            }
+                        }
+                    }
+
+                    bool isSelected = tab == OutputTabs.SelectedItem;
+                    var itemBorder = new Border
+                    {
+                        Background = isSelected
+                            ? new SolidColorBrush(Color.FromRgb(0x35, 0x35, 0x35))
+                            : Brushes.Transparent,
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(10, 6, 10, 6),
+                        Margin = new Thickness(0, 1, 0, 1),
+                        Cursor = Cursors.Hand
+                    };
+
+                    var textBlock = new TextBlock
+                    {
+                        Text = text,
+                        Foreground = isSelected
+                            ? new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56))
+                            : new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                        FontFamily = new FontFamily("Segoe UI"),
+                        FontSize = 12,
+                        FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        MaxWidth = 200
+                    };
+
+                    itemBorder.Child = textBlock;
+
+                    var capturedTab = tab;
+                    var capturedBorder = itemBorder;
+                    var capturedSelected = isSelected;
+
+                    itemBorder.MouseEnter += (_, _) =>
+                    {
+                        if (!capturedSelected)
+                            capturedBorder.Background = new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x30));
+                    };
+                    itemBorder.MouseLeave += (_, _) =>
+                    {
+                        if (!capturedSelected)
+                            capturedBorder.Background = Brushes.Transparent;
+                    };
+                    itemBorder.MouseLeftButtonDown += (_, _) =>
+                    {
+                        OutputTabs.SelectedItem = capturedTab;
+                        capturedTab.BringIntoView();
+                        popup.IsOpen = false;
+                    };
+
+                    stack.Children.Add(itemBorder);
+                }
+            }
+
+            scroll.Content = stack;
+            border.Child = scroll;
+            popup.Child = border;
+            popup.IsOpen = true;
         }
 
         // ── Process Management ─────────────────────────────────────
 
+        private string GetProjectDescription(AgentTask task)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == task.ProjectPath);
+            if (entry == null) return "";
+            return task.ExtendedPlanning
+                ? (string.IsNullOrWhiteSpace(entry.LongDescription) ? entry.ShortDescription : entry.LongDescription)
+                : entry.ShortDescription;
+        }
+
         private void LaunchHeadless(AgentTask task)
         {
-            var fullPrompt = TaskLauncher.BuildFullPrompt(SystemPrompt, task);
+            var fullPrompt = TaskLauncher.BuildFullPrompt(SystemPrompt, task, GetProjectDescription(task));
             var projectPath = task.ProjectPath;
 
             var promptFile = Path.Combine(_scriptDir, $"prompt_{task.Id}.txt");
@@ -1002,10 +1447,13 @@ namespace UnityAgent
 
         private void StartProcess(AgentTask task)
         {
+            // Capture git HEAD before the task runs so we can diff at completion
+            task.GitStartHash = TaskLauncher.CaptureGitHead(task.ProjectPath);
+
             if (task.IsOvernight)
                 TaskLauncher.PrepareTaskForOvernightStart(task);
 
-            var fullPrompt = TaskLauncher.BuildFullPrompt(SystemPrompt, task);
+            var fullPrompt = TaskLauncher.BuildFullPrompt(SystemPrompt, task, GetProjectDescription(task));
             var projectPath = task.ProjectPath;
 
             var promptFile = Path.Combine(_scriptDir, $"prompt_{task.Id}.txt");
@@ -1069,6 +1517,9 @@ namespace UnityAgent
                     }
                     else
                     {
+                        task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+                        task.EndTime = DateTime.Now;
+                        AppendCompletionSummary(task);
                         AppendOutput(task.Id, $"\n[UnityAgent] Process finished (exit code: {exitCode}). " +
                             "Use Done/Cancel to close, or send a follow-up.\n");
                         UpdateTabHeader(task);
@@ -1293,7 +1744,7 @@ namespace UnityAgent
             inputBox.Clear();
 
             // If task is still running and has stdin, write to it
-            if (task.Status == AgentTaskStatus.Running && task.Process is { HasExited: false })
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Ongoing && task.Process is { HasExited: false })
             {
                 try
                 {
@@ -1305,6 +1756,9 @@ namespace UnityAgent
             }
 
             // If task finished, start a follow-up with --continue
+            task.Status = AgentTaskStatus.Ongoing;
+            task.EndTime = null;
+            UpdateTabHeader(task);
             AppendOutput(task.Id, $"\n> {text}\n[UnityAgent] Sending follow-up with --continue...\n\n");
 
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
@@ -1346,7 +1800,15 @@ namespace UnityAgent
             process.Exited += (_, _) =>
             {
                 Dispatcher.BeginInvoke(() =>
-                    AppendOutput(task.Id, "\n[UnityAgent] Follow-up complete.\n"));
+                {
+                    var followUpExit = -1;
+                    try { followUpExit = process.ExitCode; } catch { }
+                    task.Status = followUpExit == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+                    task.EndTime = DateTime.Now;
+                    AppendCompletionSummary(task);
+                    AppendOutput(task.Id, "\n[UnityAgent] Follow-up complete.\n");
+                    UpdateTabHeader(task);
+                });
             };
 
             try
@@ -1487,6 +1949,7 @@ namespace UnityAgent
             task.EndTime = DateTime.Now;
             var duration = task.EndTime.Value - task.StartTime;
             AppendOutput(task.Id, $"[Overnight] Total runtime: {(int)duration.TotalHours}h {duration.Minutes}m across {task.CurrentIteration} iteration(s).\n");
+            AppendCompletionSummary(task);
             UpdateTabHeader(task);
             MoveToHistory(task);
         }
@@ -1596,6 +2059,15 @@ namespace UnityAgent
             task?.OutputBuilder.Append(text);
         }
 
+        private void AppendCompletionSummary(AgentTask task)
+        {
+            var duration = (task.EndTime ?? DateTime.Now) - task.StartTime;
+            var summary = TaskLauncher.GenerateCompletionSummary(
+                task.ProjectPath, task.GitStartHash, task.Status, duration);
+            task.CompletionSummary = summary;
+            AppendOutput(task.Id, summary);
+        }
+
         private void CleanupScripts(string taskId)
         {
             try
@@ -1622,6 +2094,7 @@ namespace UnityAgent
             task.Status = AgentTaskStatus.Completed;
             task.EndTime = DateTime.Now;
             KillProcess(task);
+            AppendCompletionSummary(task);
             AppendOutput(task.Id, "\n[UnityAgent] Task marked as completed.\n");
             UpdateTabHeader(task);
             MoveToHistory(task);
@@ -1651,7 +2124,15 @@ namespace UnityAgent
 
         private void CancelTask(AgentTask task)
         {
-            if (task.Status == AgentTaskStatus.Running)
+            // Finished tasks: just move to history without changing status
+            if (task.IsFinished)
+            {
+                UpdateTabHeader(task);
+                MoveToHistory(task);
+                return;
+            }
+
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Ongoing)
             {
                 if (!ShowDarkConfirm(
                     $"Task #{task.Id} is still running.\nAre you sure you want to cancel it?",
@@ -1659,6 +2140,31 @@ namespace UnityAgent
                     return;
             }
             // Stop overnight timers if active
+            if (task.OvernightRetryTimer != null)
+            {
+                task.OvernightRetryTimer.Stop();
+                task.OvernightRetryTimer = null;
+            }
+            if (task.OvernightIterationTimer != null)
+            {
+                task.OvernightIterationTimer.Stop();
+                task.OvernightIterationTimer = null;
+            }
+            task.Status = AgentTaskStatus.Cancelled;
+            task.EndTime = DateTime.Now;
+            KillProcess(task);
+            ReleaseTaskLocks(task.Id);
+            _queuedTaskInfo.Remove(task.Id);
+            _streamingToolState.Remove(task.Id);
+            AppendOutput(task.Id, "\n[UnityAgent] Task cancelled.\n");
+            UpdateTabHeader(task);
+            MoveToHistory(task);
+        }
+
+        private void CancelTaskImmediate(AgentTask task)
+        {
+            if (task.IsFinished) return;
+
             if (task.OvernightRetryTimer != null)
             {
                 task.OvernightRetryTimer.Stop();
@@ -1696,15 +2202,35 @@ namespace UnityAgent
             UpdateStatus();
         }
 
+        private void ClearFinished_Click(object sender, RoutedEventArgs e)
+        {
+            var finished = _activeTasks.Where(t => t.IsFinished).ToList();
+            if (finished.Count == 0) return;
+
+            if (!ShowDarkConfirm(
+                $"Are you sure you want to clear {finished.Count} finished task(s) from the active list?",
+                "Clear Finished")) return;
+
+            foreach (var task in finished)
+            {
+                if (_tabs.TryGetValue(task.Id, out var tab))
+                {
+                    OutputTabs.Items.Remove(tab);
+                    _tabs.Remove(task.Id);
+                }
+                _outputBoxes.Remove(task.Id);
+                _activeTasks.Remove(task);
+            }
+            RefreshFilterCombos();
+            UpdateOutputTabWidths();
+            UpdateStatus();
+        }
+
         private void ClearHistory_Click(object sender, RoutedEventArgs e)
         {
-            var result = System.Windows.MessageBox.Show(
+            if (!ShowDarkConfirm(
                 $"Are you sure you want to clear all {_historyTasks.Count} history entries? This cannot be undone.",
-                "Clear History",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes) return;
+                "Clear History")) return;
 
             foreach (var task in _historyTasks.ToList())
             {
@@ -1753,6 +2279,15 @@ namespace UnityAgent
             ReleaseTaskLocks(task.Id);
             _activeTasks.Remove(task);
             _historyTasks.Insert(0, task);
+
+            if (_tabs.TryGetValue(task.Id, out var tab))
+            {
+                OutputTabs.Items.Remove(tab);
+                _tabs.Remove(task.Id);
+            }
+            _outputBoxes.Remove(task.Id);
+            UpdateOutputTabWidths();
+
             SaveHistory();
             RefreshFilterCombos();
             UpdateStatus();
@@ -1842,7 +2377,8 @@ namespace UnityAgent
                     ProjectPath = t.ProjectPath,
                     IsOvernight = t.IsOvernight,
                     MaxIterations = t.MaxIterations,
-                    CurrentIteration = t.CurrentIteration
+                    CurrentIteration = t.CurrentIteration,
+                    CompletionSummary = t.CompletionSummary
                 }).ToList();
 
                 File.WriteAllText(_historyFile,
@@ -1873,7 +2409,8 @@ namespace UnityAgent
                         EndTime = entry.EndTime,
                         IsOvernight = entry.IsOvernight,
                         MaxIterations = entry.MaxIterations > 0 ? entry.MaxIterations : 50,
-                        CurrentIteration = entry.CurrentIteration
+                        CurrentIteration = entry.CurrentIteration,
+                        CompletionSummary = entry.CompletionSummary ?? ""
                     };
                     task.Status = Enum.TryParse<AgentTaskStatus>(entry.Status, out var s)
                         ? s : AgentTaskStatus.Completed;
@@ -1955,15 +2492,92 @@ namespace UnityAgent
 
                 // Project name + MCP status dot
                 var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
-                nameRow.Children.Add(new TextBlock
+                var nameBlock = new TextBlock
                 {
                     Text = proj.DisplayName,
                     Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
                     FontWeight = FontWeights.Bold,
                     FontSize = 14,
                     FontFamily = new FontFamily("Segoe UI"),
-                    VerticalAlignment = VerticalAlignment.Center
-                });
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Cursor = Cursors.IBeam,
+                    ToolTip = "Click to rename"
+                };
+                nameBlock.MouseEnter += (_, _) => nameBlock.TextDecorations = TextDecorations.Underline;
+                nameBlock.MouseLeave += (_, _) => nameBlock.TextDecorations = null;
+
+                var editIcon = new TextBlock
+                {
+                    Text = "\u270E",
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(5, 0, 0, 0),
+                    Cursor = Cursors.IBeam,
+                    ToolTip = "Rename project"
+                };
+                var projEntry = proj;
+                void StartRename()
+                {
+                    var tb = nameBlock;
+                    var parent = tb.Parent as StackPanel;
+                    if (parent == null) return;
+                    var idx = parent.Children.IndexOf(tb);
+                    var editBox = new TextBox
+                    {
+                        Text = projEntry.Name ?? projEntry.FolderName,
+                        Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
+                        Background = new SolidColorBrush(Color.FromRgb(0x19, 0x19, 0x19)),
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                        BorderThickness = new Thickness(1),
+                        FontWeight = FontWeights.Bold,
+                        FontSize = 14,
+                        FontFamily = new FontFamily("Segoe UI"),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Padding = new Thickness(2, 0, 2, 0),
+                        MinWidth = 80,
+                        CaretBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
+                        SelectionBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56))
+                    };
+
+                    parent.Children.RemoveAt(idx);
+                    parent.Children.Insert(idx, editBox);
+
+                    var committed = false;
+                    void CommitRename()
+                    {
+                        if (committed) return;
+                        committed = true;
+                        var newName = editBox.Text?.Trim();
+                        if (!string.IsNullOrEmpty(newName))
+                        {
+                            projEntry.Name = newName;
+                            SaveProjects();
+                            RefreshProjectCombo();
+                        }
+                        RefreshProjectList();
+                    }
+
+                    editBox.KeyDown += (_, ke) =>
+                    {
+                        if (ke.Key == Key.Enter) CommitRename();
+                        else if (ke.Key == Key.Escape) RefreshProjectList();
+                    };
+
+                    // Defer LostFocus registration so it doesn't fire during the
+                    // same input event chain that created the TextBox.
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        editBox.LostFocus += (_, _) => CommitRename();
+                    }), System.Windows.Threading.DispatcherPriority.Input);
+
+                    editBox.SelectAll();
+                    editBox.Focus();
+                }
+                nameBlock.MouseLeftButtonDown += (_, ev) => { ev.Handled = true; StartRename(); };
+                editIcon.MouseLeftButtonDown += (_, ev) => { ev.Handled = true; StartRename(); };
+                nameRow.Children.Add(nameBlock);
+                nameRow.Children.Add(editIcon);
 
                 // MCP status dot
                 var mcpColor = proj.McpStatus switch
@@ -2002,6 +2616,35 @@ namespace UnityAgent
                     Margin = new Thickness(0, 2, 0, 0),
                     ToolTip = proj.Path
                 });
+
+                // Short description or initializing indicator
+                if (proj.IsInitializing)
+                {
+                    var initRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
+                    initRow.Children.Add(new TextBlock
+                    {
+                        Text = "Initializing descriptions...",
+                        Foreground = new SolidColorBrush(Color.FromRgb(0xE0, 0xA0, 0x30)),
+                        FontSize = 11,
+                        FontStyle = FontStyles.Italic,
+                        FontFamily = new FontFamily("Segoe UI")
+                    });
+                    infoPanel.Children.Add(initRow);
+                }
+                else if (!string.IsNullOrWhiteSpace(proj.ShortDescription))
+                {
+                    infoPanel.Children.Add(new TextBlock
+                    {
+                        Text = proj.ShortDescription,
+                        Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                        FontSize = 11,
+                        FontFamily = new FontFamily("Segoe UI"),
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        TextWrapping = TextWrapping.NoWrap,
+                        Margin = new Thickness(0, 4, 0, 0),
+                        ToolTip = proj.ShortDescription
+                    });
+                }
 
                 Grid.SetColumn(infoPanel, 0);
                 grid.Children.Add(infoPanel);
@@ -2085,15 +2728,17 @@ namespace UnityAgent
 
                 // Click card to select as active project
                 var projPath = proj.Path;
-                card.MouseLeftButtonUp += (_, _) =>
+                card.MouseLeftButtonUp += (_, e) =>
                 {
+                    // Don't switch project when a rename TextBox is active
+                    if (e.OriginalSource is TextBox) return;
+                    if (projPath == _projectPath) return;
+                    if (!ShowDarkConfirm("Are you sure you want to change project?", "Change Project"))
+                        return;
                     _projectPath = projPath;
                     _terminalManager?.UpdateWorkingDirectory(projPath);
                     SaveSettings();
-                    RefreshProjectCombo();
-                    RefreshProjectList();
-                    UpdateMcpToggleForProject();
-                    UpdateStatus();
+                    SyncSettingsForProject();
                 };
 
                 ProjectListPanel.Children.Add(card);
@@ -2458,7 +3103,7 @@ namespace UnityAgent
                 foreach (var blockerId in qi.BlockedByTaskIds)
                 {
                     var blocker = _activeTasks.FirstOrDefault(t => t.Id == blockerId);
-                    if (blocker != null && blocker.Status == AgentTaskStatus.Running)
+                    if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Ongoing)
                     {
                         allClear = false;
                         break;
@@ -2523,13 +3168,14 @@ namespace UnityAgent
         private void UpdateStatus()
         {
             var running = _activeTasks.Count(t => t.Status == AgentTaskStatus.Running);
+            var ongoing = _activeTasks.Count(t => t.Status == AgentTaskStatus.Ongoing);
             var queued = _activeTasks.Count(t => t.Status == AgentTaskStatus.Queued);
             var completed = _historyTasks.Count(t => t.Status == AgentTaskStatus.Completed);
             var cancelled = _historyTasks.Count(t => t.Status == AgentTaskStatus.Cancelled);
             var failed = _historyTasks.Count(t => t.Status == AgentTaskStatus.Failed);
             var locks = _fileLocks.Count;
             var projectName = Path.GetFileName(_projectPath);
-            StatusText.Text = $"{projectName}  |  Running: {running}  |  Queued: {queued}  |  " +
+            StatusText.Text = $"{projectName}  |  Running: {running}  |  Ongoing: {ongoing}  |  Queued: {queued}  |  " +
                               $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
                               $"Locks: {locks}  |  {_projectPath}";
         }
@@ -2548,6 +3194,7 @@ namespace UnityAgent
             public bool IsOvernight { get; set; }
             public int MaxIterations { get; set; }
             public int CurrentIteration { get; set; }
+            public string CompletionSummary { get; set; } = "";
         }
 
         private class StreamingToolState

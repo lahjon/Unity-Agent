@@ -14,7 +14,8 @@ namespace UnityAgent
         Completed,
         Cancelled,
         Failed,
-        Queued
+        Queued,
+        Ongoing
     }
 
     public class AgentTask : INotifyPropertyChanged
@@ -30,6 +31,7 @@ namespace UnityAgent
         public bool UseMcp { get; set; }
         public bool SpawnTeam { get; set; }
         public bool ExtendedPlanning { get; set; }
+        public bool NoGitWrite { get; set; }
         public int MaxIterations { get; set; } = 50;
 
         private int _currentIteration;
@@ -42,6 +44,17 @@ namespace UnityAgent
         public string ProjectPath { get; set; } = "";
         public List<string> ImagePaths { get; set; } = new();
         public StringBuilder OutputBuilder { get; } = new();
+
+        // Captured at task start for completion summary diff
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? GitStartHash { get; set; }
+
+        private string _completionSummary = "";
+        public string CompletionSummary
+        {
+            get => _completionSummary;
+            set { _completionSummary = value; OnPropertyChanged(); }
+        }
 
         private string _summary = "";
         public string Summary
@@ -86,6 +99,8 @@ namespace UnityAgent
                 OnPropertyChanged(nameof(StatusText));
                 OnPropertyChanged(nameof(StatusColor));
                 OnPropertyChanged(nameof(IsRunning));
+                OnPropertyChanged(nameof(IsQueued));
+                OnPropertyChanged(nameof(IsFinished));
                 OnPropertyChanged(nameof(TimeInfo));
             }
         }
@@ -111,20 +126,26 @@ namespace UnityAgent
             AgentTaskStatus.Cancelled => "Cancelled",
             AgentTaskStatus.Failed => "Failed",
             AgentTaskStatus.Queued => "Queued",
+            AgentTaskStatus.Ongoing => "Ongoing",
             _ => "?"
         };
 
         public string StatusColor => Status switch
         {
-            AgentTaskStatus.Running => "#4CAF50",
-            AgentTaskStatus.Completed => "#2E7D32",
+            AgentTaskStatus.Running => "#00E676",
+            AgentTaskStatus.Completed => "#00E676",
             AgentTaskStatus.Cancelled => "#E0A030",
             AgentTaskStatus.Failed => "#E05555",
-            AgentTaskStatus.Queued => "#CC8800",
+            AgentTaskStatus.Queued => "#FFD600",
+            AgentTaskStatus.Ongoing => "#00E676",
             _ => "#555555"
         };
 
-        public bool IsRunning => Status == AgentTaskStatus.Running;
+        public bool IsRunning => Status == AgentTaskStatus.Running || Status == AgentTaskStatus.Ongoing;
+
+        public bool IsQueued => Status == AgentTaskStatus.Queued;
+
+        public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed;
 
         public string TimeInfo
         {

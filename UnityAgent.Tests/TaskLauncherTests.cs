@@ -63,7 +63,7 @@ namespace UnityAgent.Tests
         public void CreateTask_WithImages_CopiesImagePaths()
         {
             var images = new List<string> { "img1.png", "img2.jpg" };
-            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, images);
+            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, false, images);
 
             Assert.Equal(2, task.ImagePaths.Count);
             Assert.Contains("img1.png", task.ImagePaths);
@@ -75,6 +75,13 @@ namespace UnityAgent.Tests
         {
             var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false);
             Assert.Empty(task.ImagePaths);
+        }
+
+        [Fact]
+        public void CreateTask_NoGitWrite_SetsProperty()
+        {
+            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, noGitWrite: true);
+            Assert.True(task.NoGitWrite);
         }
 
         [Fact]
@@ -110,6 +117,23 @@ namespace UnityAgent.Tests
             Assert.StartsWith("You are running as an OVERNIGHT", result);
             Assert.EndsWith("fix bugs", result);
             Assert.DoesNotContain("SYSTEM:", result);
+        }
+
+        [Fact]
+        public void BuildBasePrompt_WithNoGitWrite_IncludesGitBlock()
+        {
+            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isOvernight: false, noGitWrite: true);
+            Assert.Contains("NO GIT WRITE OPERATIONS", result);
+            Assert.Contains("git push", result);
+            Assert.StartsWith("SYS:", result);
+            Assert.EndsWith("task", result);
+        }
+
+        [Fact]
+        public void BuildBasePrompt_WithoutNoGitWrite_ExcludesGitBlock()
+        {
+            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isOvernight: false, noGitWrite: false);
+            Assert.DoesNotContain("NO GIT WRITE OPERATIONS", result);
         }
 
         [Fact]
@@ -584,6 +608,14 @@ namespace UnityAgent.Tests
         }
 
         [Fact]
+        public void NoGitWriteBlock_ContainsRestrictions()
+        {
+            Assert.Contains("NO GIT WRITE OPERATIONS", TaskLauncher.NoGitWriteBlock);
+            Assert.Contains("git push", TaskLauncher.NoGitWriteBlock);
+            Assert.Contains("git commit", TaskLauncher.NoGitWriteBlock);
+        }
+
+        [Fact]
         public void OvernightInitialTemplate_ContainsRestrictions()
         {
             Assert.Contains("NO GIT COMMANDS", TaskLauncher.OvernightInitialTemplate);
@@ -596,6 +628,111 @@ namespace UnityAgent.Tests
         {
             Assert.Contains("{0}", TaskLauncher.OvernightContinuationTemplate);
             Assert.Contains("{1}", TaskLauncher.OvernightContinuationTemplate);
+        }
+
+        // ── Completion Summary ─────────────────────────────────────────
+
+        [Fact]
+        public void FormatCompletionSummary_ContainsStatus()
+        {
+            var result = TaskLauncher.FormatCompletionSummary(
+                AgentTaskStatus.Completed, TimeSpan.FromMinutes(5), null);
+            Assert.Contains("Completed", result);
+        }
+
+        [Fact]
+        public void FormatCompletionSummary_ContainsDuration()
+        {
+            var result = TaskLauncher.FormatCompletionSummary(
+                AgentTaskStatus.Completed, TimeSpan.FromSeconds(323), null);
+            Assert.Contains("5m 23s", result);
+        }
+
+        [Fact]
+        public void FormatCompletionSummary_NullFiles_ShowsNotAvailable()
+        {
+            var result = TaskLauncher.FormatCompletionSummary(
+                AgentTaskStatus.Completed, TimeSpan.Zero, null);
+            Assert.Contains("git not available", result);
+        }
+
+        [Fact]
+        public void FormatCompletionSummary_EmptyFiles_ShowsZero()
+        {
+            var files = new List<(string name, int added, int removed)>();
+            var result = TaskLauncher.FormatCompletionSummary(
+                AgentTaskStatus.Completed, TimeSpan.Zero, files);
+            Assert.Contains("Files modified: 0", result);
+            Assert.Contains("+0 / -0", result);
+        }
+
+        [Fact]
+        public void FormatCompletionSummary_WithFiles_ShowsCorrectCounts()
+        {
+            var files = new List<(string name, int added, int removed)>
+            {
+                ("src/App.cs", 12, 5),
+                ("src/Main.cs", 25, 8)
+            };
+            var result = TaskLauncher.FormatCompletionSummary(
+                AgentTaskStatus.Failed, TimeSpan.FromMinutes(2), files);
+            Assert.Contains("Files modified: 2", result);
+            Assert.Contains("+37 / -13", result);
+            Assert.Contains("src/App.cs", result);
+            Assert.Contains("src/Main.cs", result);
+            Assert.Contains("Failed", result);
+        }
+
+        [Fact]
+        public void FormatCompletionSummary_ContainsSummaryHeader()
+        {
+            var result = TaskLauncher.FormatCompletionSummary(
+                AgentTaskStatus.Completed, TimeSpan.Zero, null);
+            Assert.Contains("TASK COMPLETION SUMMARY", result);
+        }
+
+        [Fact]
+        public void FormatCompletionSummary_FileDetails_ShowLineChanges()
+        {
+            var files = new List<(string name, int added, int removed)>
+            {
+                ("test.cs", 10, 3)
+            };
+            var result = TaskLauncher.FormatCompletionSummary(
+                AgentTaskStatus.Completed, TimeSpan.Zero, files);
+            Assert.Contains("test.cs | +10 -3", result);
+        }
+
+        [Fact]
+        public void CaptureGitHead_ValidRepo_ReturnsHash()
+        {
+            // The project itself is a git repo
+            var hash = TaskLauncher.CaptureGitHead(System.IO.Directory.GetCurrentDirectory());
+            Assert.NotNull(hash);
+            Assert.True(hash!.Length >= 7); // short hash at minimum
+        }
+
+        [Fact]
+        public void CaptureGitHead_InvalidPath_ReturnsNull()
+        {
+            var hash = TaskLauncher.CaptureGitHead(@"C:\nonexistent_path_12345");
+            Assert.Null(hash);
+        }
+
+        [Fact]
+        public void GetGitFileChanges_InvalidPath_ReturnsNull()
+        {
+            var changes = TaskLauncher.GetGitFileChanges(@"C:\nonexistent_path_12345", null);
+            Assert.Null(changes);
+        }
+
+        [Fact]
+        public void GenerateCompletionSummary_InvalidPath_StillReturnsFormatted()
+        {
+            var result = TaskLauncher.GenerateCompletionSummary(
+                @"C:\nonexistent_path_12345", null, AgentTaskStatus.Completed, TimeSpan.FromMinutes(1));
+            Assert.Contains("TASK COMPLETION SUMMARY", result);
+            Assert.Contains("Completed", result);
         }
     }
 }

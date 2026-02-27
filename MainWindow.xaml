@@ -271,13 +271,41 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="TabControl">
                         <DockPanel>
-                            <ScrollViewer DockPanel.Dock="Top"
-                                          HorizontalScrollBarVisibility="Auto"
-                                          VerticalScrollBarVisibility="Disabled"
-                                          CanContentScroll="False"
-                                          Padding="0" Margin="0">
-                                <TabPanel IsItemsHost="True"/>
-                            </ScrollViewer>
+                            <Grid DockPanel.Dock="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ScrollViewer Grid.Column="0"
+                                              HorizontalScrollBarVisibility="Hidden"
+                                              VerticalScrollBarVisibility="Disabled"
+                                              CanContentScroll="False"
+                                              Padding="0" Margin="0">
+                                    <TabPanel IsItemsHost="True"/>
+                                </ScrollViewer>
+                                <Button x:Name="PART_OverflowButton" Grid.Column="1"
+                                        Visibility="Collapsed"
+                                        Width="24" Height="24"
+                                        Margin="2,0,0,0"
+                                        Cursor="Hand"
+                                        VerticalAlignment="Center"
+                                        ToolTip="Show all tabs">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="OverflowBd" Background="#2C2C2C" CornerRadius="4">
+                                                <TextBlock Text="▾" Foreground="#999999" FontSize="14"
+                                                           FontFamily="Segoe UI"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="OverflowBd" Property="Background" Value="#3A3A3A"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </Grid>
                             <Border Background="Transparent">
                                 <ContentPresenter ContentSource="SelectedContent"/>
                             </Border>
@@ -702,12 +730,25 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <!-- Close X button top-right -->
-                    <Button Grid.Row="0" Content="&#xE8BB;" Click="Cancel_Click"
+                    <!-- Close/Remove button top-right -->
+                    <Button Grid.Row="0" Click="Cancel_Click"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             FontFamily="Segoe MDL2 Assets" FontSize="10"
-                            Foreground="#666" Cursor="Hand" Margin="0,-2,-2,0"
-                            ToolTip="Close task">
+                            Cursor="Hand" Margin="0,-2,-2,0">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Content" Value="&#xE8BB;"/>
+                                <Setter Property="Foreground" Value="#666"/>
+                                <Setter Property="ToolTip" Value="Cancel task"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                        <Setter Property="Content" Value="&#xE73E;"/>
+                                        <Setter Property="Foreground" Value="#5CB85C"/>
+                                        <Setter Property="ToolTip" Value="Remove task"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="Bd" Background="Transparent" CornerRadius="4"
@@ -724,7 +765,7 @@
                         </Button.Template>
                     </Button>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <Grid Width="8" Height="8" Margin="0,0,6,0">
+                        <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse x:Name="StatusGlow" Width="8" Height="8"
                                      Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}">
                                 <Ellipse.Style>
@@ -740,14 +781,14 @@
                                                     <BeginStoryboard x:Name="GlowStoryboard">
                                                         <Storyboard RepeatBehavior="Forever">
                                                             <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(BlurEffect.Radius)"
-                                                                             From="0" To="6" Duration="0:0:1.2"
+                                                                             From="0" To="10" Duration="0:0:0.8"
                                                                              AutoReverse="True">
                                                                 <DoubleAnimation.EasingFunction>
                                                                     <SineEase EasingMode="EaseInOut"/>
                                                                 </DoubleAnimation.EasingFunction>
                                                             </DoubleAnimation>
                                                             <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                             From="0.5" To="1.0" Duration="0:0:1.2"
+                                                                             From="0.3" To="1.0" Duration="0:0:0.8"
                                                                              AutoReverse="True">
                                                                 <DoubleAnimation.EasingFunction>
                                                                     <SineEase EasingMode="EaseInOut"/>
@@ -760,6 +801,31 @@
                                                     <StopStoryboard BeginStoryboardName="GlowStoryboard"/>
                                                 </DataTrigger.ExitActions>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsQueued}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="QueuedGlowStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(BlurEffect.Radius)"
+                                                                             From="0" To="8" Duration="0:0:1.2"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.4" To="1.0" Duration="0:0:1.2"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="QueuedGlowStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Ellipse.Style>
@@ -769,7 +835,8 @@
                         </Grid>
                         <TextBlock Text="{Binding StatusText}"
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
-                                   FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"/>
+                                   FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
+                                   VerticalAlignment="Center"/>
                         <TextBlock Text=" | " Foreground="#444" FontSize="11" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding ProjectName}" Foreground="#888"
@@ -784,8 +851,8 @@
                                Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"
                                TextTrimming="CharacterEllipsis" Margin="0,4,0,0">
                         <TextBlock.ToolTip>
-                            <ToolTip MaxWidth="400">
-                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap"/>
+                            <ToolTip MaxWidth="600" Placement="Bottom">
+                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" MaxWidth="580"/>
                             </ToolTip>
                         </TextBlock.ToolTip>
                     </TextBlock>
@@ -856,10 +923,78 @@
                         </Button.Template>
                     </Button>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <Ellipse Width="8" Height="8" Margin="0,0,6,0"
-                                 Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}"/>
-                        <TextBlock Text="{Binding StatusText}" Foreground="#666"
-                                   FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"/>
+                        <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
+                            <Ellipse x:Name="HistStatusGlow" Width="8" Height="8"
+                                     Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Effect">
+                                            <Setter.Value>
+                                                <BlurEffect Radius="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="HistGlowStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(BlurEffect.Radius)"
+                                                                             From="0" To="10" Duration="0:0:0.8"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.3" To="1.0" Duration="0:0:0.8"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="HistGlowStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsQueued}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="HistQueuedGlowStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(BlurEffect.Radius)"
+                                                                             From="0" To="8" Duration="0:0:1.2"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.4" To="1.0" Duration="0:0:1.2"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="HistQueuedGlowStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <Ellipse x:Name="HistStatusDot" Width="8" Height="8"
+                                     Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}"/>
+                        </Grid>
+                        <TextBlock Text="{Binding StatusText}"
+                                   Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
+                                   FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
+                                   VerticalAlignment="Center"/>
                         <TextBlock Text=" | " Foreground="#444" FontSize="11" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding ProjectName}" Foreground="#666"
@@ -874,8 +1009,8 @@
                                Foreground="#888" FontSize="12" FontFamily="Segoe UI"
                                TextTrimming="CharacterEllipsis" Margin="0,4,0,0">
                         <TextBlock.ToolTip>
-                            <ToolTip MaxWidth="400">
-                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap"/>
+                            <ToolTip MaxWidth="600" Placement="Bottom">
+                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" MaxWidth="580"/>
                             </ToolTip>
                         </TextBlock.ToolTip>
                     </TextBlock>
@@ -895,6 +1030,7 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ListBoxItem">
@@ -971,8 +1107,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="120" MinHeight="60"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- ═══ INPUT SECTION ═══ -->
@@ -984,8 +1118,13 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left: Projects Panel -->
-            <Border Grid.Column="0" Background="#222222" CornerRadius="8" Padding="10" Margin="0,0,4,0"
-                    BorderThickness="1">
+            <Grid Grid.Column="0" VerticalAlignment="Top">
+                <Grid.RowDefinitions>
+                    <RowDefinition x:Name="ProjectsPanelRow" Height="140" MinHeight="60"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0" Background="#222222" CornerRadius="8" Padding="10" Margin="0,0,4,0"
+                        BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="ProjectsPanelBorder" Color="#2C2C2C"/>
                 </Border.BorderBrush>
@@ -1013,36 +1152,23 @@
                     <!-- Add Project form -->
                     <Border DockPanel.Dock="Bottom" Background="#1E1E1E" CornerRadius="6"
                             BorderBrush="#333333" BorderThickness="1" Margin="0,6,0,0" Padding="8">
-                        <StackPanel>
-                            <TextBlock Text="ADD PROJECT" Foreground="#DA7756" FontWeight="Bold"
-                                       FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,6"/>
-                            <DockPanel Margin="0,0,0,4">
-                                <TextBlock Text="Path:" Foreground="#999" FontSize="11"
-                                           FontFamily="Segoe UI" VerticalAlignment="Center"
-                                           Width="36"/>
-                                <Button Content="..." Click="BrowseProjectPath_Click"
-                                        Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"
-                                        Margin="4,0,0,0" Padding="6,3" FontSize="11"/>
-                                <TextBox x:Name="AddProjectPath"
-                                         Background="#191919" Foreground="#E8E8E8"
-                                         CaretBrush="#E8E8E8" BorderBrush="#333333"
-                                         BorderThickness="1" FontSize="11"
-                                         FontFamily="Segoe UI" Padding="6,4"/>
-                            </DockPanel>
-                            <DockPanel>
-                                <TextBlock Text="Name:" Foreground="#999" FontSize="11"
-                                           FontFamily="Segoe UI" VerticalAlignment="Center"
-                                           Width="36"/>
-                                <Button Content="Add" Click="AddProject_Click"
-                                        Background="#DA7756" Style="{StaticResource SmallBtn}"
-                                        DockPanel.Dock="Right" Margin="4,0,0,0" Padding="10,3"/>
-                                <TextBox x:Name="AddProjectName"
-                                         Background="#191919" Foreground="#E8E8E8"
-                                         CaretBrush="#E8E8E8" BorderBrush="#333333"
-                                         BorderThickness="1" FontSize="11"
-                                         FontFamily="Segoe UI" Padding="6,4"/>
-                            </DockPanel>
-                        </StackPanel>
+                        <DockPanel>
+                            <TextBlock Text="ADD" Foreground="#DA7756" FontWeight="Bold"
+                                       FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                       DockPanel.Dock="Left" Margin="0,0,6,0"/>
+                            <Button Content="Add" Click="AddProject_Click"
+                                    Background="#DA7756" Style="{StaticResource SmallBtn}"
+                                    DockPanel.Dock="Right" Margin="4,0,0,0" Padding="10,3"/>
+                            <Border Background="#191919" BorderBrush="#333333" BorderThickness="1"
+                                    CornerRadius="2" Cursor="Hand"
+                                    MouseLeftButtonDown="AddProjectPath_Click">
+                                <TextBlock x:Name="AddProjectPath"
+                                           Foreground="#666" FontSize="11"
+                                           FontFamily="Segoe UI" Padding="6,4"
+                                           Text="Click to select project folder..."
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </DockPanel>
                     </Border>
                     <!-- Header -->
                     <TextBlock DockPanel.Dock="Top" Text="PROJECTS" Foreground="#DA7756" FontWeight="Bold"
@@ -1053,13 +1179,38 @@
                     </ScrollViewer>
                 </DockPanel>
             </Border>
+                <Thumb Grid.Row="1" Cursor="SizeNS" Height="8" Margin="8,0,8,0"
+                       DragDelta="ProjectsResize_DragDelta">
+                    <Thumb.Template>
+                        <ControlTemplate TargetType="Thumb">
+                            <Grid Background="Transparent" Height="8">
+                                <Border x:Name="Indicator" Height="3" CornerRadius="1.5"
+                                        Background="#2A2A2A" HorizontalAlignment="Center" Width="30"
+                                        VerticalAlignment="Center" Opacity="0.4"/>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Indicator" Property="Background" Value="#DA7756"/>
+                                    <Setter TargetName="Indicator" Property="Opacity" Value="0.8"/>
+                                    <Setter TargetName="Indicator" Property="Width" Value="50"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Thumb.Template>
+                </Thumb>
+            </Grid>
 
             <!-- Splitter -->
             <GridSplitter Grid.Column="1" Style="{StaticResource VerticalSplitter}"/>
 
-            <!-- Right: Prompt + Options -->
-            <Border Grid.Column="2" Background="#222222" CornerRadius="8" Padding="14"
-                    BorderThickness="1">
+            <!-- Right: Prompt + Advanced -->
+            <Grid Grid.Column="2" VerticalAlignment="Top">
+                <Grid.RowDefinitions>
+                    <RowDefinition x:Name="PromptPanelRow" Height="150" MinHeight="60"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0" Background="#222222" CornerRadius="8" Padding="14"
+                        BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="InputSectionBorder" Color="#2C2C2C"/>
                 </Border.BorderBrush>
@@ -1083,20 +1234,69 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Border.Triggers>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                <DockPanel>
+                    <!-- Bottom: Advanced expander + Execute button (always visible) -->
+                    <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                        <StackPanel DockPanel.Dock="Right" Margin="10,0,0,0" VerticalAlignment="Top">
+                            <Button x:Name="ExecuteButton" Content="Execute Task" Click="Execute_Click"
+                                    Background="#DA7756" Foreground="#FFF" Style="{StaticResource Btn}"
+                                    FontSize="13" Padding="14,10"/>
+                            <TextBlock Text="Ctrl+Enter to execute" Foreground="#555" FontFamily="Segoe UI"
+                                       FontSize="10" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <Expander Style="{StaticResource DarkExpander}" IsExpanded="False">
+                            <Expander.Header>
+                                <TextBlock Text="ADVANCED" Foreground="#DA7756" FontWeight="Bold" FontSize="10"
+                                           FontFamily="Segoe UI"/>
+                            </Expander.Header>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="200">
+                                <WrapPanel Margin="0,2,0,0">
+                                    <ToggleButton x:Name="SkipPermissionsToggle" IsChecked="True"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
+                                        <TextBlock Text="Skip Permissions" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
+                                        <TextBlock Text="Remote Session" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="HeadlessToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
+                                        <TextBlock Text="Headless (Terminal)" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
+                                        <TextBlock Text="Ignore File Locks" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="UseMcpToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
+                                        <TextBlock Text="Use MCP" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="SpawnTeamToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
+                                        <TextBlock Text="Spawn Team" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="OvernightToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8"
+                                                  Checked="OvernightToggle_Changed" Unchecked="OvernightToggle_Changed">
+                                        <TextBlock Text="Overnight Task" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="ExtendedPlanningToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
+                                        <TextBlock Text="Extended Planning" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                </WrapPanel>
+                            </ScrollViewer>
+                        </Expander>
+                    </DockPanel>
+                    <!-- Top: Prompt label, project name, text input -->
                     <DockPanel>
-                        <!-- Active project indicator -->
-                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-                            <TextBlock Text="PROJECT" Foreground="#DA7756" FontWeight="Bold" FontSize="10"
-                                       FontFamily="Segoe UI" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock x:Name="ActiveProjectLabel" Foreground="#E8E8E8"
-                                       FontSize="12" FontFamily="Segoe UI" VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </DockPanel>
+                        <!-- Panel label -->
+                        <TextBlock DockPanel.Dock="Top" Text="PROMPT" Foreground="#DA7756" FontWeight="Bold"
+                                   FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,6"/>
+                        <!-- Active project name (bigger text) -->
+                        <TextBlock x:Name="ActiveProjectLabel" DockPanel.Dock="Top" Foreground="#E8E8E8"
+                                   FontSize="16" FontWeight="SemiBold" FontFamily="Segoe UI"
+                                   TextTrimming="CharacterEllipsis" Margin="0,0,0,8"/>
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,6,0,0">
                             <TextBlock x:Name="ImageIndicator" Foreground="#DA7756" FontSize="11"
                                        FontFamily="Segoe UI" VerticalAlignment="Center" Visibility="Collapsed"/>
@@ -1104,8 +1304,6 @@
                                     Style="{StaticResource GhostBtn}" Foreground="#A15252"
                                     Margin="6,0,0,0" Visibility="Collapsed"/>
                         </StackPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="PROMPT" Foreground="#DA7756" FontWeight="Bold"
-                                   FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,4"/>
                         <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
                                  MinHeight="80" MaxHeight="150"
                                  VerticalScrollBarVisibility="Auto"
@@ -1116,62 +1314,37 @@
                                  AllowDrop="True" PreviewDragOver="TaskInput_DragOver"
                                  Drop="TaskInput_Drop"/>
                     </DockPanel>
-                    <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center" Width="210">
-                        <Expander Style="{StaticResource DarkExpander}" IsExpanded="False" Margin="0,0,0,8">
-                            <Expander.Header>
-                                <TextBlock Text="OPTIONS" Foreground="#DA7756" FontWeight="Bold" FontSize="10"
-                                           FontFamily="Segoe UI"/>
-                            </Expander.Header>
-                            <StackPanel Margin="0,2,0,0">
-                                <ToggleButton x:Name="SkipPermissionsToggle" IsChecked="True"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
-                                    <TextBlock Text="Skip Permissions" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
-                                <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
-                                    <TextBlock Text="Remote Session" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
-                                <ToggleButton x:Name="HeadlessToggle" IsChecked="False"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
-                                    <TextBlock Text="Headless (Terminal)" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
-                                <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="False"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
-                                    <TextBlock Text="Ignore File Locks" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
-                                <ToggleButton x:Name="UseMcpToggle" IsChecked="False"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
-                                    <TextBlock Text="Use MCP" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
-                                <ToggleButton x:Name="SpawnTeamToggle" IsChecked="False"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8">
-                                    <TextBlock Text="Spawn Team" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
-                                <ToggleButton x:Name="OvernightToggle" IsChecked="False"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,8"
-                                              Checked="OvernightToggle_Changed" Unchecked="OvernightToggle_Changed">
-                                    <TextBlock Text="Overnight Task" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
-                                <ToggleButton x:Name="ExtendedPlanningToggle" IsChecked="False"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,4">
-                                    <TextBlock Text="Extended Planning" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
-                            </StackPanel>
-                        </Expander>
-                        <Button x:Name="ExecuteButton" Content="Execute Task" Click="Execute_Click"
-                                Background="#DA7756" Foreground="#FFF" Style="{StaticResource Btn}"
-                                FontSize="13" Padding="14,10"/>
-                        <TextBlock Text="Ctrl+Enter to execute" Foreground="#555" FontFamily="Segoe UI"
-                                   FontSize="10" Margin="0,6,0,0" HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Grid>
+                </DockPanel>
             </Border>
+                <Thumb Grid.Row="1" Cursor="SizeNS" Height="8" Margin="8,0,8,0"
+                       DragDelta="PromptResize_DragDelta">
+                    <Thumb.Template>
+                        <ControlTemplate TargetType="Thumb">
+                            <Grid Background="Transparent" Height="8">
+                                <Border x:Name="Indicator" Height="3" CornerRadius="1.5"
+                                        Background="#2A2A2A" HorizontalAlignment="Center" Width="30"
+                                        VerticalAlignment="Center" Opacity="0.4"/>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Indicator" Property="Background" Value="#DA7756"/>
+                                    <Setter TargetName="Indicator" Property="Opacity" Value="0.8"/>
+                                    <Setter TargetName="Indicator" Property="Width" Value="50"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Thumb.Template>
+                </Thumb>
+            </Grid>
         </Grid>
-
-        <GridSplitter Grid.Row="1" Style="{StaticResource HorizontalSplitter}"/>
 
         <!-- ═══ MAIN CONTENT ═══ -->
         <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="120" MinHeight="60"/>
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="270" MinWidth="150"/>
                 <ColumnDefinition Width="Auto"/>
@@ -1206,6 +1379,9 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Border.Triggers>
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="TASK LIST" Foreground="#DA7756" FontWeight="Bold"
+                               FontSize="10" FontFamily="Segoe UI" Margin="4,2,0,6"/>
                 <TabControl Background="Transparent" BorderThickness="0">
                     <TabItem>
                         <TabItem.Header>
@@ -1219,9 +1395,11 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             <DockPanel Grid.Row="0" Margin="4,0,0,8">
+                                <Button Content="Clear Finished" Click="ClearFinished_Click"
+                                        Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"/>
                                 <ComboBox x:Name="ActiveFilterCombo" SelectionChanged="ActiveFilter_Changed"
                                           FontSize="10" Padding="6,3"
-                                          HorizontalAlignment="Right"/>
+                                          HorizontalAlignment="Left"/>
                             </DockPanel>
                             <ListBox x:Name="ActiveTasksList" Grid.Row="1"
                                      Style="{StaticResource TaskListStyle}"
@@ -1245,7 +1423,7 @@
                                         Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"/>
                                 <ComboBox x:Name="HistoryFilterCombo" SelectionChanged="HistoryFilter_Changed"
                                           FontSize="10" Padding="6,3" Margin="0,0,4,0"
-                                          HorizontalAlignment="Right"/>
+                                          HorizontalAlignment="Left"/>
                             </DockPanel>
                             <ListBox x:Name="HistoryTasksList" Grid.Row="1"
                                      Style="{StaticResource TaskListStyle}"
@@ -1254,6 +1432,7 @@
                         </Grid>
                     </TabItem>
                 </TabControl>
+                </DockPanel>
             </Border>
 
             <!-- Vertical Splitter: Left ↔ Center -->
@@ -1286,7 +1465,7 @@
                     </EventTrigger>
                 </Border.Triggers>
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="OUTPUT" Foreground="#DA7756" FontWeight="Bold"
+                    <TextBlock DockPanel.Dock="Top" Text="TASK OUTPUT" Foreground="#DA7756" FontWeight="Bold"
                                FontSize="10" FontFamily="Segoe UI" Margin="8,6,0,4"/>
                     <TabControl x:Name="OutputTabs" Style="{StaticResource OutputTabControlStyle}"
                                 SizeChanged="OutputTabs_SizeChanged"/>
@@ -1296,7 +1475,7 @@
             <!-- Vertical Splitter: Center ↔ Right -->
             <GridSplitter Grid.Column="3" Style="{StaticResource VerticalSplitter}"/>
 
-            <!-- Right: File Locks + Projects + Options -->
+            <!-- Right: File Locks + Projects + Advanced -->
             <Border Grid.Column="4" Background="#222222" CornerRadius="8" Padding="4"
                     BorderThickness="1">
                 <Border.BorderBrush>
@@ -1322,6 +1501,9 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Border.Triggers>
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="SETTINGS" Foreground="#DA7756" FontWeight="Bold"
+                               FontSize="10" FontFamily="Segoe UI" Margin="8,6,0,4"/>
                 <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0">
                     <!-- File Locks tab -->
                     <TabItem x:Name="FileLocksTabHeader">
@@ -1412,10 +1594,10 @@
                             </ScrollViewer>
                         </DockPanel>
                     </TabItem>
-                    <!-- Options tab -->
+                    <!-- Advanced tab -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Options" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Advanced" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                             <StackPanel MaxWidth="600">
@@ -1453,12 +1635,89 @@
 
                                 <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
 
+                                <!-- Short Description -->
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Short Description" Foreground="#DA7756" FontWeight="Bold"
+                                               FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                    <ToggleButton x:Name="EditShortDescToggle"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="12,0,0,0"
+                                                  Checked="EditShortDescToggle_Changed"
+                                                  Unchecked="EditShortDescToggle_Changed">
+                                        <TextBlock Text="Edit" Foreground="#888" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                </DockPanel>
+                                <TextBox x:Name="ShortDescBox" AcceptsReturn="True" TextWrapping="Wrap"
+                                         MinHeight="60" MaxHeight="160"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Background="#191919" Foreground="#CCC"
+                                         CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                         FontSize="12" FontFamily="Consolas" Padding="10"
+                                         IsReadOnly="True" Opacity="0.6"/>
+                                <DockPanel Margin="0,6,0,0">
+                                    <TextBlock Text="A brief summary of the active project, sent with each task."
+                                               Foreground="#555" FontSize="11" FontFamily="Segoe UI"
+                                               VerticalAlignment="Center"/>
+                                    <StackPanel x:Name="ShortDescEditButtons" Orientation="Horizontal"
+                                                HorizontalAlignment="Right" Visibility="Collapsed">
+                                        <Button Content="Save" Click="SaveShortDesc_Click"
+                                                Background="#5CB85C" Style="{StaticResource SmallBtn}"
+                                                Padding="12,4" FontSize="11"/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+
+                                <!-- Long Description -->
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Long Description" Foreground="#DA7756" FontWeight="Bold"
+                                               FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                    <ToggleButton x:Name="EditLongDescToggle"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="12,0,0,0"
+                                                  Checked="EditLongDescToggle_Changed"
+                                                  Unchecked="EditLongDescToggle_Changed">
+                                        <TextBlock Text="Edit" Foreground="#888" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                </DockPanel>
+                                <TextBox x:Name="LongDescBox" AcceptsReturn="True" TextWrapping="Wrap"
+                                         MinHeight="120" MaxHeight="300"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Background="#191919" Foreground="#CCC"
+                                         CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                         FontSize="12" FontFamily="Consolas" Padding="10"
+                                         IsReadOnly="True" Opacity="0.6"/>
+                                <DockPanel Margin="0,6,0,0">
+                                    <TextBlock Text="Detailed project description used when Extended Planning is enabled."
+                                               Foreground="#555" FontSize="11" FontFamily="Segoe UI"
+                                               VerticalAlignment="Center"/>
+                                    <StackPanel x:Name="LongDescEditButtons" Orientation="Horizontal"
+                                                HorizontalAlignment="Right" Visibility="Collapsed">
+                                        <Button Content="Save" Click="SaveLongDesc_Click"
+                                                Background="#5CB85C" Style="{StaticResource SmallBtn}"
+                                                Padding="12,4" FontSize="11"/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Button x:Name="RegenerateDescBtn" Content="Regenerate Descriptions"
+                                        Click="RegenerateDescriptions_Click"
+                                        Background="#DA7756" Foreground="White"
+                                        FontSize="12" FontFamily="Segoe UI" FontWeight="SemiBold"
+                                        Padding="16,8" Margin="0,16,0,0"
+                                        HorizontalAlignment="Left"
+                                        Style="{StaticResource SmallBtn}"/>
+
+                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+
                                 <TextBlock Text="Defaults" Foreground="#DA7756" FontWeight="Bold"
                                            FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,12"/>
                                 <ToggleButton x:Name="DefaultSkipPermsToggle" IsChecked="True"
                                               Style="{StaticResource ToggleSwitch}" Margin="0,0,0,14"
                                               Checked="DefaultToggle_Changed" Unchecked="DefaultToggle_Changed">
                                     <TextBlock Text="Skip Permissions by default" Foreground="#CCC"
+                                               FontSize="12" FontFamily="Segoe UI"/>
+                                </ToggleButton>
+                                <ToggleButton x:Name="DefaultNoGitWriteToggle" IsChecked="True"
+                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,14">
+                                    <TextBlock Text="No Git Write by default" Foreground="#CCC"
                                                FontSize="12" FontFamily="Segoe UI"/>
                                 </ToggleButton>
 
@@ -1485,6 +1744,7 @@
                         </ScrollViewer>
                     </TabItem>
                 </TabControl>
+                </DockPanel>
             </Border>
         </Grid>
 
@@ -1518,6 +1778,14 @@
                 </EventTrigger>
             </Border.Triggers>
             <DockPanel>
+                <!-- Root path display (very bottom) -->
+                <Border DockPanel.Dock="Bottom" Background="#181818" CornerRadius="0,0,6,6"
+                        Padding="8,3" Margin="0,2,0,0">
+                    <TextBlock x:Name="TerminalRootPath"
+                               Foreground="#666666" FontFamily="Consolas" FontSize="10"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                </Border>
                 <DockPanel DockPanel.Dock="Bottom" Margin="4,2,4,4">
                     <Button x:Name="TerminalInterruptBtn" Content="Ctrl+C" DockPanel.Dock="Right"
                             Background="#A15252" Foreground="#E8E8E8"

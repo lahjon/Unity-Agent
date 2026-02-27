@@ -20,6 +20,7 @@ namespace UnityAgent
         private readonly TextBox _input;
         private readonly Button _sendBtn;
         private readonly Button _interruptBtn;
+        private readonly System.Windows.Controls.TextBlock _rootPathDisplay;
         private readonly Dispatcher _dispatcher;
         private string _defaultWorkingDirectory;
 
@@ -29,6 +30,7 @@ namespace UnityAgent
             TextBox input,
             Button sendBtn,
             Button interruptBtn,
+            System.Windows.Controls.TextBlock rootPathDisplay,
             Dispatcher dispatcher,
             string defaultWorkingDirectory)
         {
@@ -37,6 +39,7 @@ namespace UnityAgent
             _input = input;
             _sendBtn = sendBtn;
             _interruptBtn = interruptBtn;
+            _rootPathDisplay = rootPathDisplay;
             _dispatcher = dispatcher;
             _defaultWorkingDirectory = defaultWorkingDirectory;
             UpdateInputState();
@@ -47,6 +50,45 @@ namespace UnityAgent
         public void UpdateWorkingDirectory(string directory)
         {
             _defaultWorkingDirectory = directory;
+
+            // Replace terminals that haven't been used by the user
+            for (int i = _terminals.Count - 1; i >= 0; i--)
+            {
+                if (!_terminals[i].HasBeenUsed)
+                {
+                    var wasActive = i == _activeIndex;
+                    var terminal = _terminals[i];
+                    _terminals.RemoveAt(i);
+                    terminal.Dispose();
+
+                    // Insert a fresh terminal at the same position
+                    var wd = Directory.Exists(directory)
+                        ? directory
+                        : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+                    ConPtyTerminal fresh;
+                    try
+                    {
+                        fresh = new ConPtyTerminal(wd);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    WireTerminalEvents(fresh);
+                    _terminals.Insert(i, fresh);
+
+                    if (wasActive)
+                    {
+                        _activeIndex = i;
+                        LoadActiveOutput();
+                    }
+                }
+            }
+
+            RebuildTabBar();
+            UpdateRootPathDisplay();
         }
 
         // ── Add / Close / Switch ────────────────────────────────────
@@ -74,7 +116,17 @@ namespace UnityAgent
                 return;
             }
 
-            var tabNum = _nextTabNumber++;
+            _nextTabNumber++;
+            WireTerminalEvents(terminal);
+
+            _terminals.Add(terminal);
+            SwitchTo(_terminals.Count - 1);
+            RebuildTabBar();
+            UpdateInputState();
+        }
+
+        private void WireTerminalEvents(ConPtyTerminal terminal)
+        {
             terminal.OutputReceived += text =>
             {
                 _dispatcher.BeginInvoke(() =>
@@ -98,15 +150,9 @@ namespace UnityAgent
                         _output.AppendText("\n[Terminal exited]\n");
                         _output.ScrollToEnd();
                     }
-                    // Update tab to show exited state
                     RebuildTabBar();
                 });
             };
-
-            _terminals.Add(terminal);
-            SwitchTo(_terminals.Count - 1);
-            RebuildTabBar();
-            UpdateInputState();
         }
 
         public void CloseTerminal(int index)
@@ -139,6 +185,7 @@ namespace UnityAgent
             LoadActiveOutput();
             RebuildTabBar();
             UpdateInputState();
+            UpdateRootPathDisplay();
         }
 
         public void SwitchTo(int index)
@@ -147,6 +194,7 @@ namespace UnityAgent
             _activeIndex = index;
             LoadActiveOutput();
             RebuildTabBar();
+            UpdateRootPathDisplay();
             _input.Focus();
         }
 
@@ -174,6 +222,7 @@ namespace UnityAgent
             {
                 _input.Clear();
                 _output.Text = "[No terminal — click + to open one]\n";
+                _rootPathDisplay.Text = "";
             }
         }
 
@@ -190,6 +239,7 @@ namespace UnityAgent
 
             var terminal = _terminals[_activeIndex];
             terminal.HistoryIndex = -1;
+            terminal.HasBeenUsed = true;
 
             if (!string.IsNullOrWhiteSpace(cmd))
                 terminal.CommandHistory.Add(cmd);
@@ -261,6 +311,16 @@ namespace UnityAgent
                 }
                 e.Handled = true;
             }
+        }
+
+        // ── Root Path Display ──────────────────────────────────────
+
+        private void UpdateRootPathDisplay()
+        {
+            if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
+                _rootPathDisplay.Text = _terminals[_activeIndex].WorkingDirectory;
+            else
+                _rootPathDisplay.Text = "";
         }
 
         // ── Tab Bar ─────────────────────────────────────────────────

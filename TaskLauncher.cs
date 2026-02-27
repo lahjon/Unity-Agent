@@ -28,6 +28,15 @@ namespace UnityAgent
             "inspecting GameObjects, and any other Unity Editor operations that cannot be " +
             "done through file edits alone. ";
 
+        public const string NoGitWriteBlock =
+            "# STRICT RULE — NO GIT WRITE OPERATIONS\n" +
+            "You must NEVER execute any git command that writes, pushes, creates, or modifies repository state. " +
+            "This includes but is not limited to: git push, git commit, git add, git init, git merge, git rebase, " +
+            "git cherry-pick, git revert, git reset, git checkout -b, git branch, git tag, git stash, git clone, " +
+            "git pull, git fetch, git remote add, and git mv. " +
+            "Read-only git commands such as git status, git log, git diff, and git show are permitted. " +
+            "If the task requires a git write operation, refuse and explain that git write operations are disabled.\n\n";
+
         public const string ExtendedPlanningBlock =
             "# EXTENDED PLANNING MODE\n" +
             "Before beginning any implementation, you MUST first deeply analyze and enhance the task prompt. " +
@@ -134,6 +143,7 @@ namespace UnityAgent
             bool useMcp,
             bool spawnTeam = false,
             bool extendedPlanning = false,
+            bool noGitWrite = false,
             List<string>? imagePaths = null)
         {
             var task = new AgentTask
@@ -147,6 +157,7 @@ namespace UnityAgent
                 UseMcp = useMcp,
                 SpawnTeam = spawnTeam,
                 ExtendedPlanning = extendedPlanning,
+                NoGitWrite = noGitWrite,
                 MaxIterations = 50,
                 ProjectPath = projectPath
             };
@@ -157,19 +168,24 @@ namespace UnityAgent
 
         // ── Prompt Building ──────────────────────────────────────────
 
-        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false)
+        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, string projectDescription = "")
         {
+            var descBlock = "";
+            if (!string.IsNullOrWhiteSpace(projectDescription))
+                descBlock = $"# PROJECT CONTEXT\n{projectDescription}\n\n";
+
             if (isOvernight)
-                return OvernightInitialTemplate + description;
+                return descBlock + OvernightInitialTemplate + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
-            return systemPrompt + mcpBlock + planningBlock + description;
+            var gitBlock = noGitWrite ? NoGitWriteBlock : "";
+            return descBlock + systemPrompt + gitBlock + mcpBlock + planningBlock + description;
         }
 
-        public static string BuildFullPrompt(string systemPrompt, AgentTask task)
+        public static string BuildFullPrompt(string systemPrompt, AgentTask task, string projectDescription = "")
         {
-            var basePrompt = BuildBasePrompt(systemPrompt, task.Description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning);
+            var basePrompt = BuildBasePrompt(systemPrompt, task.Description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, projectDescription);
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 basePrompt = $"# Task: {task.Summary}\n{basePrompt}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
@@ -311,7 +327,7 @@ namespace UnityAgent
                 process.Start();
 
                 await process.StandardInput.WriteAsync(
-                    $"Create a short title (3-8 words) for this task. Reply with ONLY the title, nothing else.\n\nTask: {input}");
+                    $"Create a very short title (2-5 words) for this task. Reply with ONLY the title, nothing else.\n\nTask: {input}");
                 process.StandardInput.Close();
 
                 var output = await process.StandardOutput.ReadToEndAsync();
@@ -321,9 +337,9 @@ namespace UnityAgent
                 // Strip quotes if the model wrapped it
                 if (summary.StartsWith('"') && summary.EndsWith('"'))
                     summary = summary[1..^1].Trim();
-                // Sanity: cap at 60 chars
-                if (summary.Length > 60)
-                    summary = summary[..60];
+                // Sanity: cap at 40 chars
+                if (summary.Length > 40)
+                    summary = summary[..40];
 
                 return string.IsNullOrWhiteSpace(summary) ? "" : summary;
             }
@@ -333,11 +349,190 @@ namespace UnityAgent
             }
         }
 
+        // ── Project Description Generation ──────────────────────────
+
+        public static async System.Threading.Tasks.Task<(string Short, string Long)> GenerateProjectDescriptionAsync(string projectPath)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "claude",
+                    Arguments = "-p --max-turns 5 --output-format text",
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    WorkingDirectory = projectPath
+                };
+                psi.Environment.Remove("CLAUDECODE");
+
+                var process = new Process { StartInfo = psi };
+                process.Start();
+
+                await process.StandardInput.WriteAsync(
+                    "Analyze this project directory. Respond with EXACTLY two sections separated by '---SEPARATOR---':\n\n" +
+                    "SECTION 1 - SHORT DESCRIPTION (1-2 sentences, max 150 chars):\n" +
+                    "A brief summary of what this project is and its tech stack.\n\n" +
+                    "SECTION 2 - LONG DESCRIPTION (1-2 paragraphs):\n" +
+                    "A detailed summary covering: project purpose, tech stack, architecture, " +
+                    "key directories/files, main components, and any important patterns or conventions.\n\n" +
+                    "Output ONLY the two sections with the separator. No labels, no headers.");
+                process.StandardInput.Close();
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                var text = StripAnsi(output).Trim();
+
+                // Detect error outputs (e.g. "Error: Reached max turns")
+                if (text.StartsWith("Error:", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Reached max turns", StringComparison.OrdinalIgnoreCase))
+                    return ("", "");
+
+                var parts = text.Split("---SEPARATOR---", 2, StringSplitOptions.TrimEntries);
+
+                var shortDesc = parts.Length > 0 ? CleanDescriptionSection(parts[0]) : "";
+                var longDesc = parts.Length > 1 ? CleanDescriptionSection(parts[1]) : shortDesc;
+
+                // Cap short description at 200 chars
+                if (shortDesc.Length > 200)
+                    shortDesc = shortDesc[..200];
+
+                return (shortDesc, longDesc);
+            }
+            catch
+            {
+                return ("", "");
+            }
+        }
+
+        // ── Completion Summary ──────────────────────────────────────
+
+        public static string? CaptureGitHead(string projectPath)
+        {
+            return RunGitCommand(projectPath, "rev-parse HEAD");
+        }
+
+        public static List<(string name, int added, int removed)>? GetGitFileChanges(string projectPath, string? gitStartHash)
+        {
+            var diffRef = gitStartHash ?? "HEAD";
+            var numstatOutput = RunGitCommand(projectPath, $"diff {diffRef} --numstat");
+            if (numstatOutput == null) return null;
+
+            var files = new List<(string name, int added, int removed)>();
+            foreach (var line in numstatOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length < 3) continue;
+                var added = parts[0] == "-" ? 0 : int.TryParse(parts[0], out var a) ? a : 0;
+                var removed = parts[1] == "-" ? 0 : int.TryParse(parts[1], out var r) ? r : 0;
+                files.Add((parts[2], added, removed));
+            }
+            return files;
+        }
+
+        public static string FormatCompletionSummary(
+            AgentTaskStatus status,
+            TimeSpan duration,
+            List<(string name, int added, int removed)>? fileChanges)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine("═══════════════════════════════════════════");
+            sb.AppendLine(" TASK COMPLETION SUMMARY");
+            sb.AppendLine("───────────────────────────────────────────");
+            sb.AppendLine($" Status: {status}");
+            sb.AppendLine($" Duration: {(int)duration.TotalMinutes}m {duration.Seconds}s");
+
+            if (fileChanges != null)
+            {
+                var totalAdded = 0;
+                var totalRemoved = 0;
+                foreach (var (_, added, removed) in fileChanges)
+                {
+                    totalAdded += added;
+                    totalRemoved += removed;
+                }
+
+                sb.AppendLine($" Files modified: {fileChanges.Count}");
+                sb.AppendLine($" Lines changed: +{totalAdded} / -{totalRemoved}");
+
+                if (fileChanges.Count > 0)
+                {
+                    sb.AppendLine("───────────────────────────────────────────");
+                    sb.AppendLine(" Modified files:");
+                    foreach (var (name, added, removed) in fileChanges)
+                        sb.AppendLine($"   {name} | +{added} -{removed}");
+                }
+            }
+            else
+            {
+                sb.AppendLine(" Files modified: (git not available)");
+            }
+
+            sb.AppendLine("═══════════════════════════════════════════");
+            return sb.ToString();
+        }
+
+        public static string GenerateCompletionSummary(string projectPath, string? gitStartHash, AgentTaskStatus status, TimeSpan duration)
+        {
+            try
+            {
+                var fileChanges = GetGitFileChanges(projectPath, gitStartHash);
+                return FormatCompletionSummary(status, duration, fileChanges);
+            }
+            catch
+            {
+                return FormatCompletionSummary(status, duration, null);
+            }
+        }
+
+        private static string? RunGitCommand(string workingDirectory, string arguments)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = arguments,
+                    WorkingDirectory = workingDirectory,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                var process = Process.Start(psi);
+                if (process == null) return null;
+                var output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit(5000);
+                return process.ExitCode == 0 ? output.Trim() : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         // ── Utilities ────────────────────────────────────────────────
 
         public static string StripAnsi(string text)
         {
             return Regex.Replace(text, @"\x1B(?:\[[0-9;]*[a-zA-Z]|\].*?(?:\x07|\x1B\\))", "");
+        }
+
+        private static string CleanDescriptionSection(string text)
+        {
+            var cleaned = text.Trim();
+            // Strip common section label patterns Claude might include
+            cleaned = Regex.Replace(cleaned, @"^(?:SECTION\s*\d+\s*[-:–]\s*)?(?:SHORT|LONG)\s+DESCRIPTION\s*[:–\-]?\s*", "", RegexOptions.IgnoreCase);
+            cleaned = Regex.Replace(cleaned, @"^#{1,3}\s+.*\n", "", RegexOptions.Multiline);
+            // Strip surrounding quotes
+            if (cleaned.Length >= 2 && cleaned[0] == '"' && cleaned[^1] == '"')
+                cleaned = cleaned[1..^1];
+            return cleaned.Trim();
         }
 
         public static bool IsImageFile(string path)
