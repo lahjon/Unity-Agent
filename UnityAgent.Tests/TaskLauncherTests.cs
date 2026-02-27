@@ -311,6 +311,36 @@ namespace UnityAgent.Tests
             Assert.Contains("Press any key to close", script);
         }
 
+        [Fact]
+        public void BuildHeadlessPowerShellScript_ContainsVerbose()
+        {
+            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            Assert.Contains("--verbose", script);
+        }
+
+        [Fact]
+        public void BuildHeadlessPowerShellScript_ContainsDiagnosticMessages()
+        {
+            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            Assert.Contains("Starting Claude", script);
+            Assert.Contains("Project:", script);
+        }
+
+        [Fact]
+        public void BuildHeadlessPowerShellScript_ContainsErrorHandling()
+        {
+            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            Assert.Contains("LASTEXITCODE", script);
+        }
+
+        [Fact]
+        public void BuildHeadlessPowerShellScript_PipesPromptToStdin()
+        {
+            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            Assert.Contains("Get-Content -Raw", script);
+            Assert.Contains("| claude -p", script);
+        }
+
         // ── ProcessStartInfo ────────────────────────────────────────
 
         [Fact]
@@ -350,6 +380,13 @@ namespace UnityAgent.Tests
         {
             var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
             Assert.DoesNotContain("-NoExit", psi.Arguments);
+        }
+
+        [Fact]
+        public void BuildProcessStartInfo_Headless_NoProfile()
+        {
+            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: true);
+            Assert.Contains("-NoProfile", psi.Arguments);
         }
 
         [Fact]
@@ -599,6 +636,14 @@ namespace UnityAgent.Tests
         public void DefaultSystemPrompt_EndsWithTask()
         {
             Assert.EndsWith("# TASK: ", TaskLauncher.DefaultSystemPrompt);
+        }
+
+        [Fact]
+        public void DefaultSystemPrompt_ContainsNoSecretsRule()
+        {
+            Assert.Contains("NO SECRETS IN PROJECT", TaskLauncher.DefaultSystemPrompt);
+            Assert.Contains("API keys", TaskLauncher.DefaultSystemPrompt);
+            Assert.Contains("%LOCALAPPDATA%", TaskLauncher.DefaultSystemPrompt);
         }
 
         [Fact]

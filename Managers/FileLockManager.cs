@@ -1,0 +1,236 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
+
+namespace UnityAgent.Managers
+{
+    public class FileLockManager
+    {
+        private readonly Dictionary<string, FileLock> _fileLocks = new();
+        private readonly ObservableCollection<FileLock> _fileLocksView = new();
+        private readonly Dictionary<string, HashSet<string>> _taskLockedFiles = new();
+        private readonly Dictionary<string, QueuedTaskInfo> _queuedTaskInfo = new();
+        private readonly TextBlock _fileLockBadge;
+        private readonly Dispatcher _dispatcher;
+
+        public event Action<string>? QueuedTaskResumed;
+
+        public Dictionary<string, QueuedTaskInfo> QueuedTaskInfos => _queuedTaskInfo;
+        public int LockCount => _fileLocks.Count;
+        public ObservableCollection<FileLock> FileLocksView => _fileLocksView;
+
+        public FileLockManager(TextBlock fileLockBadge, Dispatcher dispatcher)
+        {
+            _fileLockBadge = fileLockBadge;
+            _dispatcher = dispatcher;
+        }
+
+        public bool TryAcquireOrConflict(string taskId, string filePath, string toolName,
+            ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
+        {
+            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
+            if (task?.IgnoreFileLocks == true)
+            {
+                TryAcquireFileLock(taskId, filePath, toolName, activeTasks, isIgnored: true);
+                return true;
+            }
+            if (!TryAcquireFileLock(taskId, filePath, toolName, activeTasks))
+            {
+                HandleFileLockConflict(taskId, filePath, toolName, activeTasks, appendOutput);
+                return false;
+            }
+            return true;
+        }
+
+        public bool TryAcquireFileLock(string taskId, string filePath, string toolName,
+            ObservableCollection<AgentTask> activeTasks, bool isIgnored = false)
+        {
+            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
+            var basePath = task?.ProjectPath;
+            var normalized = TaskLauncher.NormalizePath(filePath, basePath);
+
+            if (_fileLocks.TryGetValue(normalized, out var existing))
+            {
+                if (existing.OwnerTaskId == taskId)
+                {
+                    existing.ToolName = toolName;
+                    existing.AcquiredAt = DateTime.Now;
+                    existing.IsIgnored = isIgnored;
+                    existing.OnPropertyChanged(nameof(FileLock.ToolName));
+                    existing.OnPropertyChanged(nameof(FileLock.TimeText));
+                    existing.OnPropertyChanged(nameof(FileLock.StatusText));
+                    return true;
+                }
+                return false;
+            }
+
+            var fileLock = new FileLock
+            {
+                NormalizedPath = normalized,
+                OriginalPath = filePath,
+                OwnerTaskId = taskId,
+                ToolName = toolName,
+                AcquiredAt = DateTime.Now,
+                IsIgnored = isIgnored
+            };
+            _fileLocks[normalized] = fileLock;
+            _fileLocksView.Add(fileLock);
+
+            if (!_taskLockedFiles.TryGetValue(taskId, out var files))
+            {
+                files = new HashSet<string>();
+                _taskLockedFiles[taskId] = files;
+            }
+            files.Add(normalized);
+
+            UpdateFileLockBadge();
+            return true;
+        }
+
+        public void ReleaseTaskLocks(string taskId)
+        {
+            if (!_taskLockedFiles.TryGetValue(taskId, out var files)) return;
+
+            foreach (var path in files)
+            {
+                if (_fileLocks.TryGetValue(path, out var fl))
+                {
+                    _fileLocks.Remove(path);
+                    _fileLocksView.Remove(fl);
+                }
+            }
+            _taskLockedFiles.Remove(taskId);
+            UpdateFileLockBadge();
+        }
+
+        public void HandleFileLockConflict(string taskId, string filePath, string toolName,
+            ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
+        {
+            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
+            if (task == null) return;
+
+            var normalized = TaskLauncher.NormalizePath(filePath, task.ProjectPath);
+            var blockingLock = _fileLocks.GetValueOrDefault(normalized);
+            var blockingTaskId = blockingLock?.OwnerTaskId ?? "unknown";
+
+            appendOutput(taskId, $"\n[UnityAgent] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId} ({toolName})\n");
+            appendOutput(taskId, $"[UnityAgent] Killing task #{taskId} and queuing for auto-resume...\n");
+
+            KillProcess(task);
+            ReleaseTaskLocks(taskId);
+
+            task.Status = AgentTaskStatus.Queued;
+            task.QueuedReason = $"File locked: {Path.GetFileName(filePath)} by #{blockingTaskId}";
+            task.BlockedByTaskId = blockingTaskId;
+
+            var blockedByIds = new HashSet<string> { blockingTaskId };
+            _queuedTaskInfo[taskId] = new QueuedTaskInfo
+            {
+                Task = task,
+                ConflictingFilePath = normalized,
+                BlockingTaskId = blockingTaskId,
+                BlockedByTaskIds = blockedByIds
+            };
+        }
+
+        public void CheckQueuedTasks(ObservableCollection<AgentTask> activeTasks)
+        {
+            var toResume = new List<string>();
+
+            foreach (var kvp in _queuedTaskInfo)
+            {
+                var qi = kvp.Value;
+                var allClear = true;
+                foreach (var blockerId in qi.BlockedByTaskIds)
+                {
+                    var blocker = activeTasks.FirstOrDefault(t => t.Id == blockerId);
+                    if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Ongoing)
+                    {
+                        allClear = false;
+                        break;
+                    }
+                }
+
+                if (allClear && _fileLocks.ContainsKey(qi.ConflictingFilePath))
+                    allClear = false;
+
+                if (allClear)
+                    toResume.Add(kvp.Key);
+            }
+
+            foreach (var taskId in toResume)
+            {
+                if (!_queuedTaskInfo.TryGetValue(taskId, out var qi)) continue;
+                _queuedTaskInfo.Remove(taskId);
+
+                var task = qi.Task;
+                task.Status = AgentTaskStatus.Running;
+                task.QueuedReason = null;
+                task.BlockedByTaskId = null;
+                task.StartTime = DateTime.Now;
+
+                QueuedTaskResumed?.Invoke(taskId);
+            }
+        }
+
+        public void ForceStartQueuedTask(AgentTask task)
+        {
+            _queuedTaskInfo.Remove(task.Id);
+            task.Status = AgentTaskStatus.Running;
+            task.QueuedReason = null;
+            task.BlockedByTaskId = null;
+            task.StartTime = DateTime.Now;
+
+            QueuedTaskResumed?.Invoke(task.Id);
+        }
+
+        public void RemoveQueuedInfo(string taskId) => _queuedTaskInfo.Remove(taskId);
+
+        public void ClearAll()
+        {
+            _fileLocks.Clear();
+            _fileLocksView.Clear();
+            _taskLockedFiles.Clear();
+            _queuedTaskInfo.Clear();
+        }
+
+        private void UpdateFileLockBadge()
+        {
+            var count = _fileLocks.Count;
+            _fileLockBadge.Text = count.ToString();
+            _fileLockBadge.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static void KillProcess(AgentTask task)
+        {
+            try
+            {
+                if (task.Process is { HasExited: false })
+                    task.Process.Kill(true);
+            }
+            catch { }
+        }
+
+        public static string? TryExtractFilePathFromPartial(string partialJson)
+        {
+            var match = Regex.Match(partialJson, @"""file_path""\s*:\s*""([^""]+)""");
+            return match.Success ? match.Groups[1].Value : null;
+        }
+
+        public static string? ExtractFilePath(JsonElement input)
+        {
+            if (input.TryGetProperty("file_path", out var fp))
+                return fp.GetString();
+            if (input.TryGetProperty("path", out var p))
+                return p.GetString();
+            return null;
+        }
+    }
+}

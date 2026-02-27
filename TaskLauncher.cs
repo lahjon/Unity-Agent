@@ -15,6 +15,12 @@ namespace UnityAgent
             "# STRICT RULE " +
             "Never access, read, write, or reference any files outside the project root directory. " +
             "All operations must stay within ./ " +
+            "# STRICT RULE — NO SECRETS IN PROJECT " +
+            "Never store personal security information directly in project files. " +
+            "This includes API keys, tokens, passwords, secrets, credentials, and any other sensitive data. " +
+            "If a task requires storing such values, they MUST be placed in the system AppData directory " +
+            "(%LOCALAPPDATA%\\UnityAgent\\) — never in source code, config files, or any file within the project tree. " +
+            "If you encounter hardcoded secrets in the project, flag them to the user and recommend moving them to AppData. " +
             "# TASK: ";
 
         public const string McpPromptBlock =
@@ -36,6 +42,13 @@ namespace UnityAgent
             "git pull, git fetch, git remote add, and git mv. " +
             "Read-only git commands such as git status, git log, git diff, and git show are permitted. " +
             "If the task requires a git write operation, refuse and explain that git write operations are disabled.\n\n";
+
+        public const string GameRulesBlock =
+            "# GAME CREATION RULES\n" +
+            "This task involves creating a new game. Before writing any code, you MUST read the game rules file:\n" +
+            "Read the file `Games/GAME_RULES.md` — it contains the exact interface, theme colors, UI patterns, " +
+            "button templates, and registration steps you must follow.\n" +
+            "Do NOT deviate from the patterns defined in that file. Follow them exactly.\n\n";
 
         public const string ExtendedPlanningBlock =
             "# EXTENDED PLANNING MODE\n" +
@@ -123,6 +136,25 @@ namespace UnityAgent
             "Use COMPLETE only when ALL checklist items are done AND all exit criteria are met.\n\n" +
             "Continue working on the task now.";
 
+        // ── Game Detection ──────────────────────────────────────────
+
+        private static readonly string[] GameKeywords = { "game", "minigame", "mini-game" };
+
+        public static bool IsGameCreationTask(string description)
+        {
+            var lower = description.ToLowerInvariant();
+            bool mentionsGame = false;
+            foreach (var kw in GameKeywords)
+            {
+                if (lower.Contains(kw)) { mentionsGame = true; break; }
+            }
+            if (!mentionsGame) return false;
+
+            return lower.Contains("create") || lower.Contains("add") ||
+                   lower.Contains("build") || lower.Contains("make") ||
+                   lower.Contains("implement") || lower.Contains("new");
+        }
+
         // ── Validation ───────────────────────────────────────────────
 
         public static bool ValidateTaskInput(string? description)
@@ -144,7 +176,8 @@ namespace UnityAgent
             bool spawnTeam = false,
             bool extendedPlanning = false,
             bool noGitWrite = false,
-            List<string>? imagePaths = null)
+            List<string>? imagePaths = null,
+            ModelType model = ModelType.ClaudeCode)
         {
             var task = new AgentTask
             {
@@ -158,6 +191,7 @@ namespace UnityAgent
                 SpawnTeam = spawnTeam,
                 ExtendedPlanning = extendedPlanning,
                 NoGitWrite = noGitWrite,
+                Model = model,
                 MaxIterations = 50,
                 ProjectPath = projectPath
             };
@@ -180,7 +214,8 @@ namespace UnityAgent
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
             var gitBlock = noGitWrite ? NoGitWriteBlock : "";
-            return descBlock + systemPrompt + gitBlock + mcpBlock + planningBlock + description;
+            var gameBlock = IsGameCreationTask(description) ? GameRulesBlock : "";
+            return descBlock + systemPrompt + gitBlock + mcpBlock + planningBlock + gameBlock + description;
         }
 
         public static string BuildFullPrompt(string systemPrompt, AgentTask task, string projectDescription = "")
@@ -230,8 +265,12 @@ namespace UnityAgent
             var teamFlag = spawnTeam ? " --spawn-team" : "";
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
-                   $"$prompt = Get-Content -Raw -LiteralPath '{promptFilePath}'\n" +
-                   $"claude -p{skipFlag}{remoteFlag}{teamFlag} $prompt\n" +
+                   $"Write-Host '[UnityAgent] Project: {projectPath}' -ForegroundColor DarkGray\n" +
+                   $"Write-Host '[UnityAgent] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
+                   "Write-Host '[UnityAgent] Starting Claude...' -ForegroundColor Cyan\n" +
+                   "Write-Host ''\n" +
+                   $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{remoteFlag}{teamFlag} --verbose\n" +
+                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[UnityAgent] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
                    "Write-Host \"`n[UnityAgent] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
                    "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n";
         }
@@ -243,7 +282,7 @@ namespace UnityAgent
                 return new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
-                    Arguments = $"-ExecutionPolicy Bypass -NoExit -File \"{ps1FilePath}\"",
+                    Arguments = $"-ExecutionPolicy Bypass -NoProfile -NoExit -File \"{ps1FilePath}\"",
                     UseShellExecute = true
                 };
             }
@@ -358,7 +397,7 @@ namespace UnityAgent
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = "-p --max-turns 5 --output-format text",
+                    Arguments = "-p --max-turns 15 --output-format text",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -373,13 +412,22 @@ namespace UnityAgent
                 process.Start();
 
                 await process.StandardInput.WriteAsync(
-                    "Analyze this project directory. Respond with EXACTLY two sections separated by '---SEPARATOR---':\n\n" +
+                    "You are a codebase exploration agent. Your job is to thoroughly explore this project's actual source code before writing any description.\n\n" +
+                    "STEP 1 — EXPLORE (use your tools, do NOT guess):\n" +
+                    "- List the top-level directory structure\n" +
+                    "- Read project config files (.csproj, package.json, Cargo.toml, etc.)\n" +
+                    "- Read the main entry point and key source files\n" +
+                    "- Identify the architecture, patterns, and major components from the actual code\n" +
+                    "- Check for README or docs if they exist\n\n" +
+                    "STEP 2 — After you have explored the codebase, respond with EXACTLY two sections separated by '---SEPARATOR---':\n\n" +
                     "SECTION 1 - SHORT DESCRIPTION (1-2 sentences, max 150 chars):\n" +
-                    "A brief summary of what this project is and its tech stack.\n\n" +
+                    "A brief summary of what this project is and its tech stack, based on what you actually read.\n\n" +
                     "SECTION 2 - LONG DESCRIPTION (1-2 paragraphs):\n" +
                     "A detailed summary covering: project purpose, tech stack, architecture, " +
-                    "key directories/files, main components, and any important patterns or conventions.\n\n" +
-                    "Output ONLY the two sections with the separator. No labels, no headers.");
+                    "key directories/files, main components, and any important patterns or conventions — all based on the actual code you explored.\n\n" +
+                    "IMPORTANT: Do NOT describe the project based on assumptions or the project name alone. " +
+                    "Base your descriptions entirely on what you found by reading the actual files.\n" +
+                    "Output ONLY the two sections with the separator in your final response. No labels, no headers.");
                 process.StandardInput.Close();
 
                 var output = await process.StandardOutput.ReadToEndAsync();

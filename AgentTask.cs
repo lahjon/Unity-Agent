@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -16,6 +17,12 @@ namespace UnityAgent
         Failed,
         Queued,
         Ongoing
+    }
+
+    public enum ModelType
+    {
+        ClaudeCode,
+        Gemini
     }
 
     public class AgentTask : INotifyPropertyChanged
@@ -32,6 +39,7 @@ namespace UnityAgent
         public bool SpawnTeam { get; set; }
         public bool ExtendedPlanning { get; set; }
         public bool NoGitWrite { get; set; }
+        public ModelType Model { get; set; } = ModelType.ClaudeCode;
         public int MaxIterations { get; set; } = 50;
 
         private int _currentIteration;
@@ -43,6 +51,7 @@ namespace UnityAgent
 
         public string ProjectPath { get; set; } = "";
         public List<string> ImagePaths { get; set; } = new();
+        public List<string> GeneratedImagePaths { get; set; } = new();
         public StringBuilder OutputBuilder { get; } = new();
 
         // Captured at task start for completion summary diff
@@ -88,6 +97,9 @@ namespace UnityAgent
         [System.Text.Json.Serialization.JsonIgnore]
         public string? BlockedByTaskId { get; set; }
 
+        [System.Text.Json.Serialization.JsonIgnore]
+        public List<string> DependencyTaskIds { get; set; } = new();
+
         private AgentTaskStatus _status = AgentTaskStatus.Running;
         public AgentTaskStatus Status
         {
@@ -132,12 +144,12 @@ namespace UnityAgent
 
         public string StatusColor => Status switch
         {
-            AgentTaskStatus.Running => "#00E676",
+            AgentTaskStatus.Running => "#64B5F6",
             AgentTaskStatus.Completed => "#00E676",
             AgentTaskStatus.Cancelled => "#E0A030",
             AgentTaskStatus.Failed => "#E05555",
             AgentTaskStatus.Queued => "#FFD600",
-            AgentTaskStatus.Ongoing => "#00E676",
+            AgentTaskStatus.Ongoing => "#64B5F6",
             _ => "#555555"
         };
 
@@ -154,9 +166,13 @@ namespace UnityAgent
                 var started = $"Started {StartTime:HH:mm:ss}";
                 if (Status == AgentTaskStatus.Queued)
                 {
-                    var waitInfo = !string.IsNullOrEmpty(BlockedByTaskId)
-                        ? $"waiting for #{BlockedByTaskId}"
-                        : "waiting";
+                    string waitInfo;
+                    if (DependencyTaskIds.Count > 0)
+                        waitInfo = "waiting for " + string.Join(", ", DependencyTaskIds.Select(id => $"#{id}"));
+                    else if (!string.IsNullOrEmpty(BlockedByTaskId))
+                        waitInfo = $"waiting for #{BlockedByTaskId}";
+                    else
+                        waitInfo = "waiting";
                     return $"{started} | Queued ({waitInfo})";
                 }
                 if (EndTime.HasValue)

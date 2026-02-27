@@ -1,0 +1,459 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+
+namespace UnityAgent.Managers
+{
+    public class OutputTabManager
+    {
+        private readonly Dictionary<string, TabItem> _tabs = new();
+        private readonly Dictionary<string, TextBox> _outputBoxes = new();
+        private readonly Dictionary<string, WrapPanel> _geminiGalleries = new();
+        private Button? _overflowBtn;
+        private readonly TabControl _outputTabs;
+        private readonly Dispatcher _dispatcher;
+
+        public event Action<AgentTask>? TabCloseRequested;
+        public event Action<AgentTask, TextBox>? InputSent;
+        public event Action<AgentTask>? CancelClicked;
+
+        public Dictionary<string, TabItem> Tabs => _tabs;
+        public Dictionary<string, TextBox> OutputBoxes => _outputBoxes;
+
+        public OutputTabManager(TabControl outputTabs, Dispatcher dispatcher)
+        {
+            _outputTabs = outputTabs;
+            _dispatcher = dispatcher;
+        }
+
+        public void CreateTab(AgentTask task)
+        {
+            var outputBox = new TextBox
+            {
+                IsReadOnly = true,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Background = new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0A)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 13,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(8)
+            };
+            _outputBoxes[task.Id] = outputBox;
+
+            var inputBox = new TextBox
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                CaretBrush = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 13,
+                Padding = new Thickness(8, 6, 8, 6),
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+
+            var sendBtn = new Button
+            {
+                Content = "Send",
+                Style = (Style)Application.Current.FindResource("Btn"),
+                Background = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                FontWeight = FontWeights.Bold,
+                FontSize = 12,
+                Padding = new Thickness(14, 6, 14, 6),
+                Margin = new Thickness(4, 0, 0, 0)
+            };
+
+            var cancelBtn = new Button
+            {
+                Content = "Cancel",
+                Style = (Style)Application.Current.FindResource("DangerBtn"),
+                FontWeight = FontWeights.Bold,
+                FontSize = 12,
+                Padding = new Thickness(14, 6, 14, 6),
+                Margin = new Thickness(4, 0, 0, 0),
+                ToolTip = "Immediately cancel this task (Escape)"
+            };
+
+            sendBtn.Click += (_, _) => InputSent?.Invoke(task, inputBox);
+            inputBox.KeyDown += (_, ke) =>
+            {
+                if (ke.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+                {
+                    InputSent?.Invoke(task, inputBox);
+                    ke.Handled = true;
+                }
+            };
+
+            cancelBtn.Click += (_, _) => CancelClicked?.Invoke(task);
+
+            var inputPanel = new DockPanel { Margin = new Thickness(0, 4, 0, 0) };
+            DockPanel.SetDock(cancelBtn, Dock.Right);
+            DockPanel.SetDock(sendBtn, Dock.Right);
+            inputPanel.Children.Add(cancelBtn);
+            inputPanel.Children.Add(sendBtn);
+            inputPanel.Children.Add(inputBox);
+
+            var content = new DockPanel();
+            DockPanel.SetDock(inputPanel, Dock.Bottom);
+            content.Children.Add(inputPanel);
+            content.Children.Add(outputBox);
+
+            var header = CreateTabHeader(task);
+
+            var tabItem = new TabItem
+            {
+                Header = header,
+                Content = content,
+                Tag = task.Id
+            };
+
+            tabItem.PreviewMouseDown += (_, me) =>
+            {
+                if (me.MiddleButton == MouseButtonState.Pressed)
+                {
+                    TabCloseRequested?.Invoke(task);
+                    me.Handled = true;
+                }
+            };
+
+            _tabs[task.Id] = tabItem;
+            _outputTabs.Items.Add(tabItem);
+            _outputTabs.SelectedItem = tabItem;
+            UpdateOutputTabWidths();
+        }
+
+        public void CreateGeminiTab(AgentTask task, string imageFolder)
+        {
+            var geminiPanel = GeminiImagePanel.Create(task, out var outputBox, out var imageGallery);
+            GeminiImagePanel.SetOpenFolderHandler(geminiPanel, imageFolder);
+
+            _outputBoxes[task.Id] = outputBox;
+            _geminiGalleries[task.Id] = imageGallery;
+
+            var header = CreateTabHeader(task, isGemini: true);
+
+            var tabItem = new TabItem
+            {
+                Header = header,
+                Content = geminiPanel,
+                Tag = task.Id
+            };
+
+            tabItem.PreviewMouseDown += (_, me) =>
+            {
+                if (me.MiddleButton == MouseButtonState.Pressed)
+                {
+                    TabCloseRequested?.Invoke(task);
+                    me.Handled = true;
+                }
+            };
+
+            _tabs[task.Id] = tabItem;
+            _outputTabs.Items.Add(tabItem);
+            _outputTabs.SelectedItem = tabItem;
+            UpdateOutputTabWidths();
+        }
+
+        public void AddGeminiImage(string taskId, string imagePath)
+        {
+            if (!_geminiGalleries.TryGetValue(taskId, out var gallery)) return;
+            _dispatcher.BeginInvoke(() => GeminiImagePanel.AddImage(gallery, imagePath));
+        }
+
+        private StackPanel CreateTabHeader(AgentTask task, bool isGemini = false)
+        {
+            var panel = new StackPanel { Orientation = Orientation.Horizontal };
+
+            var dot = new System.Windows.Shapes.Ellipse
+            {
+                Width = 8,
+                Height = 8,
+                Fill = new SolidColorBrush(ParseHexColor(task.StatusColor)),
+                Margin = new Thickness(0, 0, 5, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var prefix = isGemini ? "\uE91B " : "";
+            var label = new TextBlock
+            {
+                Text = prefix + task.ShortDescription,
+                MaxWidth = 120,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = isGemini
+                    ? new SolidColorBrush(Color.FromRgb(0x4E, 0xA8, 0xDB))
+                    : new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0))
+            };
+
+            var closeBtn = new Button
+            {
+                Content = "\uE8BB",
+                Background = Brushes.Transparent,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+                BorderThickness = new Thickness(0),
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 9,
+                Padding = new Thickness(0),
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var bdFactory = new FrameworkElementFactory(typeof(Border));
+            bdFactory.Name = "Bd";
+            bdFactory.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            bdFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+            bdFactory.SetValue(FrameworkElement.WidthProperty, 18.0);
+            bdFactory.SetValue(FrameworkElement.HeightProperty, 18.0);
+            var cpFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            cpFactory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            cpFactory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            bdFactory.AppendChild(cpFactory);
+
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)), "Bd"));
+            hoverTrigger.Setters.Add(new Setter(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC))));
+
+            var closeBtnTemplate = new ControlTemplate(typeof(Button)) { VisualTree = bdFactory };
+            closeBtnTemplate.Triggers.Add(hoverTrigger);
+            closeBtn.Template = closeBtnTemplate;
+            closeBtn.Click += (_, _) => TabCloseRequested?.Invoke(task);
+
+            panel.Children.Add(dot);
+            panel.Children.Add(label);
+            panel.Children.Add(closeBtn);
+            return panel;
+        }
+
+        public void CloseTab(AgentTask task)
+        {
+            if (_tabs.TryGetValue(task.Id, out var tab))
+            {
+                _outputTabs.Items.Remove(tab);
+                _tabs.Remove(task.Id);
+            }
+            _outputBoxes.Remove(task.Id);
+            _geminiGalleries.Remove(task.Id);
+            UpdateOutputTabWidths();
+        }
+
+        public void UpdateTabHeader(AgentTask task)
+        {
+            if (!_tabs.TryGetValue(task.Id, out var tab)) return;
+            if (tab.Header is StackPanel sp && sp.Children[0] is System.Windows.Shapes.Ellipse dot)
+            {
+                dot.Fill = new SolidColorBrush(ParseHexColor(task.StatusColor));
+
+                if (sp.Children.Count > 1 && sp.Children[1] is TextBlock label)
+                    label.Text = task.ShortDescription;
+
+                if (sp.Children.Count > 2 && sp.Children[2] is Button closeBtn)
+                {
+                    var isDone = task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
+                    closeBtn.Content = isDone ? "\uE73E" : "\uE8BB";
+                    closeBtn.Foreground = isDone
+                        ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
+                        : new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+                }
+            }
+        }
+
+        public void AppendOutput(string taskId, string text,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            if (!_outputBoxes.TryGetValue(taskId, out var box)) return;
+            box.AppendText(text);
+            box.ScrollToEnd();
+
+            var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
+                    ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
+            task?.OutputBuilder.Append(text);
+        }
+
+        private static Color ParseHexColor(string hex)
+        {
+            try
+            {
+                var c = (Color)ColorConverter.ConvertFromString(hex);
+                return c;
+            }
+            catch
+            {
+                return Color.FromRgb(0x55, 0x55, 0x55);
+            }
+        }
+
+        public bool HasTab(string taskId) => _tabs.ContainsKey(taskId);
+
+        public TabItem? GetTab(string taskId) => _tabs.GetValueOrDefault(taskId);
+
+        public void EnsureOverflowButton()
+        {
+            if (_overflowBtn != null) return;
+            _outputTabs.ApplyTemplate();
+            _overflowBtn = _outputTabs.Template.FindName("PART_OverflowButton", _outputTabs) as Button;
+            if (_overflowBtn != null)
+                _overflowBtn.Click += TabOverflow_Click;
+        }
+
+        public void UpdateOutputTabWidths()
+        {
+            EnsureOverflowButton();
+
+            const double maxWidth = 200.0;
+            const double minWidth = 60.0;
+            const double headerOverhead = 55.0;
+            const double overflowBtnWidth = 28.0;
+
+            int count = _outputTabs.Items.Count;
+            if (count == 0)
+            {
+                if (_overflowBtn != null) _overflowBtn.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            double available = _outputTabs.ActualWidth;
+            if (available <= 0) available = 500;
+
+            bool overflow = count * minWidth > available;
+            if (_overflowBtn != null)
+                _overflowBtn.Visibility = overflow ? Visibility.Visible : Visibility.Collapsed;
+
+            double tabAvailable = overflow ? available - overflowBtnWidth : available;
+            double tabWidth = Math.Max(minWidth, Math.Min(maxWidth, tabAvailable / count));
+            double labelMax = Math.Max(20, tabWidth - headerOverhead);
+
+            foreach (var item in _outputTabs.Items)
+            {
+                if (item is TabItem tab)
+                {
+                    tab.Width = tabWidth;
+                    if (tab.Header is StackPanel sp)
+                    {
+                        foreach (var child in sp.Children)
+                        {
+                            if (child is TextBlock tb)
+                            {
+                                tb.MaxWidth = labelMax;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void TabOverflow_Click(object sender, RoutedEventArgs e)
+        {
+            var popup = new Popup
+            {
+                PlacementTarget = _overflowBtn,
+                Placement = PlacementMode.Bottom,
+                StaysOpen = false,
+                AllowsTransparency = true
+            };
+
+            var border = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0x25, 0x25, 0x25)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(4),
+                MinWidth = 150,
+                MaxHeight = 300
+            };
+
+            var scroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+
+            var stack = new StackPanel();
+
+            foreach (var item in _outputTabs.Items)
+            {
+                if (item is TabItem tab)
+                {
+                    string text = "Tab";
+                    if (tab.Header is StackPanel sp)
+                    {
+                        foreach (var child in sp.Children)
+                        {
+                            if (child is TextBlock tb)
+                            {
+                                text = tb.Text;
+                                break;
+                            }
+                        }
+                    }
+
+                    bool isSelected = tab == _outputTabs.SelectedItem;
+                    var itemBorder = new Border
+                    {
+                        Background = isSelected
+                            ? new SolidColorBrush(Color.FromRgb(0x35, 0x35, 0x35))
+                            : Brushes.Transparent,
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(10, 6, 10, 6),
+                        Margin = new Thickness(0, 1, 0, 1),
+                        Cursor = Cursors.Hand
+                    };
+
+                    var textBlock = new TextBlock
+                    {
+                        Text = text,
+                        Foreground = isSelected
+                            ? new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56))
+                            : new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                        FontFamily = new FontFamily("Segoe UI"),
+                        FontSize = 12,
+                        FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        MaxWidth = 200
+                    };
+
+                    itemBorder.Child = textBlock;
+
+                    var capturedTab = tab;
+                    var capturedBorder = itemBorder;
+                    var capturedSelected = isSelected;
+
+                    itemBorder.MouseEnter += (_, _) =>
+                    {
+                        if (!capturedSelected)
+                            capturedBorder.Background = new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x30));
+                    };
+                    itemBorder.MouseLeave += (_, _) =>
+                    {
+                        if (!capturedSelected)
+                            capturedBorder.Background = Brushes.Transparent;
+                    };
+                    itemBorder.MouseLeftButtonDown += (_, _) =>
+                    {
+                        _outputTabs.SelectedItem = capturedTab;
+                        capturedTab.BringIntoView();
+                        popup.IsOpen = false;
+                    };
+
+                    stack.Children.Add(itemBorder);
+                }
+            }
+
+            scroll.Content = stack;
+            border.Child = scroll;
+            popup.Child = border;
+            popup.IsOpen = true;
+        }
+    }
+}

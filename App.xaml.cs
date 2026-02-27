@@ -24,6 +24,11 @@ namespace UnityAgent
             AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
+            // Make tooltips appear 2x quicker (default 400ms → 200ms)
+            ToolTipService.InitialShowDelayProperty.OverrideMetadata(
+                typeof(FrameworkElement),
+                new FrameworkPropertyMetadata(200));
+
             base.OnStartup(e);
         }
 
@@ -105,7 +110,7 @@ namespace UnityAgent
             {
                 Content = "OK",
                 Background = new SolidColorBrush(Color.FromRgb(0xA1, 0x52, 0x52)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xE0, 0xE0, 0xE0)),
                 FontFamily = new FontFamily("Segoe UI"),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12,

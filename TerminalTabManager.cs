@@ -51,20 +51,28 @@ namespace UnityAgent
         {
             _defaultWorkingDirectory = directory;
 
-            // Replace terminals that haven't been used by the user
+            var wd = Directory.Exists(directory)
+                ? directory
+                : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+            // Collect indices of unused terminals to replace
+            var toReplace = new List<(int index, bool wasActive)>();
             for (int i = _terminals.Count - 1; i >= 0; i--)
             {
                 if (!_terminals[i].HasBeenUsed)
+                    toReplace.Add((i, i == _activeIndex));
+            }
+
+            foreach (var (i, wasActive) in toReplace)
+            {
+                try
                 {
-                    var wasActive = i == _activeIndex;
                     var terminal = _terminals[i];
                     _terminals.RemoveAt(i);
-                    terminal.Dispose();
+                    try { terminal.Dispose(); } catch { }
 
-                    // Insert a fresh terminal at the same position
-                    var wd = Directory.Exists(directory)
-                        ? directory
-                        : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    if (_activeIndex > i) _activeIndex--;
+                    else if (_activeIndex == i) _activeIndex = -1;
 
                     ConPtyTerminal fresh;
                     try
@@ -73,6 +81,7 @@ namespace UnityAgent
                     }
                     catch
                     {
+                        // If terminal creation fails, don't insert anything
                         continue;
                     }
 
@@ -84,11 +93,20 @@ namespace UnityAgent
                         _activeIndex = i;
                         LoadActiveOutput();
                     }
+                    else if (_activeIndex >= i)
+                    {
+                        _activeIndex++;
+                    }
+                }
+                catch
+                {
+                    // Don't let a single terminal failure break the whole swap
                 }
             }
 
             RebuildTabBar();
             UpdateRootPathDisplay();
+            UpdateInputState();
         }
 
         // ── Add / Close / Switch ────────────────────────────────────
@@ -111,6 +129,7 @@ namespace UnityAgent
                 _dispatcher.BeginInvoke(() =>
                 {
                     _output.AppendText($"[Failed to create terminal: {ex.Message}]\n");
+                    _output.CaretIndex = _output.Text.Length;
                     _output.ScrollToEnd();
                 });
                 return;
@@ -127,16 +146,19 @@ namespace UnityAgent
 
         private void WireTerminalEvents(ConPtyTerminal terminal)
         {
-            terminal.OutputReceived += text =>
+            // Coalesce rapid output updates to avoid excessive UI re-renders
+            var renderQueued = false;
+
+            terminal.OutputReceived += () =>
             {
+                if (renderQueued) return;
+                renderQueued = true;
                 _dispatcher.BeginInvoke(() =>
                 {
+                    renderQueued = false;
                     var idx = _terminals.IndexOf(terminal);
-                    if (idx == _activeIndex)
-                    {
-                        _output.AppendText(text);
-                        _output.ScrollToEnd();
-                    }
+                    if (idx >= 0 && idx == _activeIndex)
+                        RenderActiveTerminal();
                 });
             };
 
@@ -145,14 +167,25 @@ namespace UnityAgent
                 _dispatcher.BeginInvoke(() =>
                 {
                     var idx = _terminals.IndexOf(terminal);
-                    if (idx == _activeIndex)
+                    if (idx >= 0)
                     {
-                        _output.AppendText("\n[Terminal exited]\n");
-                        _output.ScrollToEnd();
+                        if (idx == _activeIndex)
+                            RenderActiveTerminal();
+                        RebuildTabBar();
                     }
-                    RebuildTabBar();
                 });
             };
+        }
+
+        private void RenderActiveTerminal()
+        {
+            if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
+            {
+                _output.Text = _terminals[_activeIndex].GetOutputText();
+                _output.CaretIndex = _output.Text.Length;
+                _dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+                    () => _output.ScrollToEnd());
+            }
         }
 
         public void CloseTerminal(int index)
@@ -172,15 +205,10 @@ namespace UnityAgent
                 return;
             }
 
-            if (_activeIndex >= _terminals.Count)
-                _activeIndex = _terminals.Count - 1;
-            else if (_activeIndex > index)
+            if (_activeIndex > index)
                 _activeIndex--;
-            else if (_activeIndex == index)
-            {
-                if (_activeIndex >= _terminals.Count)
-                    _activeIndex = _terminals.Count - 1;
-            }
+            else if (_activeIndex >= _terminals.Count)
+                _activeIndex = _terminals.Count - 1;
 
             LoadActiveOutput();
             RebuildTabBar();
@@ -201,14 +229,9 @@ namespace UnityAgent
         private void LoadActiveOutput()
         {
             if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
-            {
-                _output.Text = _terminals[_activeIndex].GetOutputText();
-                _output.ScrollToEnd();
-            }
+                RenderActiveTerminal();
             else
-            {
                 _output.Clear();
-            }
         }
 
         private void UpdateInputState()
@@ -244,17 +267,10 @@ namespace UnityAgent
             if (!string.IsNullOrWhiteSpace(cmd))
                 terminal.CommandHistory.Add(cmd);
 
-            // Handle cls/clear locally
-            if (cmd.Trim().Equals("cls", StringComparison.OrdinalIgnoreCase) ||
-                cmd.Trim().Equals("clear", StringComparison.OrdinalIgnoreCase))
-            {
-                terminal.ClearOutput();
-                _output.Clear();
-            }
-
             if (terminal.HasExited)
             {
-                _output.AppendText("[Terminal has exited — close this tab and open a new one]\n");
+                _output.Text += "\n[Terminal has exited — close this tab and open a new one]\n";
+                _output.CaretIndex = _output.Text.Length;
                 _output.ScrollToEnd();
                 return;
             }
@@ -272,7 +288,18 @@ namespace UnityAgent
         {
             if (_terminals.Count == 0) return;
 
-            if (e.Key == Key.Enter)
+            if (e.Key == Key.Tab)
+            {
+                if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
+                {
+                    var terminal = _terminals[_activeIndex];
+                    var text = _input.Text ?? "";
+                    terminal.SendRaw(text + "\t");
+                    _input.Clear();
+                }
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
             {
                 SendCommand();
                 e.Handled = true;

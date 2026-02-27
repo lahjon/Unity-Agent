@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
+using UnityAgent.Models;
 
 namespace UnityAgent
 {
@@ -129,13 +129,7 @@ namespace UnityAgent
         private Thread? _readThread;
         private volatile bool _disposed;
 
-        private readonly StringBuilder _outputBuffer = new();
-        private readonly object _outputLock = new();
-        private const int MaxOutputChars = 200_000;
-
-        private static readonly Regex AnsiRegex = new(
-            @"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\)|\(B)",
-            RegexOptions.Compiled);
+        private readonly VtScreenBuffer _screenBuffer;
 
         // Per-terminal command history
         public List<string> CommandHistory { get; } = new();
@@ -148,14 +142,17 @@ namespace UnityAgent
         {
             get
             {
-                if (_disposed || _processHandle == IntPtr.Zero) return true;
-                return WaitForSingleObject(_processHandle, 0) != 258; // WAIT_TIMEOUT = 258
+                if (_disposed) return true;
+                var handle = _processHandle;
+                if (handle == IntPtr.Zero) return true;
+                return WaitForSingleObject(handle, 0) != 258; // WAIT_TIMEOUT = 258
             }
         }
 
         // ── Events ──────────────────────────────────────────────────
 
-        public event Action<string>? OutputReceived;
+        /// <summary>Fires when new output has been processed into the screen buffer.</summary>
+        public event Action? OutputReceived;
         public event Action? Exited;
 
         // ── Constructor ─────────────────────────────────────────────
@@ -165,80 +162,90 @@ namespace UnityAgent
         public ConPtyTerminal(string workingDirectory, short cols = 120, short rows = 30)
         {
             WorkingDirectory = workingDirectory;
+            _screenBuffer = new VtScreenBuffer(cols, rows);
 
-            var sa = new SECURITY_ATTRIBUTES
+            try
             {
-                nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(),
-                bInheritHandle = true
-            };
-
-            // Create pipes: input pipe (we write to pipeInWrite, console reads from pipeInRead)
-            if (!CreatePipe(out _pipeInRead, out _pipeInWrite, ref sa, 0))
-                throw new InvalidOperationException($"CreatePipe (input) failed: {Marshal.GetLastWin32Error()}");
-
-            // Output pipe (console writes to pipeOutWrite, we read from pipeOutRead)
-            if (!CreatePipe(out _pipeOutRead, out _pipeOutWrite, ref sa, 0))
-                throw new InvalidOperationException($"CreatePipe (output) failed: {Marshal.GetLastWin32Error()}");
-
-            // Create pseudo console
-            var size = new COORD { X = cols, Y = rows };
-            int hr = CreatePseudoConsole(size, _pipeInRead, _pipeOutWrite, 0, out _pseudoConsole);
-            if (hr != 0)
-                throw new InvalidOperationException($"CreatePseudoConsole failed: 0x{hr:X8}");
-
-            // Initialize thread attribute list
-            var listSize = IntPtr.Zero;
-            InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref listSize);
-            _attrList = Marshal.AllocHGlobal(listSize);
-            if (!InitializeProcThreadAttributeList(_attrList, 1, 0, ref listSize))
-                throw new InvalidOperationException($"InitializeProcThreadAttributeList failed: {Marshal.GetLastWin32Error()}");
-
-            if (!UpdateProcThreadAttribute(
-                _attrList, 0,
-                PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-                _pseudoConsole, (IntPtr)IntPtr.Size,
-                IntPtr.Zero, IntPtr.Zero))
-                throw new InvalidOperationException($"UpdateProcThreadAttribute failed: {Marshal.GetLastWin32Error()}");
-
-            // Resolve cmd.exe via %ComSpec% for reliability
-            var cmdPath = Environment.GetEnvironmentVariable("ComSpec")
-                          ?? Path.Combine(Environment.SystemDirectory, "cmd.exe");
-
-            // Create process
-            var si = new STARTUPINFOEX
-            {
-                StartupInfo = new STARTUPINFO
+                var sa = new SECURITY_ATTRIBUTES
                 {
-                    cb = Marshal.SizeOf<STARTUPINFOEX>()
-                },
-                lpAttributeList = _attrList
-            };
+                    nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(),
+                    bInheritHandle = true
+                };
 
-            if (!CreateProcessW(
-                null, cmdPath,
-                IntPtr.Zero, IntPtr.Zero,
-                false, EXTENDED_STARTUPINFO_PRESENT,
-                IntPtr.Zero, workingDirectory,
-                ref si, out var pi))
-                throw new InvalidOperationException($"CreateProcess failed: {Marshal.GetLastWin32Error()}");
+                // Create pipes: input pipe (we write to pipeInWrite, console reads from pipeInRead)
+                if (!CreatePipe(out _pipeInRead, out _pipeInWrite, ref sa, 0))
+                    throw new InvalidOperationException($"CreatePipe (input) failed: {Marshal.GetLastWin32Error()}");
 
-            _processHandle = pi.hProcess;
-            _threadHandle = pi.hThread;
-            ProcessId = pi.dwProcessId;
+                // Output pipe (console writes to pipeOutWrite, we read from pipeOutRead)
+                if (!CreatePipe(out _pipeOutRead, out _pipeOutWrite, ref sa, 0))
+                    throw new InvalidOperationException($"CreatePipe (output) failed: {Marshal.GetLastWin32Error()}");
 
-            // Close the pipe ends the console owns
-            CloseHandle(_pipeInRead);
-            _pipeInRead = IntPtr.Zero;
-            CloseHandle(_pipeOutWrite);
-            _pipeOutWrite = IntPtr.Zero;
+                // Create pseudo console
+                var size = new COORD { X = cols, Y = rows };
+                int hr = CreatePseudoConsole(size, _pipeInRead, _pipeOutWrite, 0, out _pseudoConsole);
+                if (hr != 0)
+                    throw new InvalidOperationException($"CreatePseudoConsole failed: 0x{hr:X8}");
 
-            // Start reading output
-            _readThread = new Thread(ReadOutputLoop)
+                // Initialize thread attribute list
+                var listSize = IntPtr.Zero;
+                InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref listSize);
+                _attrList = Marshal.AllocHGlobal(listSize);
+                if (!InitializeProcThreadAttributeList(_attrList, 1, 0, ref listSize))
+                    throw new InvalidOperationException($"InitializeProcThreadAttributeList failed: {Marshal.GetLastWin32Error()}");
+
+                if (!UpdateProcThreadAttribute(
+                    _attrList, 0,
+                    PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
+                    _pseudoConsole, (IntPtr)IntPtr.Size,
+                    IntPtr.Zero, IntPtr.Zero))
+                    throw new InvalidOperationException($"UpdateProcThreadAttribute failed: {Marshal.GetLastWin32Error()}");
+
+                // Resolve cmd.exe via %ComSpec% for reliability
+                var cmdPath = Environment.GetEnvironmentVariable("ComSpec")
+                              ?? Path.Combine(Environment.SystemDirectory, "cmd.exe");
+
+                // Create process
+                var si = new STARTUPINFOEX
+                {
+                    StartupInfo = new STARTUPINFO
+                    {
+                        cb = Marshal.SizeOf<STARTUPINFOEX>()
+                    },
+                    lpAttributeList = _attrList
+                };
+
+                if (!CreateProcessW(
+                    null, cmdPath,
+                    IntPtr.Zero, IntPtr.Zero,
+                    false, EXTENDED_STARTUPINFO_PRESENT,
+                    IntPtr.Zero, workingDirectory,
+                    ref si, out var pi))
+                    throw new InvalidOperationException($"CreateProcess failed: {Marshal.GetLastWin32Error()}");
+
+                _processHandle = pi.hProcess;
+                _threadHandle = pi.hThread;
+                ProcessId = pi.dwProcessId;
+
+                // Close the pipe ends the console owns
+                CloseHandle(_pipeInRead);
+                _pipeInRead = IntPtr.Zero;
+                CloseHandle(_pipeOutWrite);
+                _pipeOutWrite = IntPtr.Zero;
+
+                // Start reading output
+                _readThread = new Thread(ReadOutputLoop)
+                {
+                    IsBackground = true,
+                    Name = $"ConPTY-Reader-{pi.dwProcessId}"
+                };
+                _readThread.Start();
+            }
+            catch
             {
-                IsBackground = true,
-                Name = $"ConPTY-Reader-{pi.dwProcessId}"
-            };
-            _readThread.Start();
+                // Clean up any resources allocated before the failure
+                CleanupNativeResources();
+                throw;
+            }
         }
 
         public int ProcessId { get; }
@@ -255,21 +262,9 @@ namespace UnityAgent
                     break;
 
                 var raw = Encoding.UTF8.GetString(buffer, 0, (int)bytesRead);
-                var cleaned = AnsiRegex.Replace(raw, "");
-                // Normalize line endings
-                cleaned = cleaned.Replace("\r\n", "\n").Replace("\r", "\n");
+                _screenBuffer.Process(raw);
 
-                lock (_outputLock)
-                {
-                    _outputBuffer.Append(cleaned);
-                    if (_outputBuffer.Length > MaxOutputChars)
-                    {
-                        var excess = _outputBuffer.Length - MaxOutputChars;
-                        _outputBuffer.Remove(0, excess);
-                    }
-                }
-
-                OutputReceived?.Invoke(cleaned);
+                OutputReceived?.Invoke();
             }
 
             if (!_disposed)
@@ -297,18 +292,12 @@ namespace UnityAgent
 
         public string GetOutputText()
         {
-            lock (_outputLock)
-            {
-                return _outputBuffer.ToString();
-            }
+            return _screenBuffer.Render();
         }
 
         public void ClearOutput()
         {
-            lock (_outputLock)
-            {
-                _outputBuffer.Clear();
-            }
+            _screenBuffer.Clear();
         }
 
         // ── IDisposable ─────────────────────────────────────────────
@@ -325,6 +314,14 @@ namespace UnityAgent
                 _pseudoConsole = IntPtr.Zero;
             }
 
+            // Wait for the read thread to finish so no more events fire after this point
+            try { _readThread?.Join(2000); } catch { }
+
+            CleanupNativeResources();
+        }
+
+        private void CleanupNativeResources()
+        {
             // Terminate the process
             if (_processHandle != IntPtr.Zero)
             {

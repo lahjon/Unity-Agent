@@ -46,7 +46,7 @@ namespace UnityAgent.Tests
         {
             var task = new AgentTask();
             task.Status = AgentTaskStatus.Completed;
-            Assert.Equal("Completed", task.StatusText);
+            Assert.Equal("Finished", task.StatusText);
         }
 
         [Fact]
@@ -82,12 +82,12 @@ namespace UnityAgent.Tests
         }
 
         [Theory]
-        [InlineData(AgentTaskStatus.Running, "#E8D44D")]
-        [InlineData(AgentTaskStatus.Completed, "#2E7D32")]
+        [InlineData(AgentTaskStatus.Running, "#00E676")]
+        [InlineData(AgentTaskStatus.Completed, "#64B5F6")]
         [InlineData(AgentTaskStatus.Cancelled, "#E0A030")]
         [InlineData(AgentTaskStatus.Failed, "#E05555")]
-        [InlineData(AgentTaskStatus.Queued, "#CC8800")]
-        [InlineData(AgentTaskStatus.Ongoing, "#E8D44D")]
+        [InlineData(AgentTaskStatus.Queued, "#FFD600")]
+        [InlineData(AgentTaskStatus.Ongoing, "#00E676")]
         public void StatusColor_MatchesStatus(AgentTaskStatus status, string expectedColor)
         {
             var task = new AgentTask();
