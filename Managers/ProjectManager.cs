@@ -24,6 +24,23 @@ namespace UnityAgent.Managers
         private string _addProjectSelectedPath = "";
         private bool _isSwapping;
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
+        private static readonly Random _rng = new();
+
+        private static readonly string[] ProjectColorPalette =
+        {
+            "#D4806B", // soft coral
+            "#6BA3A0", // soft teal
+            "#9B8EC4", // soft lavender
+            "#C4A94D", // soft gold
+            "#7BAF7B", // soft sage
+            "#6B8FD4", // soft blue
+            "#C47B8E", // soft rose
+            "#D4A06B", // soft amber
+            "#6BC4A0", // soft mint
+            "#B08EB0", // soft mauve
+            "#8BAFC4", // soft steel
+            "#C49B6B", // soft tan
+        };
 
         private static readonly JsonSerializerOptions _projectJsonOptions = new()
         {
@@ -89,6 +106,29 @@ namespace UnityAgent.Managers
             _dispatcher = dispatcher;
         }
 
+        private string PickProjectColor()
+        {
+            // Pick a color not already used; generate a random unique one if palette exhausted
+            var used = new HashSet<string>(
+                _savedProjects
+                    .Where(p => !string.IsNullOrEmpty(p.Color))
+                    .Select(p => p.Color),
+                StringComparer.OrdinalIgnoreCase);
+            var available = ProjectColorPalette.Where(c => !used.Contains(c)).ToArray();
+            if (available.Length > 0)
+                return available[_rng.Next(available.Length)];
+
+            // All palette colors taken – generate a random color that isn't already used
+            for (var i = 0; i < 200; i++)
+            {
+                var candidate = $"#{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}";
+                if (!used.Contains(candidate))
+                    return candidate;
+            }
+            // Extremely unlikely fallback
+            return $"#{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}";
+        }
+
         public void LoadProjects()
         {
             try
@@ -109,6 +149,15 @@ namespace UnityAgent.Managers
                 }
             }
             catch { _savedProjects = new(); }
+
+            // Backfill colors for projects that don't have one yet
+            var needsSave = false;
+            foreach (var p in _savedProjects.Where(p => string.IsNullOrEmpty(p.Color)))
+            {
+                p.Color = PickProjectColor();
+                needsSave = true;
+            }
+            if (needsSave) SaveProjects();
 
             RefreshProjectCombo();
             UpdateMcpToggleForProject();
@@ -198,7 +247,7 @@ namespace UnityAgent.Managers
             }
 
             var name = Path.GetFileName(path);
-            var entry = new ProjectEntry { Name = name, Path = path, IsInitializing = true };
+            var entry = new ProjectEntry { Name = name, Path = path, IsInitializing = true, Color = PickProjectColor() };
             _savedProjects.Add(entry);
             SaveProjects();
             _projectPath = path;
@@ -265,7 +314,7 @@ namespace UnityAgent.Managers
                 }
             }
 
-            var entry = new ProjectEntry { Name = result.Name, Path = fullPath, IsInitializing = true };
+            var entry = new ProjectEntry { Name = result.Name, Path = fullPath, IsInitializing = true, Color = PickProjectColor() };
             _savedProjects.Add(entry);
             SaveProjects();
             _projectPath = fullPath;
@@ -299,6 +348,12 @@ namespace UnityAgent.Managers
         public ProjectEntry? GetCurrentProject()
         {
             return _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+        }
+
+        public string GetProjectColor(string projectPath)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
+            return entry?.Color ?? "#666666";
         }
 
         public string GetProjectDescription(AgentTask task)
@@ -524,10 +579,13 @@ namespace UnityAgent.Managers
                 }
                 else if (!string.IsNullOrWhiteSpace(proj.ShortDescription))
                 {
+                    var descColor = !string.IsNullOrEmpty(proj.Color)
+                        ? (Color)ColorConverter.ConvertFromString(proj.Color)
+                        : Color.FromRgb(0xAA, 0xAA, 0xAA);
                     infoPanel.Children.Add(new TextBlock
                     {
                         Text = proj.ShortDescription,
-                        Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                        Foreground = new SolidColorBrush(descColor),
                         FontSize = 11,
                         FontFamily = new FontFamily("Segoe UI"),
                         TextTrimming = TextTrimming.CharacterEllipsis,
@@ -675,11 +733,14 @@ namespace UnityAgent.Managers
                     _projectPath = projPath;
                     // Defer heavy work so we're not modifying the visual tree
                     // from inside the click handler of a card that will be destroyed.
-                    _dispatcher.BeginInvoke(new Action(() =>
+                    // Use async to yield between operations and keep the UI responsive.
+                    _dispatcher.BeginInvoke(new Action(async () =>
                     {
                         try
                         {
                             updateTerminalWorkingDirectory?.Invoke(projPath);
+                            // Yield to let UI repaint after terminal update
+                            await System.Threading.Tasks.Task.Yield();
                             saveSettings?.Invoke();
                             syncSettings?.Invoke();
                         }
@@ -750,7 +811,8 @@ namespace UnityAgent.Managers
                 Description = "The MCP server mcp-for-unity-server at http://127.0.0.1:8080/mcp is not responding. " +
                     "Diagnose and fix the connection. Check if the Unity Editor is running with the MCP plugin installed and enabled.",
                 SkipPermissions = _skipPermissionsToggle.IsChecked == true,
-                ProjectPath = projectPath
+                ProjectPath = projectPath,
+                ProjectColor = GetProjectColor(projectPath)
             };
             McpInvestigationRequested?.Invoke(investigateTask);
         }

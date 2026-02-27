@@ -13,6 +13,11 @@
                     BorderThickness="1"
                     MouseUp="TaskCard_MouseUp"
                     MouseMove="TaskCard_MouseMove">
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
+                    </ContextMenu>
+                </Border.ContextMenu>
                 <Border.Background>
                     <SolidColorBrush x:Name="CardBg" Color="#222222"/>
                 </Border.Background>
@@ -144,7 +149,8 @@
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
-                        <TextBlock Text="{Binding Id, StringFormat='#{0}'}" Foreground="#555"
+                        <TextBlock Text="{Binding Id, StringFormat='#{0}'}"
+                                   Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
@@ -168,6 +174,11 @@
         <DataTemplate x:Key="HistoryTaskTemplate">
             <Border CornerRadius="8" Padding="10" Margin="0,2"
                     BorderThickness="1">
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
+                    </ContextMenu>
+                </Border.ContextMenu>
                 <Border.Background>
                     <SolidColorBrush x:Name="HistCardBg" Color="#222222"/>
                 </Border.Background>
@@ -286,7 +297,8 @@
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
-                        <TextBlock Text="{Binding Id, StringFormat='#{0}'}" Foreground="#444"
+                        <TextBlock Text="{Binding Id, StringFormat='#{0}'}"
+                                   Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
@@ -595,9 +607,14 @@
                             <DockPanel Grid.Row="0" Margin="4,0,0,8">
                                 <Button Content="Clear Finished" Click="ClearFinished_Click"
                                         Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"/>
-                                <ComboBox x:Name="ActiveFilterCombo" SelectionChanged="ActiveFilter_Changed"
-                                          FontSize="10" Padding="6,3"
-                                          HorizontalAlignment="Left"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <ComboBox x:Name="ActiveFilterCombo" SelectionChanged="ActiveFilter_Changed"
+                                              FontSize="10" Padding="6,3"
+                                              HorizontalAlignment="Left"/>
+                                    <ComboBox x:Name="ActiveStatusFilterCombo" SelectionChanged="ActiveStatusFilter_Changed"
+                                              FontSize="10" Padding="6,3" Margin="4,0,0,0"
+                                              HorizontalAlignment="Left"/>
+                                </StackPanel>
                             </DockPanel>
                             <ListBox x:Name="ActiveTasksList" Grid.Row="1"
                                      Style="{StaticResource TaskListStyle}"
@@ -619,9 +636,14 @@
                             <DockPanel Grid.Row="0" Margin="4,0,0,8">
                                 <Button Content="Clear" Click="ClearHistory_Click"
                                         Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"/>
-                                <ComboBox x:Name="HistoryFilterCombo" SelectionChanged="HistoryFilter_Changed"
-                                          FontSize="10" Padding="6,3" Margin="0,0,4,0"
-                                          HorizontalAlignment="Left"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <ComboBox x:Name="HistoryFilterCombo" SelectionChanged="HistoryFilter_Changed"
+                                              FontSize="10" Padding="6,3" Margin="0,0,4,0"
+                                              HorizontalAlignment="Left"/>
+                                    <ComboBox x:Name="HistoryStatusFilterCombo" SelectionChanged="HistoryStatusFilter_Changed"
+                                              FontSize="10" Padding="6,3"
+                                              HorizontalAlignment="Left"/>
+                                </StackPanel>
                             </DockPanel>
                             <ListBox x:Name="HistoryTasksList" Grid.Row="1"
                                      Style="{StaticResource TaskListStyle}"

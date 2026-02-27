@@ -17,6 +17,7 @@ namespace UnityAgent.Models
         public McpStatus McpStatus { get; set; } = McpStatus.Disabled;
         public string ShortDescription { get; set; } = "";
         public string LongDescription { get; set; } = "";
+        public string Color { get; set; } = "";
 
         [JsonIgnore]
         public bool IsInitializing { get; set; }

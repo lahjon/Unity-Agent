@@ -11,6 +11,7 @@ namespace UnityAgent.Models
         public bool SkipPermissions { get; set; }
         public bool RemoteSession { get; set; }
         public string? ProjectPath { get; set; }
+        public string ProjectColor { get; set; } = "#666666";
         public bool IsOvernight { get; set; }
         public int MaxIterations { get; set; }
         public int CurrentIteration { get; set; }

@@ -50,6 +50,7 @@ namespace UnityAgent
         }
 
         public string ProjectPath { get; set; } = "";
+        public string ProjectColor { get; set; } = "#666666";
         public List<string> ImagePaths { get; set; } = new();
         public List<string> GeneratedImagePaths { get; set; } = new();
         public StringBuilder OutputBuilder { get; } = new();

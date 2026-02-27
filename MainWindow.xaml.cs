@@ -275,9 +275,8 @@ namespace UnityAgent
                     SyncSettingsForProject);
                 _projectManager.UpdateMcpToggleForProject();
                 RefreshFilterCombos();
-
-                SelectProjectInFilterCombo(ActiveFilterCombo, _projectManager.ProjectPath, ActiveFilter_Changed);
-                SelectProjectInFilterCombo(HistoryFilterCombo, _projectManager.ProjectPath, HistoryFilter_Changed);
+                ActiveFilter_Changed(ActiveFilterCombo, null!);
+                HistoryFilter_Changed(HistoryFilterCombo, null!);
 
                 if (EditSystemPromptToggle.IsChecked == true)
                 {
@@ -615,6 +614,7 @@ namespace UnityAgent
                 DefaultNoGitWriteToggle.IsChecked == true,
                 _imageManager.DetachImages(),
                 selectedModel);
+            task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
 
             // Capture dependencies before clearing
             var dependencies = _pendingDependencies.ToList();
@@ -849,6 +849,13 @@ namespace UnityAgent
             MoveToHistory(task);
         }
 
+        private void CopyPrompt_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            if (!string.IsNullOrEmpty(task.Description))
+                Clipboard.SetText(task.Description);
+        }
+
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
@@ -943,13 +950,9 @@ namespace UnityAgent
             if (finished.Count == 0) return;
 
             foreach (var task in finished)
-            {
-                _outputTabManager.CloseTab(task);
-                _activeTasks.Remove(task);
-            }
-            RefreshFilterCombos();
+                MoveToHistory(task);
+
             _outputTabManager.UpdateOutputTabWidths();
-            UpdateStatus();
         }
 
         private void ClearHistory_Click(object sender, RoutedEventArgs e)
@@ -1211,21 +1214,97 @@ namespace UnityAgent
             }
             if (!found) HistoryFilterCombo.SelectedIndex = 0;
             HistoryFilterCombo.SelectionChanged += HistoryFilter_Changed;
+
+            RefreshStatusFilterCombos();
         }
 
-        private void ActiveFilter_Changed(object sender, SelectionChangedEventArgs e)
+        private void RefreshStatusFilterCombos()
+        {
+            if (ActiveStatusFilterCombo == null || HistoryStatusFilterCombo == null) return;
+
+            var statusOptions = new[] { "All Status", "Running", "Queued", "Completed", "Failed", "Cancelled", "Ongoing" };
+
+            var activeStatusTag = (ActiveStatusFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+            var historyStatusTag = (HistoryStatusFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+
+            ActiveStatusFilterCombo.SelectionChanged -= ActiveStatusFilter_Changed;
+            ActiveStatusFilterCombo.Items.Clear();
+            foreach (var s in statusOptions)
+                ActiveStatusFilterCombo.Items.Add(new ComboBoxItem { Content = s, Tag = s == "All Status" ? "" : s });
+            var found = false;
+            if (!string.IsNullOrEmpty(activeStatusTag))
+            {
+                foreach (ComboBoxItem item in ActiveStatusFilterCombo.Items)
+                {
+                    if (item.Tag as string == activeStatusTag) { ActiveStatusFilterCombo.SelectedItem = item; found = true; break; }
+                }
+            }
+            if (!found) ActiveStatusFilterCombo.SelectedIndex = 0;
+            ActiveStatusFilterCombo.SelectionChanged += ActiveStatusFilter_Changed;
+
+            HistoryStatusFilterCombo.SelectionChanged -= HistoryStatusFilter_Changed;
+            HistoryStatusFilterCombo.Items.Clear();
+            foreach (var s in statusOptions)
+                HistoryStatusFilterCombo.Items.Add(new ComboBoxItem { Content = s, Tag = s == "All Status" ? "" : s });
+            found = false;
+            if (!string.IsNullOrEmpty(historyStatusTag))
+            {
+                foreach (ComboBoxItem item in HistoryStatusFilterCombo.Items)
+                {
+                    if (item.Tag as string == historyStatusTag) { HistoryStatusFilterCombo.SelectedItem = item; found = true; break; }
+                }
+            }
+            if (!found) HistoryStatusFilterCombo.SelectedIndex = 0;
+            HistoryStatusFilterCombo.SelectionChanged += HistoryStatusFilter_Changed;
+        }
+
+        private void ApplyActiveFilters()
         {
             if (_activeView == null) return;
-            var tag = (ActiveFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string;
-            _activeView.Filter = string.IsNullOrEmpty(tag) ? null : obj => obj is AgentTask t && t.ProjectPath == tag;
+            var projectTag = (ActiveFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string;
+            var statusTag = (ActiveStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
+            var hasProject = !string.IsNullOrEmpty(projectTag);
+            var hasStatus = !string.IsNullOrEmpty(statusTag);
+
+            if (!hasProject && !hasStatus)
+                _activeView.Filter = null;
+            else
+                _activeView.Filter = obj =>
+                {
+                    if (obj is not AgentTask t) return false;
+                    if (hasProject && t.ProjectPath != projectTag) return false;
+                    if (hasStatus && t.Status.ToString() != statusTag) return false;
+                    return true;
+                };
         }
 
-        private void HistoryFilter_Changed(object sender, SelectionChangedEventArgs e)
+        private void ApplyHistoryFilters()
         {
             if (_historyView == null) return;
-            var tag = (HistoryFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string;
-            _historyView.Filter = string.IsNullOrEmpty(tag) ? null : obj => obj is AgentTask t && t.ProjectPath == tag;
+            var projectTag = (HistoryFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string;
+            var statusTag = (HistoryStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
+            var hasProject = !string.IsNullOrEmpty(projectTag);
+            var hasStatus = !string.IsNullOrEmpty(statusTag);
+
+            if (!hasProject && !hasStatus)
+                _historyView.Filter = null;
+            else
+                _historyView.Filter = obj =>
+                {
+                    if (obj is not AgentTask t) return false;
+                    if (hasProject && t.ProjectPath != projectTag) return false;
+                    if (hasStatus && t.Status.ToString() != statusTag) return false;
+                    return true;
+                };
         }
+
+        private void ActiveFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyActiveFilters();
+
+        private void HistoryFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
+
+        private void ActiveStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyActiveFilters();
+
+        private void HistoryStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
 
         // ── Games ──────────────────────────────────────────────────
 

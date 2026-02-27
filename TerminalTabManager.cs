@@ -69,7 +69,8 @@ namespace UnityAgent
                 {
                     var terminal = _terminals[i];
                     _terminals.RemoveAt(i);
-                    try { terminal.Dispose(); } catch { }
+                    // Dispose on background thread to avoid Thread.Join(2000) blocking the UI
+                    _ = System.Threading.Tasks.Task.Run(() => { try { terminal.Dispose(); } catch { } });
 
                     if (_activeIndex > i) _activeIndex--;
                     else if (_activeIndex == i) _activeIndex = -1;
