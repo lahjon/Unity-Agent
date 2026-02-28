@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using Xunit;
 
-namespace UnityAgent.Tests
+namespace AgenticEngine.Tests
 {
     public class AgentTaskTests
     {

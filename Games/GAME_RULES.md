@@ -1,10 +1,10 @@
 # Game Creation Rules
 
-You MUST follow these rules exactly when creating a new minigame for Unity Agent.
+You MUST follow these rules exactly when creating a new minigame for Agentic Engine.
 
 ## Architecture
 
-- **Namespace**: `UnityAgent.Games`
+- **Namespace**: `AgenticEngine.Games`
 - **Location**: All game files go in the `Games/` directory
 - **Files per game**: Exactly two — `{GameName}.xaml` and `{GameName}.xaml.cs`
 - **Interface**: Every game MUST implement `IMinigame` (defined in `Games/IMinigame.cs`)
@@ -123,7 +123,7 @@ All buttons use inline `ControlTemplate` with `CornerRadius="6"` and a hover tri
 ## XAML Structure
 
 ```xml
-<UserControl x:Class="UnityAgent.Games.{GameName}"
+<UserControl x:Class="AgenticEngine.Games.{GameName}"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Focusable="True">
@@ -142,7 +142,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace UnityAgent.Games
+namespace AgenticEngine.Games
 {
     public partial class {GameName} : UserControl, IMinigame
     {

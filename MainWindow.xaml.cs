@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -13,12 +14,12 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using UnityAgent.Dialogs;
-using UnityAgent.Games;
-using UnityAgent.Managers;
-using UnityAgent.Models;
+using AgenticEngine.Dialogs;
+using AgenticEngine.Games;
+using AgenticEngine.Managers;
+using AgenticEngine.Models;
 
-namespace UnityAgent
+namespace AgenticEngine
 {
     public partial class MainWindow : Window
     {
@@ -47,6 +48,8 @@ namespace UnityAgent
         private TerminalTabManager? _terminalManager;
         private GeminiService _geminiService = null!;
         private HelperManager _helperManager = null!;
+        private DispatcherTimer? _helperAnimTimer;
+        private int _helperAnimTick;
 
         // Task numbering (1–9999, resets on app restart)
         private int _nextTaskNumber = 1;
@@ -54,11 +57,14 @@ namespace UnityAgent
         // Saved prompts
         private readonly List<SavedPromptEntry> _savedPrompts = new();
 
-        // Unviewed stored task count
-        private int _unviewedStoredCount;
+        // Chat
+        private List<ChatMessage> _chatHistory = new();
+        private CancellationTokenSource? _chatCts;
+        private bool _chatBusy;
+
 
         // Terminal collapse state
-        private bool _terminalCollapsed;
+        private bool _terminalCollapsed = true;
         private GridLength _terminalExpandedHeight = new(120);
 
         // Games
@@ -73,15 +79,14 @@ namespace UnityAgent
 
             var appDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "UnityAgent");
+                "AgenticEngine");
             Directory.CreateDirectory(appDataDir);
 
             var scriptDir = Path.Combine(appDataDir, "scripts");
             Directory.CreateDirectory(scriptDir);
 
-            // Initialize managers
+            // Initialize managers (no file I/O here — async loading happens in Window_Loaded)
             _settingsManager = new SettingsManager(appDataDir);
-            _settingsManager.LoadSettings();
 
             _historyManager = new HistoryManager(appDataDir);
 
@@ -93,16 +98,18 @@ namespace UnityAgent
             _outputTabManager.TabStoreRequested += OnTabStoreRequested;
             _outputTabManager.InputSent += OnTabInputSent;
 
-            // ProjectManager needs many UI refs — initialize after InitializeComponent
+            // ProjectManager needs many UI refs — initialize after InitializeComponent.
+            // Use a quick sync peek at settings for the initial project path (tiny file);
+            // full async load of all data happens in Window_Loaded.
             _projectManager = new ProjectManager(
                 appDataDir,
-                DetermineInitialProjectPath(),
+                PeekInitialProjectPath(appDataDir),
                 PromptProjectLabel, AddProjectPath, ProjectListPanel,
-                UseMcpToggle, ShortDescBox, LongDescBox,
-                EditShortDescToggle, EditLongDescToggle,
-                ShortDescEditButtons, LongDescEditButtons,
+                UseMcpToggle, ShortDescBox, LongDescBox, RuleInstructionBox,
+                EditShortDescToggle, EditLongDescToggle, EditRuleInstructionToggle,
+                ShortDescEditButtons, LongDescEditButtons, RuleInstructionEditButtons,
+                ProjectRulesList,
                 RegenerateDescBtn, Dispatcher);
-            _projectManager.LoadProjects();
             _projectManager.McpInvestigationRequested += OnMcpInvestigationRequested;
 
             _imageManager = new ImageAttachmentManager(appDataDir, ImageIndicator, ClearImagesBtn);
@@ -118,6 +125,7 @@ namespace UnityAgent
                 scriptDir, _fileLockManager, _outputTabManager,
                 () => SystemPrompt,
                 task => _projectManager.GetProjectDescription(task),
+                path => _projectManager.GetProjectRulesBlock(path),
                 Dispatcher);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
 
@@ -131,27 +139,26 @@ namespace UnityAgent
             FileLocksListView.ItemsSource = _fileLockManager.FileLocksView;
             SuggestionsListView.ItemsSource = _helperManager.Suggestions;
 
-            _historyManager.LoadHistory(_historyTasks, _settingsManager.HistoryRetentionHours);
-            _historyManager.LoadStoredTasks(_storedTasks);
-            RefreshFilterCombos();
-            _projectManager.RefreshProjectList(
-                p => _terminalManager?.UpdateWorkingDirectory(p),
-                () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
-                SyncSettingsForProject);
+            _activeTasks.CollectionChanged += (_, _) => UpdateTabCounts();
+            _historyTasks.CollectionChanged += (_, _) => UpdateTabCounts();
+            _storedTasks.CollectionChanged += (_, _) => UpdateTabCounts();
+            UpdateTabCounts();
 
             _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             _statusTimer.Tick += (_, _) =>
             {
+                App.TraceUi("StatusTimer.Tick");
                 foreach (var t in _activeTasks)
                     t.OnPropertyChanged(nameof(t.TimeInfo));
+                App.TraceUi("StatusTimer.CleanupHistory");
                 _historyManager.CleanupOldHistory(_historyTasks, _outputTabManager.Tabs, OutputTabs, _outputTabManager.OutputBoxes, _settingsManager.HistoryRetentionHours);
+                App.TraceUi("StatusTimer.UpdateTabWidths");
                 _outputTabManager.UpdateOutputTabWidths();
+                App.TraceUi("StatusTimer.UpdateStatus");
                 UpdateStatus();
             };
-            _statusTimer.Start();
 
             Closing += OnWindowClosing;
-            UpdateStatus();
 
             _terminalManager = new TerminalTabManager(
                 TerminalTabBar, TerminalOutput, TerminalInput,
@@ -167,14 +174,27 @@ namespace UnityAgent
             MainTabs.SelectionChanged += MainTabs_SelectionChanged;
         }
 
-        private string DetermineInitialProjectPath()
+        /// <summary>
+        /// Lightweight sync peek at settings + projects files to determine the initial project path.
+        /// These files are tiny (a few KB). The full async load happens in Window_Loaded.
+        /// </summary>
+        private static string PeekInitialProjectPath(string appDataDir)
         {
-            _settingsManager.LoadSettings();
-            // We need to peek at saved projects to determine the initial path
-            // This is called before _projectManager.LoadProjects(), so we do a quick check
-            var projectsFile = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "UnityAgent", "projects.json");
+            string? lastSelected = null;
+            var settingsFile = Path.Combine(appDataDir, "settings.json");
+            try
+            {
+                if (File.Exists(settingsFile))
+                {
+                    var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(
+                        File.ReadAllText(settingsFile));
+                    if (dict != null && dict.TryGetValue("selectedProject", out var sp))
+                        lastSelected = sp.GetString();
+                }
+            }
+            catch { /* best-effort */ }
+
+            var projectsFile = Path.Combine(appDataDir, "projects.json");
             var savedProjects = new List<ProjectEntry>();
             try
             {
@@ -185,16 +205,16 @@ namespace UnityAgent
                         new System.Text.Json.JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }) ?? new();
                 }
             }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to load projects for initial path", ex); }
+            catch { /* best-effort */ }
 
-            var restored = _settingsManager.LastSelectedProject != null && savedProjects.Any(p => p.Path == _settingsManager.LastSelectedProject);
-            return restored ? _settingsManager.LastSelectedProject! :
+            var restored = lastSelected != null && savedProjects.Any(p => p.Path == lastSelected);
+            return restored ? lastSelected! :
                    savedProjects.Count > 0 ? savedProjects[0].Path : Directory.GetCurrentDirectory();
         }
 
         // ── Window Loaded ──────────────────────────────────────────
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -220,6 +240,9 @@ namespace UnityAgent
                 GeminiModelCombo.Items.Add(model);
             GeminiModelCombo.SelectedItem = _geminiService.SelectedModel;
 
+            // Async data loading — settings, projects, history, stored tasks
+            await LoadStartupDataAsync();
+
             foreach (ComboBoxItem item in HistoryRetentionCombo.Items)
             {
                 if (int.TryParse(item.Tag?.ToString(), out var h) && h == _settingsManager.HistoryRetentionHours)
@@ -229,15 +252,57 @@ namespace UnityAgent
                 }
             }
 
+            MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
+
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
+        }
+
+        private async System.Threading.Tasks.Task LoadStartupDataAsync()
+        {
+            try
+            {
+                // Load settings, projects, history, and stored tasks off the UI thread
+                var settingsTask = _settingsManager.LoadSettingsAsync();
+                var projectsTask = _projectManager.LoadProjectsAsync();
+                var historyTask = _historyManager.LoadHistoryAsync(_settingsManager.HistoryRetentionHours);
+                var storedTask = _historyManager.LoadStoredTasksAsync();
+
+                await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask);
+
+                // Populate collections on the UI thread
+                var historyItems = historyTask.Result;
+                var storedItems = storedTask.Result;
+
+                foreach (var item in historyItems)
+                    _historyTasks.Add(item);
+                foreach (var item in storedItems)
+                    _storedTasks.Add(item);
+
+                RefreshFilterCombos();
+                _projectManager.RefreshProjectList(
+                    p => _terminalManager?.UpdateWorkingDirectory(p),
+                    () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
+                    SyncSettingsForProject);
+
+                _statusTimer.Start();
+                UpdateStatus();
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Warn("MainWindow", "Failed during async startup loading", ex);
+            }
+            finally
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+            }
         }
 
         // ── System Prompt ──────────────────────────────────────────
 
         private string SystemPromptFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "UnityAgent", "system_prompt.txt");
+            "AgenticEngine", "system_prompt.txt");
 
         private void LoadSystemPrompt()
         {
@@ -297,6 +362,7 @@ namespace UnityAgent
         {
             try
             {
+                App.TraceUi("SyncSettingsForProject");
                 _projectManager.RefreshProjectCombo();
                 _projectManager.RefreshProjectList(
                     p => _terminalManager?.UpdateWorkingDirectory(p),
@@ -360,6 +426,39 @@ namespace UnityAgent
 
         private void SaveLongDesc_Click(object sender, RoutedEventArgs e) => _projectManager.SaveLongDesc();
 
+        private void EditRuleInstructionToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            var editing = EditRuleInstructionToggle.IsChecked == true;
+            RuleInstructionBox.IsReadOnly = !editing;
+            RuleInstructionBox.Opacity = editing ? 1.0 : 0.6;
+            RuleInstructionEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void SaveRuleInstruction_Click(object sender, RoutedEventArgs e) => _projectManager.SaveRuleInstruction();
+
+        private void AddProjectRule_Click(object sender, RoutedEventArgs e)
+        {
+            var rule = NewRuleInput.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(rule)) return;
+            _projectManager.AddProjectRule(rule);
+            NewRuleInput.Clear();
+        }
+
+        private void NewRuleInput_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                AddProjectRule_Click(sender, e);
+                e.Handled = true;
+            }
+        }
+
+        private void RemoveProjectRule_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is string rule)
+                _projectManager.RemoveProjectRule(rule);
+        }
+
         private void RegenerateDescriptions_Click(object sender, RoutedEventArgs e) => _projectManager.RegenerateDescriptions();
 
         // ── Toggle Handlers ────────────────────────────────────────
@@ -392,6 +491,32 @@ namespace UnityAgent
             {
                 _settingsManager.HistoryRetentionHours = hours;
                 _settingsManager.SaveSettings(_projectManager.ProjectPath);
+            }
+        }
+
+        private void MaxConcurrentTasks_Changed(object sender, RoutedEventArgs e)
+        {
+            ApplyMaxConcurrentTasks();
+        }
+
+        private void MaxConcurrentTasks_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter) ApplyMaxConcurrentTasks();
+        }
+
+        private void ApplyMaxConcurrentTasks()
+        {
+            if (_settingsManager == null || _projectManager == null) return;
+            if (int.TryParse(MaxConcurrentTasksBox.Text?.Trim(), out var val) && val >= 1)
+            {
+                _settingsManager.MaxConcurrentTasks = val;
+                MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
+                _settingsManager.SaveSettings(_projectManager.ProjectPath);
+                DrainInitQueue();
+            }
+            else
+            {
+                MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
             }
         }
 
@@ -483,6 +608,15 @@ namespace UnityAgent
         }
 
         // ── Input Events ───────────────────────────────────────────
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                SavePromptEntry_Click(sender, e);
+                e.Handled = true;
+            }
+        }
 
         private void TaskInput_PreviewKeyDown(object sender, KeyEventArgs e)
         {
@@ -701,10 +835,10 @@ namespace UnityAgent
                     task.IsPlanningBeforeQueue = true;
                     task.PlanOnly = true;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[UnityAgent] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.Id}"))}) — starting in plan mode...\n",
+                        $"[AgenticEngine] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.Id}"))}) — starting in plan mode...\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
-                    _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                 }
                 else
                 {
@@ -713,17 +847,27 @@ namespace UnityAgent
                     task.QueuedReason = "Waiting for dependencies";
                     task.BlockedByTaskId = activeDeps[0].Id;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[UnityAgent] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.Id}"))}\n",
+                        $"[AgenticEngine] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.Id}"))}\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                 }
             }
+            else if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
+            {
+                // Max concurrent sessions reached — init-queue (no Claude session yet)
+                task.Status = AgentTaskStatus.InitQueued;
+                task.QueuedReason = "Max concurrent tasks reached";
+                _outputTabManager.AppendOutput(task.Id,
+                    $"[AgenticEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.Id} waiting for a slot...\n",
+                    _activeTasks, _historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+            }
             else
             {
-                _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
             }
 
-            _ = GenerateSummaryInBackground(task, desc!);
+            _ = GenerateSummaryInBackground(task, desc!, task.Cts?.Token ?? System.Threading.CancellationToken.None);
             RefreshFilterCombos();
             UpdateStatus();
         }
@@ -739,6 +883,9 @@ namespace UnityAgent
                 return;
             }
 
+            task.Cts?.Dispose();
+            task.Cts = new System.Threading.CancellationTokenSource();
+
             task.Summary = "Generating Image...";
             AddActiveTask(task);
             _outputTabManager.CreateGeminiTab(task, _geminiService.GetImageDirectory());
@@ -750,6 +897,7 @@ namespace UnityAgent
 
         private async System.Threading.Tasks.Task RunGeminiImageGeneration(AgentTask task)
         {
+            var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
             var progress = new Progress<string>(msg =>
             {
                 _outputTabManager.AppendOutput(task.Id, msg, _activeTasks, _historyTasks);
@@ -762,7 +910,7 @@ namespace UnityAgent
 
             try
             {
-                var result = await _geminiService.GenerateImageAsync(task.Description, task.Id, progress);
+                var result = await _geminiService.GenerateImageAsync(task.Description, task.Id, progress, ct);
 
                 if (result.Success)
                 {
@@ -790,6 +938,13 @@ namespace UnityAgent
                         $"\n{result.ErrorMessage}\n", _activeTasks, _historyTasks);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                task.Status = AgentTaskStatus.Cancelled;
+                task.EndTime = DateTime.Now;
+                _outputTabManager.AppendOutput(task.Id,
+                    "\n[Gemini] Generation cancelled.\n", _activeTasks, _historyTasks);
+            }
             catch (Exception ex)
             {
                 task.Status = AgentTaskStatus.Failed;
@@ -802,17 +957,18 @@ namespace UnityAgent
             UpdateStatus();
         }
 
-        private async System.Threading.Tasks.Task GenerateSummaryInBackground(AgentTask task, string description)
+        private async System.Threading.Tasks.Task GenerateSummaryInBackground(AgentTask task, string description, System.Threading.CancellationToken cancellationToken = default)
         {
             try
             {
-                var summary = await TaskLauncher.GenerateSummaryAsync(description);
-                if (!string.IsNullOrWhiteSpace(summary))
+                var summary = await TaskLauncher.GenerateSummaryAsync(description, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(summary) && !cancellationToken.IsCancellationRequested)
                 {
                     task.Summary = summary;
                     _outputTabManager.UpdateTabHeader(task);
                 }
             }
+            catch (OperationCanceledException) { /* cancelled — ignore */ }
             catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to generate summary for task {task.Id}: {ex.Message}"); }
         }
 
@@ -829,11 +985,14 @@ namespace UnityAgent
             {
                 task.OvernightRetryTimer?.Stop();
                 task.OvernightIterationTimer?.Stop();
+                try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
                 task.Status = AgentTaskStatus.Cancelled;
                 task.EndTime = DateTime.Now;
                 TaskExecutionManager.KillProcess(task);
+                task.Cts?.Dispose();
+                task.Cts = null;
                 _outputTabManager.AppendOutput(task.Id,
-                    "\n[UnityAgent] Task cancelled and stored.\n", _activeTasks, _historyTasks);
+                    "\n[AgenticEngine] Task cancelled and stored.\n", _activeTasks, _historyTasks);
             }
 
             // Create the stored task entry
@@ -852,25 +1011,10 @@ namespace UnityAgent
 
             _storedTasks.Insert(0, storedTask);
             _historyManager.SaveStoredTasks(_storedTasks);
-            _unviewedStoredCount++;
-            UpdateStoredTabBadge();
             RefreshFilterCombos();
 
             // Clean up the active task and close the tab
-            if (_activeTasks.Contains(task))
-            {
-                _fileLockManager.ReleaseTaskLocks(task.Id);
-                _fileLockManager.RemoveQueuedInfo(task.Id);
-                _taskExecutionManager.RemoveStreamingState(task.Id);
-                _activeTasks.Remove(task);
-                _historyTasks.Insert(0, task);
-                _historyManager.SaveHistory(_historyTasks);
-                _fileLockManager.CheckQueuedTasks(_activeTasks);
-                CheckDependencyQueuedTasks(task.Id);
-            }
-
-            _outputTabManager.CloseTab(task);
-            UpdateStatus();
+            FinalizeTask(task);
         }
 
         private void OnTabInputSent(AgentTask task, TextBox inputBox) =>
@@ -887,13 +1031,13 @@ namespace UnityAgent
             else if (task.IsRunning)
             {
                 _taskExecutionManager.PauseTask(task);
-                _outputTabManager.AppendOutput(task.Id, "\n[UnityAgent] Task paused.\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task paused.\n", _activeTasks, _historyTasks);
             }
         }
 
         private void CloseTab(AgentTask task)
         {
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Paused || task.Status == AgentTaskStatus.Queued)
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Paused or AgentTaskStatus.InitQueued || task.Status == AgentTaskStatus.Queued)
             {
                 var processAlreadyDone = task.Process == null || task.Process.HasExited;
                 if (processAlreadyDone)
@@ -910,38 +1054,13 @@ namespace UnityAgent
                     task.EndTime = DateTime.Now;
                     TaskExecutionManager.KillProcess(task);
                 }
-
-                // Create stored task if this was a plan-only task that completed
-                if (task.PlanOnly && task.Status == AgentTaskStatus.Completed)
-                    CreateStoredTaskFromPlan(task);
-
-                _fileLockManager.ReleaseTaskLocks(task.Id);
-                _fileLockManager.RemoveQueuedInfo(task.Id);
-                _taskExecutionManager.RemoveStreamingState(task.Id);
-                _activeTasks.Remove(task);
-                _historyTasks.Insert(0, task);
-                _historyManager.SaveHistory(_historyTasks);
-                _fileLockManager.CheckQueuedTasks(_activeTasks);
-                CheckDependencyQueuedTasks(task.Id);
             }
             else if (_activeTasks.Contains(task))
             {
-                // Create stored task if this was a plan-only task that completed
-                if (task.PlanOnly && task.Status == AgentTaskStatus.Completed)
-                    CreateStoredTaskFromPlan(task);
-
                 task.EndTime ??= DateTime.Now;
-                _fileLockManager.ReleaseTaskLocks(task.Id);
-                _fileLockManager.RemoveQueuedInfo(task.Id);
-                _taskExecutionManager.RemoveStreamingState(task.Id);
-                _activeTasks.Remove(task);
-                _historyTasks.Insert(0, task);
-                _historyManager.SaveHistory(_historyTasks);
-                CheckDependencyQueuedTasks(task.Id);
             }
 
-            _outputTabManager.CloseTab(task);
-            UpdateStatus();
+            FinalizeTask(task);
         }
 
         // ── Task Actions ───────────────────────────────────────────
@@ -949,6 +1068,21 @@ namespace UnityAgent
         private void Complete_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+
+            if (task.Status == AgentTaskStatus.InitQueued)
+            {
+                // Force-start an init-queued task (bypass max concurrent limit)
+                task.Status = AgentTaskStatus.Running;
+                task.QueuedReason = null;
+                task.StartTime = DateTime.Now;
+                _outputTabManager.AppendOutput(task.Id,
+                    $"\n[AgenticEngine] Force-starting task #{task.Id} (limit bypassed)...\n\n",
+                    _activeTasks, _historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                UpdateStatus();
+                return;
+            }
 
             if (task.Status == AgentTaskStatus.Queued)
             {
@@ -961,10 +1095,10 @@ namespace UnityAgent
                     task.DependencyTaskIds.Clear();
                     task.StartTime = DateTime.Now;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[UnityAgent] Force-starting task #{task.Id} (dependencies skipped)...\n\n",
+                        $"\n[AgenticEngine] Force-starting task #{task.Id} (dependencies skipped)...\n\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
-                    _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                     UpdateStatus();
                 }
                 else
@@ -1016,7 +1150,7 @@ namespace UnityAgent
                 _outputTabManager.UpdateTabHeader(task);
                 if (sender != null)
                 {
-                    _outputTabManager.AppendOutput(task.Id, "\n[UnityAgent] Task removed.\n", _activeTasks, _historyTasks);
+                    _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task removed.\n", _activeTasks, _historyTasks);
                     AnimateRemoval(sender, () => MoveToHistory(task));
                 }
                 else
@@ -1044,21 +1178,21 @@ namespace UnityAgent
                 task.OvernightIterationTimer.Stop();
                 task.OvernightIterationTimer = null;
             }
+            try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
             task.Status = AgentTaskStatus.Cancelled;
             task.EndTime = DateTime.Now;
             TaskExecutionManager.KillProcess(task);
-            _fileLockManager.ReleaseTaskLocks(task.Id);
-            _fileLockManager.RemoveQueuedInfo(task.Id);
-            _taskExecutionManager.RemoveStreamingState(task.Id);
-            _outputTabManager.AppendOutput(task.Id, "\n[UnityAgent] Task cancelled.\n", _activeTasks, _historyTasks);
+            task.Cts?.Dispose();
+            task.Cts = null;
+            _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task cancelled.\n", _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(task);
-            MoveToHistory(task);
+            FinalizeTask(task);
         }
 
         private void RemoveHistoryTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            _outputTabManager.AppendOutput(task.Id, "\n[UnityAgent] Task removed.\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task removed.\n", _activeTasks, _historyTasks);
             AnimateRemoval(el, () =>
             {
                 _outputTabManager.CloseTab(task);
@@ -1107,11 +1241,14 @@ namespace UnityAgent
             }
 
             _outputTabManager.CreateTab(task);
-            _outputTabManager.AppendOutput(task.Id, $"[UnityAgent] Resumed session\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[UnityAgent] Original task: {task.Description}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[UnityAgent] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[UnityAgent] Status: {task.StatusText}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"\n[UnityAgent] Type a follow-up message below. It will be sent with --continue.\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Resumed session\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Original task: {task.Description}\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Status: {task.StatusText}\n", _activeTasks, _historyTasks);
+            if (!string.IsNullOrEmpty(task.ConversationId))
+                _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
+            var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
+            _outputTabManager.AppendOutput(task.Id, $"\n[AgenticEngine] Type a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
 
             _historyTasks.Remove(task);
             _activeTasks.Insert(0, task);
@@ -1179,9 +1316,9 @@ namespace UnityAgent
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
             _outputTabManager.AppendOutput(newTask.Id,
-                $"[UnityAgent] Executing stored plan from task #{task.Id}\n",
+                $"[AgenticEngine] Executing stored plan from task #{task.Id}\n",
                 _activeTasks, _historyTasks);
-            _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
+            _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
             RefreshFilterCombos();
             UpdateStatus();
         }
@@ -1203,26 +1340,16 @@ namespace UnityAgent
 
         private void TaskListTab_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender is not TabControl tc) return;
-            if (tc.SelectedItem is TabItem tab && tab == StoredTabItem)
-            {
-                _unviewedStoredCount = 0;
-                UpdateStoredTabBadge();
-            }
         }
 
-        private void UpdateStoredTabBadge()
+        private void UpdateTabCounts()
         {
-            if (StoredTabBadge == null) return;
-            if (_unviewedStoredCount > 0)
+            ActiveTabCount.Text = $" ({_activeTasks.Count})";
+            HistoryTabCount.Text = $" ({_historyTasks.Count})";
+            if (StoredTabBadge != null)
             {
-                StoredTabBadge.Text = $" ({_unviewedStoredCount})";
+                StoredTabBadge.Text = $" ({_storedTasks.Count})";
                 StoredTabBadge.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                StoredTabBadge.Text = "";
-                StoredTabBadge.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -1271,8 +1398,6 @@ namespace UnityAgent
 
             _storedTasks.Insert(0, storedTask);
             _historyManager.SaveStoredTasks(_storedTasks);
-            _unviewedStoredCount++;
-            UpdateStoredTabBadge();
             RefreshFilterCombos();
         }
 
@@ -1282,7 +1407,12 @@ namespace UnityAgent
         {
             task.TaskNumber = _nextTaskNumber;
             _nextTaskNumber = _nextTaskNumber >= 9999 ? 1 : _nextTaskNumber + 1;
-            _activeTasks.Insert(0, task);
+
+            // Insert below all finished tasks so finished stay on top
+            int insertIndex = 0;
+            while (insertIndex < _activeTasks.Count && _activeTasks[insertIndex].IsFinished)
+                insertIndex++;
+            _activeTasks.Insert(insertIndex, task);
         }
 
         private void AnimateRemoval(FrameworkElement sender, Action onComplete)
@@ -1318,21 +1448,83 @@ namespace UnityAgent
             ((ScaleTransform)card.RenderTransform).BeginAnimation(ScaleTransform.ScaleYProperty, scaleY);
         }
 
-        private void MoveToHistory(AgentTask task)
+        /// <summary>
+        /// Consolidates all task teardown: releases locks, removes queued/streaming state,
+        /// moves from active list to history, closes the output tab, and resumes any
+        /// queued or dependency-blocked tasks. Every code path that finishes a task
+        /// should funnel through here.
+        /// </summary>
+        private void FinalizeTask(AgentTask task, bool closeTab = true)
         {
             // If this was a plan-only task that completed successfully, create a stored task
             if (task.PlanOnly && task.Status == AgentTaskStatus.Completed)
                 CreateStoredTaskFromPlan(task);
 
+            // Release all resources associated with this task
             _fileLockManager.ReleaseTaskLocks(task.Id);
+            _fileLockManager.RemoveQueuedInfo(task.Id);
+            _taskExecutionManager.RemoveStreamingState(task.Id);
+
+            // Move from active to history
             _activeTasks.Remove(task);
             _historyTasks.Insert(0, task);
-            _outputTabManager.CloseTab(task);
+
+            if (closeTab)
+                _outputTabManager.CloseTab(task);
+
             _historyManager.SaveHistory(_historyTasks);
             RefreshFilterCombos();
             UpdateStatus();
+
+            // Resume tasks that were waiting on file locks or dependencies
             _fileLockManager.CheckQueuedTasks(_activeTasks);
             CheckDependencyQueuedTasks(task.Id);
+
+            // Launch init-queued tasks now that a slot may be free
+            DrainInitQueue();
+        }
+
+        // Keep MoveToHistory as a thin alias for callers that pass it as a delegate
+        private void MoveToHistory(AgentTask task) => FinalizeTask(task);
+
+        /// <summary>
+        /// Counts tasks that have an active Claude session (Running or Paused — not Queued/InitQueued/finished).
+        /// </summary>
+        private int CountActiveSessionTasks()
+        {
+            return _activeTasks.Count(t => t.Status is AgentTaskStatus.Running or AgentTaskStatus.Paused);
+        }
+
+        /// <summary>
+        /// Launches InitQueued tasks when slots become available under MaxConcurrentTasks.
+        /// </summary>
+        private void DrainInitQueue()
+        {
+            var max = _settingsManager.MaxConcurrentTasks;
+            var toStart = new List<AgentTask>();
+
+            foreach (var task in _activeTasks)
+            {
+                if (task.Status != AgentTaskStatus.InitQueued) continue;
+                if (CountActiveSessionTasks() >= max) break;
+
+                toStart.Add(task);
+            }
+
+            foreach (var task in toStart)
+            {
+                task.Status = AgentTaskStatus.Running;
+                task.QueuedReason = null;
+                task.StartTime = DateTime.Now;
+
+                _outputTabManager.AppendOutput(task.Id,
+                    $"[AgenticEngine] Slot available — starting task #{task.Id}...\n\n",
+                    _activeTasks, _historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+            }
+
+            if (toStart.Count > 0) UpdateStatus();
         }
 
         private void CheckDependencyQueuedTasks(string completedTaskId)
@@ -1364,10 +1556,10 @@ namespace UnityAgent
                 task.StartTime = DateTime.Now;
 
                 _outputTabManager.AppendOutput(task.Id,
-                    $"\n[UnityAgent] All dependencies resolved — starting task #{task.Id}...\n\n",
+                    $"\n[AgenticEngine] All dependencies resolved — starting task #{task.Id}...\n\n",
                     _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
-                _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                 UpdateStatus();
             }
         }
@@ -1376,21 +1568,56 @@ namespace UnityAgent
         {
             var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
             if (task == null) return;
-            _outputTabManager.AppendOutput(taskId, $"\n[UnityAgent] Resuming task #{taskId} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(taskId, $"\n[AgenticEngine] Resuming task #{taskId} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(task);
-            _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
             UpdateStatus();
         }
 
-        private void OnTaskProcessCompleted(string taskId) => CheckDependencyQueuedTasks(taskId);
+        private void OnTaskProcessCompleted(string taskId)
+        {
+            // Move finished task to top of active list
+            var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
+            if (task is { IsFinished: true })
+            {
+                var idx = _activeTasks.IndexOf(task);
+                if (idx > 0)
+                    _activeTasks.Move(idx, 0);
+            }
+
+            CheckDependencyQueuedTasks(taskId);
+        }
 
         private void OnMcpInvestigationRequested(AgentTask task)
         {
             AddActiveTask(task);
             _outputTabManager.CreateTab(task);
-            _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
             RefreshFilterCombos();
             UpdateStatus();
+        }
+
+        // ── Scroll Fix ────────────────────────────────────────────
+
+        private void TaskList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (sender is not ListBox listBox) return;
+            var sv = FindVisualChild<ScrollViewer>(listBox);
+            if (sv == null) return;
+            sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta);
+            e.Handled = true;
+        }
+
+        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T result) return result;
+                var found = FindVisualChild<T>(child);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         // ── Selection Sync ─────────────────────────────────────────
@@ -1429,9 +1656,15 @@ namespace UnityAgent
             _projectManager.SaveProjects();
             _settingsManager.SaveSettings(_projectManager.ProjectPath);
             _historyManager.SaveHistory(_historyTasks);
+            PersistSavedPrompts();
 
             foreach (var task in _activeTasks)
+            {
+                try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
                 TaskExecutionManager.KillProcess(task);
+                task.Cts?.Dispose();
+                task.Cts = null;
+            }
 
             _fileLockManager.ClearAll();
             _taskExecutionManager.StreamingToolState.Clear();
@@ -1817,6 +2050,14 @@ namespace UnityAgent
         {
             if (sender is not FrameworkElement el || el.Tag is not Suggestion suggestion) return;
 
+            // For Rules category, add to project rules instead of running a task
+            if (suggestion.Category == SuggestionCategory.Rules)
+            {
+                _projectManager.AddProjectRule($"{suggestion.Title}: {suggestion.Description}");
+                _helperManager.RemoveSuggestion(suggestion);
+                return;
+            }
+
             var desc = $"{suggestion.Title}\n\n{suggestion.Description}";
 
             var task = TaskLauncher.CreateTask(
@@ -1834,7 +2075,8 @@ namespace UnityAgent
 
             AddActiveTask(task);
             _outputTabManager.CreateTab(task);
-            _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+            _helperManager.RemoveSuggestion(suggestion);
 
             RefreshFilterCombos();
             UpdateStatus();
@@ -1853,6 +2095,12 @@ namespace UnityAgent
             Clipboard.SetText(text);
         }
 
+        private void IgnoreSuggestion_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement el || el.Tag is not Suggestion suggestion) return;
+            _helperManager.IgnoreSuggestion(suggestion);
+        }
+
         private void SaveSuggestion_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.Tag is not Suggestion suggestion) return;
@@ -1865,22 +2113,65 @@ namespace UnityAgent
             _savedPrompts.Insert(0, entry);
             PersistSavedPrompts();
             RenderSavedPrompts();
+            _helperManager.RemoveSuggestion(suggestion);
+        }
+
+        private static readonly string[] _helperAnimPhases = [
+            "Analyzing project",
+            "Scanning files",
+            "Generating suggestions",
+            "Thinking",
+        ];
+
+        private void StartHelperAnimation()
+        {
+            _helperAnimTick = 0;
+            _helperAnimTimer?.Stop();
+            _helperAnimTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            _helperAnimTimer.Tick += (_, _) =>
+            {
+                var dots = new string('.', (_helperAnimTick % 3) + 1);
+                var phase = _helperAnimPhases[(_helperAnimTick / 6) % _helperAnimPhases.Length];
+                HelperStatusText.Text = phase + dots;
+                _helperAnimTick++;
+            };
+            _helperAnimTimer.Start();
+        }
+
+        private void StopHelperAnimation()
+        {
+            _helperAnimTimer?.Stop();
+            _helperAnimTimer = null;
+            GenerateSuggestionsBtn.BeginAnimation(OpacityProperty, null);
+            GenerateSuggestionsBtn.Opacity = 1.0;
         }
 
         private void OnHelperGenerationStarted()
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(() =>
             {
+                App.TraceUi("HelperGenerationStarted");
                 GenerateSuggestionsBtn.IsEnabled = false;
                 GenerateSuggestionsBtn.Content = "Generating...";
                 HelperStatusText.Text = "Analyzing project...";
+
+                var pulse = new DoubleAnimation(1.0, 0.5, TimeSpan.FromSeconds(0.8))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new SineEase()
+                };
+                GenerateSuggestionsBtn.BeginAnimation(OpacityProperty, pulse);
+
+                StartHelperAnimation();
             });
         }
 
         private void OnHelperGenerationCompleted()
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(() =>
             {
+                StopHelperAnimation();
                 GenerateSuggestionsBtn.IsEnabled = true;
                 GenerateSuggestionsBtn.Content = "Add Suggestions";
                 HelperStatusText.Text = $"{_helperManager.Suggestions.Count} suggestions generated";
@@ -1889,8 +2180,9 @@ namespace UnityAgent
 
         private void OnHelperGenerationFailed(string error)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(() =>
             {
+                StopHelperAnimation();
                 GenerateSuggestionsBtn.IsEnabled = true;
                 GenerateSuggestionsBtn.Content = "Add Suggestions";
                 HelperStatusText.Text = error;
@@ -1901,7 +2193,7 @@ namespace UnityAgent
 
         private string SavedPromptsFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "UnityAgent", "saved_prompts.json");
+            "AgenticEngine", "saved_prompts.json");
 
         private void LoadSavedPrompts()
         {
@@ -1962,6 +2254,7 @@ namespace UnityAgent
             _savedPrompts.Insert(0, entry);
             PersistSavedPrompts();
             RenderSavedPrompts();
+            TaskInput.Text = string.Empty;
         }
 
         private void RenderSavedPrompts()
@@ -2072,18 +2365,178 @@ namespace UnityAgent
             RenderSavedPrompts();
         }
 
+        // ── Chat Panel ────────────────────────────────────────────
+
+        private bool _chatCollapsed;
+        private double _chatExpandedWidth = 280;
+
+        private void ChatToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _chatCollapsed = !_chatCollapsed;
+            if (_chatCollapsed)
+            {
+                _chatExpandedWidth = ChatPanelCol.Width.Value > 0 ? ChatPanelCol.Width.Value : 280;
+                ChatExpandedPanel.Visibility = Visibility.Collapsed;
+                ChatCollapsedStrip.Visibility = Visibility.Visible;
+                ChatSplitter.Visibility = Visibility.Collapsed;
+                ChatPanelCol.Width = new GridLength(0, GridUnitType.Auto);
+                ChatPanelCol.MinWidth = 0;
+            }
+            else
+            {
+                ChatExpandedPanel.Visibility = Visibility.Visible;
+                ChatCollapsedStrip.Visibility = Visibility.Collapsed;
+                ChatSplitter.Visibility = Visibility.Visible;
+                ChatPanelCol.Width = new GridLength(_chatExpandedWidth);
+                ChatPanelCol.MinWidth = 0;
+                ChatInput.Focus();
+            }
+        }
+
+        private void NewChat_Click(object sender, RoutedEventArgs e)
+        {
+            _chatHistory.Clear();
+            ChatMessagesPanel.Children.Clear();
+            _chatCts?.Cancel();
+            _chatBusy = false;
+            ChatInput.Focus();
+        }
+
+        private void ChatSend_Click(object sender, RoutedEventArgs e)
+        {
+            SendChatMessage();
+        }
+
+        private void ChatInput_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                e.Handled = true;
+                SendChatMessage();
+            }
+        }
+
+        private async void SendChatMessage()
+        {
+            var text = ChatInput.Text?.Trim();
+            if (string.IsNullOrEmpty(text) || _chatBusy) return;
+
+            if (!_geminiService.IsConfigured)
+            {
+                AddChatBubble("System", "Gemini API key not configured.\nSet it in Settings > Gemini.", "#FF6B6B");
+                return;
+            }
+
+            _chatBusy = true;
+            ChatInput.Text = "";
+            ChatInput.IsEnabled = false;
+            ChatSendBtn.IsEnabled = false;
+
+            // Add user bubble
+            AddChatBubble("You", text, "#DA7756");
+
+            // Add typing indicator
+            var typingBubble = AddChatBubble("Gemini", "Thinking...", "#888888");
+
+            _chatCts?.Cancel();
+            _chatCts = new CancellationTokenSource();
+
+            try
+            {
+                var systemPrompt = "You are a helpful coding assistant embedded in the Agentic Engine app. " +
+                    "Give concise, practical suggestions. Keep responses short unless asked for detail. " +
+                    "The user is working on software projects, primarily Unity game development.";
+
+                var response = await _geminiService.SendChatMessageAsync(
+                    _chatHistory, text, systemPrompt, _chatCts.Token);
+
+                // Update typing bubble with actual response
+                ChatMessagesPanel.Children.Remove(typingBubble);
+
+                if (!response.StartsWith("[Cancelled]"))
+                {
+                    _chatHistory.Add(new ChatMessage { Role = "user", Text = text });
+                    _chatHistory.Add(new ChatMessage { Role = "model", Text = response });
+                    AddChatBubble("Gemini", response, "#E89B7E");
+                }
+            }
+            catch (OperationCanceledException) { ChatMessagesPanel.Children.Remove(typingBubble); }
+            catch (Exception ex)
+            {
+                ChatMessagesPanel.Children.Remove(typingBubble);
+                AddChatBubble("Error", ex.Message, "#FF6B6B");
+            }
+            finally
+            {
+                _chatBusy = false;
+                ChatInput.IsEnabled = true;
+                ChatSendBtn.IsEnabled = true;
+                ChatInput.Focus();
+            }
+        }
+
+        private Border AddChatBubble(string sender, string message, string accentColor)
+        {
+            bool isUser = sender == "You";
+
+            var bubble = new Border
+            {
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isUser ? "#2A2A2A" : "#1E1E1E")),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(8, 6, 8, 6),
+                Margin = new Thickness(isUser ? 20 : 0, 2, isUser ? 0 : 20, 2),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333333")),
+                BorderThickness = new Thickness(1),
+                HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+            };
+
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock
+            {
+                Text = sender,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(accentColor)),
+                FontWeight = FontWeights.Bold,
+                FontSize = 9,
+                FontFamily = new FontFamily("Segoe UI"),
+                Margin = new Thickness(0, 0, 0, 2)
+            });
+            panel.Children.Add(new TextBlock
+            {
+                Text = message,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E0E0E0")),
+                FontSize = 12,
+                FontFamily = new FontFamily("Segoe UI"),
+                TextWrapping = TextWrapping.Wrap
+            });
+
+            bubble.Child = panel;
+
+            // Context menu to copy
+            var contextMenu = new ContextMenu();
+            var copyItem = new MenuItem { Header = "Copy" };
+            copyItem.Click += (_, _) => Clipboard.SetText(message);
+            contextMenu.Items.Add(copyItem);
+            bubble.ContextMenu = contextMenu;
+
+            ChatMessagesPanel.Children.Add(bubble);
+            ChatScrollViewer.ScrollToEnd();
+            return bubble;
+        }
+
         // ── Status ─────────────────────────────────────────────────
 
         private void UpdateStatus()
         {
             var running = _activeTasks.Count(t => t.Status == AgentTaskStatus.Running);
             var queued = _activeTasks.Count(t => t.Status == AgentTaskStatus.Queued);
+            var waiting = _activeTasks.Count(t => t.Status == AgentTaskStatus.InitQueued);
             var completed = _historyTasks.Count(t => t.Status == AgentTaskStatus.Completed);
             var cancelled = _historyTasks.Count(t => t.Status == AgentTaskStatus.Cancelled);
             var failed = _historyTasks.Count(t => t.Status == AgentTaskStatus.Failed);
             var locks = _fileLockManager.LockCount;
             var projectName = Path.GetFileName(_projectManager.ProjectPath);
-            StatusText.Text = $"{projectName}  |  Running: {running}  |  Queued: {queued}  |  " +
+            var waitingPart = waiting > 0 ? $"  |  Waiting: {waiting}" : "";
+            StatusText.Text = $"{projectName}  |  Running: {running}  |  Queued: {queued}{waitingPart}  |  " +
                               $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
                               $"Locks: {locks}  |  {_projectManager.ProjectPath}";
         }

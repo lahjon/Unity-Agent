@@ -1,6 +1,7 @@
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace UnityAgent.Models
+namespace AgenticEngine.Models
 {
     public enum McpStatus
     {
@@ -17,6 +18,8 @@ namespace UnityAgent.Models
         public McpStatus McpStatus { get; set; } = McpStatus.Disabled;
         public string ShortDescription { get; set; } = "";
         public string LongDescription { get; set; } = "";
+        public string RuleInstruction { get; set; } = "";
+        public List<string> ProjectRules { get; set; } = new();
         public string Color { get; set; } = "";
 
         [JsonIgnore]

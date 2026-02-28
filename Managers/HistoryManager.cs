@@ -4,10 +4,11 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Controls;
-using UnityAgent.Models;
+using AgenticEngine.Models;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public class HistoryManager
     {
@@ -27,11 +28,13 @@ namespace UnityAgent.Managers
                 var dir = Path.GetDirectoryName(_historyFile)!;
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
+                // Snapshot data on the UI thread, write to disk on background thread
                 var entries = historyTasks.Select(t => new TaskHistoryEntry
                 {
                     Description = t.Description,
                     Summary = t.Summary ?? "",
                     StoredPrompt = t.StoredPrompt ?? "",
+                    ConversationId = t.ConversationId ?? "",
                     Status = t.Status.ToString(),
                     StartTime = t.StartTime,
                     EndTime = t.EndTime,
@@ -45,20 +48,26 @@ namespace UnityAgent.Managers
                     CompletionSummary = t.CompletionSummary
                 }).ToList();
 
-                File.WriteAllText(_historyFile,
-                    JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true }));
+                var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
+                var path = _historyFile;
+                Task.Run(() =>
+                {
+                    try { File.WriteAllText(path, json); }
+                    catch (Exception ex) { AppLogger.Warn("HistoryManager", "Background save failed", ex); }
+                });
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save task history", ex); }
         }
 
-        public void LoadHistory(ObservableCollection<AgentTask> historyTasks, int retentionHours)
+        public async Task<List<AgentTask>> LoadHistoryAsync(int retentionHours)
         {
+            var results = new List<AgentTask>();
             try
             {
-                if (!File.Exists(_historyFile)) return;
-                var entries = JsonSerializer.Deserialize<List<TaskHistoryEntry>>(
-                    File.ReadAllText(_historyFile));
-                if (entries == null) return;
+                if (!File.Exists(_historyFile)) return results;
+                var json = await File.ReadAllTextAsync(_historyFile).ConfigureAwait(false);
+                var entries = JsonSerializer.Deserialize<List<TaskHistoryEntry>>(json);
+                if (entries == null) return results;
 
                 var cutoff = DateTime.Now.AddHours(-retentionHours);
                 foreach (var entry in entries.Where(e => e.StartTime > cutoff))
@@ -67,6 +76,7 @@ namespace UnityAgent.Managers
                     {
                         Description = entry.Description,
                         StoredPrompt = string.IsNullOrEmpty(entry.StoredPrompt) ? null : entry.StoredPrompt,
+                        ConversationId = string.IsNullOrEmpty(entry.ConversationId) ? null : entry.ConversationId,
                         SkipPermissions = entry.SkipPermissions,
                         RemoteSession = entry.RemoteSession,
                         ProjectPath = entry.ProjectPath ?? "",
@@ -82,10 +92,11 @@ namespace UnityAgent.Managers
                     task.Status = Enum.TryParse<AgentTaskStatus>(entry.Status, out var s)
                         ? s : AgentTaskStatus.Completed;
 
-                    historyTasks.Add(task);
+                    results.Add(task);
                 }
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to load task history", ex); }
+            return results;
         }
 
         public void CleanupOldHistory(
@@ -120,11 +131,13 @@ namespace UnityAgent.Managers
                 var dir = Path.GetDirectoryName(_storedTasksFile)!;
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
+                // Snapshot data on the UI thread, write to disk on background thread
                 var entries = storedTasks.Select(t => new StoredTaskEntry
                 {
                     Description = t.Description,
                     Summary = t.Summary,
                     StoredPrompt = t.StoredPrompt ?? "",
+                    ConversationId = t.ConversationId ?? "",
                     FullOutput = t.FullOutput ?? "",
                     ProjectPath = t.ProjectPath,
                     ProjectColor = t.ProjectColor,
@@ -132,20 +145,26 @@ namespace UnityAgent.Managers
                     SkipPermissions = t.SkipPermissions
                 }).ToList();
 
-                File.WriteAllText(_storedTasksFile,
-                    JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true }));
+                var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
+                var path = _storedTasksFile;
+                Task.Run(() =>
+                {
+                    try { File.WriteAllText(path, json); }
+                    catch (Exception ex) { AppLogger.Warn("HistoryManager", "Background save failed", ex); }
+                });
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save stored tasks", ex); }
         }
 
-        public void LoadStoredTasks(ObservableCollection<AgentTask> storedTasks)
+        public async Task<List<AgentTask>> LoadStoredTasksAsync()
         {
+            var results = new List<AgentTask>();
             try
             {
-                if (!File.Exists(_storedTasksFile)) return;
-                var entries = JsonSerializer.Deserialize<List<StoredTaskEntry>>(
-                    File.ReadAllText(_storedTasksFile));
-                if (entries == null) return;
+                if (!File.Exists(_storedTasksFile)) return results;
+                var json = await File.ReadAllTextAsync(_storedTasksFile).ConfigureAwait(false);
+                var entries = JsonSerializer.Deserialize<List<StoredTaskEntry>>(json);
+                if (entries == null) return results;
 
                 foreach (var entry in entries)
                 {
@@ -153,6 +172,7 @@ namespace UnityAgent.Managers
                     {
                         Description = entry.Description,
                         StoredPrompt = entry.StoredPrompt,
+                        ConversationId = string.IsNullOrEmpty(entry.ConversationId) ? null : entry.ConversationId,
                         FullOutput = entry.FullOutput,
                         ProjectPath = entry.ProjectPath ?? "",
                         ProjectColor = entry.ProjectColor ?? "#666666",
@@ -162,10 +182,11 @@ namespace UnityAgent.Managers
                     task.Summary = entry.Summary ?? "";
                     task.Status = AgentTaskStatus.Completed;
 
-                    storedTasks.Add(task);
+                    results.Add(task);
                 }
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to load stored tasks", ex); }
+            return results;
         }
     }
 }

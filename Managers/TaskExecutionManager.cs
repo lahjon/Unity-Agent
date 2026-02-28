@@ -11,7 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public class TaskExecutionManager
     {
@@ -21,6 +21,7 @@ namespace UnityAgent.Managers
         private readonly OutputTabManager _outputTabManager;
         private readonly Func<string> _getSystemPrompt;
         private readonly Func<AgentTask, string> _getProjectDescription;
+        private readonly Func<string, string> _getProjectRulesBlock;
         private readonly Dispatcher _dispatcher;
 
         private const int OvernightMaxRuntimeHours = 12;
@@ -39,6 +40,7 @@ namespace UnityAgent.Managers
             OutputTabManager outputTabManager,
             Func<string> getSystemPrompt,
             Func<AgentTask, string> getProjectDescription,
+            Func<string, string> getProjectRulesBlock,
             Dispatcher dispatcher)
         {
             _scriptDir = scriptDir;
@@ -46,19 +48,23 @@ namespace UnityAgent.Managers
             _outputTabManager = outputTabManager;
             _getSystemPrompt = getSystemPrompt;
             _getProjectDescription = getProjectDescription;
+            _getProjectRulesBlock = getProjectRulesBlock;
             _dispatcher = dispatcher;
         }
 
-        public void StartProcess(AgentTask task,
+        public async System.Threading.Tasks.Task StartProcess(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            task.GitStartHash = TaskLauncher.CaptureGitHead(task.ProjectPath);
+            task.Cts?.Dispose();
+            task.Cts = new System.Threading.CancellationTokenSource();
+
+            task.GitStartHash = await TaskLauncher.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
 
             if (task.IsOvernight)
                 TaskLauncher.PrepareTaskForOvernightStart(task);
 
-            var fullPrompt = TaskLauncher.BuildFullPrompt(_getSystemPrompt(), task, _getProjectDescription(task));
+            var fullPrompt = TaskLauncher.BuildFullPrompt(_getSystemPrompt(), task, _getProjectDescription(task), _getProjectRulesBlock(task.ProjectPath));
             var projectPath = task.ProjectPath;
 
             var promptFile = Path.Combine(_scriptDir, $"prompt_{task.Id}.txt");
@@ -71,110 +77,81 @@ namespace UnityAgent.Managers
                 TaskLauncher.BuildPowerShellScript(projectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
-            AppendOutput(task.Id, $"[UnityAgent] Task #{task.Id} starting...\n", activeTasks, historyTasks);
+            AppendOutput(task.Id, $"[AgenticEngine] Task #{task.Id} starting...\n", activeTasks, historyTasks);
             if (!string.IsNullOrWhiteSpace(task.Summary))
-                AppendOutput(task.Id, $"[UnityAgent] Summary: {task.Summary}\n", activeTasks, historyTasks);
-            AppendOutput(task.Id, $"[UnityAgent] Project: {projectPath}\n", activeTasks, historyTasks);
-            AppendOutput(task.Id, $"[UnityAgent] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
-            AppendOutput(task.Id, $"[UnityAgent] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
+                AppendOutput(task.Id, $"[AgenticEngine] Summary: {task.Summary}\n", activeTasks, historyTasks);
+            AppendOutput(task.Id, $"[AgenticEngine] Project: {projectPath}\n", activeTasks, historyTasks);
+            AppendOutput(task.Id, $"[AgenticEngine] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
+            AppendOutput(task.Id, $"[AgenticEngine] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
             if (task.ExtendedPlanning)
-                AppendOutput(task.Id, $"[UnityAgent] Extended planning: ON\n", activeTasks, historyTasks);
+                AppendOutput(task.Id, $"[AgenticEngine] Extended planning: ON\n", activeTasks, historyTasks);
             if (task.IsOvernight)
             {
-                AppendOutput(task.Id, $"[UnityAgent] Overnight mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
-                AppendOutput(task.Id, $"[UnityAgent] Safety: skip-permissions forced, git blocked, 30min iteration timeout\n", activeTasks, historyTasks);
+                AppendOutput(task.Id, $"[AgenticEngine] Overnight mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
+                AppendOutput(task.Id, $"[AgenticEngine] Safety: skip-permissions forced, git blocked, 30min iteration timeout\n", activeTasks, historyTasks);
             }
-            AppendOutput(task.Id, $"[UnityAgent] Connecting to Claude...\n\n", activeTasks, historyTasks);
+            AppendOutput(task.Id, $"[AgenticEngine] Connecting to Claude...\n\n", activeTasks, historyTasks);
 
-            var psi = TaskLauncher.BuildProcessStartInfo(ps1File, headless: false);
-
-            var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-
-            process.OutputDataReceived += (_, e) =>
+            var process = CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
-                if (e.Data == null) return;
-                var line = TaskLauncher.StripAnsi(e.Data).Trim();
-                if (string.IsNullOrEmpty(line)) return;
-                _dispatcher.BeginInvoke(() => ParseStreamJson(task.Id, line, activeTasks, historyTasks));
-            };
+                CleanupScripts(task.Id);
 
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                var line = TaskLauncher.StripAnsi(e.Data);
-                if (!string.IsNullOrWhiteSpace(line))
-                    _dispatcher.BeginInvoke(() => AppendOutput(task.Id, $"[stderr] {line}\n", activeTasks, historyTasks));
-            };
-
-            process.Exited += (_, _) =>
-            {
-                _dispatcher.BeginInvoke(() =>
+                // Plan-before-queue: killed process needs to restart in plan mode
+                if (task.NeedsPlanRestart)
                 {
-                    var exitCode = -1;
-                    try { exitCode = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get exit code for task {task.Id}: {ex.Message}"); }
+                    task.NeedsPlanRestart = false;
+                    task.IsPlanningBeforeQueue = true;
+                    task.StartTime = DateTime.Now;
+                    AppendOutput(task.Id, "\n[AgenticEngine] Restarting in plan mode...\n\n", activeTasks, historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                    _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
+                    return;
+                }
 
-                    CleanupScripts(task.Id);
+                // Plan-before-queue: planning phase complete
+                if (task.IsPlanningBeforeQueue)
+                {
+                    HandlePlanBeforeQueueCompletion(task, activeTasks, historyTasks, moveToHistory);
+                    return;
+                }
 
-                    // Plan-before-queue: killed process needs to restart in plan mode
-                    if (task.NeedsPlanRestart)
-                    {
-                        task.NeedsPlanRestart = false;
-                        task.IsPlanningBeforeQueue = true;
-                        task.StartTime = DateTime.Now;
-                        AppendOutput(task.Id, "\n[UnityAgent] Restarting in plan mode...\n\n", activeTasks, historyTasks);
-                        _outputTabManager.UpdateTabHeader(task);
-                        StartProcess(task, activeTasks, historyTasks, moveToHistory);
-                        return;
-                    }
-
-                    // Plan-before-queue: planning phase complete
-                    if (task.IsPlanningBeforeQueue)
-                    {
-                        HandlePlanBeforeQueueCompletion(task, activeTasks, historyTasks, moveToHistory);
-                        return;
-                    }
-
-                    // Already queued or cancelled — skip normal completion
-                    if (task.Status is AgentTaskStatus.Queued or AgentTaskStatus.Cancelled)
-                    {
-                        _fileLockManager.CheckQueuedTasks(activeTasks);
-                        TaskCompleted?.Invoke(task.Id);
-                        return;
-                    }
-
-                    if (task.IsOvernight && task.Status == AgentTaskStatus.Running)
-                    {
-                        // Don't release locks between overnight iterations — the task
-                        // will continue working on the same files.  Locks are released
-                        // when the overnight task finishes via FinishOvernightTask → moveToHistory.
-                        HandleOvernightIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
-                    }
-                    else
-                    {
-                        _fileLockManager.ReleaseTaskLocks(task.Id);
-                        task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
-                        task.EndTime = DateTime.Now;
-                        AppendCompletionSummary(task, activeTasks, historyTasks);
-                        var statusColor = exitCode == 0
-                            ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
-                            : new SolidColorBrush(Color.FromRgb(0xE0, 0x55, 0x55));
-                        AppendColoredOutput(task.Id,
-                            $"\n[UnityAgent] Process finished (exit code: {exitCode}).\n",
-                            statusColor, activeTasks, historyTasks);
-                        _outputTabManager.UpdateTabHeader(task);
-                    }
-
+                // Already queued or cancelled — skip normal completion
+                if (task.Status is AgentTaskStatus.Queued or AgentTaskStatus.Cancelled)
+                {
                     _fileLockManager.CheckQueuedTasks(activeTasks);
                     TaskCompleted?.Invoke(task.Id);
-                });
-            };
+                    return;
+                }
+
+                if (task.IsOvernight && task.Status == AgentTaskStatus.Running)
+                {
+                    // Don't release locks between overnight iterations — the task
+                    // will continue working on the same files.  Locks are released
+                    // when the overnight task finishes via FinishOvernightTask → moveToHistory.
+                    HandleOvernightIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
+                }
+                else
+                {
+                    _fileLockManager.ReleaseTaskLocks(task.Id);
+                    task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+                    task.EndTime = DateTime.Now;
+                    AppendCompletionSummary(task, activeTasks, historyTasks);
+                    var statusColor = exitCode == 0
+                        ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
+                        : new SolidColorBrush(Color.FromRgb(0xE0, 0x55, 0x55));
+                    AppendColoredOutput(task.Id,
+                        $"\n[AgenticEngine] Process finished (exit code: {exitCode}).\n",
+                        statusColor, activeTasks, historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                }
+
+                _fileLockManager.CheckQueuedTasks(activeTasks);
+                TaskCompleted?.Invoke(task.Id);
+            });
 
             try
             {
-                process.Start();
-                task.Process = process;
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
+                StartManagedProcess(task, process);
 
                 if (task.IsOvernight)
                 {
@@ -198,7 +175,7 @@ namespace UnityAgent.Managers
             }
             catch (Exception ex)
             {
-                AppendOutput(task.Id, $"[UnityAgent] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
+                AppendOutput(task.Id, $"[AgenticEngine] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);
@@ -208,7 +185,7 @@ namespace UnityAgent.Managers
 
         public void LaunchHeadless(AgentTask task)
         {
-            var fullPrompt = TaskLauncher.BuildFullPrompt(_getSystemPrompt(), task, _getProjectDescription(task));
+            var fullPrompt = TaskLauncher.BuildFullPrompt(_getSystemPrompt(), task, _getProjectDescription(task), _getProjectRulesBlock(task.ProjectPath));
             var projectPath = task.ProjectPath;
 
             var promptFile = Path.Combine(_scriptDir, $"prompt_{task.Id}.txt");
@@ -238,7 +215,7 @@ namespace UnityAgent.Managers
             if (string.IsNullOrEmpty(text)) return;
             inputBox.Clear();
 
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Running && task.Process is { HasExited: false })
+            if (task.Status is AgentTaskStatus.Running && task.Process is { HasExited: false })
             {
                 try
                 {
@@ -251,8 +228,20 @@ namespace UnityAgent.Managers
 
             task.Status = AgentTaskStatus.Running;
             task.EndTime = null;
+            task.Cts?.Dispose();
+            task.Cts = new System.Threading.CancellationTokenSource();
             _outputTabManager.UpdateTabHeader(task);
-            AppendOutput(task.Id, $"\n> {text}\n[UnityAgent] Sending follow-up with --continue...\n\n", activeTasks, historyTasks);
+
+            // Use --resume with session ID when available, fall back to --continue
+            var hasSessionId = !string.IsNullOrEmpty(task.ConversationId);
+            var resumeFlag = hasSessionId
+                ? $" --resume {task.ConversationId}"
+                : " --continue";
+            var resumeLabel = hasSessionId
+                ? $"--resume {task.ConversationId}"
+                : "--continue";
+
+            AppendOutput(task.Id, $"\n> {text}\n[AgenticEngine] Sending follow-up with {resumeLabel}...\n\n", activeTasks, historyTasks);
 
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
             var followUpFile = Path.Combine(_scriptDir, $"followup_{task.Id}_{DateTime.Now.Ticks}.txt");
@@ -263,56 +252,25 @@ namespace UnityAgent.Managers
                 "$env:CLAUDECODE = $null\n" +
                 $"Set-Location -LiteralPath '{task.ProjectPath}'\n" +
                 $"$prompt = Get-Content -Raw -LiteralPath '{followUpFile}'\n" +
-                $"claude -p{skipFlag} --continue $prompt\n",
+                $"claude -p{skipFlag}{resumeFlag} --verbose --output-format stream-json $prompt\n",
                 Encoding.UTF8);
 
-            var psi = new ProcessStartInfo
+            var process = CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
-                FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -File \"{ps1File}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-
-            var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                _dispatcher.BeginInvoke(() => AppendOutput(task.Id, TaskLauncher.StripAnsi(e.Data) + "\n", activeTasks, historyTasks));
-            };
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                _dispatcher.BeginInvoke(() => AppendOutput(task.Id, TaskLauncher.StripAnsi(e.Data) + "\n", activeTasks, historyTasks));
-            };
-            process.Exited += (_, _) =>
-            {
-                _dispatcher.BeginInvoke(() =>
-                {
-                    var followUpExit = -1;
-                    try { followUpExit = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get follow-up exit code for task {task.Id}: {ex.Message}"); }
-                    task.Status = followUpExit == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
-                    task.EndTime = DateTime.Now;
-                    AppendCompletionSummary(task, activeTasks, historyTasks);
-                    AppendOutput(task.Id, "\n[UnityAgent] Follow-up complete.\n", activeTasks, historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                });
-            };
+                task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+                task.EndTime = DateTime.Now;
+                AppendCompletionSummary(task, activeTasks, historyTasks);
+                AppendOutput(task.Id, "\n[AgenticEngine] Follow-up complete.\n", activeTasks, historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+            });
 
             try
             {
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
+                StartManagedProcess(task, process);
             }
             catch (Exception ex)
             {
-                AppendOutput(task.Id, $"[UnityAgent] Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
+                AppendOutput(task.Id, $"[AgenticEngine] Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
             }
         }
 
@@ -325,6 +283,9 @@ namespace UnityAgent.Managers
             {
                 try { ResumeProcessTree(task.Process); } catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to resume process tree before cancel for task {task.Id}", ex); }
             }
+
+            // Cancel cooperative async operations before killing the process
+            try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
 
             if (task.OvernightRetryTimer != null)
             {
@@ -342,6 +303,8 @@ namespace UnityAgent.Managers
             _fileLockManager.ReleaseTaskLocks(task.Id);
             _fileLockManager.RemoveQueuedInfo(task.Id);
             _streamingToolState.Remove(task.Id);
+            task.Cts?.Dispose();
+            task.Cts = null;
         }
 
         public static void KillProcess(AgentTask task)
@@ -355,6 +318,59 @@ namespace UnityAgent.Managers
         }
 
         public void RemoveStreamingState(string taskId) => _streamingToolState.Remove(taskId);
+
+        /// <summary>
+        /// Creates a Process with standard output/error/event wiring for stream-json parsing.
+        /// The caller supplies only the Exited callback. Returns the wired (but not started) Process.
+        /// </summary>
+        private Process CreateManagedProcess(
+            string ps1File,
+            string taskId,
+            ObservableCollection<AgentTask> activeTasks,
+            ObservableCollection<AgentTask> historyTasks,
+            Action<int> onExited)
+        {
+            var psi = TaskLauncher.BuildProcessStartInfo(ps1File, headless: false);
+
+            var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+
+            process.OutputDataReceived += (_, e) =>
+            {
+                if (e.Data == null) return;
+                var line = TaskLauncher.StripAnsi(e.Data).Trim();
+                if (string.IsNullOrEmpty(line)) return;
+                _dispatcher.BeginInvoke(() => ParseStreamJson(taskId, line, activeTasks, historyTasks));
+            };
+
+            process.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data == null) return;
+                var line = TaskLauncher.StripAnsi(e.Data);
+                if (!string.IsNullOrWhiteSpace(line))
+                    _dispatcher.BeginInvoke(() => AppendOutput(taskId, $"[stderr] {line}\n", activeTasks, historyTasks));
+            };
+
+            process.Exited += (_, _) =>
+            {
+                _dispatcher.BeginInvoke(() =>
+                {
+                    var exitCode = -1;
+                    try { exitCode = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get exit code for task {taskId}: {ex.Message}"); }
+                    onExited(exitCode);
+                });
+            };
+
+            return process;
+        }
+
+        /// <summary>Starts a managed process, assigns it to the task, and begins async output reading.</summary>
+        private void StartManagedProcess(AgentTask task, Process process)
+        {
+            process.Start();
+            task.Process = process;
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
 
         // ── Process Suspend / Resume (P/Invoke) ────────────────────
 
@@ -518,7 +534,7 @@ namespace UnityAgent.Managers
             }
 
             _outputTabManager.UpdateTabHeader(task);
-            AppendOutput(task.Id, "\n[UnityAgent] Task resumed.\n", activeTasks, historyTasks);
+            AppendOutput(task.Id, "\n[AgenticEngine] Task resumed.\n", activeTasks, historyTasks);
         }
 
         private static string FormatToolAction(string toolName, JsonElement? input)
@@ -712,6 +728,20 @@ namespace UnityAgent.Managers
                         }
                         break;
 
+                    case "system":
+                        // Capture conversation/session ID for resume support
+                        {
+                            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                            if (task != null)
+                            {
+                                if (root.TryGetProperty("session_id", out var sessionIdProp))
+                                    task.ConversationId = sessionIdProp.GetString();
+                                else if (root.TryGetProperty("conversation_id", out var convIdProp))
+                                    task.ConversationId = convIdProp.GetString();
+                            }
+                        }
+                        break;
+
                     case "error":
                         var errMsg = root.TryGetProperty("error", out var err)
                             ? (err.TryGetProperty("message", out var em) ? em.GetString() : err.ToString())
@@ -720,7 +750,7 @@ namespace UnityAgent.Managers
                         break;
 
                     default:
-                        if (type != null && type != "ping" && type != "message_start" && type != "message_stop" && type != "user" && type != "system")
+                        if (type != null && type != "ping" && type != "message_start" && type != "message_stop" && type != "user")
                             AppendOutput(taskId, $"[{type}]\n", activeTasks, historyTasks);
                         break;
                 }
@@ -864,50 +894,25 @@ namespace UnityAgent.Managers
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
             var remoteFlag = task.RemoteSession ? " --remote" : "";
             var teamFlag = task.SpawnTeam ? " --spawn-team" : "";
-            var claudeCmd = $"claude -p{skipFlag}{remoteFlag}{teamFlag} --verbose --continue --output-format stream-json $prompt";
+            var resumeFlag = !string.IsNullOrEmpty(task.ConversationId)
+                ? $" --resume {task.ConversationId}"
+                : " --continue";
+            var claudeCmd = $"claude -p{skipFlag}{remoteFlag}{teamFlag} --verbose{resumeFlag} --output-format stream-json $prompt";
 
             var ps1File = Path.Combine(_scriptDir, $"overnight_{task.Id}.ps1");
             File.WriteAllText(ps1File,
                 TaskLauncher.BuildPowerShellScript(task.ProjectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
-            var psi = TaskLauncher.BuildProcessStartInfo(ps1File, headless: false);
-
-            var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-
-            process.OutputDataReceived += (_, e) =>
+            var process = CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
-                if (e.Data == null) return;
-                var line = TaskLauncher.StripAnsi(e.Data).Trim();
-                if (string.IsNullOrEmpty(line)) return;
-                _dispatcher.BeginInvoke(() => ParseStreamJson(task.Id, line, activeTasks, historyTasks));
-            };
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                var line = TaskLauncher.StripAnsi(e.Data);
-                if (!string.IsNullOrWhiteSpace(line))
-                    _dispatcher.BeginInvoke(() => AppendOutput(task.Id, $"[stderr] {line}\n", activeTasks, historyTasks));
-            };
-
-            process.Exited += (_, _) =>
-            {
-                _dispatcher.BeginInvoke(() =>
-                {
-                    var exitCode = -1;
-                    try { exitCode = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get overnight exit code for task {task.Id}: {ex.Message}"); }
-                    CleanupScripts(task.Id);
-                    HandleOvernightIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
-                });
-            };
+                CleanupScripts(task.Id);
+                HandleOvernightIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
+            });
 
             try
             {
-                process.Start();
-                task.Process = process;
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
+                StartManagedProcess(task, process);
 
                 var iterationTimer = new DispatcherTimer
                 {
@@ -968,7 +973,7 @@ namespace UnityAgent.Managers
                         return dep != null && !dep.IsFinished;
                     });
                     AppendOutput(task.Id,
-                        $"\n[UnityAgent] Planning complete. Queued — waiting for dependencies: " +
+                        $"\n[AgenticEngine] Planning complete. Queued — waiting for dependencies: " +
                         $"{string.Join(", ", task.DependencyTaskIds.Select(id => $"#{id}"))}\n",
                         activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
@@ -998,7 +1003,7 @@ namespace UnityAgent.Managers
                         BlockingTaskId = blockerId,
                         BlockedByTaskIds = new HashSet<string> { blockerId }
                     };
-                    AppendOutput(task.Id, "\n[UnityAgent] Planning complete. Queued — waiting for file lock to clear.\n", activeTasks, historyTasks);
+                    AppendOutput(task.Id, "\n[AgenticEngine] Planning complete. Queued — waiting for file lock to clear.\n", activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _fileLockManager.CheckQueuedTasks(activeTasks);
                     return;
@@ -1008,9 +1013,9 @@ namespace UnityAgent.Managers
 
             // No more blockers — start execution
             task.StartTime = DateTime.Now;
-            AppendOutput(task.Id, "\n[UnityAgent] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
+            AppendOutput(task.Id, "\n[AgenticEngine] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
-            StartProcess(task, activeTasks, historyTasks, moveToHistory);
+            _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
         }
 
         private void AppendOutput(string taskId, string text,
@@ -1025,14 +1030,24 @@ namespace UnityAgent.Managers
             _outputTabManager.AppendColoredOutput(taskId, text, foreground, activeTasks, historyTasks);
         }
 
-        private void AppendCompletionSummary(AgentTask task,
+        private async void AppendCompletionSummary(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
+            var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
             var duration = (task.EndTime ?? DateTime.Now) - task.StartTime;
-            var summary = TaskLauncher.GenerateCompletionSummary(
-                task.ProjectPath, task.GitStartHash, task.Status, duration);
-            task.CompletionSummary = summary;
-            AppendOutput(task.Id, summary, activeTasks, historyTasks);
+            try
+            {
+                var summary = await TaskLauncher.GenerateCompletionSummaryAsync(
+                    task.ProjectPath, task.GitStartHash, task.Status, duration, ct);
+                task.CompletionSummary = summary;
+                AppendOutput(task.Id, summary, activeTasks, historyTasks);
+            }
+            catch (OperationCanceledException)
+            {
+                var summary = TaskLauncher.FormatCompletionSummary(task.Status, duration, null);
+                task.CompletionSummary = summary;
+                AppendOutput(task.Id, summary, activeTasks, historyTasks);
+            }
         }
 
         private void CleanupScripts(string taskId)

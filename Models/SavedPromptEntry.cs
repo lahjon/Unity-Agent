@@ -1,6 +1,6 @@
 using System;
 
-namespace UnityAgent.Models
+namespace AgenticEngine.Models
 {
     internal class SavedPromptEntry
     {

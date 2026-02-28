@@ -5,7 +5,7 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-        <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
+        <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/>
         <Setter Property="ItemContainerStyle">
             <Setter.Value>
                 <Style TargetType="ListBoxItem">

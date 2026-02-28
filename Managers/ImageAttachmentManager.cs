@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public class ImageAttachmentManager
     {

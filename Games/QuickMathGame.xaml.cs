@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 
-namespace UnityAgent.Games
+namespace AgenticEngine.Games
 {
     public partial class QuickMathGame : UserControl, IMinigame
     {

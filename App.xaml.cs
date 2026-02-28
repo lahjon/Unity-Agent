@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,14 +9,15 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace UnityAgent
+namespace AgenticEngine
 {
     public partial class App : Application
     {
         private static readonly string LogDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "UnityAgent", "logs");
+            "AgenticEngine", "logs");
         private static readonly string LogFile = Path.Combine(LogDir, "crash.log");
+        private static readonly string HangLogFile = Path.Combine(LogDir, "hang.log");
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -25,6 +28,9 @@ namespace UnityAgent
             DispatcherUnhandledException += OnDispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+            // Start UI thread hang watchdog
+            StartUiWatchdog();
 
             // Make tooltips appear 2x quicker (default 400ms → 200ms)
             ToolTipService.InitialShowDelayProperty.OverrideMetadata(
@@ -41,7 +47,7 @@ namespace UnityAgent
             // Show the error so the user can see what's going wrong
             var msg = e.Exception.InnerException?.Message ?? e.Exception.Message;
             var detail = e.Exception.InnerException?.GetType().Name ?? e.Exception.GetType().Name;
-            ShowDarkError($"[{detail}] {msg}\n\nFull details logged to:\n{LogFile}", "UnityAgent Error");
+            ShowDarkError($"[{detail}] {msg}\n\nFull details logged to:\n{LogFile}", "AgenticEngine Error");
 
             e.Handled = true;
         }
@@ -130,6 +136,119 @@ namespace UnityAgent
 
             try { dlg.Owner = Current.MainWindow; } catch { /* MainWindow may not be available */ }
             dlg.ShowDialog();
+        }
+
+        private static string? _lastUiAction;
+        private static long _opStartTicks;
+        private static string? _currentOpName;
+
+        /// <summary>Call from UI-thread code to mark what's currently executing (for hang diagnosis).</summary>
+        public static void TraceUi(string action) => _lastUiAction = action;
+
+        private void StartUiWatchdog()
+        {
+            var heartbeat = new ManualResetEventSlim(false);
+            var hangStart = DateTime.MinValue;
+
+            // Track every dispatcher operation start/end with timing
+            Dispatcher.Hooks.OperationStarted += (_, e) =>
+            {
+                _opStartTicks = Stopwatch.GetTimestamp();
+                _currentOpName = _lastUiAction ?? "unknown";
+            };
+            Dispatcher.Hooks.OperationCompleted += (_, e) =>
+            {
+                var elapsed = Stopwatch.GetElapsedTime(_opStartTicks);
+                if (elapsed.TotalMilliseconds > 500)
+                {
+                    var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] SLOW OP: {_currentOpName} took {elapsed.TotalMilliseconds:F0}ms (priority={e.Operation.Priority})\n";
+                    try { File.AppendAllText(HangLogFile, entry); }
+                    catch { }
+                }
+                _currentOpName = null;
+            };
+            Dispatcher.Hooks.OperationAborted += (_, e) =>
+            {
+                _currentOpName = null;
+            };
+
+            // UI thread pings the heartbeat every 500ms
+            var heartbeatTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+            heartbeatTimer.Tick += (_, _) =>
+            {
+                _lastUiAction = "idle";
+                heartbeat.Set();
+            };
+            heartbeatTimer.Start();
+
+            // Background thread monitors the heartbeat
+            var watchdog = new Thread(() =>
+            {
+                while (true)
+                {
+                    heartbeat.Reset();
+                    // Wait up to 3 seconds for the UI thread to respond
+                    if (!heartbeat.Wait(3000))
+                    {
+                        hangStart = DateTime.Now;
+                        var lastAction = _lastUiAction ?? "unknown";
+
+                        var currentOp = _currentOpName ?? "none";
+                        var opDuration = _opStartTicks > 0
+                            ? $"{Stopwatch.GetElapsedTime(_opStartTicks).TotalMilliseconds:F0}ms"
+                            : "n/a";
+
+                        var entry = $"[{hangStart:yyyy-MM-dd HH:mm:ss.fff}] UI THREAD HANG DETECTED (>3s)\n" +
+                                    $"  Last UI action: {lastAction}\n" +
+                                    $"  Current dispatcher op: {currentOp} (running for {opDuration})\n" +
+                                    $"  Process threads:\n";
+
+                        // Dump managed thread pool info
+                        ThreadPool.GetAvailableThreads(out var workerAvail, out var ioAvail);
+                        ThreadPool.GetMaxThreads(out var workerMax, out var ioMax);
+                        entry += $"  ThreadPool: workers={workerMax - workerAvail}/{workerMax}, IO={ioMax - ioAvail}/{ioMax}\n";
+                        entry += $"  GC memory: {GC.GetTotalMemory(false) / 1024 / 1024} MB\n";
+
+                        // List OS-level threads
+                        try
+                        {
+                            var proc = Process.GetCurrentProcess();
+                            foreach (ProcessThread pt in proc.Threads)
+                            {
+                                try
+                                {
+                                    if (pt.ThreadState == System.Diagnostics.ThreadState.Running ||
+                                        pt.TotalProcessorTime.TotalMilliseconds > 1000)
+                                        entry += $"  Thread {pt.Id}: state={pt.ThreadState}, cpu={pt.TotalProcessorTime.TotalSeconds:F1}s, " +
+                                                 $"wait={pt.WaitReason}\n";
+                                }
+                                catch { }
+                            }
+                        }
+                        catch { }
+
+                        entry += $"{"".PadRight(80, '=')}\n";
+
+                        try { File.AppendAllText(HangLogFile, entry); }
+                        catch { }
+                        Managers.AppLogger.Error("Watchdog", $"UI thread hang detected! Last action: {lastAction}. Details in hang.log");
+
+                        // Wait for recovery, then log how long it lasted
+                        heartbeat.Wait(60000);
+                        var duration = DateTime.Now - hangStart;
+                        var recovery = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] UI RECOVERED after {duration.TotalSeconds:F1}s\n{"".PadRight(80, '-')}\n";
+                        try { File.AppendAllText(HangLogFile, recovery); }
+                        catch { }
+                        Managers.AppLogger.Warn("Watchdog", $"UI thread recovered after {duration.TotalSeconds:F1}s");
+                    }
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "UI-Watchdog",
+                Priority = ThreadPriority.AboveNormal
+            };
+            watchdog.Start();
         }
 
         public static void LogCrash(string source, Exception? ex)

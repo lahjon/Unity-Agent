@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace UnityAgent.Converters
+namespace AgenticEngine.Converters
 {
     public class StringToBrushConverter : IValueConverter
     {

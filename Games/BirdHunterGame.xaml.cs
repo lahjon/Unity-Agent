@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 
-namespace UnityAgent.Games
+namespace AgenticEngine.Games
 {
     public partial class BirdHunterGame : UserControl, IMinigame
     {
@@ -18,7 +18,7 @@ namespace UnityAgent.Games
 
         private static readonly string HighScoreFile = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "UnityAgent", "birdhunter_highscore.txt");
+            "AgenticEngine", "birdhunter_highscore.txt");
 
         private const int GameDurationSeconds = 10;
         private static readonly string[] BirdChars = { "\U0001F426", "\U0001F985", "\U0001F986" }; // 🐦🦅🦆

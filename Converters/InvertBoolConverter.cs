@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Windows.Data;
 
-namespace UnityAgent.Converters
+namespace AgenticEngine.Converters
 {
     public class InvertBoolConverter : IValueConverter
     {

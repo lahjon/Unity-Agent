@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 
-namespace UnityAgent.Games
+namespace AgenticEngine.Games
 {
     public partial class ReactionTestGame : UserControl, IMinigame
     {
@@ -18,7 +18,7 @@ namespace UnityAgent.Games
 
         private static readonly string HighScoreFile = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "UnityAgent", "reaction_highscore.txt");
+            "AgenticEngine", "reaction_highscore.txt");
 
         private readonly DispatcherTimer _delayTimer = new();
         private readonly Stopwatch _stopwatch = new();

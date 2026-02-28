@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace UnityAgent
+namespace AgenticEngine
 {
     public class TerminalTabManager
     {
@@ -149,19 +150,32 @@ namespace UnityAgent
 
         private void WireTerminalEvents(ConPtyTerminal terminal)
         {
-            // Coalesce rapid output updates to avoid excessive UI re-renders
-            var renderQueued = false;
+            // Time-throttled rendering: at most once per 50ms to prevent UI flood
+            var renderPending = 0; // 0 = idle, 1 = queued
+            DispatcherTimer? renderTimer = null;
 
             terminal.OutputReceived += () =>
             {
-                if (renderQueued) return;
-                renderQueued = true;
+                if (Interlocked.CompareExchange(ref renderPending, 1, 0) != 0) return;
                 _dispatcher.BeginInvoke(() =>
                 {
-                    renderQueued = false;
-                    var idx = _terminals.IndexOf(terminal);
-                    if (idx >= 0 && idx == _activeIndex)
-                        RenderActiveTerminal();
+                    if (renderTimer == null)
+                    {
+                        renderTimer = new DispatcherTimer(DispatcherPriority.Background)
+                        {
+                            Interval = TimeSpan.FromMilliseconds(50)
+                        };
+                        renderTimer.Tick += (_, _) =>
+                        {
+                            renderTimer.Stop();
+                            Interlocked.Exchange(ref renderPending, 0);
+                            var idx = _terminals.IndexOf(terminal);
+                            if (idx >= 0 && idx == _activeIndex)
+                                RenderActiveTerminal();
+                        };
+                    }
+                    if (!renderTimer.IsEnabled)
+                        renderTimer.Start();
                 });
             };
 
@@ -169,6 +183,7 @@ namespace UnityAgent
             {
                 _dispatcher.BeginInvoke(() =>
                 {
+                    Interlocked.Exchange(ref renderPending, 0);
                     var idx = _terminals.IndexOf(terminal);
                     if (idx >= 0)
                     {
@@ -184,10 +199,17 @@ namespace UnityAgent
         {
             if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
             {
-                _output.Text = _terminals[_activeIndex].GetOutputText();
-                _output.CaretIndex = _output.Text.Length;
-                _dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                    () => _output.ScrollToEnd());
+                App.TraceUi("TerminalRender.GetOutputText");
+                var text = _terminals[_activeIndex].GetOutputText();
+                // Only update if content actually changed
+                if (_output.Text != text)
+                {
+                    App.TraceUi("TerminalRender.SetText");
+                    _output.Text = text;
+                    _output.CaretIndex = text.Length;
+                    _dispatcher.BeginInvoke(DispatcherPriority.Background,
+                        () => _output.ScrollToEnd());
+                }
             }
         }
 

@@ -4,31 +4,75 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using UnityAgent.Models;
+using AgenticEngine.Models;
+using Microsoft.Win32.SafeHandles;
 
-namespace UnityAgent
+namespace AgenticEngine
 {
     public sealed class ConPtyTerminal : IDisposable
     {
+        // ── SafeHandle wrappers ──────────────────────────────────────
+
+        /// <summary>Kernel handle released via CloseHandle (pipes, process, thread).</summary>
+        private sealed class SafeKernelHandle : SafeHandleZeroOrMinusOneIsInvalid
+        {
+            public SafeKernelHandle() : base(true) { }
+
+            public SafeKernelHandle(IntPtr existingHandle) : base(true)
+            {
+                SetHandle(existingHandle);
+            }
+
+            protected override bool ReleaseHandle() => CloseHandle(handle);
+        }
+
+        /// <summary>Pseudo-console handle released via ClosePseudoConsole.</summary>
+        private sealed class SafePseudoConsoleHandle : SafeHandleZeroOrMinusOneIsInvalid
+        {
+            public SafePseudoConsoleHandle() : base(true) { }
+
+            protected override bool ReleaseHandle()
+            {
+                ClosePseudoConsole(handle);
+                return true;
+            }
+        }
+
+        /// <summary>Proc-thread attribute list released via DeleteProcThreadAttributeList + FreeHGlobal.</summary>
+        private sealed class SafeAttributeListHandle : SafeHandleZeroOrMinusOneIsInvalid
+        {
+            public SafeAttributeListHandle(IntPtr buffer) : base(true)
+            {
+                SetHandle(buffer);
+            }
+
+            protected override bool ReleaseHandle()
+            {
+                DeleteProcThreadAttributeList(handle);
+                Marshal.FreeHGlobal(handle);
+                return true;
+            }
+        }
+
         // ── P/Invoke ────────────────────────────────────────────────
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern int CreatePseudoConsole(COORD size, IntPtr hInput, IntPtr hOutput, uint dwFlags, out IntPtr phPC);
+        private static extern int CreatePseudoConsole(COORD size, SafeKernelHandle hInput, SafeKernelHandle hOutput, uint dwFlags, out SafePseudoConsoleHandle phPC);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern void ClosePseudoConsole(IntPtr hPC);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CreatePipe(out IntPtr hReadPipe, out IntPtr hWritePipe, ref SECURITY_ATTRIBUTES lpPipeAttributes, uint nSize);
+        private static extern bool CreatePipe(out SafeKernelHandle hReadPipe, out SafeKernelHandle hWritePipe, ref SECURITY_ATTRIBUTES lpPipeAttributes, uint nSize);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr hObject);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool ReadFile(IntPtr hFile, byte[] lpBuffer, uint nNumberOfBytesToRead, out uint lpNumberOfBytesRead, IntPtr lpOverlapped);
+        private static extern bool ReadFile(SafeKernelHandle hFile, byte[] lpBuffer, uint nNumberOfBytesToRead, out uint lpNumberOfBytesRead, IntPtr lpOverlapped);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool WriteFile(IntPtr hFile, byte[] lpBuffer, uint nNumberOfBytesToWrite, out uint lpNumberOfBytesWritten, IntPtr lpOverlapped);
+        private static extern bool WriteFile(SafeKernelHandle hFile, byte[] lpBuffer, uint nNumberOfBytesToWrite, out uint lpNumberOfBytesWritten, IntPtr lpOverlapped);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool InitializeProcThreadAttributeList(IntPtr lpAttributeList, int dwAttributeCount, int dwFlags, ref IntPtr lpSize);
@@ -53,13 +97,13 @@ namespace UnityAgent
             out PROCESS_INFORMATION lpProcessInformation);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+        private static extern uint WaitForSingleObject(SafeKernelHandle hHandle, uint dwMilliseconds);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
+        private static extern bool TerminateProcess(SafeKernelHandle hProcess, uint uExitCode);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
+        private static extern bool GetExitCodeProcess(SafeKernelHandle hProcess, out uint lpExitCode);
 
         // ── Structs ─────────────────────────────────────────────────
 
@@ -121,11 +165,11 @@ namespace UnityAgent
 
         // ── Fields ──────────────────────────────────────────────────
 
-        private IntPtr _pseudoConsole;
-        private IntPtr _pipeInRead, _pipeInWrite;
-        private IntPtr _pipeOutRead, _pipeOutWrite;
-        private IntPtr _processHandle, _threadHandle;
-        private IntPtr _attrList;
+        private SafePseudoConsoleHandle? _pseudoConsole;
+        private SafeKernelHandle? _pipeInRead, _pipeInWrite;
+        private SafeKernelHandle? _pipeOutRead, _pipeOutWrite;
+        private SafeKernelHandle? _processHandle, _threadHandle;
+        private SafeAttributeListHandle? _attrList;
         private Thread? _readThread;
         private volatile bool _disposed;
 
@@ -144,7 +188,7 @@ namespace UnityAgent
             {
                 if (_disposed) return true;
                 var handle = _processHandle;
-                if (handle == IntPtr.Zero) return true;
+                if (handle == null || handle.IsInvalid || handle.IsClosed) return true;
                 return WaitForSingleObject(handle, 0) != 258; // WAIT_TIMEOUT = 258
             }
         }
@@ -173,30 +217,30 @@ namespace UnityAgent
                 };
 
                 // Create pipes: input pipe (we write to pipeInWrite, console reads from pipeInRead)
-                if (!CreatePipe(out _pipeInRead, out _pipeInWrite, ref sa, 0))
+                if (!CreatePipe(out _pipeInRead!, out _pipeInWrite!, ref sa, 0))
                     throw new InvalidOperationException($"CreatePipe (input) failed: {Marshal.GetLastWin32Error()}");
 
                 // Output pipe (console writes to pipeOutWrite, we read from pipeOutRead)
-                if (!CreatePipe(out _pipeOutRead, out _pipeOutWrite, ref sa, 0))
+                if (!CreatePipe(out _pipeOutRead!, out _pipeOutWrite!, ref sa, 0))
                     throw new InvalidOperationException($"CreatePipe (output) failed: {Marshal.GetLastWin32Error()}");
 
                 // Create pseudo console
                 var size = new COORD { X = cols, Y = rows };
-                int hr = CreatePseudoConsole(size, _pipeInRead, _pipeOutWrite, 0, out _pseudoConsole);
+                int hr = CreatePseudoConsole(size, _pipeInRead, _pipeOutWrite, 0, out _pseudoConsole!);
                 if (hr != 0)
                     throw new InvalidOperationException($"CreatePseudoConsole failed: 0x{hr:X8}");
 
                 // Initialize thread attribute list
                 var listSize = IntPtr.Zero;
                 InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref listSize);
-                _attrList = Marshal.AllocHGlobal(listSize);
-                if (!InitializeProcThreadAttributeList(_attrList, 1, 0, ref listSize))
+                _attrList = new SafeAttributeListHandle(Marshal.AllocHGlobal(listSize));
+                if (!InitializeProcThreadAttributeList(_attrList.DangerousGetHandle(), 1, 0, ref listSize))
                     throw new InvalidOperationException($"InitializeProcThreadAttributeList failed: {Marshal.GetLastWin32Error()}");
 
                 if (!UpdateProcThreadAttribute(
-                    _attrList, 0,
+                    _attrList.DangerousGetHandle(), 0,
                     PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-                    _pseudoConsole, (IntPtr)IntPtr.Size,
+                    _pseudoConsole.DangerousGetHandle(), (IntPtr)IntPtr.Size,
                     IntPtr.Zero, IntPtr.Zero))
                     throw new InvalidOperationException($"UpdateProcThreadAttribute failed: {Marshal.GetLastWin32Error()}");
 
@@ -211,7 +255,7 @@ namespace UnityAgent
                     {
                         cb = Marshal.SizeOf<STARTUPINFOEX>()
                     },
-                    lpAttributeList = _attrList
+                    lpAttributeList = _attrList.DangerousGetHandle()
                 };
 
                 if (!CreateProcessW(
@@ -222,15 +266,19 @@ namespace UnityAgent
                     ref si, out var pi))
                     throw new InvalidOperationException($"CreateProcess failed: {Marshal.GetLastWin32Error()}");
 
-                _processHandle = pi.hProcess;
-                _threadHandle = pi.hThread;
+                // Prevent premature GC of SafeHandles whose raw values were embedded in the struct
+                GC.KeepAlive(_attrList);
+                GC.KeepAlive(_pseudoConsole);
+
+                _processHandle = new SafeKernelHandle(pi.hProcess);
+                _threadHandle = new SafeKernelHandle(pi.hThread);
                 ProcessId = pi.dwProcessId;
 
                 // Close the pipe ends the console owns
-                CloseHandle(_pipeInRead);
-                _pipeInRead = IntPtr.Zero;
-                CloseHandle(_pipeOutWrite);
-                _pipeOutWrite = IntPtr.Zero;
+                _pipeInRead.Dispose();
+                _pipeInRead = null;
+                _pipeOutWrite.Dispose();
+                _pipeOutWrite = null;
 
                 // Start reading output
                 _readThread = new Thread(ReadOutputLoop)
@@ -242,8 +290,8 @@ namespace UnityAgent
             }
             catch
             {
-                // Clean up any resources allocated before the failure
-                CleanupNativeResources();
+                // SafeHandles guarantee cleanup via finalizer, but dispose now for immediate release
+                Dispose();
                 throw;
             }
         }
@@ -255,9 +303,10 @@ namespace UnityAgent
         private void ReadOutputLoop()
         {
             var buffer = new byte[4096];
+            var pipe = _pipeOutRead!;
             while (!_disposed)
             {
-                bool ok = ReadFile(_pipeOutRead, buffer, (uint)buffer.Length, out var bytesRead, IntPtr.Zero);
+                bool ok = ReadFile(pipe, buffer, (uint)buffer.Length, out var bytesRead, IntPtr.Zero);
                 if (!ok || bytesRead == 0)
                     break;
 
@@ -281,8 +330,10 @@ namespace UnityAgent
         public void SendRaw(string text)
         {
             if (_disposed) return;
+            var pipe = _pipeInWrite;
+            if (pipe == null || pipe.IsClosed) return;
             var bytes = Encoding.UTF8.GetBytes(text);
-            WriteFile(_pipeInWrite, bytes, (uint)bytes.Length, out _, IntPtr.Zero);
+            WriteFile(pipe, bytes, (uint)bytes.Length, out _, IntPtr.Zero);
         }
 
         public void SendInterrupt()
@@ -308,47 +359,25 @@ namespace UnityAgent
             _disposed = true;
 
             // Close pseudo console first - this will cause ReadFile to fail and exit the read thread
-            if (_pseudoConsole != IntPtr.Zero)
-            {
-                ClosePseudoConsole(_pseudoConsole);
-                _pseudoConsole = IntPtr.Zero;
-            }
+            _pseudoConsole?.Dispose();
+            _pseudoConsole = null;
 
             // Wait for the read thread to finish so no more events fire after this point
             try { _readThread?.Join(2000); } catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", $"Read thread join failed: {ex.Message}"); }
 
-            CleanupNativeResources();
-        }
-
-        private void CleanupNativeResources()
-        {
-            // Terminate the process
-            if (_processHandle != IntPtr.Zero)
+            // Terminate the process before closing its handle
+            if (_processHandle is { IsInvalid: false, IsClosed: false })
             {
                 try { TerminateProcess(_processHandle, 0); } catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", $"TerminateProcess failed: {ex.Message}"); }
-                CloseHandle(_processHandle);
-                _processHandle = IntPtr.Zero;
             }
 
-            if (_threadHandle != IntPtr.Zero)
-            {
-                CloseHandle(_threadHandle);
-                _threadHandle = IntPtr.Zero;
-            }
-
-            // Close remaining pipe handles
-            if (_pipeInWrite != IntPtr.Zero) { CloseHandle(_pipeInWrite); _pipeInWrite = IntPtr.Zero; }
-            if (_pipeOutRead != IntPtr.Zero) { CloseHandle(_pipeOutRead); _pipeOutRead = IntPtr.Zero; }
-            if (_pipeInRead != IntPtr.Zero) { CloseHandle(_pipeInRead); _pipeInRead = IntPtr.Zero; }
-            if (_pipeOutWrite != IntPtr.Zero) { CloseHandle(_pipeOutWrite); _pipeOutWrite = IntPtr.Zero; }
-
-            // Clean up attribute list
-            if (_attrList != IntPtr.Zero)
-            {
-                DeleteProcThreadAttributeList(_attrList);
-                Marshal.FreeHGlobal(_attrList);
-                _attrList = IntPtr.Zero;
-            }
+            _processHandle?.Dispose();
+            _threadHandle?.Dispose();
+            _pipeInWrite?.Dispose();
+            _pipeOutRead?.Dispose();
+            _pipeInRead?.Dispose();
+            _pipeOutWrite?.Dispose();
+            _attrList?.Dispose();
         }
     }
 }

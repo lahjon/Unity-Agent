@@ -10,14 +10,15 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public enum SuggestionCategory
     {
         General,
         BugFixes,
         NewFeatures,
-        Extensions
+        Extensions,
+        Rules
     }
 
     public class Suggestion
@@ -32,8 +33,10 @@ namespace UnityAgent.Managers
         private readonly string _appDataDir;
         private string _currentProjectPath;
         private string _suggestionsFile;
+        private string _ignoredFile;
         private CancellationTokenSource? _cts;
         private Func<IEnumerable<string>>? _getActiveTaskDescriptions;
+        private readonly HashSet<string> _ignoredTitles = new(StringComparer.OrdinalIgnoreCase);
 
         public ObservableCollection<Suggestion> Suggestions { get; } = new();
         public bool IsGenerating { get; private set; }
@@ -47,6 +50,8 @@ namespace UnityAgent.Managers
             _appDataDir = appDataDir;
             _currentProjectPath = projectPath;
             _suggestionsFile = GetSuggestionsFilePath(projectPath);
+            _ignoredFile = GetIgnoredFilePath(projectPath);
+            LoadIgnoredTitles();
             LoadSuggestions();
         }
 
@@ -69,12 +74,15 @@ namespace UnityAgent.Managers
 
             _currentProjectPath = projectPath;
             _suggestionsFile = GetSuggestionsFilePath(projectPath);
+            _ignoredFile = GetIgnoredFilePath(projectPath);
 
             // Cancel any in-progress generation
             if (IsGenerating)
                 CancelGeneration();
 
             // Load new project's suggestions
+            _ignoredTitles.Clear();
+            LoadIgnoredTitles();
             Suggestions.Clear();
             LoadSuggestions();
         }
@@ -83,6 +91,12 @@ namespace UnityAgent.Managers
         {
             var hash = ComputePathHash(projectPath);
             return Path.Combine(_appDataDir, $"helper_suggestions_{hash}.json");
+        }
+
+        private string GetIgnoredFilePath(string projectPath)
+        {
+            var hash = ComputePathHash(projectPath);
+            return Path.Combine(_appDataDir, $"helper_ignored_{hash}.json");
         }
 
         private static string ComputePathHash(string projectPath)
@@ -96,10 +110,15 @@ namespace UnityAgent.Managers
         {
             if (IsGenerating) return;
 
+            _cts?.Dispose();
             _cts = new CancellationTokenSource();
+            var ct = _cts.Token;
             IsGenerating = true;
+            Suggestions.Clear();
+            SaveSuggestions();
             GenerationStarted?.Invoke();
 
+            Process? process = null;
             try
             {
                 var categoryFilter = category switch
@@ -108,6 +127,7 @@ namespace UnityAgent.Managers
                     SuggestionCategory.BugFixes => "potential bugs, error handling gaps, edge cases, and reliability issues",
                     SuggestionCategory.NewFeatures => "new features that naturally fit the project's scope and purpose",
                     SuggestionCategory.Extensions => "experimental or ambitious features that extend beyond the current scope — creative ideas that push the project in new directions",
+                    SuggestionCategory.Rules => "project-specific rules, constraints, coding conventions, and guidelines that should be enforced when working on this project (e.g. naming conventions, forbidden patterns, required practices, architectural constraints)",
                     _ => "general improvements"
                 };
 
@@ -142,16 +162,14 @@ namespace UnityAgent.Managers
                 };
                 psi.Environment.Remove("CLAUDECODE");
 
-                var process = new Process { StartInfo = psi };
+                process = new Process { StartInfo = psi };
                 process.Start();
 
                 await process.StandardInput.WriteAsync(prompt);
                 process.StandardInput.Close();
 
-                var output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                if (_cts.IsCancellationRequested) return;
+                var output = await process.StandardOutput.ReadToEndAsync(ct);
+                await process.WaitForExitAsync(ct);
 
                 var text = StripAnsi(output).Trim();
 
@@ -174,12 +192,14 @@ namespace UnityAgent.Managers
                     return;
                 }
 
-                Suggestions.Clear();
                 foreach (var item in items)
                 {
+                    var title = item.Title ?? "";
+                    if (_ignoredTitles.Contains(title)) continue;
+
                     Suggestions.Add(new Suggestion
                     {
-                        Title = item.Title ?? "",
+                        Title = title,
                         Description = item.Description ?? "",
                         Category = category
                     });
@@ -188,6 +208,10 @@ namespace UnityAgent.Managers
                 FilterSuggestionsAgainstActiveTasks();
                 SaveSuggestions();
                 GenerationCompleted?.Invoke();
+            }
+            catch (OperationCanceledException)
+            {
+                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -201,7 +225,9 @@ namespace UnityAgent.Managers
 
         public void CancelGeneration()
         {
-            _cts?.Cancel();
+            try { _cts?.Cancel(); } catch (ObjectDisposedException) { }
+            _cts?.Dispose();
+            _cts = null;
             IsGenerating = false;
         }
 
@@ -215,6 +241,15 @@ namespace UnityAgent.Managers
         {
             Suggestions.Remove(suggestion);
             SaveSuggestions();
+        }
+
+        public void IgnoreSuggestion(Suggestion suggestion)
+        {
+            if (!string.IsNullOrWhiteSpace(suggestion.Title))
+                _ignoredTitles.Add(suggestion.Title);
+            Suggestions.Remove(suggestion);
+            SaveSuggestions();
+            SaveIgnoredTitles();
         }
 
         /// <summary>
@@ -297,6 +332,29 @@ namespace UnityAgent.Managers
                 FilterSuggestionsAgainstActiveTasks();
             }
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to load suggestions", ex); }
+        }
+
+        private void SaveIgnoredTitles()
+        {
+            try
+            {
+                File.WriteAllText(_ignoredFile,
+                    JsonSerializer.Serialize(_ignoredTitles.ToList(), new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to save ignored titles", ex); }
+        }
+
+        private void LoadIgnoredTitles()
+        {
+            try
+            {
+                if (!File.Exists(_ignoredFile)) return;
+                var titles = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(_ignoredFile));
+                if (titles == null) return;
+                foreach (var t in titles)
+                    _ignoredTitles.Add(t);
+            }
+            catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to load ignored titles", ex); }
         }
 
         private static string StripAnsi(string text)

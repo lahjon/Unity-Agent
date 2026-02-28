@@ -9,7 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public static class GeminiImagePanel
     {
@@ -22,6 +22,7 @@ namespace UnityAgent.Managers
             {
                 IsReadOnly = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 Background = new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0A)),
                 Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
                 FontFamily = new FontFamily("Consolas"),

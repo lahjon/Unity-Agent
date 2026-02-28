@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Xunit;
 
-namespace UnityAgent.Tests
+namespace AgenticEngine.Tests
 {
     public class TaskLauncherTests
     {

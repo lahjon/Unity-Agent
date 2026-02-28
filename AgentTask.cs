@@ -7,7 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace UnityAgent
+namespace AgenticEngine
 {
     public enum AgentTaskStatus
     {
@@ -16,7 +16,8 @@ namespace UnityAgent
         Cancelled,
         Failed,
         Queued,
-        Paused
+        Paused,
+        InitQueued
     }
 
     public enum ModelType
@@ -27,101 +28,100 @@ namespace UnityAgent
 
     public class AgentTask : INotifyPropertyChanged
     {
-        public string Id { get; } = Guid.NewGuid().ToString("N")[..8];
-        public int TaskNumber { get; set; }
-        public string Description { get; set; } = "";
-        public DateTime StartTime { get; set; } = DateTime.Now;
-        public bool SkipPermissions { get; set; }
-        public bool RemoteSession { get; set; }
-        public bool Headless { get; set; }
-        public bool IsOvernight { get; set; }
-        public bool IgnoreFileLocks { get; set; }
-        public bool UseMcp { get; set; }
-        public bool SpawnTeam { get; set; }
-        public bool ExtendedPlanning { get; set; }
-        public bool NoGitWrite { get; set; }
-        public bool PlanOnly { get; set; }
-        public string? StoredPrompt { get; set; }
-        public string? FullOutput { get; set; }
-        public ModelType Model { get; set; } = ModelType.ClaudeCode;
-        public int MaxIterations { get; set; } = 50;
+        /// <summary>Persistent task data, safe for serialization and cross-boundary passing.</summary>
+        public AgentTaskData Data { get; } = new();
 
-        private int _currentIteration;
+        /// <summary>Transient runtime state (process, timers, output buffer). Not persisted.</summary>
+        public RuntimeTaskContext Runtime { get; } = new();
+
+        // ── Persistent data delegation ────────────────────────────────
+
+        public string Id => Data.Id;
+        public int TaskNumber { get => Data.TaskNumber; set => Data.TaskNumber = value; }
+        public string Description { get => Data.Description; set => Data.Description = value; }
+        public DateTime StartTime { get => Data.StartTime; set => Data.StartTime = value; }
+        public bool SkipPermissions { get => Data.SkipPermissions; set => Data.SkipPermissions = value; }
+        public bool RemoteSession { get => Data.RemoteSession; set => Data.RemoteSession = value; }
+        public bool Headless { get => Data.Headless; set => Data.Headless = value; }
+        public bool IsOvernight { get => Data.IsOvernight; set => Data.IsOvernight = value; }
+        public bool IgnoreFileLocks { get => Data.IgnoreFileLocks; set => Data.IgnoreFileLocks = value; }
+        public bool UseMcp { get => Data.UseMcp; set => Data.UseMcp = value; }
+        public bool SpawnTeam { get => Data.SpawnTeam; set => Data.SpawnTeam = value; }
+        public bool ExtendedPlanning { get => Data.ExtendedPlanning; set => Data.ExtendedPlanning = value; }
+        public bool NoGitWrite { get => Data.NoGitWrite; set => Data.NoGitWrite = value; }
+        public bool PlanOnly { get => Data.PlanOnly; set => Data.PlanOnly = value; }
+        public string? StoredPrompt { get => Data.StoredPrompt; set => Data.StoredPrompt = value; }
+        public string? ConversationId { get => Data.ConversationId; set => Data.ConversationId = value; }
+        public string? FullOutput { get => Data.FullOutput; set => Data.FullOutput = value; }
+        public ModelType Model { get => Data.Model; set => Data.Model = value; }
+        public int MaxIterations { get => Data.MaxIterations; set => Data.MaxIterations = value; }
+        public List<string> ImagePaths { get => Data.ImagePaths; set => Data.ImagePaths = value; }
+        public List<string> GeneratedImagePaths { get => Data.GeneratedImagePaths; set => Data.GeneratedImagePaths = value; }
+        public string ProjectPath { get => Data.ProjectPath; set => Data.ProjectPath = value; }
+        public string ProjectColor { get => Data.ProjectColor; set => Data.ProjectColor = value; }
+
         public int CurrentIteration
         {
-            get => _currentIteration;
-            set { _currentIteration = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
+            get => Data.CurrentIteration;
+            set { Data.CurrentIteration = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
         }
 
-        public string ProjectPath { get; set; } = "";
-        public string ProjectColor { get; set; } = "#666666";
-        public List<string> ImagePaths { get; set; } = new();
-        public List<string> GeneratedImagePaths { get; set; } = new();
-        public StringBuilder OutputBuilder { get; } = new();
-
-        // Captured at task start for completion summary diff
-        [System.Text.Json.Serialization.JsonIgnore]
-        public string? GitStartHash { get; set; }
-
-        private string _completionSummary = "";
         public string CompletionSummary
         {
-            get => _completionSummary;
-            set { _completionSummary = value; OnPropertyChanged(); }
+            get => Data.CompletionSummary;
+            set { Data.CompletionSummary = value; OnPropertyChanged(); }
         }
 
-        private string _summary = "";
         public string Summary
         {
-            get => _summary;
-            set { _summary = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShortDescription)); }
+            get => Data.Summary;
+            set { Data.Summary = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShortDescription)); }
         }
 
-        // Used by overnight mode to store the retry timer so it can be cancelled
-        [System.Text.Json.Serialization.JsonIgnore]
-        public System.Windows.Threading.DispatcherTimer? OvernightRetryTimer { get; set; }
+        public AgentTaskStatus Status
+        {
+            get => Data.Status;
+            set
+            {
+                Data.Status = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusText));
+                OnPropertyChanged(nameof(StatusColor));
+                OnPropertyChanged(nameof(IsRunning));
+                OnPropertyChanged(nameof(IsQueued));
+                OnPropertyChanged(nameof(IsPaused));
+                OnPropertyChanged(nameof(IsInitQueued));
+                OnPropertyChanged(nameof(IsFinished));
+                OnPropertyChanged(nameof(TimeInfo));
+            }
+        }
 
-        // Overnight safety: per-iteration timeout timer
-        [System.Text.Json.Serialization.JsonIgnore]
-        public System.Windows.Threading.DispatcherTimer? OvernightIterationTimer { get; set; }
+        public DateTime? EndTime
+        {
+            get => Data.EndTime;
+            set { Data.EndTime = value; OnPropertyChanged(); OnPropertyChanged(nameof(TimeInfo)); }
+        }
 
-        // Overnight safety: track consecutive failures to detect crash loops
-        [System.Text.Json.Serialization.JsonIgnore]
-        public int ConsecutiveFailures { get; set; }
+        // ── Runtime state delegation ──────────────────────────────────
 
-        // Overnight safety: marks the start of the current iteration's output in OutputBuilder
-        [System.Text.Json.Serialization.JsonIgnore]
-        public int LastIterationOutputStart { get; set; }
+        public StringBuilder OutputBuilder => Runtime.OutputBuilder;
+        public string? GitStartHash { get => Runtime.GitStartHash; set => Runtime.GitStartHash = value; }
+        public System.Windows.Threading.DispatcherTimer? OvernightRetryTimer { get => Runtime.OvernightRetryTimer; set => Runtime.OvernightRetryTimer = value; }
+        public System.Windows.Threading.DispatcherTimer? OvernightIterationTimer { get => Runtime.OvernightIterationTimer; set => Runtime.OvernightIterationTimer = value; }
+        public int ConsecutiveFailures { get => Runtime.ConsecutiveFailures; set => Runtime.ConsecutiveFailures = value; }
+        public int LastIterationOutputStart { get => Runtime.LastIterationOutputStart; set => Runtime.LastIterationOutputStart = value; }
+        public Process? Process { get => Runtime.Process; set => Runtime.Process = value; }
+        public System.Threading.CancellationTokenSource? Cts { get => Runtime.Cts; set => Runtime.Cts = value; }
+        public string? QueuedReason { get => Runtime.QueuedReason; set => Runtime.QueuedReason = value; }
+        public string? BlockedByTaskId { get => Runtime.BlockedByTaskId; set => Runtime.BlockedByTaskId = value; }
+        public List<string> DependencyTaskIds { get => Runtime.DependencyTaskIds; set => Runtime.DependencyTaskIds = value; }
+        public bool IsPlanningBeforeQueue { get => Runtime.IsPlanningBeforeQueue; set => Runtime.IsPlanningBeforeQueue = value; }
+        public bool NeedsPlanRestart { get => Runtime.NeedsPlanRestart; set => Runtime.NeedsPlanRestart = value; }
+        public string? PendingFileLockPath { get => Runtime.PendingFileLockPath; set => Runtime.PendingFileLockPath = value; }
+        public string? PendingFileLockBlocker { get => Runtime.PendingFileLockBlocker; set => Runtime.PendingFileLockBlocker = value; }
 
-        [System.Text.Json.Serialization.JsonIgnore]
-        public Process? Process { get; set; }
+        // ── Tool activity feed (UI-bound) ─────────────────────────────
 
-        [System.Text.Json.Serialization.JsonIgnore]
-        public string? QueuedReason { get; set; }
-
-        [System.Text.Json.Serialization.JsonIgnore]
-        public string? BlockedByTaskId { get; set; }
-
-        [System.Text.Json.Serialization.JsonIgnore]
-        public List<string> DependencyTaskIds { get; set; } = new();
-
-        /// <summary>True when the task is currently running in plan-only mode before being queued.</summary>
-        [System.Text.Json.Serialization.JsonIgnore]
-        public bool IsPlanningBeforeQueue { get; set; }
-
-        /// <summary>True when a killed process needs to restart in plan mode (set by file lock conflict).</summary>
-        [System.Text.Json.Serialization.JsonIgnore]
-        public bool NeedsPlanRestart { get; set; }
-
-        /// <summary>File path that caused a lock conflict, stored during planning phase.</summary>
-        [System.Text.Json.Serialization.JsonIgnore]
-        public string? PendingFileLockPath { get; set; }
-
-        /// <summary>Task ID that holds the conflicting file lock.</summary>
-        [System.Text.Json.Serialization.JsonIgnore]
-        public string? PendingFileLockBlocker { get; set; }
-
-        // Real-time tool activity feed (last 3 actions)
         private readonly List<string> _recentToolActions = new();
         private string _toolActivityText = "";
 
@@ -147,30 +147,7 @@ namespace UnityAgent
             ToolActivityText = "";
         }
 
-        private AgentTaskStatus _status = AgentTaskStatus.Running;
-        public AgentTaskStatus Status
-        {
-            get => _status;
-            set
-            {
-                _status = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(StatusText));
-                OnPropertyChanged(nameof(StatusColor));
-                OnPropertyChanged(nameof(IsRunning));
-                OnPropertyChanged(nameof(IsQueued));
-                OnPropertyChanged(nameof(IsPaused));
-                OnPropertyChanged(nameof(IsFinished));
-                OnPropertyChanged(nameof(TimeInfo));
-            }
-        }
-
-        private DateTime? _endTime;
-        public DateTime? EndTime
-        {
-            get => _endTime;
-            set { _endTime = value; OnPropertyChanged(); OnPropertyChanged(nameof(TimeInfo)); }
-        }
+        // ── Computed properties ───────────────────────────────────────
 
         public string ProjectName =>
             string.IsNullOrEmpty(ProjectPath) ? "" : Path.GetFileName(ProjectPath);
@@ -187,6 +164,7 @@ namespace UnityAgent
             AgentTaskStatus.Failed => "Failed",
             AgentTaskStatus.Queued => "Queued",
             AgentTaskStatus.Paused => "Paused",
+            AgentTaskStatus.InitQueued => "Waiting",
             _ => "?"
         };
 
@@ -198,6 +176,7 @@ namespace UnityAgent
             AgentTaskStatus.Failed => "#E05555",
             AgentTaskStatus.Queued => "#FFD600",
             AgentTaskStatus.Paused => "#CE93D8",
+            AgentTaskStatus.InitQueued => "#FF9800",
             _ => "#555555"
         };
 
@@ -207,6 +186,8 @@ namespace UnityAgent
 
         public bool IsPaused => Status == AgentTaskStatus.Paused;
 
+        public bool IsInitQueued => Status == AgentTaskStatus.InitQueued;
+
         public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed;
 
         public string TimeInfo
@@ -214,6 +195,8 @@ namespace UnityAgent
             get
             {
                 var started = $"Started {StartTime:HH:mm:ss}";
+                if (Status == AgentTaskStatus.InitQueued)
+                    return $"{started} | Waiting (max concurrent reached)";
                 if (Status == AgentTaskStatus.Queued)
                 {
                     string waitInfo;
@@ -236,6 +219,8 @@ namespace UnityAgent
                 return $"{started} | Running {(int)running.TotalMinutes}m {running.Seconds}s";
             }
         }
+
+        // ── INotifyPropertyChanged ────────────────────────────────────
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public void OnPropertyChanged([CallerMemberName] string? name = null)

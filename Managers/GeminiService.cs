@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public class GeminiService
     {
@@ -58,10 +59,21 @@ namespace UnityAgent.Managers
                 if (!File.Exists(_configFile)) return;
                 var json = File.ReadAllText(_configFile);
                 var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("apiKey", out var key))
+                bool needsResave = false;
+                if (doc.RootElement.TryGetProperty("encryptedApiKey", out var encKey))
+                {
+                    _apiKey = DecryptString(encKey.GetString());
+                }
+                else if (doc.RootElement.TryGetProperty("apiKey", out var key))
+                {
+                    // Migrate plaintext key to encrypted format
                     _apiKey = key.GetString();
+                    needsResave = true;
+                }
                 if (doc.RootElement.TryGetProperty("model", out var model))
                     _selectedModel = model.GetString() ?? DefaultModel;
+                if (needsResave && !string.IsNullOrEmpty(_apiKey))
+                    SaveConfig();
             }
             catch (Exception ex) { AppLogger.Warn("GeminiService", "Failed to load config", ex); }
         }
@@ -78,7 +90,7 @@ namespace UnityAgent.Managers
             {
                 var config = new Dictionary<string, string>();
                 if (!string.IsNullOrEmpty(_apiKey))
-                    config["apiKey"] = _apiKey;
+                    config["encryptedApiKey"] = EncryptString(_apiKey);
                 config["model"] = _selectedModel;
                 File.WriteAllText(_configFile,
                     JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
@@ -91,6 +103,21 @@ namespace UnityAgent.Managers
             if (string.IsNullOrEmpty(_apiKey)) return "";
             if (_apiKey.Length <= 8) return new string('*', _apiKey.Length);
             return _apiKey[..4] + new string('*', _apiKey.Length - 8) + _apiKey[^4..];
+        }
+
+        private static string EncryptString(string plainText)
+        {
+            var bytes = Encoding.UTF8.GetBytes(plainText);
+            var encrypted = ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser);
+            return Convert.ToBase64String(encrypted);
+        }
+
+        private static string? DecryptString(string? cipherBase64)
+        {
+            if (string.IsNullOrEmpty(cipherBase64)) return null;
+            var encrypted = Convert.FromBase64String(cipherBase64);
+            var bytes = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(bytes);
         }
 
         public async Task<GeminiImageResult> GenerateImageAsync(string prompt, string taskId,
@@ -247,6 +274,98 @@ namespace UnityAgent.Managers
         }
 
         public string GetImageDirectory() => _imageDir;
+
+        /// <summary>
+        /// Sends a text chat message to Gemini with conversation history.
+        /// </summary>
+        public async Task<string> SendChatMessageAsync(
+            List<ChatMessage> history,
+            string userMessage,
+            string? systemInstruction = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(_apiKey))
+                return "[Error] Gemini API key not configured. Set it in Settings > Gemini.";
+
+            try
+            {
+                var contents = new List<object>();
+                foreach (var msg in history)
+                {
+                    contents.Add(new
+                    {
+                        role = msg.Role,
+                        parts = new[] { new { text = msg.Text } }
+                    });
+                }
+                contents.Add(new
+                {
+                    role = "user",
+                    parts = new[] { new { text = userMessage } }
+                });
+
+                object requestBody;
+                if (!string.IsNullOrEmpty(systemInstruction))
+                {
+                    requestBody = new
+                    {
+                        system_instruction = new
+                        {
+                            parts = new[] { new { text = systemInstruction } }
+                        },
+                        contents
+                    };
+                }
+                else
+                {
+                    requestBody = new { contents };
+                }
+
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var url = $"{ApiBaseUrl}/{_selectedModel}:generateContent?key={_apiKey}";
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorMsg = TryExtractErrorMessage(responseBody);
+                    return $"[Error] Gemini API ({(int)response.StatusCode}): {errorMsg}";
+                }
+
+                using var doc = JsonDocument.Parse(responseBody);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("candidates", out var candidates) &&
+                    candidates.GetArrayLength() > 0)
+                {
+                    var parts = candidates[0].GetProperty("content").GetProperty("parts");
+                    foreach (var part in parts.EnumerateArray())
+                    {
+                        if (part.TryGetProperty("text", out var textProp))
+                            return textProp.GetString() ?? "";
+                    }
+                }
+
+                return "[Error] No response from Gemini.";
+            }
+            catch (TaskCanceledException)
+            {
+                return "[Cancelled]";
+            }
+            catch (Exception ex)
+            {
+                return $"[Error] {ex.Message}";
+            }
+        }
+    }
+
+    public class ChatMessage
+    {
+        public string Role { get; set; } = "user";
+        public string Text { get; set; } = "";
     }
 
     public class GeminiImageResult

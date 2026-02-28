@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace UnityAgent
+namespace AgenticEngine
 {
     public static class TaskLauncher
     {
@@ -19,7 +22,7 @@ namespace UnityAgent
             "Never store personal security information directly in project files. " +
             "This includes API keys, tokens, passwords, secrets, credentials, and any other sensitive data. " +
             "If a task requires storing such values, they MUST be placed in the system AppData directory " +
-            "(%LOCALAPPDATA%\\UnityAgent\\) — never in source code, config files, or any file within the project tree. " +
+            "(%LOCALAPPDATA%\\AgenticEngine\\) — never in source code, config files, or any file within the project tree. " +
             "If you encounter hardcoded secrets in the project, flag them to the user and recommend moving them to AppData. " +
             "# TASK: ";
 
@@ -230,27 +233,27 @@ namespace UnityAgent
 
         // ── Prompt Building ──────────────────────────────────────────
 
-        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, bool planOnly = false, string projectDescription = "")
+        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, bool planOnly = false, string projectDescription = "", string projectRulesBlock = "")
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
                 descBlock = $"# PROJECT CONTEXT\n{projectDescription}\n\n";
 
             if (isOvernight)
-                return descBlock + OvernightInitialTemplate + description;
+                return descBlock + projectRulesBlock + OvernightInitialTemplate + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
             var planOnlyBlock = planOnly ? PlanOnlyBlock : "";
             var gitBlock = noGitWrite ? NoGitWriteBlock : "";
             var gameBlock = IsGameCreationTask(description) ? GameRulesBlock : "";
-            return descBlock + systemPrompt + gitBlock + mcpBlock + planningBlock + planOnlyBlock + gameBlock + description;
+            return descBlock + systemPrompt + gitBlock + projectRulesBlock + mcpBlock + planningBlock + planOnlyBlock + gameBlock + description;
         }
 
-        public static string BuildFullPrompt(string systemPrompt, AgentTask task, string projectDescription = "")
+        public static string BuildFullPrompt(string systemPrompt, AgentTask task, string projectDescription = "", string projectRulesBlock = "")
         {
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock);
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 basePrompt = $"# Task: {task.Summary}\n{basePrompt}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
@@ -295,13 +298,13 @@ namespace UnityAgent
             var teamFlag = spawnTeam ? " --spawn-team" : "";
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
-                   $"Write-Host '[UnityAgent] Project: {projectPath}' -ForegroundColor DarkGray\n" +
-                   $"Write-Host '[UnityAgent] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
-                   "Write-Host '[UnityAgent] Starting Claude...' -ForegroundColor Cyan\n" +
+                   $"Write-Host '[AgenticEngine] Project: {projectPath}' -ForegroundColor DarkGray\n" +
+                   $"Write-Host '[AgenticEngine] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
+                   "Write-Host '[AgenticEngine] Starting Claude...' -ForegroundColor Cyan\n" +
                    "Write-Host ''\n" +
                    $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{remoteFlag}{teamFlag} --verbose\n" +
-                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[UnityAgent] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
-                   "Write-Host \"`n[UnityAgent] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
+                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[AgenticEngine] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
+                   "Write-Host \"`n[AgenticEngine] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
                    "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n";
         }
 
@@ -372,8 +375,9 @@ namespace UnityAgent
 
         // ── Summary Generation ──────────────────────────────────────
 
-        public static async System.Threading.Tasks.Task<string> GenerateSummaryAsync(string description)
+        public static async System.Threading.Tasks.Task<string> GenerateSummaryAsync(string description, CancellationToken cancellationToken = default)
         {
+            Process? process = null;
             try
             {
                 // Truncate very long descriptions for the summary call
@@ -392,15 +396,15 @@ namespace UnityAgent
                 };
                 psi.Environment.Remove("CLAUDECODE");
 
-                var process = new Process { StartInfo = psi };
+                process = new Process { StartInfo = psi };
                 process.Start();
 
                 await process.StandardInput.WriteAsync(
                     $"Create a very short title (2-5 words) for this task. Reply with ONLY the title, nothing else.\n\nTask: {input}");
                 process.StandardInput.Close();
 
-                var output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+                await process.WaitForExitAsync(cancellationToken);
 
                 var summary = StripAnsi(output).Trim();
                 // Strip quotes if the model wrapped it
@@ -412,6 +416,11 @@ namespace UnityAgent
 
                 return string.IsNullOrWhiteSpace(summary) ? "" : summary;
             }
+            catch (OperationCanceledException)
+            {
+                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
+                return "";
+            }
             catch (Exception ex)
             {
                 Managers.AppLogger.Warn("TaskLauncher", "Failed to generate summary", ex);
@@ -421,8 +430,9 @@ namespace UnityAgent
 
         // ── Project Description Generation ──────────────────────────
 
-        public static async System.Threading.Tasks.Task<(string Short, string Long)> GenerateProjectDescriptionAsync(string projectPath)
+        public static async System.Threading.Tasks.Task<(string Short, string Long)> GenerateProjectDescriptionAsync(string projectPath, CancellationToken cancellationToken = default)
         {
+            Process? process = null;
             try
             {
                 var psi = new ProcessStartInfo
@@ -439,7 +449,7 @@ namespace UnityAgent
                 };
                 psi.Environment.Remove("CLAUDECODE");
 
-                var process = new Process { StartInfo = psi };
+                process = new Process { StartInfo = psi };
                 process.Start();
 
                 await process.StandardInput.WriteAsync(
@@ -461,8 +471,8 @@ namespace UnityAgent
                     "Output ONLY the two sections with the separator in your final response. No labels, no headers.");
                 process.StandardInput.Close();
 
-                var output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+                await process.WaitForExitAsync(cancellationToken);
 
                 var text = StripAnsi(output).Trim();
 
@@ -481,6 +491,11 @@ namespace UnityAgent
                     shortDesc = shortDesc[..200];
 
                 return (shortDesc, longDesc);
+            }
+            catch (OperationCanceledException)
+            {
+                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
+                return ("", "");
             }
             catch (Exception ex)
             {
@@ -589,6 +604,12 @@ namespace UnityAgent
                 if (process == null) return null;
                 var output = process.StandardOutput.ReadToEnd();
                 process.WaitForExit(5000);
+                if (!process.HasExited)
+                {
+                    try { process.Kill(); } catch { }
+                    Managers.AppLogger.Warn("TaskLauncher", $"Git command timed out: git {arguments}");
+                    return null;
+                }
                 return process.ExitCode == 0 ? output.Trim() : null;
             }
             catch (Exception ex)
@@ -596,6 +617,83 @@ namespace UnityAgent
                 Managers.AppLogger.Debug("TaskLauncher", $"Git command failed: {ex.Message}");
                 return null;
             }
+        }
+
+        public static async Task<string?> RunGitCommandAsync(string workingDirectory, string arguments, CancellationToken cancellationToken = default)
+        {
+            Process? process = null;
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = arguments,
+                    WorkingDirectory = workingDirectory,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                process = Process.Start(psi);
+                if (process == null) return null;
+                var output = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+                using var timeoutCts = new CancellationTokenSource(5000);
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, cancellationToken);
+                await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
+                return process.ExitCode == 0 ? output.Trim() : null;
+            }
+            catch (OperationCanceledException)
+            {
+                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
+                Managers.AppLogger.Warn("TaskLauncher", $"Git command timed out or cancelled: git {arguments}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Debug("TaskLauncher", $"Async git command failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        public static async Task<string?> CaptureGitHeadAsync(string projectPath, CancellationToken cancellationToken = default)
+        {
+            return await RunGitCommandAsync(projectPath, "rev-parse HEAD", cancellationToken).ConfigureAwait(false);
+        }
+
+        public static async Task<string> GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash, AgentTaskStatus status, TimeSpan duration, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var fileChanges = await GetGitFileChangesAsync(projectPath, gitStartHash, cancellationToken).ConfigureAwait(false);
+                return FormatCompletionSummary(status, duration, fileChanges);
+            }
+            catch (OperationCanceledException)
+            {
+                return FormatCompletionSummary(status, duration, null);
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Debug("TaskLauncher", $"Failed to get git file changes for completion summary: {ex.Message}");
+                return FormatCompletionSummary(status, duration, null);
+            }
+        }
+
+        public static async Task<List<(string name, int added, int removed)>?> GetGitFileChangesAsync(string projectPath, string? gitStartHash, CancellationToken cancellationToken = default)
+        {
+            var diffRef = gitStartHash ?? "HEAD";
+            var numstatOutput = await RunGitCommandAsync(projectPath, $"diff {diffRef} --numstat", cancellationToken).ConfigureAwait(false);
+            if (numstatOutput == null) return null;
+
+            var files = new List<(string name, int added, int removed)>();
+            foreach (var line in numstatOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length < 3) continue;
+                int.TryParse(parts[0], out var added);
+                int.TryParse(parts[1], out var removed);
+                files.Add((parts[2], added, removed));
+            }
+            return files.Count > 0 ? files : null;
         }
 
         // ── Utilities ────────────────────────────────────────────────

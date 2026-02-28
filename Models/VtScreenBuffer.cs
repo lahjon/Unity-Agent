@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace UnityAgent.Models
+namespace AgenticEngine.Models
 {
     /// <summary>
     /// Minimal VT100 screen buffer that processes raw ConPty output.
@@ -15,7 +15,7 @@ namespace UnityAgent.Models
         private char[][] _screen;
         private int _cursorRow;
         private int _cursorCol;
-        private readonly List<string> _scrollback = new();
+        private readonly Queue<string> _scrollback = new();
         private const int MaxScrollbackLines = 5000;
 
         // Scroll region (DECSTBM), 0-based inclusive
@@ -390,9 +390,9 @@ namespace UnityAgent.Models
                 if (_scrollTop == 0)
                 {
                     var line = new string(_screen[0]).TrimEnd();
-                    _scrollback.Add(line);
+                    _scrollback.Enqueue(line);
                     if (_scrollback.Count > MaxScrollbackLines)
-                        _scrollback.RemoveAt(0);
+                        _scrollback.Dequeue();
                 }
 
                 // Shift lines up within scroll region

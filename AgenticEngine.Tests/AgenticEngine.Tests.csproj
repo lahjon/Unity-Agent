@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\UnityAgent.csproj" />
+    <ProjectReference Include="..\AgenticEngine.csproj" />
   </ItemGroup>
 
 </Project>

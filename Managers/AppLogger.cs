@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public enum LogLevel
     {
@@ -17,7 +17,7 @@ namespace UnityAgent.Managers
     {
         private static readonly string LogDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "UnityAgent", "logs");
+            "AgenticEngine", "logs");
         private static readonly string LogFile = Path.Combine(LogDir, "app.log");
 
         private const int MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB

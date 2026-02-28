@@ -4,14 +4,18 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>UnityAgent</AssemblyName>
-    <RootNamespace>UnityAgent</RootNamespace>
+    <AssemblyName>AgenticEngine</AssemblyName>
+    <RootNamespace>AgenticEngine</RootNamespace>
     <Nullable>enable</Nullable>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="UnityAgent.Tests\**" />
-    <None Remove="UnityAgent.Tests\**" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="AgenticEngine.Tests\**" />
+    <None Remove="AgenticEngine.Tests\**" />
   </ItemGroup>
 </Project>

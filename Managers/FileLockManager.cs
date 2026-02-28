@@ -9,7 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public class FileLockManager
     {
@@ -131,7 +131,7 @@ namespace UnityAgent.Managers
             if (string.IsNullOrEmpty(task.StoredPrompt) && !task.IsPlanningBeforeQueue)
             {
                 // No plan yet — restart in plan mode before queuing
-                appendOutput(taskId, $"\n[UnityAgent] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId}. Restarting in plan mode...\n");
+                appendOutput(taskId, $"\n[AgenticEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId}. Restarting in plan mode...\n");
                 task.NeedsPlanRestart = true;
                 task.PlanOnly = true;
                 task.PendingFileLockPath = normalized;
@@ -140,8 +140,8 @@ namespace UnityAgent.Managers
             else
             {
                 // Already has a plan — queue immediately
-                appendOutput(taskId, $"\n[UnityAgent] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId} ({toolName})\n");
-                appendOutput(taskId, $"[UnityAgent] Queuing task #{taskId} for auto-resume...\n");
+                appendOutput(taskId, $"\n[AgenticEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId} ({toolName})\n");
+                appendOutput(taskId, $"[AgenticEngine] Queuing task #{taskId} for auto-resume...\n");
 
                 task.Status = AgentTaskStatus.Queued;
                 task.QueuedReason = $"File locked: {Path.GetFileName(filePath)} by #{blockingTaskId}";

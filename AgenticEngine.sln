@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnityAgent", "UnityAgent.csproj", "{13A55FC4-5E75-4EE6-8DFE-FB0A18B4AAE4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgenticEngine", "AgenticEngine.csproj", "{13A55FC4-5E75-4EE6-8DFE-FB0A18B4AAE4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnityAgent.Tests", "UnityAgent.Tests\UnityAgent.Tests.csproj", "{F948008D-F681-40FC-B3AA-30FCBB27FBA3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgenticEngine.Tests", "AgenticEngine.Tests\AgenticEngine.Tests.csproj", "{F948008D-F681-40FC-B3AA-30FCBB27FBA3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

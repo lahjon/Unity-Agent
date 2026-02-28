@@ -1,176 +1,122 @@
-# Plan: Task Output Search and Filtering
+# Plan: Eliminate Hardcoded Color Strings with Theme Resource Lookup
 
 ## Overview
-Add Ctrl+F search bar overlay and content-type filter toggles to each output tab.
+Replace hardcoded hex color strings across C# and XAML files with named brush resources defined in `Themes/Colors.xaml`. This centralizes theming, reduces duplication, and makes future theme changes trivial.
 
-## Files Changed
+## Step 1: Expand `Themes/Colors.xaml` with new named brushes
 
-| File | Type | Description |
-|------|------|-------------|
-| `Models/OutputSegment.cs` | **NEW** | Enum + model for categorized output chunks |
-| `AgentTask.cs` | Modified | Add `OutputSegments` list alongside `OutputBuilder` |
-| `Managers/OutputTabManager.cs` | Major | Search overlay UI, filter bar, search/filter logic, enhanced `AppendOutput` |
-| `Managers/TaskExecutionManager.cs` | Modified | Tag every `AppendOutput` call with correct segment type |
+Add ~30 new `SolidColorBrush` resources organized by category:
 
----
+**Backgrounds (darkest → lightest):**
+| Key | Value | Semantic Use |
+|-----|-------|-------------|
+| BgAbyss | #0A0A0A | Terminal/output read-only areas |
+| BgPit | #0E0E0E | Log viewer body |
+| BgTerminalInput | #141414 | Terminal text inputs |
+| BgDarkTerminal | #181818 | Terminal root bar |
+| BgSection | #1E1E1E | Section/card backgrounds within panels |
+| BgPopup | #252525 | Popups, saved prompt cards |
+| BgCard | #2A2A2A | Card/input backgrounds, grid splitter |
+| BgCardHover | #2E2E2E | Card hover state |
+| BgOverlay | #CC191919 | Semi-transparent loading overlay |
 
-## Step 1: Create `Models/OutputSegment.cs`
+**Borders:**
+| Key | Value | Semantic Use |
+|-----|-------|-------------|
+| BorderMedium | #3A3A3A | Panel/dialog borders (heavier than BorderSubtle) |
 
-New file with:
-```csharp
-public enum OutputSegmentType { AssistantText, ToolCall, Thinking, Error, Status, Result, Other }
-public class OutputSegment { string Text; OutputSegmentType Type; }
-```
+**Text (dimmest → brightest):**
+| Key | Value | Semantic Use |
+|-----|-------|-------------|
+| TextDisabled | #555555 | Disabled/fallback/hint text |
+| TextDim | #777777 | Dimmed labels |
+| TextSubdued | #888888 | Dim labels, secondary info, close buttons |
+| TextTabHeader | #AAAAAA | Tab header text, neutral info |
+| TextBody | #B0B0B0 | Standard body text, terminal output |
+| TextButton | #C8C8C8 | Button foreground text |
+| TextLight | #CCCCCC | Light body text, input foreground |
+| TextBright | #E0E0E0 | TextBox foregrounds, bright text |
 
-## Step 2: Add segment storage to `AgentTask.cs`
+**Accents:**
+| Key | Value | Semantic Use |
+|-----|-------|-------------|
+| AccentBlue | #4EA8DB | Chat/Gemini selection blue |
+| AccentTeal | #4DB6AC | Stored tasks, Gemini teal |
 
-Add one property:
-```csharp
-public List<OutputSegment> OutputSegments { get; } = new();
-```
-This stores categorized output alongside the existing `OutputBuilder` StringBuilder. Both are populated on every append.
+**Status/Feedback:**
+| Key | Value | Semantic Use |
+|-----|-------|-------------|
+| DangerBright | #E05555 | Failed/error (brighter than Danger) |
+| DangerAlert | #FF6B6B | Bright error message text |
+| DangerDeleteHover | #E57373 | Delete button hover |
+| WarningYellow | #FFD600 | Queued status |
+| WarningAmber | #E0A030 | Cancelled/amber status |
+| WarningOrange | #CC8800 | File lock badge |
+| SuccessGreen | #4CAF50 | MCP enabled green |
+| HighScoreGold | #FFD700 | Game high-score text |
 
-## Step 3: Enhance `OutputTabManager.AppendOutput`
+**Specialty:**
+| Key | Value | Semantic Use |
+|-----|-------|-------------|
+| PlanBadgeBg | #2A1F3D | Plan mode badge background |
+| PlanBadgeBorder | #7E57C2 | Plan mode badge border |
+| PlanBadgeText | #CE93D8 | Plan mode badge/pause text |
+| PausedBlue | #64B5F6 | Resume button foreground |
+| ToolActivityText | #7A9EC2 | Tool activity feed text |
+| SeparatorDark | #444444 | Separator lines, dep chip borders |
 
-Currently `AppendOutput` does `box.AppendText(text)` as plain text. Change to:
+## Step 2: Replace hardcoded colors in C# files with `FindResource`
 
-- **New overload** accepting `OutputSegmentType segmentType`
-- Creates a `Run` element with `Tag = segmentType` and type-specific foreground color
-- Appends Run to the FlowDocument's last Paragraph (or creates one)
-- Stores segment in `task.OutputSegments`
-- If segment type is currently filtered out, skips adding Run to document
-- If search is active, incrementally checks new text for matches
+For each file, replace `new SolidColorBrush(Color.FromRgb(...))` and `ColorConverter.ConvertFromString(...)` with resource lookups:
 
-**Color mapping** (using existing theme palette):
-- AssistantText: `#B0B0B0` (default light gray)
-- ToolCall: `#999999` (TextSecondary - dimmer)
-- Thinking: `#666666` (TextMuted)
-- Error: `#A15252` (Danger red)
-- Status: `#DA7756` (Accent orange)
-- Result: `#5CB85C` (Success green)
-- Other: `#B0B0B0` (default)
+- **MainWindow.xaml.cs** (~15 replacements) — uses `FindResource()` directly (is a Window)
+  - Chat bubbles, saved prompts, dependency chips
+  - Refactor `AddChatBubble` to accept `Brush` instead of hex string
 
-The existing `AppendColoredOutput` method stays untouched.
+- **Managers/OutputTabManager.cs** (~25 replacements) — uses `Application.Current.FindResource()`
+  - Output panel, input boxes, tab colors, stored task cards
 
-## Step 4: Tag calls in `TaskExecutionManager`
+- **Managers/GeminiImagePanel.cs** (~8 replacements) — uses `Application.Current.FindResource()`
+  - Image gallery backgrounds, borders, labels
 
-Every `AppendOutput(...)` call gets a segment type parameter. Mapping:
+- **Managers/ProjectManager.cs** (~20 replacements, skip palette array lines 32-43)
+  - Project cards, MCP indicators, rename UI
 
-| Call site | Segment Type |
-|-----------|-------------|
-| `[UnityAgent]` prefixed lines (StartProcess, etc.) | `Status` |
-| `[stderr]` lines (process.ErrorDataReceived) | `Error` |
-| `text_delta` content blocks | `AssistantText` |
-| `tool_use` / FormatToolAction output | `ToolCall` |
-| `thinking` / `thinking_delta` blocks | `Thinking` |
-| `result` blocks | `Result` |
-| `error` blocks | `Error` |
-| Completion messages | `Status` |
-| Everything else / fallback | `Other` |
+- **TerminalTabManager.cs** (~12 replacements)
+  - Terminal tab colors, labels, backgrounds
 
-~30 call sites to update (mechanical - add one enum argument each).
+- **Dialogs/CreateProjectDialog.cs** (~12 replacements)
+- **Dialogs/DarkDialog.cs** (~8 replacements)
+- **Dialogs/LogViewerDialog.cs** (~10 replacements)
+- **Dialogs/StoredTaskViewerDialog.cs** (~10 replacements)
+- **App.xaml.cs** (~6 replacements) — with fallback guard for early-startup calls
+- **Converters/StringToBrushConverter.cs** (1 replacement — fallback color)
 
-## Step 5: Build filter bar UI in `CreateTab()`
+## Step 3: Replace hardcoded colors in XAML files with `{StaticResource}`
 
-Add a horizontal `StackPanel` (Dock.Top) with toggle buttons:
+- **MainWindow.xaml** (~100+ replacements) — largest file
+  - Map all `Background="#191919"` → `{StaticResource BgDeep}`, etc.
+  - Leave `ColorAnimation To="..."` values hardcoded (WPF limitation)
+  - Leave category-specific tint colors hardcoded (unique semantics)
 
-```
-[Text ✓] [Tools ✓] [Errors ✓] [Status ✓]
-```
+- **Games/*.xaml** (3 files, ~8 replacements each)
+  - BirdHunterGame.xaml, QuickMathGame.xaml, ReactionTestGame.xaml
 
-- Small pill-shaped ToggleButtons, styled to match dark theme
-- All checked by default (all content visible)
-- Unchecking rebuilds the RichTextBox document from `task.OutputSegments`, skipping hidden types
-- Rechecking does the same rebuild including those types again
+- **Themes/*.xaml** (~15 replacements across ComboBox, TabControl, GridSplitter, ToggleSwitch, Buttons)
 
-**Filter state** tracked per tab in a new `Dictionary<string, OutputFilterState>`.
+## Step 4: Build verification
 
-**Rebuild logic**: Clear FlowDocument → iterate `OutputSegments` → create Run for each visible segment → re-run search if active. Cost: ~50-100ms for 5000 segments, acceptable for a toggle action.
+Run `dotnet build` to verify all resource keys resolve correctly.
 
-## Step 6: Build search overlay UI in `CreateTab()`
+## What NOT to change
+1. Project color palette array in ProjectManager.cs (data, not theme)
+2. `AgentTask.StatusColor` string properties (bound via StringToBrush converter)
+3. `Brushes.Transparent` references (framework-provided)
+4. `ColorAnimation To="..."` values in XAML storyboards (WPF limitation)
+5. Category-specific tint colors (#3A2020, #1A3A20, etc.) — unique semantics
+6. Colors used only once with no reusable semantic meaning
 
-Wrap the RichTextBox in a `Grid` so the search bar can overlay on top:
-
-```
-Grid (fills remaining space)
-  ├── RichTextBox (output)
-  └── Border (searchOverlay, Collapsed, VerticalAlign=Top, HAlign=Stretch)
-        └── DockPanel
-              ├── Button "✕" (Dock.Right) — close search
-              ├── Button "▼" (Dock.Right) — next match
-              ├── Button "▲" (Dock.Right) — prev match
-              ├── TextBlock "0 of 0" (Dock.Right) — match count
-              └── TextBox (searchInput, fills rest)
-```
-
-Styled with `BgElevated` (#2C2C2C) background, `BorderSubtle` (#333333) border, 6px corner radius.
-
-**Keyboard shortcuts**:
-- `Ctrl+F` on RichTextBox → show search bar, focus input
-- `Escape` in search input → hide search bar, clear highlights
-- `Enter` in search input → next match
-- `Shift+Enter` → previous match
-
-## Step 7: Implement search logic
-
-**Search state** per tab in `Dictionary<string, OutputSearchState>`:
-```csharp
-class OutputSearchState {
-    string Query;
-    List<TextRange> Matches;
-    int CurrentMatchIndex;
-}
-```
-
-**ExecuteSearch**:
-1. Get full document text via `TextRange(doc.ContentStart, doc.ContentEnd).Text`
-2. Find all occurrences (case-insensitive `IndexOf`)
-3. Convert string offsets to `TextPointer` positions by walking the FlowDocument inline tree
-4. Apply yellow-ish background (`#6B5B1A`) to all match `TextRange`s
-5. Apply accent background (`#DA7756`) to the current match
-6. Scroll current match into view
-
-**Debounce**: 300ms `DispatcherTimer` on search input TextChanged, so search only fires after user stops typing.
-
-**Match navigation**: GoToNext/GoToPrev cycle through matches, updating the current-match highlight and scrolling.
-
-**Incremental search on streaming**: When new output appends and search is active, scan only the new text for matches and append to the match list (O(1) per append vs O(n) full re-scan).
-
-## Step 8: Cleanup
-
-In `CloseTab()`, clean up the new dictionaries:
-```csharp
-_searchOverlays.Remove(task.Id);
-_searchInputs.Remove(task.Id);
-_searchStates.Remove(task.Id);
-_filterStates.Remove(task.Id);
-```
-
----
-
-## New tab content layout (final)
-
-```
-DockPanel (tab content)
-  ├── DockPanel (inputPanel, Dock.Bottom)
-  │     ├── Button "Send" (Dock.Right)
-  │     └── TextBox (inputBox)
-  ├── StackPanel (filterBar, Dock.Top, Horizontal)
-  │     ├── ToggleButton "Text"
-  │     ├── ToggleButton "Tools"
-  │     ├── ToggleButton "Errors"
-  │     └── ToggleButton "Status"
-  └── Grid (fills rest)
-        ├── RichTextBox (outputBox)
-        └── Border (searchOverlay, Collapsed, top-aligned)
-```
-
-## Performance Summary
-
-| Operation | Cost | Mitigation |
-|-----------|------|------------|
-| Streaming append | O(1) | Direct Run creation |
-| Full search | O(n) | 300ms debounce |
-| Filter toggle | O(segments) | One-time rebuild ~50-100ms |
-| Incremental search | O(new text length) | Only scans appended text |
-| Match navigation | O(1) | Direct TextRange highlight |
+## Risks & Edge Cases
+- **App.xaml.cs early calls**: `ShowErrorDialog` may run before resources load — wrap FindResource in try-catch fallback
+- **Frozen brushes**: StaticResource brushes are frozen/shared — verify no code mutates returned brushes
+- **ColorAnimation**: Storyboard `To=` attributes cannot use StaticResource — must stay hardcoded

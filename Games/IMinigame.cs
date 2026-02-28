@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Controls;
 
-namespace UnityAgent.Games
+namespace AgenticEngine.Games
 {
     public interface IMinigame
     {

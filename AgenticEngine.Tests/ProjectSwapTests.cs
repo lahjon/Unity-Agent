@@ -1,8 +1,9 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 
-namespace UnityAgent.Tests
+namespace AgenticEngine.Tests
 {
     /// <summary>
     /// Tests verifying that project swapping behaves correctly when tasks are
@@ -1079,9 +1080,9 @@ namespace UnityAgent.Tests
         // ── History round-trip: Summary and StoredPrompt ────────────
 
         [Fact]
-        public void HistoryRoundTrip_PreservesSummary()
+        public async Task HistoryRoundTrip_PreservesSummary()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"UnityAgentTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1093,9 +1094,9 @@ namespace UnityAgent.Tests
                 original.Add(task);
 
                 hm.SaveHistory(original);
+                await Task.Delay(200); // Allow background write to complete
 
-                var loaded = new ObservableCollection<AgentTask>();
-                hm.LoadHistory(loaded, retentionHours: 24);
+                var loaded = await hm.LoadHistoryAsync(retentionHours: 24);
 
                 Assert.Single(loaded);
                 Assert.Equal("Fix login bug", loaded[0].Summary);
@@ -1104,9 +1105,9 @@ namespace UnityAgent.Tests
         }
 
         [Fact]
-        public void HistoryRoundTrip_PreservesStoredPrompt()
+        public async Task HistoryRoundTrip_PreservesStoredPrompt()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"UnityAgentTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1118,9 +1119,9 @@ namespace UnityAgent.Tests
                 original.Add(task);
 
                 hm.SaveHistory(original);
+                await Task.Delay(200);
 
-                var loaded = new ObservableCollection<AgentTask>();
-                hm.LoadHistory(loaded, retentionHours: 24);
+                var loaded = await hm.LoadHistoryAsync(retentionHours: 24);
 
                 Assert.Single(loaded);
                 Assert.Equal("Detailed execution prompt for resuming", loaded[0].StoredPrompt);
@@ -1129,9 +1130,9 @@ namespace UnityAgent.Tests
         }
 
         [Fact]
-        public void HistoryRoundTrip_EmptyStoredPrompt_LoadsAsNull()
+        public async Task HistoryRoundTrip_EmptyStoredPrompt_LoadsAsNull()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"UnityAgentTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1143,9 +1144,9 @@ namespace UnityAgent.Tests
                 original.Add(task);
 
                 hm.SaveHistory(original);
+                await Task.Delay(200);
 
-                var loaded = new ObservableCollection<AgentTask>();
-                hm.LoadHistory(loaded, retentionHours: 24);
+                var loaded = await hm.LoadHistoryAsync(retentionHours: 24);
 
                 Assert.Single(loaded);
                 Assert.Null(loaded[0].StoredPrompt);
@@ -1154,9 +1155,9 @@ namespace UnityAgent.Tests
         }
 
         [Fact]
-        public void HistoryRoundTrip_PreservesAllFields()
+        public async Task HistoryRoundTrip_PreservesAllFields()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"UnityAgentTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1171,9 +1172,9 @@ namespace UnityAgent.Tests
                 original.Add(task);
 
                 hm.SaveHistory(original);
+                await Task.Delay(200);
 
-                var loaded = new ObservableCollection<AgentTask>();
-                hm.LoadHistory(loaded, retentionHours: 24);
+                var loaded = await hm.LoadHistoryAsync(retentionHours: 24);
 
                 Assert.Single(loaded);
                 var t = loaded[0];
@@ -1187,9 +1188,9 @@ namespace UnityAgent.Tests
         }
 
         [Fact]
-        public void StoredTaskRoundTrip_PreservesSummaryAndPrompt()
+        public async Task StoredTaskRoundTrip_PreservesSummaryAndPrompt()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"UnityAgentTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1208,9 +1209,9 @@ namespace UnityAgent.Tests
                 original.Add(task);
 
                 hm.SaveStoredTasks(original);
+                await Task.Delay(200);
 
-                var loaded = new ObservableCollection<AgentTask>();
-                hm.LoadStoredTasks(loaded);
+                var loaded = await hm.LoadStoredTasksAsync();
 
                 Assert.Single(loaded);
                 Assert.Equal("My Stored Plan", loaded[0].Summary);

@@ -5,16 +5,17 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using UnityAgent.Dialogs;
-using UnityAgent.Models;
+using AgenticEngine.Dialogs;
+using AgenticEngine.Models;
 
-namespace UnityAgent.Managers
+namespace AgenticEngine.Managers
 {
     public class ProjectManager
     {
@@ -54,10 +55,14 @@ namespace UnityAgent.Managers
         private readonly ToggleButton _useMcpToggle;
         private readonly TextBox _shortDescBox;
         private readonly TextBox _longDescBox;
+        private readonly TextBox _ruleInstructionBox;
         private readonly ToggleButton _editShortDescToggle;
         private readonly ToggleButton _editLongDescToggle;
+        private readonly ToggleButton _editRuleInstructionToggle;
         private readonly StackPanel _shortDescEditButtons;
         private readonly StackPanel _longDescEditButtons;
+        private readonly StackPanel _ruleInstructionEditButtons;
+        private readonly ItemsControl _projectRulesList;
         private readonly Button _regenerateDescBtn;
         private readonly Dispatcher _dispatcher;
 
@@ -80,10 +85,14 @@ namespace UnityAgent.Managers
             ToggleButton useMcpToggle,
             TextBox shortDescBox,
             TextBox longDescBox,
+            TextBox ruleInstructionBox,
             ToggleButton editShortDescToggle,
             ToggleButton editLongDescToggle,
+            ToggleButton editRuleInstructionToggle,
             StackPanel shortDescEditButtons,
             StackPanel longDescEditButtons,
+            StackPanel ruleInstructionEditButtons,
+            ItemsControl projectRulesList,
             Button regenerateDescBtn,
             Dispatcher dispatcher)
         {
@@ -95,10 +104,14 @@ namespace UnityAgent.Managers
             _useMcpToggle = useMcpToggle;
             _shortDescBox = shortDescBox;
             _longDescBox = longDescBox;
+            _ruleInstructionBox = ruleInstructionBox;
             _editShortDescToggle = editShortDescToggle;
             _editLongDescToggle = editLongDescToggle;
+            _editRuleInstructionToggle = editRuleInstructionToggle;
             _shortDescEditButtons = shortDescEditButtons;
             _longDescEditButtons = longDescEditButtons;
+            _ruleInstructionEditButtons = ruleInstructionEditButtons;
+            _projectRulesList = projectRulesList;
             _regenerateDescBtn = regenerateDescBtn;
             _dispatcher = dispatcher;
         }
@@ -126,13 +139,13 @@ namespace UnityAgent.Managers
             return $"#{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}";
         }
 
-        public void LoadProjects()
+        public async Task LoadProjectsAsync()
         {
             try
             {
                 if (File.Exists(_projectsFile))
                 {
-                    var json = File.ReadAllText(_projectsFile);
+                    var json = await File.ReadAllTextAsync(_projectsFile).ConfigureAwait(false);
                     try
                     {
                         _savedProjects = JsonSerializer.Deserialize<List<ProjectEntry>>(json, _projectJsonOptions) ?? new();
@@ -156,8 +169,11 @@ namespace UnityAgent.Managers
             }
             if (needsSave) SaveProjects();
 
-            RefreshProjectCombo();
-            UpdateMcpToggleForProject();
+            _dispatcher.Invoke(() =>
+            {
+                RefreshProjectCombo();
+                UpdateMcpToggleForProject();
+            });
         }
 
         public void SaveProjects()
@@ -198,8 +214,13 @@ namespace UnityAgent.Managers
                 _longDescBox.FontStyle = FontStyles.Normal;
             }
 
+            _ruleInstructionBox.Text = entry?.RuleInstruction ?? "";
+            _projectRulesList.ItemsSource = null;
+            _projectRulesList.ItemsSource = entry?.ProjectRules ?? new List<string>();
+
             _editShortDescToggle.IsChecked = false;
             _editLongDescToggle.IsChecked = false;
+            _editRuleInstructionToggle.IsChecked = false;
             _editShortDescToggle.IsEnabled = !initializing;
             _editLongDescToggle.IsEnabled = !initializing;
         }
@@ -431,6 +452,57 @@ namespace UnityAgent.Managers
                 SaveProjects();
             }
             _editLongDescToggle.IsChecked = false;
+        }
+
+        public void SaveRuleInstruction()
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+            if (entry != null)
+            {
+                entry.RuleInstruction = _ruleInstructionBox.Text;
+                SaveProjects();
+            }
+            _editRuleInstructionToggle.IsChecked = false;
+        }
+
+        public void AddProjectRule(string rule)
+        {
+            if (string.IsNullOrWhiteSpace(rule)) return;
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+            if (entry == null) return;
+            entry.ProjectRules.Add(rule.Trim());
+            SaveProjects();
+            RefreshDescriptionBoxes();
+        }
+
+        public void RemoveProjectRule(string rule)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+            if (entry == null) return;
+            entry.ProjectRules.Remove(rule);
+            SaveProjects();
+            RefreshDescriptionBoxes();
+        }
+
+        public string GetProjectRulesBlock(string projectPath)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
+            if (entry == null) return "";
+
+            var sb = new System.Text.StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(entry.RuleInstruction))
+                sb.Append(entry.RuleInstruction.Trim()).Append("\n");
+
+            if (entry.ProjectRules.Count > 0)
+            {
+                if (sb.Length > 0) sb.Append("\n");
+                foreach (var rule in entry.ProjectRules)
+                    sb.Append("- ").Append(rule).Append("\n");
+            }
+
+            if (sb.Length == 0) return "";
+            return "# PROJECT RULES\n" + sb + "\n";
         }
 
         public void RefreshProjectList(
