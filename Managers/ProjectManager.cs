@@ -447,7 +447,20 @@ namespace AgenticEngine.Managers
         public void UpdateMcpToggleForProject()
         {
             var proj = _savedProjects.Find(p => p.Path == _projectPath);
-            _useMcpToggle.IsChecked = proj?.McpStatus == McpStatus.Enabled;
+            if (proj != null)
+            {
+                _useMcpToggle.IsEnabled = true;
+                _useMcpToggle.IsChecked = proj.McpStatus == McpStatus.Enabled;
+                _useMcpToggle.Opacity = 1.0;
+                _useMcpToggle.ToolTip = null;
+            }
+            else
+            {
+                _useMcpToggle.IsChecked = false;
+                _useMcpToggle.IsEnabled = false;
+                _useMcpToggle.Opacity = 0.4;
+                _useMcpToggle.ToolTip = null;
+            }
         }
 
         public ProjectEntry? GetCurrentProject()
@@ -636,6 +649,17 @@ namespace AgenticEngine.Managers
                 var infoPanel = new StackPanel();
 
                 var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
+
+                var typeIcon = new TextBlock
+                {
+                    Text = proj.IsGame ? "\U0001F3AE" : "\U0001F4BB",
+                    FontSize = 14,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 6, 0),
+                    ToolTip = proj.IsGame ? "Game" : "App"
+                };
+                nameRow.Children.Add(typeIcon);
+
                 var nameColor = !string.IsNullOrEmpty(proj.Color)
                     ? (Color)ColorConverter.ConvertFromString(proj.Color)
                     : Color.FromRgb(0xE8, 0xE8, 0xE8);
@@ -853,61 +877,63 @@ namespace AgenticEngine.Managers
                     }
                 }
 
-                var mcpEnabled = proj.McpStatus != McpStatus.Disabled;
-                var mcpTogglePanel = new StackPanel
+                if (proj.McpStatus != McpStatus.Disabled)
                 {
-                    Orientation = Orientation.Horizontal,
-                    Margin = new Thickness(0, 4, 0, 0),
-                    ToolTip = mcpEnabled ? $"MCP: {proj.McpStatus}" : "MCP disabled"
-                };
-                var mcpToggle = new ToggleButton
-                {
-                    IsChecked = mcpEnabled,
-                    Style = (Style)Application.Current.FindResource("ToggleSwitch"),
-                    Tag = proj.Path,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                mcpToggle.Content = new TextBlock
-                {
-                    Text = "MCP",
-                    Foreground = (Brush)Application.Current.FindResource("TextLight"),
-                    FontSize = 10,
-                    FontFamily = new FontFamily("Segoe UI"),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                mcpToggle.Checked += async (s, ev) =>
-                {
-                    ev.Handled = true;
-                    if (s is ToggleButton tb && tb.Tag is string path)
-                        await ConnectMcpAsync(path);
-                };
-                mcpToggle.Unchecked += (s, ev) =>
-                {
-                    ev.Handled = true;
-                    if (s is ToggleButton tb && tb.Tag is string path)
-                        DisconnectMcp(path);
-                };
-                mcpTogglePanel.Children.Add(mcpToggle);
-
-                if (mcpEnabled && proj.McpStatus != McpStatus.Enabled)
-                {
-                    var mcpStatusColor = proj.McpStatus switch
+                    var mcpTogglePanel = new StackPanel
                     {
-                        McpStatus.Initialized => Color.FromRgb(0xE0, 0xA0, 0x30),
-                        McpStatus.Investigating => Color.FromRgb(0xE0, 0x80, 0x30),
-                        _ => Color.FromRgb(0x66, 0x66, 0x66)
+                        Orientation = Orientation.Horizontal,
+                        Margin = new Thickness(0, 4, 0, 0),
+                        ToolTip = $"MCP: {proj.McpStatus}"
                     };
-                    mcpTogglePanel.Children.Add(new System.Windows.Shapes.Ellipse
+                    var mcpToggle = new ToggleButton
                     {
-                        Width = 6,
-                        Height = 6,
-                        Fill = new SolidColorBrush(mcpStatusColor),
-                        Margin = new Thickness(4, 0, 0, 0),
-                        VerticalAlignment = VerticalAlignment.Center,
-                        ToolTip = proj.McpStatus.ToString()
-                    });
+                        IsChecked = true,
+                        Style = (Style)Application.Current.FindResource("ToggleSwitch"),
+                        Tag = proj.Path,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    mcpToggle.Content = new TextBlock
+                    {
+                        Text = "MCP",
+                        Foreground = (Brush)Application.Current.FindResource("TextLight"),
+                        FontSize = 10,
+                        FontFamily = new FontFamily("Segoe UI"),
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    mcpToggle.Checked += async (s, ev) =>
+                    {
+                        ev.Handled = true;
+                        if (s is ToggleButton tb && tb.Tag is string path)
+                            await ConnectMcpAsync(path);
+                    };
+                    mcpToggle.Unchecked += (s, ev) =>
+                    {
+                        ev.Handled = true;
+                        if (s is ToggleButton tb && tb.Tag is string path)
+                            DisconnectMcp(path);
+                    };
+                    mcpTogglePanel.Children.Add(mcpToggle);
+
+                    if (proj.McpStatus != McpStatus.Enabled)
+                    {
+                        var mcpStatusColor = proj.McpStatus switch
+                        {
+                            McpStatus.Initialized => Color.FromRgb(0xE0, 0xA0, 0x30),
+                            McpStatus.Investigating => Color.FromRgb(0xE0, 0x80, 0x30),
+                            _ => Color.FromRgb(0x66, 0x66, 0x66)
+                        };
+                        mcpTogglePanel.Children.Add(new System.Windows.Shapes.Ellipse
+                        {
+                            Width = 6,
+                            Height = 6,
+                            Fill = new SolidColorBrush(mcpStatusColor),
+                            Margin = new Thickness(4, 0, 0, 0),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            ToolTip = proj.McpStatus.ToString()
+                        });
+                    }
+                    infoPanel.Children.Add(mcpTogglePanel);
                 }
-                infoPanel.Children.Add(mcpTogglePanel);
 
                 Grid.SetColumn(infoPanel, 0);
                 grid.Children.Add(infoPanel);
@@ -988,9 +1014,10 @@ namespace AgenticEngine.Managers
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
             if (entry == null) return;
 
-            var mcpUrl = "http://127.0.0.1:8080/mcp";
+            var mcpUrl = string.IsNullOrWhiteSpace(entry.McpAddress) ? "http://127.0.0.1:8080/mcp" : entry.McpAddress;
+            var serverName = string.IsNullOrWhiteSpace(entry.McpServerName) ? "mcp-for-unity-server" : entry.McpServerName;
             var mcpJsonPath = Path.Combine(projectPath, ".mcp.json");
-            var mcpJsonContent = "{\n  \"mcpServers\": {\n    \"mcp-for-unity-server\": {\n      \"type\": \"http\",\n      \"url\": \"" + mcpUrl + "\"\n    }\n  }\n}";
+            var mcpJsonContent = "{\n  \"mcpServers\": {\n    \"" + serverName + "\": {\n      \"type\": \"http\",\n      \"url\": \"" + mcpUrl + "\"\n    }\n  }\n}";
 
             var reachable = await CheckMcpHealth(mcpUrl);
 
@@ -1030,7 +1057,7 @@ namespace AgenticEngine.Managers
 
             var investigateTask = new AgentTask
             {
-                Description = "The MCP server mcp-for-unity-server at http://127.0.0.1:8080/mcp is not responding. " +
+                Description = $"The MCP server {serverName} at {mcpUrl} is not responding. " +
                     "Diagnose and fix the connection. Check if the Unity Editor is running with the MCP plugin installed and enabled.",
                 SkipPermissions = true,
                 ProjectPath = projectPath,

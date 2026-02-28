@@ -24,7 +24,8 @@ namespace AgenticEngine
     public enum ModelType
     {
         ClaudeCode,
-        Gemini
+        Gemini,
+        GeminiGameArt
     }
 
     public class AgentTask : INotifyPropertyChanged
@@ -55,11 +56,16 @@ namespace AgenticEngine
         public bool ExtendedPlanning { get => Data.ExtendedPlanning; set => Data.ExtendedPlanning = value; }
         public bool NoGitWrite { get => Data.NoGitWrite; set => Data.NoGitWrite = value; }
         public bool PlanOnly { get => Data.PlanOnly; set => Data.PlanOnly = value; }
-        public int Priority { get => Data.Priority; set => Data.Priority = value; }
+        public int Priority
+        {
+            get => Data.Priority;
+            set { Data.Priority = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasPriorityBadge)); OnPropertyChanged(nameof(PriorityBadgeText)); }
+        }
         public bool UseMessageBus { get => Data.UseMessageBus; set => Data.UseMessageBus = value; }
         public bool AutoDecompose { get => Data.AutoDecompose; set => Data.AutoDecompose = value; }
         public string? GroupId { get => Data.GroupId; set => Data.GroupId = value; }
         public string? GroupName { get => Data.GroupName; set => Data.GroupName = value; }
+        public string AdditionalInstructions { get => Data.AdditionalInstructions; set => Data.AdditionalInstructions = value; }
         public string? StoredPrompt { get => Data.StoredPrompt; set => Data.StoredPrompt = value; }
         public string? ConversationId { get => Data.ConversationId; set => Data.ConversationId = value; }
         public string? FullOutput { get => Data.FullOutput; set => Data.FullOutput = value; }
@@ -125,6 +131,7 @@ namespace AgenticEngine
                 OnPropertyChanged(nameof(IsFinished));
                 OnPropertyChanged(nameof(IsRetryable));
                 OnPropertyChanged(nameof(TimeInfo));
+                OnPropertyChanged(nameof(HasPriorityBadge));
             }
         }
 
@@ -302,6 +309,9 @@ namespace AgenticEngine
         public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed;
 
         public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
+
+        public bool HasPriorityBadge => Priority > 0 && (IsQueued || IsInitQueued);
+        public string PriorityBadgeText => $"P{Priority}";
 
         public string TimeInfo
         {

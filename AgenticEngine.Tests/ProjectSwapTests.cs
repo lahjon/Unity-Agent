@@ -799,10 +799,10 @@ namespace AgenticEngine.Tests
         // ── SpawnTeam during swap ────────────────────────────────────
 
         [Fact]
-        public void SpawnTeam_Task_CommandIncludesFlag()
+        public void SpawnTeam_Task_PromptIncludesTeamBlock()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(false, false, spawnTeam: true);
-            Assert.Contains("--spawn-team", cmd);
+            var prompt = TaskLauncher.BuildBasePrompt("system", "team task", false, false, spawnTeam: true);
+            Assert.Contains("TEAM SPAWN MODE", prompt);
         }
 
         [Fact]
@@ -839,7 +839,7 @@ namespace AgenticEngine.Tests
             var images = new List<string> { @"C:\imgs\screenshot.png" };
             var task = TaskLauncher.CreateTask("with images", @"C:\Projects\Alpha",
                 false, false, false, false, false, false,
-                false, false, false, false, images);
+                false, false, false, false, false, images);
 
             Assert.Single(task.ImagePaths);
             Assert.Equal(@"C:\imgs\screenshot.png", task.ImagePaths[0]);
@@ -1086,7 +1086,7 @@ namespace AgenticEngine.Tests
             Directory.CreateDirectory(tempDir);
             try
             {
-                var hm = new Managers.HistoryManager(tempDir);
+                var hm = new Managers.HistoryManager(tempDir, new object(), new object());
                 var original = new ObservableCollection<AgentTask>();
                 var task = MakeTask(@"C:\Projects\Alpha", AgentTaskStatus.Completed);
                 task.Summary = "Fix login bug";
@@ -1111,7 +1111,7 @@ namespace AgenticEngine.Tests
             Directory.CreateDirectory(tempDir);
             try
             {
-                var hm = new Managers.HistoryManager(tempDir);
+                var hm = new Managers.HistoryManager(tempDir, new object(), new object());
                 var original = new ObservableCollection<AgentTask>();
                 var task = MakeTask(@"C:\Projects\Alpha", AgentTaskStatus.Completed);
                 task.StoredPrompt = "Detailed execution prompt for resuming";
@@ -1136,7 +1136,7 @@ namespace AgenticEngine.Tests
             Directory.CreateDirectory(tempDir);
             try
             {
-                var hm = new Managers.HistoryManager(tempDir);
+                var hm = new Managers.HistoryManager(tempDir, new object(), new object());
                 var original = new ObservableCollection<AgentTask>();
                 var task = MakeTask(@"C:\Projects\Alpha", AgentTaskStatus.Completed);
                 // StoredPrompt is null by default
@@ -1161,7 +1161,7 @@ namespace AgenticEngine.Tests
             Directory.CreateDirectory(tempDir);
             try
             {
-                var hm = new Managers.HistoryManager(tempDir);
+                var hm = new Managers.HistoryManager(tempDir, new object(), new object());
                 var original = new ObservableCollection<AgentTask>();
                 var task = MakeTask(@"C:\Projects\Alpha", AgentTaskStatus.Completed);
                 task.Summary = "Test Summary";
@@ -1194,7 +1194,7 @@ namespace AgenticEngine.Tests
             Directory.CreateDirectory(tempDir);
             try
             {
-                var hm = new Managers.HistoryManager(tempDir);
+                var hm = new Managers.HistoryManager(tempDir, new object(), new object());
                 var original = new ObservableCollection<AgentTask>();
                 var task = new AgentTask
                 {

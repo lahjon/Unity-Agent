@@ -19,33 +19,7 @@ namespace AgenticEngine.Dialogs
     {
         public static CreateProjectResult? Show()
         {
-            Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("CreateProjectDialog", "Could not get MainWindow", ex); }
-
-            var dlg = new Window
-            {
-                Title = "Create Project",
-                Width = 440,
-                Height = 390,
-                WindowStartupLocation = owner != null
-                    ? WindowStartupLocation.CenterOwner
-                    : WindowStartupLocation.CenterScreen,
-                ResizeMode = ResizeMode.NoResize,
-                Background = Brushes.Transparent,
-                WindowStyle = WindowStyle.None,
-                AllowsTransparency = true,
-                Topmost = true,
-                ShowInTaskbar = true
-            };
-
-            var outerBorder = new Border
-            {
-                Background = (Brush)Application.Current.FindResource("BgSurface"),
-                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12)
-            };
-            outerBorder.MouseLeftButtonDown += (_, me) => { if (me.ClickCount == 1) dlg.DragMove(); };
+            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow("Create Project", 440, 480);
 
             CreateProjectResult? result = null;
             var stack = new StackPanel { Margin = new Thickness(20, 18, 20, 18) };
@@ -363,12 +337,9 @@ namespace AgenticEngine.Dialogs
             stack.Children.Add(btnPanel);
 
             outerBorder.Child = stack;
-            dlg.Content = outerBorder;
-            if (owner != null) dlg.Owner = owner;
 
             dlg.KeyDown += (_, ke) =>
             {
-                if (ke.Key == Key.Escape) dlg.Close();
                 if (ke.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
                     createBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             };

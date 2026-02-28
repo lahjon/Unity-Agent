@@ -10,10 +10,11 @@ using System.Windows.Threading;
 
 namespace AgenticEngine
 {
-    public class TerminalTabManager
+    public class TerminalTabManager : IDisposable
     {
         private readonly List<ConPtyTerminal> _terminals = new();
         private readonly Dictionary<ConPtyTerminal, DispatcherTimer> _renderTimers = new();
+        private bool _disposed;
         private int _activeIndex = -1;
         private int _nextTabNumber = 1;
 
@@ -530,8 +531,11 @@ namespace AgenticEngine
 
         // ── Cleanup ─────────────────────────────────────────────────
 
-        public void DisposeAll()
+        public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+
             foreach (var timer in _renderTimers.Values)
             {
                 try { timer.Stop(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", $"Failed to stop render timer: {ex.Message}"); }

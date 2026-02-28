@@ -28,13 +28,14 @@ namespace AgenticEngine.Managers
         public SuggestionCategory Category { get; set; } = SuggestionCategory.General;
     }
 
-    public class HelperManager
+    public class HelperManager : IDisposable
     {
         private readonly string _appDataDir;
         private string _currentProjectPath;
         private string _suggestionsFile;
         private string _ignoredFile;
         private CancellationTokenSource? _cts;
+        private bool _disposed;
         private Func<IEnumerable<string>>? _getActiveTaskDescriptions;
         private readonly HashSet<string> _ignoredTitles = new(StringComparer.OrdinalIgnoreCase);
 
@@ -237,6 +238,14 @@ namespace AgenticEngine.Managers
             IsGenerating = false;
         }
 
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            CancelGeneration();
+        }
+
         public void ClearSuggestions()
         {
             Suggestions.Clear();
@@ -255,6 +264,14 @@ namespace AgenticEngine.Managers
                 _ignoredTitles.Add(suggestion.Title);
             Suggestions.Remove(suggestion);
             SaveSuggestions();
+            SaveIgnoredTitles();
+        }
+
+        public int IgnoredCount => _ignoredTitles.Count;
+
+        public void ClearIgnoredTitles()
+        {
+            _ignoredTitles.Clear();
             SaveIgnoredTitles();
         }
 

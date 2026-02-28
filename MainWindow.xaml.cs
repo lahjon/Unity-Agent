@@ -16,16 +16,17 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using AgenticEngine.Dialogs;
-using AgenticEngine.Games;
 using AgenticEngine.Managers;
 using AgenticEngine.Models;
 
 namespace AgenticEngine
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, IDisposable
     {
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+        private static readonly System.Net.Http.HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
 
         private const string DefaultSystemPrompt = TaskLauncher.DefaultSystemPrompt;
         private string SystemPrompt;
@@ -63,8 +64,8 @@ namespace AgenticEngine
         // Task numbering (1–9999, resets on app restart)
         private int _nextTaskNumber = 1;
 
-        // Saved prompts
-        private readonly List<SavedPromptEntry> _savedPrompts = new();
+        // Disposal guard
+        private bool _disposed;
 
         // Chat
         private ChatManager _chatManager = null!;
@@ -74,9 +75,6 @@ namespace AgenticEngine
         private bool _terminalCollapsed = true;
         private GridLength _terminalExpandedHeight = new(120);
 
-        // Games
-        private readonly List<IMinigame> _availableGames = new();
-        private IMinigame? _activeGame;
 
         public MainWindow()
         {
@@ -127,7 +125,8 @@ namespace AgenticEngine
             _claudeService = new ClaudeService(appDataDir);
             _chatManager = new ChatManager(
                 ChatMessagesPanel, ChatScrollViewer, ChatInput, ChatSendBtn,
-                ChatModelCombo, _claudeService, _geminiService);
+                ChatModelCombo, _claudeService, _geminiService,
+                ChatImagePreview, appDataDir);
             _helperManager = new HelperManager(appDataDir, _projectManager.ProjectPath);
             _helperManager.SetActiveTaskSource(() =>
             {
@@ -184,8 +183,12 @@ namespace AgenticEngine
             _statusTimer.Tick += (_, _) =>
             {
                 App.TraceUi("StatusTimer.Tick");
-                foreach (var t in _activeTasks)
-                    t.OnPropertyChanged(nameof(t.TimeInfo));
+                // Batch-refresh the active tasks view once instead of firing
+                // OnPropertyChanged(TimeInfo) on every individual task.
+                // Refresh() triggers a single CollectionChanged-Reset which causes
+                // WPF to re-read all bound properties (including TimeInfo) for
+                // visible items in one layout pass.
+                _activeView?.Refresh();
                 App.TraceUi("StatusTimer.CleanupHistory");
                 _historyManager.CleanupOldHistory(_historyTasks, _outputTabManager.Tabs, OutputTabs, _outputTabManager.OutputBoxes, _settingsManager.HistoryRetentionHours);
                 App.TraceUi("StatusTimer.UpdateTabWidths");
@@ -204,8 +207,6 @@ namespace AgenticEngine
 
             // Saved prompts loaded async in Window_Loaded
 
-            // Games
-            InitializeGames();
             MainTabs.SelectionChanged += MainTabs_SelectionChanged;
         }
 
@@ -318,6 +319,8 @@ namespace AgenticEngine
 
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
+
+            SetupMainTabsOverflow();
 
             await CheckClaudeCliAsync();
         }
@@ -492,6 +495,7 @@ namespace AgenticEngine
                 _projectManager.UpdateMcpToggleForProject();
                 var activeEntry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
                 ProjectTypeGameToggle.IsChecked = activeEntry?.IsGame == true;
+                SyncMcpSettingsFields();
                 await _helperManager.SwitchProjectAsync(_projectManager.ProjectPath);
                 RefreshFilterCombos();
                 ActiveFilter_Changed(ActiveFilterCombo, null!);
@@ -567,6 +571,78 @@ namespace AgenticEngine
             {
                 entry.IsGame = ProjectTypeGameToggle.IsChecked == true;
                 _projectManager.SaveProjects();
+            }
+        }
+
+        // ── MCP Settings ────────────────────────────────────────────
+
+        private void SyncMcpSettingsFields()
+        {
+            var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
+            if (entry != null)
+            {
+                McpServerNameBox.Text = entry.McpServerName;
+                McpAddressBox.Text = entry.McpAddress;
+                McpStartCommandBox.Text = entry.McpStartCommand;
+                McpConnectionStatus.Text = entry.McpStatus switch
+                {
+                    Models.McpStatus.Enabled => "Connected",
+                    Models.McpStatus.Initialized => "Initialized",
+                    Models.McpStatus.Investigating => "Investigating...",
+                    _ => "Disconnected"
+                };
+                McpConnectionStatus.Foreground = entry.McpStatus switch
+                {
+                    Models.McpStatus.Enabled => FindResource("Success") as System.Windows.Media.Brush,
+                    Models.McpStatus.Investigating => FindResource("WarningOrange") as System.Windows.Media.Brush,
+                    _ => FindResource("TextMuted") as System.Windows.Media.Brush
+                } ?? FindResource("TextMuted") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Gray;
+            }
+        }
+
+        private void McpSettings_Changed(object sender, RoutedEventArgs e)
+        {
+            var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
+            if (entry == null) return;
+            entry.McpServerName = McpServerNameBox.Text?.Trim() ?? "mcp-for-unity-server";
+            entry.McpAddress = McpAddressBox.Text?.Trim() ?? "http://127.0.0.1:8080/mcp";
+            entry.McpStartCommand = McpStartCommandBox.Text?.Trim() ?? "";
+            _projectManager.SaveProjects();
+        }
+
+        private async void McpTestConnection_Click(object sender, RoutedEventArgs e)
+        {
+            McpConnectionStatus.Text = "Testing...";
+            McpConnectionStatus.Foreground = FindResource("TextMuted") as System.Windows.Media.Brush
+                ?? System.Windows.Media.Brushes.Gray;
+            McpTestConnectionBtn.IsEnabled = false;
+            try
+            {
+                var address = McpAddressBox.Text?.Trim();
+                if (string.IsNullOrEmpty(address)) { McpConnectionStatus.Text = "No address"; return; }
+                var response = await SharedHttpClient.GetAsync(address);
+                if (response.IsSuccessStatusCode)
+                {
+                    McpConnectionStatus.Text = "Connected";
+                    McpConnectionStatus.Foreground = FindResource("Success") as System.Windows.Media.Brush
+                        ?? System.Windows.Media.Brushes.Green;
+                }
+                else
+                {
+                    McpConnectionStatus.Text = $"Error: {(int)response.StatusCode}";
+                    McpConnectionStatus.Foreground = FindResource("Danger") as System.Windows.Media.Brush
+                        ?? System.Windows.Media.Brushes.Red;
+                }
+            }
+            catch
+            {
+                McpConnectionStatus.Text = "Unreachable";
+                McpConnectionStatus.Foreground = FindResource("Danger") as System.Windows.Media.Brush
+                    ?? System.Windows.Media.Brushes.Red;
+            }
+            finally
+            {
+                McpTestConnectionBtn.IsEnabled = true;
             }
         }
 
@@ -695,6 +771,20 @@ namespace AgenticEngine
         private void ViewActivity_Click(object sender, RoutedEventArgs e)
         {
             Dialogs.ActivityDashboardDialog.Show(_activeTasks, _historyTasks, _projectManager.SavedProjects);
+        }
+
+        private void ClearIgnoredSuggestions_Click(object sender, RoutedEventArgs e)
+        {
+            var count = _helperManager.IgnoredCount;
+            if (count == 0)
+            {
+                DarkDialog.ShowAlert("There are no ignored suggestions to clear.", "No Ignored Suggestions");
+                return;
+            }
+            if (!DarkDialog.ShowConfirm(
+                $"This will clear {count} ignored suggestion(s).\n\nPreviously ignored suggestions may reappear on the next generation. Continue?",
+                "Clear Ignored Suggestions")) return;
+            _helperManager.ClearIgnoredTitles();
         }
 
         private void InitializeNodeGraphPanel()
@@ -1047,7 +1137,9 @@ namespace AgenticEngine
         private void ModelCombo_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (ModelCombo?.SelectedItem is not ComboBoxItem item) return;
-            var isGemini = item.Tag?.ToString() == "Gemini";
+            var tag = item.Tag?.ToString();
+            var isGemini = tag == "Gemini" || tag == "GeminiGameArt";
+            var isGameArt = tag == "GeminiGameArt";
             // Disable advanced options that don't apply to Gemini
             if (RemoteSessionToggle != null) RemoteSessionToggle.IsEnabled = !isGemini;
             if (HeadlessToggle != null) HeadlessToggle.IsEnabled = !isGemini;
@@ -1055,6 +1147,9 @@ namespace AgenticEngine
             if (SpawnTeamToggle != null) SpawnTeamToggle.IsEnabled = !isGemini;
             if (ExtendedPlanningToggle != null) ExtendedPlanningToggle.IsEnabled = !isGemini;
             if (AutoDecomposeToggle != null) AutoDecomposeToggle.IsEnabled = !isGemini;
+            // Show/hide asset type selector for Game Art mode
+            if (AssetTypeLabel != null) AssetTypeLabel.Visibility = isGameArt ? Visibility.Visible : Visibility.Collapsed;
+            if (AssetTypeCombo != null) AssetTypeCombo.Visibility = isGameArt ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ── Input Events ───────────────────────────────────────────
@@ -1126,7 +1221,7 @@ namespace AgenticEngine
 
             _dragStartPoint = null;
             var data = new DataObject("AgentTask", task);
-            DragDrop.DoDragDrop(el, data, DragDropEffects.Link);
+            DragDrop.DoDragDrop(el, data, DragDropEffects.Link | DragDropEffects.Move);
         }
 
         private void DependencyZone_DragOver(object sender, DragEventArgs e)
@@ -1253,9 +1348,13 @@ namespace AgenticEngine
                 return;
             }
 
-            e.Effects = DragDropEffects.Link;
+            // Reorder mode when both tasks are queued
+            e.Effects = IsReorderablePair(dragged, target) ? DragDropEffects.Move : DragDropEffects.Link;
             e.Handled = true;
         }
+
+        private static bool IsReorderablePair(AgentTask a, AgentTask b) =>
+            (a.IsQueued || a.IsInitQueued) && (b.IsQueued || b.IsInitQueued);
 
         private void TaskCard_Drop(object sender, DragEventArgs e)
         {
@@ -1263,6 +1362,14 @@ namespace AgenticEngine
             if (sender is not FrameworkElement { DataContext: AgentTask target }) return;
             if (e.Data.GetData("AgentTask") is not AgentTask dragged) return;
             if (dragged.Id == target.Id || target.IsFinished || dragged.IsFinished) return;
+
+            // Reorder queued tasks instead of adding dependency
+            if (IsReorderablePair(dragged, target))
+            {
+                ReorderQueuedTask(dragged, target);
+                e.Handled = true;
+                return;
+            }
 
             // Prevent duplicate dependency
             if (dragged.ContainsDependencyTaskId(target.Id)) return;
@@ -1306,6 +1413,34 @@ namespace AgenticEngine
             e.Handled = true;
         }
 
+        /// <summary>
+        /// Moves the dragged task to the target task's position in the active list,
+        /// then recalculates Priority values so visual order matches execution order.
+        /// </summary>
+        private void ReorderQueuedTask(AgentTask dragged, AgentTask target)
+        {
+            var dragIdx = _activeTasks.IndexOf(dragged);
+            var targetIdx = _activeTasks.IndexOf(target);
+            if (dragIdx < 0 || targetIdx < 0 || dragIdx == targetIdx) return;
+
+            _activeTasks.Move(dragIdx, targetIdx);
+            RecalculateQueuePriorities();
+        }
+
+        /// <summary>
+        /// Assigns descending Priority values to all Queued/InitQueued tasks
+        /// based on their position in the active list (earlier = higher priority).
+        /// </summary>
+        private void RecalculateQueuePriorities()
+        {
+            var queuedTasks = _activeTasks
+                .Where(t => t.IsQueued || t.IsInitQueued)
+                .ToList();
+
+            for (int i = 0; i < queuedTasks.Count; i++)
+                queuedTasks[i].Priority = queuedTasks.Count - i;
+        }
+
         private bool WouldCreateCircularDependency(AgentTask dragged, AgentTask target)
         {
             var visited = new HashSet<string>();
@@ -1325,633 +1460,6 @@ namespace AgenticEngine
             }
 
             return false;
-        }
-
-        // ── Execute ────────────────────────────────────────────────
-
-        private void Execute_Click(object sender, RoutedEventArgs e)
-        {
-            var desc = TaskInput.Text?.Trim();
-            if (!TaskLauncher.ValidateTaskInput(desc)) return;
-
-            var selectedModel = ModelType.ClaudeCode;
-            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem && modelItem.Tag?.ToString() == "Gemini")
-                selectedModel = ModelType.Gemini;
-
-            var task = TaskLauncher.CreateTask(
-                desc!,
-                _projectManager.ProjectPath,
-                true,
-                RemoteSessionToggle.IsChecked == true,
-                HeadlessToggle.IsChecked == true,
-                OvernightToggle.IsChecked == true,
-                IgnoreFileLocksToggle.IsChecked == true,
-                UseMcpToggle.IsChecked == true,
-                SpawnTeamToggle.IsChecked == true,
-                ExtendedPlanningToggle.IsChecked == true,
-                DefaultNoGitWriteToggle.IsChecked == true,
-                PlanOnlyToggle.IsChecked == true,
-                imagePaths: _imageManager.DetachImages(),
-                model: selectedModel,
-                autoDecompose: AutoDecomposeToggle.IsChecked == true);
-            task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
-            task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
-
-            // Capture dependencies before clearing
-            var dependencies = _pendingDependencies.ToList();
-            ClearPendingDependencies();
-            TaskInput.Clear();
-
-            // Reset per-task toggles
-            RemoteSessionToggle.IsChecked = false;
-            HeadlessToggle.IsChecked = false;
-            SpawnTeamToggle.IsChecked = false;
-            OvernightToggle.IsChecked = false;
-            ExtendedPlanningToggle.IsChecked = false;
-            PlanOnlyToggle.IsChecked = false;
-            AutoDecomposeToggle.IsChecked = false;
-
-            if (selectedModel == ModelType.Gemini)
-            {
-                ExecuteGeminiTask(task);
-                return;
-            }
-
-            if (task.Headless)
-            {
-                _taskExecutionManager.LaunchHeadless(task);
-                UpdateStatus();
-                return;
-            }
-
-            task.Summary = TaskLauncher.GenerateLocalSummary(desc!);
-            AddActiveTask(task);
-            _outputTabManager.CreateTab(task);
-
-            // Check if any dependencies are still active (not finished)
-            var activeDeps = dependencies.Where(d => !d.IsFinished).ToList();
-            if (activeDeps.Count > 0)
-            {
-                task.DependencyTaskIds = activeDeps.Select(d => d.Id).ToList();
-                task.DependencyTaskNumbers = activeDeps.Select(d => d.TaskNumber).ToList();
-
-                // Register with orchestrator so it tracks the DAG edges
-                _taskOrchestrator.AddTask(task, task.DependencyTaskIds.ToList());
-
-                if (!task.PlanOnly)
-                {
-                    // Start in plan mode first, then queue when planning completes
-                    task.IsPlanningBeforeQueue = true;
-                    task.PlanOnly = true;
-                    task.Status = AgentTaskStatus.Planning;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"[AgenticEngine] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
-                        _activeTasks, _historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-                }
-                else
-                {
-                    // User explicitly wants plan-only — queue as before
-                    task.Status = AgentTaskStatus.Queued;
-                    task.QueuedReason = "Waiting for dependencies";
-                    task.BlockedByTaskId = activeDeps[0].Id;
-                    task.BlockedByTaskNumber = activeDeps[0].TaskNumber;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"[AgenticEngine] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
-                        _activeTasks, _historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                }
-            }
-            else if (CountActiveSessionTasks() > _settingsManager.MaxConcurrentTasks)
-            {
-                // Max concurrent sessions reached — init-queue (no Claude session yet)
-                task.Status = AgentTaskStatus.InitQueued;
-                task.QueuedReason = "Max concurrent tasks reached";
-                _outputTabManager.AppendOutput(task.Id,
-                    $"[AgenticEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
-                    _activeTasks, _historyTasks);
-                _outputTabManager.UpdateTabHeader(task);
-            }
-            else
-            {
-                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-            }
-
-            RefreshFilterCombos();
-            UpdateStatus();
-        }
-
-        private void ExecuteGeminiTask(AgentTask task)
-        {
-            if (!_geminiService.IsConfigured)
-            {
-                Dialogs.DarkDialog.ShowConfirm(
-                    "Gemini API key not configured.\n\nGo to Settings > Gemini tab to set your API key.\n" +
-                    "Get one free at https://ai.google.dev/gemini-api/docs/api-key",
-                    "Gemini Not Configured");
-                return;
-            }
-
-            task.Cts?.Dispose();
-            task.Cts = new System.Threading.CancellationTokenSource();
-
-            task.Summary = "Generating Image...";
-            AddActiveTask(task);
-            _outputTabManager.CreateGeminiTab(task, _geminiService.GetImageDirectory());
-
-            _ = RunGeminiImageGeneration(task);
-            RefreshFilterCombos();
-            UpdateStatus();
-        }
-
-        private async System.Threading.Tasks.Task RunGeminiImageGeneration(AgentTask task)
-        {
-            var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
-            var progress = new Progress<string>(msg =>
-            {
-                _outputTabManager.AppendOutput(task.Id, msg, _activeTasks, _historyTasks);
-            });
-
-            _outputTabManager.AppendOutput(task.Id,
-                $"[Gemini] Task #{task.TaskNumber} — Image generation\n" +
-                $"[Gemini] Prompt: {task.Description}\n\n",
-                _activeTasks, _historyTasks);
-
-            try
-            {
-                var result = await _geminiService.GenerateImageAsync(task.Description, task.Id, progress, ct);
-
-                if (result.Success)
-                {
-                    task.Status = AgentTaskStatus.Completed;
-                    task.EndTime = DateTime.Now;
-                    task.GeneratedImagePaths.AddRange(result.ImagePaths);
-
-                    foreach (var path in result.ImagePaths)
-                        _outputTabManager.AddGeminiImage(task.Id, path);
-
-                    if (!string.IsNullOrEmpty(result.TextResponse))
-                        _outputTabManager.AppendOutput(task.Id,
-                            $"\n[Gemini] {result.TextResponse}\n", _activeTasks, _historyTasks);
-
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"\n[Gemini] Done — {result.ImagePaths.Count} image(s) generated.\n",
-                        _activeTasks, _historyTasks);
-                    task.Summary = $"Image: {(task.Description.Length > 30 ? task.Description[..30] + "..." : task.Description)}";
-                }
-                else
-                {
-                    task.Status = AgentTaskStatus.Failed;
-                    task.EndTime = DateTime.Now;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"\n{result.ErrorMessage}\n", _activeTasks, _historyTasks);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                task.Status = AgentTaskStatus.Cancelled;
-                task.EndTime = DateTime.Now;
-                _outputTabManager.AppendOutput(task.Id,
-                    "\n[Gemini] Generation cancelled.\n", _activeTasks, _historyTasks);
-            }
-            catch (Exception ex)
-            {
-                task.Status = AgentTaskStatus.Failed;
-                task.EndTime = DateTime.Now;
-                _outputTabManager.AppendOutput(task.Id,
-                    $"\n[Gemini] Unexpected error: {ex.Message}\n", _activeTasks, _historyTasks);
-            }
-
-            _outputTabManager.UpdateTabHeader(task);
-            UpdateStatus();
-        }
-
-
-        // ── Tab Events ─────────────────────────────────────────────
-
-        private void OutputTabs_SizeChanged(object sender, SizeChangedEventArgs e) => _outputTabManager.UpdateOutputTabWidths();
-
-        private void OnTabCloseRequested(AgentTask task) => CloseTab(task);
-
-        private void OnTabStoreRequested(AgentTask task)
-        {
-            // If the task is still active, cancel it first
-            if (task.IsRunning || task.IsPlanning || task.IsPaused || task.IsQueued)
-            {
-                task.OvernightRetryTimer?.Stop();
-                task.OvernightIterationTimer?.Stop();
-                try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
-                task.Status = AgentTaskStatus.Cancelled;
-                task.EndTime = DateTime.Now;
-                TaskExecutionManager.KillProcess(task);
-                task.Cts?.Dispose();
-                task.Cts = null;
-                _outputTabManager.AppendOutput(task.Id,
-                    "\n[AgenticEngine] Task cancelled and stored.\n", _activeTasks, _historyTasks);
-            }
-
-            // Create the stored task entry
-            var storedTask = new AgentTask
-            {
-                Description = task.Description,
-                ProjectPath = task.ProjectPath,
-                ProjectColor = task.ProjectColor,
-                ProjectDisplayName = task.ProjectDisplayName,
-                StoredPrompt = task.StoredPrompt ?? task.Description,
-                SkipPermissions = task.SkipPermissions,
-                StartTime = DateTime.Now
-            };
-            storedTask.Summary = !string.IsNullOrWhiteSpace(task.Summary)
-                ? task.Summary : task.ShortDescription;
-            storedTask.Status = AgentTaskStatus.Completed;
-
-            _storedTasks.Insert(0, storedTask);
-            _historyManager.SaveStoredTasks(_storedTasks);
-            RefreshFilterCombos();
-
-            // Clean up the active task and close the tab
-            FinalizeTask(task);
-        }
-
-        private void OnTabInputSent(AgentTask task, TextBox inputBox) =>
-            _taskExecutionManager.SendInput(task, inputBox, _activeTasks, _historyTasks);
-
-        private void Pause_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-
-            if (task.Status == AgentTaskStatus.Paused)
-            {
-                _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
-            }
-            else if (task.IsRunning)
-            {
-                _taskExecutionManager.PauseTask(task);
-                _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task paused.\n", _activeTasks, _historyTasks);
-            }
-        }
-
-        private void ToggleFileLock_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            task.IgnoreFileLocks = !task.IgnoreFileLocks;
-        }
-
-        private void CloseTab(AgentTask task)
-        {
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.InitQueued || task.Status == AgentTaskStatus.Queued)
-            {
-                var processAlreadyDone = task.Process == null || task.Process.HasExited;
-                if (processAlreadyDone)
-                {
-                    task.Status = AgentTaskStatus.Completed;
-                    task.EndTime ??= DateTime.Now;
-                }
-                else
-                {
-                    if (!DarkDialog.ShowConfirm("This task is still running. Closing will terminate it.\n\nAre you sure?", "Task Running"))
-                        return;
-
-                    task.TokenLimitRetryTimer?.Stop();
-                    task.TokenLimitRetryTimer = null;
-                    task.Status = AgentTaskStatus.Cancelled;
-                    task.EndTime = DateTime.Now;
-                    TaskExecutionManager.KillProcess(task);
-                }
-            }
-            else if (_activeTasks.Contains(task))
-            {
-                task.EndTime ??= DateTime.Now;
-            }
-
-            FinalizeTask(task);
-        }
-
-        // ── Task Actions ───────────────────────────────────────────
-
-        private void Complete_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-
-            if (task.Status == AgentTaskStatus.InitQueued)
-            {
-                // Force-start an init-queued task (bypass max concurrent limit)
-                task.Status = AgentTaskStatus.Running;
-                task.QueuedReason = null;
-                task.StartTime = DateTime.Now;
-                _outputTabManager.AppendOutput(task.Id,
-                    $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n",
-                    _activeTasks, _historyTasks);
-                _outputTabManager.UpdateTabHeader(task);
-                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-                UpdateStatus();
-                return;
-            }
-
-            if (task.Status == AgentTaskStatus.Queued)
-            {
-                if (task.DependencyTaskIdCount > 0)
-                {
-                    // Force-start a dependency-queued task — remove from orchestrator tracking
-                    _taskOrchestrator.MarkResolved(task.Id);
-                    task.QueuedReason = null;
-                    task.BlockedByTaskId = null;
-                    task.BlockedByTaskNumber = null;
-                    task.ClearDependencyTaskIds();
-                    task.DependencyTaskNumbers.Clear();
-
-                    if (task.Process is { HasExited: false })
-                    {
-                        // Resume suspended process (was queued via drag-drop)
-                        _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
-                        _outputTabManager.AppendOutput(task.Id,
-                            $"\n[AgenticEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
-                            _activeTasks, _historyTasks);
-                    }
-                    else
-                    {
-                        task.Status = AgentTaskStatus.Running;
-                        task.StartTime = DateTime.Now;
-                        _outputTabManager.AppendOutput(task.Id,
-                            $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
-                            _activeTasks, _historyTasks);
-                        _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-                    }
-
-                    _outputTabManager.UpdateTabHeader(task);
-                    UpdateStatus();
-                }
-                else
-                {
-                    _fileLockManager.ForceStartQueuedTask(task);
-                }
-                return;
-            }
-
-            task.Status = AgentTaskStatus.Completed;
-            task.EndTime = DateTime.Now;
-            TaskExecutionManager.KillProcess(task);
-            _outputTabManager.UpdateTabHeader(task);
-            MoveToHistory(task);
-        }
-
-        private void CopyPrompt_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            if (!string.IsNullOrEmpty(task.Description))
-                Clipboard.SetText(task.Description);
-        }
-
-        private async void RevertTask_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-
-            if (string.IsNullOrEmpty(task.GitStartHash))
-            {
-                DarkDialog.ShowAlert("No git snapshot was captured when this task started.\nRevert is not available.", "Revert Unavailable");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(task.ProjectPath) || !Directory.Exists(task.ProjectPath))
-            {
-                DarkDialog.ShowAlert("The project path for this task no longer exists.", "Revert Unavailable");
-                return;
-            }
-
-            var shortHash = task.GitStartHash.Length > 7 ? task.GitStartHash[..7] : task.GitStartHash;
-            if (!DarkDialog.ShowConfirm(
-                $"This will hard-reset the project to the state before this task ran (commit {shortHash}).\n\n" +
-                "All uncommitted changes and any commits made after that point will be lost.\n\n" +
-                "Are you sure?",
-                "Revert Task Changes"))
-                return;
-
-            try
-            {
-                var result = await TaskLauncher.RunGitCommandAsync(
-                    task.ProjectPath, $"reset --hard {task.GitStartHash}");
-
-                if (result != null)
-                {
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
-                    DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
-                }
-                else
-                {
-                    DarkDialog.ShowAlert("Git reset failed. The commit may no longer exist or the repository state may have changed.", "Revert Failed");
-                }
-            }
-            catch (Exception ex)
-            {
-                DarkDialog.ShowAlert($"Revert failed: {ex.Message}", "Revert Error");
-            }
-        }
-
-        private void Cancel_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            CancelTask(task, el);
-        }
-
-        private void TaskCard_MouseUp(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-
-            if (e.ChangedButton == MouseButton.Middle)
-            {
-                CancelTask(task, el);
-                e.Handled = true;
-            }
-            else if (e.ChangedButton == MouseButton.Left && _outputTabManager.HasTab(task.Id))
-            {
-                OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
-            }
-        }
-
-        private void CancelTask(AgentTask task, FrameworkElement? sender = null)
-        {
-            if (task.IsFinished)
-            {
-                _outputTabManager.UpdateTabHeader(task);
-                if (sender != null)
-                {
-                    _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task removed.\n", _activeTasks, _historyTasks);
-                    AnimateRemoval(sender, () => MoveToHistory(task));
-                }
-                else
-                {
-                    MoveToHistory(task);
-                }
-                return;
-            }
-
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused)
-            {
-                if (!DarkDialog.ShowConfirm(
-                    $"Task #{task.TaskNumber} is still running.\nAre you sure you want to cancel it?",
-                    "Cancel Running Task"))
-                    return;
-            }
-
-            if (task.OvernightRetryTimer != null)
-            {
-                task.OvernightRetryTimer.Stop();
-                task.OvernightRetryTimer = null;
-            }
-            if (task.OvernightIterationTimer != null)
-            {
-                task.OvernightIterationTimer.Stop();
-                task.OvernightIterationTimer = null;
-            }
-            if (task.TokenLimitRetryTimer != null)
-            {
-                task.TokenLimitRetryTimer.Stop();
-                task.TokenLimitRetryTimer = null;
-            }
-            try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
-            task.Status = AgentTaskStatus.Cancelled;
-            task.EndTime = DateTime.Now;
-            TaskExecutionManager.KillProcess(task);
-            task.Cts?.Dispose();
-            task.Cts = null;
-            _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task cancelled.\n", _activeTasks, _historyTasks);
-            _outputTabManager.UpdateTabHeader(task);
-            FinalizeTask(task);
-        }
-
-        private void RemoveHistoryTask_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task removed.\n", _activeTasks, _historyTasks);
-            AnimateRemoval(el, () =>
-            {
-                _outputTabManager.CloseTab(task);
-                _historyTasks.Remove(task);
-                _historyManager.SaveHistory(_historyTasks);
-                RefreshFilterCombos();
-                _outputTabManager.UpdateOutputTabWidths();
-                UpdateStatus();
-            });
-        }
-
-        private void ClearFinished_Click(object sender, RoutedEventArgs e)
-        {
-            var finished = _activeTasks.Where(t => t.IsFinished).ToList();
-            if (finished.Count == 0) return;
-
-            foreach (var task in finished)
-                MoveToHistory(task);
-
-            _outputTabManager.UpdateOutputTabWidths();
-        }
-
-        private void ClearHistory_Click(object sender, RoutedEventArgs e)
-        {
-            if (!DarkDialog.ShowConfirm(
-                $"Are you sure you want to clear all {_historyTasks.Count} history entries? This cannot be undone.",
-                "Clear History")) return;
-
-            foreach (var task in _historyTasks.ToList())
-                _outputTabManager.CloseTab(task);
-            _historyTasks.Clear();
-            _historyManager.SaveHistory(_historyTasks);
-            RefreshFilterCombos();
-            _outputTabManager.UpdateOutputTabWidths();
-            UpdateStatus();
-        }
-
-        private void Resume_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-
-            if (_outputTabManager.HasTab(task.Id))
-            {
-                OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
-                return;
-            }
-
-            _outputTabManager.CreateTab(task);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Resumed session\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Original task: {task.Description}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Status: {task.StatusText}\n", _activeTasks, _historyTasks);
-            if (!string.IsNullOrEmpty(task.ConversationId))
-                _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
-            var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
-            _outputTabManager.AppendOutput(task.Id, $"\n[AgenticEngine] Type a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
-
-            _historyTasks.Remove(task);
-            var topRow = RootGrid.RowDefinitions[0];
-            if (topRow.ActualHeight > 0)
-                topRow.Height = new GridLength(topRow.ActualHeight);
-            _activeTasks.Insert(0, task);
-            RestoreStarRow();
-            UpdateStatus();
-        }
-
-        private void Continue_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            if (!task.HasRecommendations) return;
-
-            if (!_outputTabManager.HasTab(task.Id))
-                _outputTabManager.CreateTab(task);
-
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Continuing with recommended next steps\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
-
-            OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
-
-            if (_historyTasks.Remove(task))
-            {
-                var topRow = RootGrid.RowDefinitions[0];
-                if (topRow.ActualHeight > 0)
-                    topRow.Height = new GridLength(topRow.ActualHeight);
-                _activeTasks.Insert(0, task);
-                RestoreStarRow();
-            }
-            UpdateStatus();
-
-            var prompt = "Continue with the recommended next steps from the previous task. Specifically:\n\n" + task.Recommendations;
-            task.Recommendations = "";
-            task.ContinueReason = "";
-            _taskExecutionManager.SendFollowUp(task, prompt, _activeTasks, _historyTasks);
-        }
-
-        private void RetryTask_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            if (!task.IsRetryable) return;
-
-            var prompt = task.StoredPrompt ?? task.Description;
-            var newTask = TaskLauncher.CreateTask(
-                prompt,
-                task.ProjectPath,
-                task.SkipPermissions,
-                task.RemoteSession,
-                task.Headless,
-                task.IsOvernight,
-                task.IgnoreFileLocks,
-                task.UseMcp,
-                task.SpawnTeam,
-                task.ExtendedPlanning,
-                task.NoGitWrite,
-                task.PlanOnly,
-                task.UseMessageBus,
-                model: task.Model);
-            newTask.ProjectColor = task.ProjectColor;
-            newTask.ProjectDisplayName = task.ProjectDisplayName;
-            newTask.Summary = TaskLauncher.GenerateLocalSummary(prompt);
-
-            AddActiveTask(newTask);
-            _outputTabManager.CreateTab(newTask);
-            _outputTabManager.AppendOutput(newTask.Id,
-                $"[AgenticEngine] Retrying failed task #{task.TaskNumber}\n", _activeTasks, _historyTasks);
-
-            _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
-            UpdateStatus();
         }
 
         // ── Stored Tasks ──────────────────────────────────────────
@@ -2024,14 +1532,11 @@ namespace AgenticEngine
             newTask.ProjectDisplayName = _projectManager.GetProjectDisplayName(newTask.ProjectPath);
             newTask.Summary = $"Executing stored plan: {task.ShortDescription}";
 
-            // Reset per-task toggles (same as Execute_Click)
-            RemoteSessionToggle.IsChecked = false;
-            HeadlessToggle.IsChecked = false;
-            SpawnTeamToggle.IsChecked = false;
-            OvernightToggle.IsChecked = false;
-            ExtendedPlanningToggle.IsChecked = false;
-            PlanOnlyToggle.IsChecked = false;
-            AutoDecomposeToggle.IsChecked = false;
+            // Remove the stored task from the list after extracting its data
+            _storedTasks.Remove(task);
+            _historyManager.SaveStoredTasks(_storedTasks);
+
+            ResetPerTaskToggles();
 
             if (selectedModel == ModelType.Gemini)
             {
@@ -2137,318 +1642,6 @@ namespace AgenticEngine
             RefreshFilterCombos();
         }
 
-        // ── Orchestration ──────────────────────────────────────────
-
-        private void AddActiveTask(AgentTask task)
-        {
-            // Pin Row 0 to pixel height to prevent layout jitter when populating the task list
-            var topRow = RootGrid.RowDefinitions[0];
-            if (topRow.ActualHeight > 0)
-                topRow.Height = new GridLength(topRow.ActualHeight);
-
-            task.TaskNumber = _nextTaskNumber;
-            _nextTaskNumber = _nextTaskNumber >= 9999 ? 1 : _nextTaskNumber + 1;
-
-            // Register with group tracker if this task belongs to a group
-            _taskGroupTracker.RegisterTask(task);
-
-            if (task.IsSubTask)
-            {
-                // Find the parent and insert immediately after it (and its existing children)
-                var parentIndex = -1;
-                for (int i = 0; i < _activeTasks.Count; i++)
-                {
-                    if (_activeTasks[i].Id == task.ParentTaskId)
-                    {
-                        parentIndex = i;
-                        _activeTasks[i].SubTaskCounter++;
-                        task.Runtime.SubTaskIndex = _activeTasks[i].SubTaskCounter;
-                        _activeTasks[i].ChildTaskIds.Add(task.Id);
-                        break;
-                    }
-                }
-
-                if (parentIndex >= 0)
-                {
-                    // Insert after parent and all its existing children
-                    int insertAfter = parentIndex + 1;
-                    while (insertAfter < _activeTasks.Count &&
-                           _activeTasks[insertAfter].ParentTaskId == task.ParentTaskId)
-                        insertAfter++;
-                    _activeTasks.Insert(insertAfter, task);
-                    RefreshActivityDashboard();
-                    RestoreStarRow();
-                    return;
-                }
-            }
-
-            // Insert below all finished tasks so finished stay on top
-            int insertIndex = 0;
-            while (insertIndex < _activeTasks.Count && _activeTasks[insertIndex].IsFinished)
-                insertIndex++;
-            _activeTasks.Insert(insertIndex, task);
-            RefreshActivityDashboard();
-            RestoreStarRow();
-        }
-
-        /// <summary>Restores Row 0 to star sizing after layout settles, preventing resize jitter.</summary>
-        private void RestoreStarRow()
-        {
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
-            {
-                RootGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
-            });
-        }
-
-        private void AnimateRemoval(FrameworkElement sender, Action onComplete)
-        {
-            // Walk up from the button to find the card Border (the DataTemplate root)
-            FrameworkElement? card = sender;
-            while (card != null && card is not ContentPresenter)
-                card = VisualTreeHelper.GetParent(card) as FrameworkElement;
-            if (card is ContentPresenter cp && VisualTreeHelper.GetChildrenCount(cp) > 0)
-                card = VisualTreeHelper.GetChild(cp, 0) as FrameworkElement;
-
-            if (card == null) { onComplete(); return; }
-
-            card.IsHitTestVisible = false;
-
-            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(250))
-            {
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-            };
-
-            var scaleY = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200))
-            {
-                BeginTime = TimeSpan.FromMilliseconds(100),
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-            };
-
-            card.RenderTransformOrigin = new Point(0.5, 0);
-            card.RenderTransform = new ScaleTransform(1, 1);
-
-            scaleY.Completed += (_, _) => onComplete();
-
-            card.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-            ((ScaleTransform)card.RenderTransform).BeginAnimation(ScaleTransform.ScaleYProperty, scaleY);
-        }
-
-        /// <summary>
-        /// Consolidates all task teardown: releases locks, removes queued/streaming state,
-        /// moves from active list to history, closes the output tab, and resumes any
-        /// queued or dependency-blocked tasks. Every code path that finishes a task
-        /// should funnel through here.
-        /// </summary>
-        private void FinalizeTask(AgentTask task, bool closeTab = true)
-        {
-            // If this was a plan-only task that completed successfully, create a stored task
-            if (task.PlanOnly && task.Status == AgentTaskStatus.Completed)
-                CreateStoredTaskFromPlan(task);
-
-            // Release all resources associated with this task
-            _fileLockManager.ReleaseTaskLocks(task.Id);
-            _fileLockManager.RemoveQueuedInfo(task.Id);
-            _taskExecutionManager.RemoveStreamingState(task.Id);
-
-            // Move from active to history
-            _activeTasks.Remove(task);
-            _historyTasks.Insert(0, task);
-
-            if (closeTab)
-                _outputTabManager.CloseTab(task);
-
-            _historyManager.SaveHistory(_historyTasks);
-            RefreshActivityDashboard();
-            RefreshFilterCombos();
-            RefreshInlineProjectStats();
-            UpdateStatus();
-
-            // Resume tasks that were waiting on file locks or dependencies
-            _fileLockManager.CheckQueuedTasks(_activeTasks);
-            _taskOrchestrator.OnTaskCompleted(task.Id);
-
-            // Notify group tracker
-            _taskGroupTracker.OnTaskCompleted(task);
-
-            // Launch init-queued tasks now that a slot may be free
-            DrainInitQueue();
-        }
-
-        // Keep MoveToHistory as a thin alias for callers that pass it as a delegate
-        private void MoveToHistory(AgentTask task) => FinalizeTask(task);
-
-        /// <summary>
-        /// Counts tasks that have an active Claude session (Running or Paused — not Queued/InitQueued/finished).
-        /// </summary>
-        private int CountActiveSessionTasks()
-        {
-            return _activeTasks.Count(t => t.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused);
-        }
-
-        /// <summary>
-        /// Launches InitQueued tasks when slots become available under MaxConcurrentTasks.
-        /// </summary>
-        private void DrainInitQueue()
-        {
-            var max = _settingsManager.MaxConcurrentTasks;
-            var toStart = new List<AgentTask>();
-
-            foreach (var task in _activeTasks)
-            {
-                if (task.Status != AgentTaskStatus.InitQueued) continue;
-                if (CountActiveSessionTasks() > max) break;
-
-                toStart.Add(task);
-            }
-
-            foreach (var task in toStart)
-            {
-                task.Status = AgentTaskStatus.Running;
-                task.QueuedReason = null;
-                task.StartTime = DateTime.Now;
-
-                _outputTabManager.AppendOutput(task.Id,
-                    $"[AgenticEngine] Slot available — starting task #{task.TaskNumber}...\n\n",
-                    _activeTasks, _historyTasks);
-                _outputTabManager.UpdateTabHeader(task);
-                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-            }
-
-            if (toStart.Count > 0) UpdateStatus();
-        }
-
-        /// <summary>
-        /// Called by the TaskOrchestrator when a task's dependencies are all resolved
-        /// and it is ready to run.
-        /// </summary>
-        private void OnOrchestratorTaskReady(AgentTask task)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                // Gather context from completed dependencies before clearing them
-                var depSnapshot = task.DependencyTaskIds;
-                if (depSnapshot.Count > 0)
-                {
-                    task.DependencyContext = TaskLauncher.BuildDependencyContext(
-                        depSnapshot, _activeTasks, _historyTasks);
-                }
-
-                task.QueuedReason = null;
-                task.BlockedByTaskId = null;
-                task.BlockedByTaskNumber = null;
-                task.ClearDependencyTaskIds();
-                task.DependencyTaskNumbers.Clear();
-
-                if (task.Process is { HasExited: false })
-                {
-                    // Task was suspended via drag-drop — resume its process
-                    _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] All dependencies resolved — resuming task #{task.TaskNumber}.\n\n",
-                        _activeTasks, _historyTasks);
-                }
-                else
-                {
-                    // No running process — start fresh
-                    task.Status = AgentTaskStatus.Running;
-                    task.StartTime = DateTime.Now;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] All dependencies resolved — starting task #{task.TaskNumber}...\n\n",
-                        _activeTasks, _historyTasks);
-                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-                }
-
-                _outputTabManager.UpdateTabHeader(task);
-                UpdateStatus();
-            });
-        }
-
-        private void OnQueuedTaskResumed(string taskId)
-        {
-            var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
-            if (task == null) return;
-            _outputTabManager.AppendOutput(taskId, $"\n[AgenticEngine] Resuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
-            _outputTabManager.UpdateTabHeader(task);
-            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-            UpdateStatus();
-        }
-
-        private void OnTaskProcessCompleted(string taskId)
-        {
-            // Move finished task to top of active list
-            var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
-            if (task is { IsFinished: true })
-            {
-                var idx = _activeTasks.IndexOf(task);
-                if (idx > 0)
-                    _activeTasks.Move(idx, 0);
-            }
-
-            _taskOrchestrator.OnTaskCompleted(taskId);
-        }
-
-        private void OnTaskGroupCompleted(object? sender, GroupCompletedEventArgs e)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                var state = e.GroupState;
-                var statusWord = state.FailedCount > 0 ? "with failures" : "successfully";
-                DarkDialog.ShowAlert(
-                    $"Task group \"{state.GroupName}\" completed {statusWord}.\n" +
-                    $"{state.CompletedCount} completed, {state.FailedCount} failed out of {state.TotalCount} tasks.",
-                    "Group Completed");
-                GroupSummaryDialog.Show(state);
-            });
-        }
-
-        private void OnSubTaskSpawned(AgentTask parent, AgentTask child)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                AddActiveTask(child);
-                _outputTabManager.CreateTab(child);
-
-                _outputTabManager.AppendOutput(parent.Id,
-                    $"\n[AgenticEngine] Spawned subtask #{child.TaskNumber}: {child.Description}\n",
-                    _activeTasks, _historyTasks);
-
-                _outputTabManager.AppendOutput(child.Id,
-                    $"[AgenticEngine] Subtask of #{parent.TaskNumber}: {parent.Description}\n",
-                    _activeTasks, _historyTasks);
-
-                _outputTabManager.UpdateTabHeader(child);
-
-                // If the child isn't queued, start it immediately
-                if (child.Status != AgentTaskStatus.Queued)
-                {
-                    _ = _taskExecutionManager.StartProcess(child, _activeTasks, _historyTasks, MoveToHistory);
-                }
-
-                RefreshFilterCombos();
-                UpdateStatus();
-            });
-        }
-
-        private void OnMcpInvestigationRequested(AgentTask task)
-        {
-            AddActiveTask(task);
-            _outputTabManager.CreateTab(task);
-            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-            RefreshFilterCombos();
-            UpdateStatus();
-        }
-
-        private void OnProjectRenamed(string projectPath, string newName)
-        {
-            foreach (var task in _activeTasks.Concat(_historyTasks).Concat(_storedTasks)
-                         .Where(t => t.ProjectPath == projectPath))
-            {
-                task.ProjectDisplayName = newName;
-            }
-            _historyManager.SaveHistory(_historyTasks);
-            _historyManager.SaveStoredTasks(_storedTasks);
-        }
-
         // ── Scroll Fix ────────────────────────────────────────────
 
         private void TaskList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -2484,6 +1677,12 @@ namespace AgenticEngine
         {
             if (HistoryTasksList.SelectedItem is AgentTask task && _outputTabManager.HasTab(task.Id))
                 OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
+        }
+
+        private void ActiveTaskList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (ActiveTasksList.SelectedItem is AgentTask task)
+                NodeGraphPanel.FocusOnTask(task.Id);
         }
 
         // ── Named handlers for anonymous lambdas (needed for cleanup) ──
@@ -2557,6 +1756,14 @@ namespace AgenticEngine
                 }
             }
 
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
             // ── 1. Unsubscribe all event handlers to prevent leaks ──
             UnsubscribeAllEvents();
 
@@ -2567,7 +1774,7 @@ namespace AgenticEngine
             // ── 3. Cancel in-flight async work ──
             _chatManager.CancelAndDispose();
 
-            _helperManager?.CancelGeneration();
+            _helperManager?.Dispose();
 
             // ── 4. Persist state (queues background writes via SafeFileWriter) ──
             _projectManager.SaveProjects();
@@ -2590,8 +1797,7 @@ namespace AgenticEngine
             _fileLockManager.ClearAll();
             _taskExecutionManager.StreamingToolState.Clear();
 
-            StopActiveGame();
-            _terminalManager?.DisposeAll();
+            _terminalManager?.Dispose();
         }
 
         // ── Splitter drag (Thumb-based, avoids GridSplitter star-sizing jitter) ──
@@ -2622,6 +1828,15 @@ namespace AgenticEngine
         {
             // Restore star sizing so Row 0 flexes with window resizes
             RootGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+        }
+
+        // ── Right splitter drag (Thumb-based, avoids GridSplitter targeting collapsed Col 4) ──
+
+        private void RightSplitter_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+        {
+            double newWidth = RightPanelCol.Width.Value - e.HorizontalChange;
+            if (newWidth < RightPanelCol.MinWidth) newWidth = RightPanelCol.MinWidth;
+            RightPanelCol.Width = new GridLength(newWidth);
         }
 
         // ── Chat splitter drag (Thumb-based, avoids GridSplitter star-sizing inversion) ──
@@ -2904,109 +2119,112 @@ namespace AgenticEngine
 
         private void HistorySearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyHistoryFilters();
 
-        // ── Games ──────────────────────────────────────────────────
-
-        private void InitializeGames()
-        {
-            _availableGames.Add(new ReactionTestGame());
-            _availableGames.Add(new QuickMathGame());
-            _availableGames.Add(new BirdHunterGame());
-            RebuildGameSelector();
-        }
-
-        private void RebuildGameSelector()
-        {
-            GameIconsPanel.Children.Clear();
-            foreach (var game in _availableGames)
-            {
-                var btn = new Button
-                {
-                    Width = 90, Height = 90,
-                    Margin = new Thickness(6),
-                    Cursor = Cursors.Hand,
-                    Background = (Brush)FindResource("BgElevated"),
-                    BorderThickness = new Thickness(0),
-                    ToolTip = game.GameDescription
-                };
-                var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-                stack.Children.Add(new TextBlock
-                {
-                    Text = game.GameIcon,
-                    Foreground = (Brush)FindResource("Accent"),
-                    FontSize = 28,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Margin = new Thickness(0, 0, 0, 6)
-                });
-                stack.Children.Add(new TextBlock
-                {
-                    Text = game.GameName,
-                    Foreground = (Brush)FindResource("TextLight"),
-                    FontSize = 11,
-                    FontFamily = new FontFamily("Segoe UI"),
-                    HorizontalAlignment = HorizontalAlignment.Center
-                });
-
-                var template = new ControlTemplate(typeof(Button));
-                var borderFactory = new FrameworkElementFactory(typeof(Border));
-                borderFactory.Name = "Bd";
-                borderFactory.SetValue(Border.BackgroundProperty, (Brush)FindResource("BgElevated"));
-                borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
-                borderFactory.SetValue(Border.PaddingProperty, new Thickness(8));
-                var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
-                contentFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-                contentFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-                borderFactory.AppendChild(contentFactory);
-                template.VisualTree = borderFactory;
-
-                var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-                hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty,
-                    (Brush)FindResource("BorderMedium"), "Bd"));
-                template.Triggers.Add(hoverTrigger);
-
-                btn.Template = template;
-                btn.Content = stack;
-
-                var capturedGame = game;
-                btn.Click += (_, _) => LaunchGame(capturedGame);
-                GameIconsPanel.Children.Add(btn);
-            }
-        }
-
-        private void LaunchGame(IMinigame game)
-        {
-            if (_activeGame != null)
-            {
-                _activeGame.QuitRequested -= OnGameQuitRequested;
-                _activeGame.Stop();
-            }
-            _activeGame = game;
-            game.QuitRequested += OnGameQuitRequested;
-            GameSelectorPanel.Visibility = Visibility.Collapsed;
-            GameHost.Content = game.View;
-            GameHost.Visibility = Visibility.Visible;
-            game.Start();
-        }
-
-        private void OnGameQuitRequested() => StopActiveGame();
-
-        private void StopActiveGame()
-        {
-            if (_activeGame == null) return;
-            _activeGame.QuitRequested -= OnGameQuitRequested;
-            _activeGame.Stop();
-            GameHost.Content = null;
-            GameHost.Visibility = Visibility.Collapsed;
-            GameSelectorPanel.Visibility = Visibility.Visible;
-            _activeGame = null;
-        }
-
         private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (e.Source != MainTabs) return;
-            if (MainTabs.SelectedItem != GamesTabItem)
-                StopActiveGame();
             if (MainTabs.SelectedItem == ActivityTabItem)
                 _activityDashboard.RefreshIfNeeded(ActivityTabContent);
+        }
+
+        private void SetupMainTabsOverflow()
+        {
+            MainTabs.ApplyTemplate();
+            var btn = MainTabs.Template.FindName("PART_OverflowButton", MainTabs) as Button;
+            if (btn != null)
+                btn.Click += MainTabsOverflow_Click;
+        }
+
+        private void MainTabsOverflow_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            var popup = new System.Windows.Controls.Primitives.Popup
+            {
+                PlacementTarget = btn,
+                Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+                StaysOpen = false,
+                AllowsTransparency = true
+            };
+
+            var border = new Border
+            {
+                Background = (Brush)FindResource("BgPopup"),
+                BorderBrush = (Brush)FindResource("BorderMedium"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(4),
+                MinWidth = 130,
+                MaxHeight = 350
+            };
+
+            var stack = new StackPanel();
+
+            foreach (var item in MainTabs.Items)
+            {
+                if (item is TabItem tab && tab.Visibility == Visibility.Visible)
+                {
+                    string text = GetTabHeaderText(tab);
+                    bool isSelected = tab == MainTabs.SelectedItem;
+
+                    var itemBorder = new Border
+                    {
+                        Background = isSelected
+                            ? (Brush)FindResource("BgHover")
+                            : Brushes.Transparent,
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(10, 6, 10, 6),
+                        Margin = new Thickness(0, 1, 0, 1),
+                        Cursor = Cursors.Hand
+                    };
+
+                    var textBlock = new TextBlock
+                    {
+                        Text = text,
+                        Foreground = isSelected
+                            ? (Brush)FindResource("Accent")
+                            : (Brush)FindResource("TextBody"),
+                        FontFamily = new FontFamily("Segoe UI"),
+                        FontSize = 12,
+                        FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal
+                    };
+
+                    itemBorder.Child = textBlock;
+
+                    var capturedTab = tab;
+                    itemBorder.MouseEnter += (_, _) =>
+                    {
+                        if (capturedTab != MainTabs.SelectedItem)
+                            itemBorder.Background = (Brush)FindResource("BgElevated");
+                    };
+                    itemBorder.MouseLeave += (_, _) =>
+                    {
+                        if (capturedTab != MainTabs.SelectedItem)
+                            itemBorder.Background = Brushes.Transparent;
+                    };
+                    itemBorder.MouseLeftButtonDown += (_, _) =>
+                    {
+                        MainTabs.SelectedItem = capturedTab;
+                        popup.IsOpen = false;
+                    };
+
+                    stack.Children.Add(itemBorder);
+                }
+            }
+
+            border.Child = stack;
+            popup.Child = border;
+            popup.IsOpen = true;
+        }
+
+        private static string GetTabHeaderText(TabItem tab)
+        {
+            if (tab.Header is TextBlock tb) return tb.Text;
+            if (tab.Header is StackPanel sp)
+            {
+                foreach (var child in sp.Children)
+                    if (child is TextBlock t) return t.Text;
+            }
+            if (tab.Header is string s) return s;
+            return "Tab";
         }
 
         private void RefreshActivityDashboard()
@@ -3150,14 +2368,7 @@ namespace AgenticEngine
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
             task.Summary = suggestion.Title;
 
-            // Reset per-task toggles (same as Execute_Click)
-            RemoteSessionToggle.IsChecked = false;
-            HeadlessToggle.IsChecked = false;
-            SpawnTeamToggle.IsChecked = false;
-            OvernightToggle.IsChecked = false;
-            ExtendedPlanningToggle.IsChecked = false;
-            PlanOnlyToggle.IsChecked = false;
-            AutoDecomposeToggle.IsChecked = false;
+            ResetPerTaskToggles();
 
             if (selectedModel == ModelType.Gemini)
             {
@@ -3229,7 +2440,6 @@ namespace AgenticEngine
             };
             _savedPrompts.Insert(0, entry);
             PersistSavedPrompts();
-            RenderSavedPrompts();
             _helperManager.RemoveSuggestion(suggestion);
         }
 
@@ -3306,387 +2516,24 @@ namespace AgenticEngine
             });
         }
 
-        // ── Saved Prompts ─────────────────────────────────────────
-
-        private string SavedPromptsFile => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AgenticEngine", "saved_prompts.json");
-
-        private async System.Threading.Tasks.Task LoadSavedPromptsAsync()
-        {
-            try
-            {
-                if (File.Exists(SavedPromptsFile))
-                {
-                    var json = await System.Threading.Tasks.Task.Run(() => File.ReadAllText(SavedPromptsFile));
-                    var entries = System.Text.Json.JsonSerializer.Deserialize<List<SavedPromptEntry>>(json);
-                    if (entries != null)
-                    {
-                        _savedPrompts.Clear();
-                        _savedPrompts.AddRange(entries);
-                    }
-                }
-            }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to load saved prompts", ex); }
-            RenderSavedPrompts();
-        }
-
-        private void PersistSavedPrompts()
-        {
-            try
-            {
-                var json = System.Text.Json.JsonSerializer.Serialize(_savedPrompts,
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                Managers.SafeFileWriter.WriteInBackground(SavedPromptsFile, json, "MainWindow");
-            }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to persist saved prompts", ex); }
-        }
-
-        private void SavePromptEntry_Click(object sender, RoutedEventArgs e)
-        {
-            var text = TaskInput.Text?.Trim();
-            if (string.IsNullOrEmpty(text)) return;
-
-            var modelTag = "ClaudeCode";
-            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem)
-                modelTag = modelItem.Tag?.ToString() ?? "ClaudeCode";
-
-            var entry = new SavedPromptEntry
-            {
-                PromptText = text,
-                DisplayName = text.Length > 40 ? text.Substring(0, 40) + "..." : text,
-                Model = modelTag,
-                RemoteSession = RemoteSessionToggle.IsChecked == true,
-                Headless = HeadlessToggle.IsChecked == true,
-                SpawnTeam = SpawnTeamToggle.IsChecked == true,
-                IsOvernight = OvernightToggle.IsChecked == true,
-                ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true,
-                PlanOnly = PlanOnlyToggle.IsChecked == true,
-                IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true,
-                UseMcp = UseMcpToggle.IsChecked == true,
-                NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true,
-                UseMessageBus = MessageBusToggle.IsChecked == true,
-                AutoDecompose = AutoDecomposeToggle.IsChecked == true,
-                AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
-            };
-
-            _savedPrompts.Insert(0, entry);
-            PersistSavedPrompts();
-            RenderSavedPrompts();
-            TaskInput.Text = string.Empty;
-            AdditionalInstructionsInput.Clear();
-
-            // Reset per-task toggles
-            RemoteSessionToggle.IsChecked = false;
-            HeadlessToggle.IsChecked = false;
-            SpawnTeamToggle.IsChecked = false;
-            OvernightToggle.IsChecked = false;
-            ExtendedPlanningToggle.IsChecked = false;
-            PlanOnlyToggle.IsChecked = false;
-            MessageBusToggle.IsChecked = false;
-            AutoDecomposeToggle.IsChecked = false;
-        }
-
-        private void RenderSavedPrompts()
-        {
-            SavedPromptsPanel.Children.Clear();
-            foreach (var entry in _savedPrompts)
-            {
-                var card = new Border
-                {
-                    Background = (Brush)FindResource("BgPopup"),
-                    CornerRadius = new CornerRadius(4),
-                    Padding = new Thickness(6, 5, 6, 5),
-                    Margin = new Thickness(0, 0, 0, 4),
-                    Cursor = Cursors.Hand,
-                    Tag = entry.Id,
-                };
-
-                card.MouseEnter += (s, _) => card.Background = (Brush)FindResource("BgCardHover");
-                card.MouseLeave += (s, _) => card.Background = (Brush)FindResource("BgPopup");
-
-                var grid = new Grid();
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                var textBlock = new TextBlock
-                {
-                    Text = entry.DisplayName,
-                    Foreground = (Brush)FindResource("TextLight"),
-                    FontSize = 11,
-                    FontFamily = new FontFamily("Segoe UI"),
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    ToolTip = WrapTooltipText(entry.PromptText, 80),
-                };
-                Grid.SetColumn(textBlock, 0);
-
-                var deleteBtn = new Button
-                {
-                    Content = "X",
-                    FontSize = 9,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = (Brush)FindResource("TextSubdued"),
-                    Background = Brushes.Transparent,
-                    BorderThickness = new Thickness(0),
-                    Cursor = Cursors.Hand,
-                    Padding = new Thickness(4, 1, 4, 1),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Tag = entry.Id,
-                };
-                deleteBtn.MouseEnter += (s, _) => deleteBtn.Foreground = (Brush)FindResource("DangerDeleteHover");
-                deleteBtn.MouseLeave += (s, _) => deleteBtn.Foreground = (Brush)FindResource("TextSubdued");
-                deleteBtn.Click += DeleteSavedPrompt_Click;
-                Grid.SetColumn(deleteBtn, 1);
-
-                grid.Children.Add(textBlock);
-                grid.Children.Add(deleteBtn);
-                card.Child = grid;
-
-                card.MouseLeftButtonDown += LoadSavedPrompt_Click;
-                card.MouseDown += (s, ev) =>
-                {
-                    if (ev.ChangedButton == MouseButton.Middle)
-                    {
-                        var promptId = card.Tag as string;
-                        _savedPrompts.RemoveAll(p => p.Id == promptId);
-                        PersistSavedPrompts();
-                        RenderSavedPrompts();
-                        ev.Handled = true;
-                    }
-                };
-
-                var contextMenu = new ContextMenu();
-                var entryId = entry.Id;
-                var runItem = new MenuItem { Header = "Run" };
-                runItem.Click += (s, _) =>
-                {
-                    var prompt = _savedPrompts.FirstOrDefault(p => p.Id == entryId);
-                    if (prompt == null) return;
-                    LoadSavedPromptIntoUi(prompt);
-                    _savedPrompts.RemoveAll(p => p.Id == entryId);
-                    PersistSavedPrompts();
-                    RenderSavedPrompts();
-                    Execute_Click(this, new RoutedEventArgs());
-                };
-                contextMenu.Items.Add(runItem);
-                var copyItem = new MenuItem { Header = "Copy Prompt" };
-                var promptText = entry.PromptText;
-                copyItem.Click += (s, _) => Clipboard.SetText(promptText);
-                contextMenu.Items.Add(copyItem);
-                card.ContextMenu = contextMenu;
-
-                SavedPromptsPanel.Children.Add(card);
-            }
-        }
-
-        private void LoadSavedPrompt_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (sender is not Border card || card.Tag is not string id) return;
-            var entry = _savedPrompts.FirstOrDefault(p => p.Id == id);
-            if (entry == null) return;
-            LoadSavedPromptIntoUi(entry);
-        }
-
-        private void LoadSavedPromptIntoUi(SavedPromptEntry entry)
-        {
-            TaskInput.Text = entry.PromptText;
-
-            // Restore model selection
-            for (int i = 0; i < ModelCombo.Items.Count; i++)
-            {
-                if (ModelCombo.Items[i] is ComboBoxItem item && item.Tag?.ToString() == entry.Model)
-                {
-                    ModelCombo.SelectedIndex = i;
-                    break;
-                }
-            }
-
-            // Restore toggles
-            RemoteSessionToggle.IsChecked = entry.RemoteSession;
-            HeadlessToggle.IsChecked = entry.Headless;
-            SpawnTeamToggle.IsChecked = entry.SpawnTeam;
-            OvernightToggle.IsChecked = entry.IsOvernight;
-            ExtendedPlanningToggle.IsChecked = entry.ExtendedPlanning;
-            PlanOnlyToggle.IsChecked = entry.PlanOnly;
-            IgnoreFileLocksToggle.IsChecked = entry.IgnoreFileLocks;
-            UseMcpToggle.IsChecked = entry.UseMcp;
-            DefaultNoGitWriteToggle.IsChecked = entry.NoGitWrite;
-            MessageBusToggle.IsChecked = entry.UseMessageBus;
-            AutoDecomposeToggle.IsChecked = entry.AutoDecompose;
-            AdditionalInstructionsInput.Text = entry.AdditionalInstructions ?? "";
-        }
-
-        private void DeleteSavedPrompt_Click(object sender, RoutedEventArgs e)
-        {
-            e.Handled = true;
-            if (sender is not Button btn || btn.Tag is not string id) return;
-            _savedPrompts.RemoveAll(p => p.Id == id);
-            PersistSavedPrompts();
-            RenderSavedPrompts();
-        }
-
-        // ── Task Templates ────────────────────────────────────────
-
-        private void SaveAsTemplate_Click(object sender, RoutedEventArgs e)
-        {
-            var name = Dialogs.DarkDialog.ShowTextInput("Save as Template", "Template name:");
-            if (string.IsNullOrEmpty(name)) return;
-
-            var modelTag = "ClaudeCode";
-            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem)
-                modelTag = modelItem.Tag?.ToString() ?? "ClaudeCode";
-
-            var template = new TaskTemplate
-            {
-                Name = name,
-                Description = name,
-                AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
-                RemoteSession = RemoteSessionToggle.IsChecked == true,
-                Headless = HeadlessToggle.IsChecked == true,
-                SpawnTeam = SpawnTeamToggle.IsChecked == true,
-                IsOvernight = OvernightToggle.IsChecked == true,
-                ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true,
-                PlanOnly = PlanOnlyToggle.IsChecked == true,
-                IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true,
-                UseMcp = UseMcpToggle.IsChecked == true,
-                NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true,
-                UseMessageBus = MessageBusToggle.IsChecked == true,
-                AutoDecompose = AutoDecomposeToggle.IsChecked == true,
-                Model = modelTag,
-            };
-
-            _settingsManager.TaskTemplates.Insert(0, template);
-            _settingsManager.SaveTemplates();
-            RenderTemplateCombo();
-        }
-
-        private void RenderTemplateCombo()
-        {
-            TemplateCombo.SelectionChanged -= TemplateCombo_Changed;
-            TemplateCombo.Items.Clear();
-            TemplateCombo.Items.Add(new ComboBoxItem { Content = "(No Template)", Tag = "" });
-
-            foreach (var t in _settingsManager.TaskTemplates)
-            {
-                var item = new ComboBoxItem { Content = t.Name, Tag = t.Id };
-                item.ToolTip = BuildTemplateTooltip(t);
-                TemplateCombo.Items.Add(item);
-            }
-
-            // Add a "Manage..." option at the end
-            TemplateCombo.Items.Add(new ComboBoxItem
-            {
-                Content = "Delete templates...",
-                Tag = "__manage__",
-                Foreground = (Brush)FindResource("TextMuted"),
-                FontStyle = FontStyles.Italic
-            });
-
-            TemplateCombo.SelectedIndex = 0;
-            TemplateCombo.SelectionChanged += TemplateCombo_Changed;
-        }
-
-        private static string BuildTemplateTooltip(TaskTemplate t)
-        {
-            var flags = new List<string>();
-            if (t.RemoteSession) flags.Add("Remote");
-            if (t.Headless) flags.Add("Headless");
-            if (t.SpawnTeam) flags.Add("Team");
-            if (t.IsOvernight) flags.Add("Overnight");
-            if (t.ExtendedPlanning) flags.Add("ExtPlanning");
-            if (t.PlanOnly) flags.Add("PlanOnly");
-            if (t.UseMessageBus) flags.Add("MsgBus");
-            if (t.AutoDecompose) flags.Add("AutoDecompose");
-            if (t.NoGitWrite) flags.Add("NoGitWrite");
-            if (t.IgnoreFileLocks) flags.Add("IgnoreLocks");
-            if (t.UseMcp) flags.Add("MCP");
-            var tooltip = flags.Count > 0 ? string.Join(", ", flags) : "(default settings)";
-            if (!string.IsNullOrWhiteSpace(t.AdditionalInstructions))
-                tooltip += "\n\nInstructions: " + (t.AdditionalInstructions.Length > 80
-                    ? t.AdditionalInstructions[..80] + "..."
-                    : t.AdditionalInstructions);
-            return tooltip;
-        }
-
-        private void TemplateCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (TemplateCombo.SelectedItem is not ComboBoxItem selected) return;
-            var tag = selected.Tag?.ToString();
-
-            if (tag == "__manage__")
-            {
-                // Show template management
-                TemplateCombo.SelectionChanged -= TemplateCombo_Changed;
-                TemplateCombo.SelectedIndex = 0;
-                TemplateCombo.SelectionChanged += TemplateCombo_Changed;
-                ShowTemplateManagement();
-                return;
-            }
-
-            if (string.IsNullOrEmpty(tag)) return;
-
-            var template = _settingsManager.TaskTemplates.Find(t => t.Id == tag);
-            if (template == null) return;
-
-            // Apply template values to toggles
-            RemoteSessionToggle.IsChecked = template.RemoteSession;
-            HeadlessToggle.IsChecked = template.Headless;
-            SpawnTeamToggle.IsChecked = template.SpawnTeam;
-            OvernightToggle.IsChecked = template.IsOvernight;
-            ExtendedPlanningToggle.IsChecked = template.ExtendedPlanning;
-            PlanOnlyToggle.IsChecked = template.PlanOnly;
-            IgnoreFileLocksToggle.IsChecked = template.IgnoreFileLocks;
-            UseMcpToggle.IsChecked = template.UseMcp;
-            DefaultNoGitWriteToggle.IsChecked = template.NoGitWrite;
-            MessageBusToggle.IsChecked = template.UseMessageBus;
-            AutoDecomposeToggle.IsChecked = template.AutoDecompose;
-
-            // Apply additional instructions
-            AdditionalInstructionsInput.Text = template.AdditionalInstructions ?? "";
-
-            // Apply model selection
-            for (int i = 0; i < ModelCombo.Items.Count; i++)
-            {
-                if (ModelCombo.Items[i] is ComboBoxItem item && item.Tag?.ToString() == template.Model)
-                {
-                    ModelCombo.SelectedIndex = i;
-                    break;
-                }
-            }
-
-            UpdateExecuteButtonText();
-        }
-
-        private void ShowTemplateManagement()
-        {
-            if (_settingsManager.TaskTemplates.Count == 0)
-            {
-                Dialogs.DarkDialog.ShowAlert("No templates saved yet.", "Task Templates");
-                return;
-            }
-
-            var names = _settingsManager.TaskTemplates
-                .Select((t, i) => $"{i + 1}. {t.Name}")
-                .ToList();
-
-            var input = Dialogs.DarkDialog.ShowTextInput(
-                "Delete Template",
-                "Enter the number of the template to delete:\n\n" + string.Join("\n", names));
-
-            if (input != null && int.TryParse(input, out var idx) && idx >= 1 && idx <= _settingsManager.TaskTemplates.Count)
-            {
-                _settingsManager.TaskTemplates.RemoveAt(idx - 1);
-                _settingsManager.SaveTemplates();
-                RenderTemplateCombo();
-            }
-        }
-
         // ── Chat Panel (delegated to ChatManager) ─────────────────
 
         private void NewChat_Click(object sender, RoutedEventArgs e) => _chatManager.HandleNewChat();
         private void ChatSend_Click(object sender, RoutedEventArgs e) => _chatManager.HandleSendClick();
-        private void ChatInput_PreviewKeyDown(object sender, KeyEventArgs e) => _chatManager.HandleInputKeyDown(e);
+        private void ChatInput_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                if (_chatManager.HandlePaste())
+                {
+                    e.Handled = true;
+                    return;
+                }
+            }
+            _chatManager.HandleInputKeyDown(e);
+        }
+        private void ChatInput_DragOver(object sender, DragEventArgs e) => _chatManager.HandleDragOver(e);
+        private void ChatInput_Drop(object sender, DragEventArgs e) => _chatManager.HandleDrop(e);
         private void ChatModelCombo_Changed(object sender, SelectionChangedEventArgs e) => _chatManager.HandleModelComboChanged();
 
         // ── Status ─────────────────────────────────────────────────

@@ -10,50 +10,15 @@ namespace AgenticEngine.Dialogs
     {
         public static void Show(AgentTask task)
         {
-            Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("StoredTaskViewer", $"MainWindow not available: {ex.Message}"); }
-
-            var dlg = new Window
-            {
-                Title = "Stored Task Context",
-                Width = 850,
-                Height = 560,
-                WindowStartupLocation = owner != null
-                    ? WindowStartupLocation.CenterOwner
-                    : WindowStartupLocation.CenterScreen,
-                ResizeMode = ResizeMode.CanResize,
-                Background = Brushes.Transparent,
-                WindowStyle = WindowStyle.None,
-                AllowsTransparency = true,
-                Topmost = false,
-                ShowInTaskbar = true
-            };
-
-            var outerBorder = new Border
-            {
-                Background = (Brush)Application.Current.FindResource("BgDeep"),
-                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12)
-            };
-            outerBorder.MouseLeftButtonDown += (_, me) => { if (me.ClickCount == 1) dlg.DragMove(); };
+            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow("Stored Task Context", 850, 560,
+                ResizeMode.CanResize, topmost: false, backgroundResource: "BgDeep");
 
             var root = new DockPanel();
 
             // Title bar
-            var titleBar = new DockPanel { Margin = new Thickness(18, 14, 18, 0) };
-
-            var titleBlock = new TextBlock
-            {
-                Text = task.ShortDescription,
-                Foreground = (Brush)Application.Current.FindResource("AccentTeal"),
-                FontSize = 15,
-                FontWeight = FontWeights.Bold,
-                FontFamily = new FontFamily("Segoe UI"),
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 600
-            };
+            var (titleBar, titleBlock) = DialogFactory.CreateTitleBar(dlg, task.ShortDescription, "AccentTeal");
+            titleBlock.TextTrimming = TextTrimming.CharacterEllipsis;
+            titleBlock.MaxWidth = 600;
 
             var projectBlock = new TextBlock
             {
@@ -64,26 +29,6 @@ namespace AgenticEngine.Dialogs
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 0, 0)
             };
-
-            var closeBtn = new Button
-            {
-                Content = "\u2715",
-                Background = Brushes.Transparent,
-                Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
-                FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 14,
-                Padding = new Thickness(6, 2, 6, 2),
-                BorderThickness = new Thickness(0),
-                Cursor = Cursors.Hand,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            closeBtn.Click += (_, _) => dlg.Close();
-            closeBtn.MouseEnter += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextPrimary");
-            closeBtn.MouseLeave += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextSubdued");
-
-            DockPanel.SetDock(closeBtn, Dock.Right);
-            titleBar.Children.Add(closeBtn);
-            titleBar.Children.Add(titleBlock);
             titleBar.Children.Add(projectBlock);
 
             DockPanel.SetDock(titleBar, Dock.Top);
@@ -190,14 +135,6 @@ namespace AgenticEngine.Dialogs
             LoadContent();
 
             outerBorder.Child = root;
-            dlg.Content = outerBorder;
-            if (owner != null) dlg.Owner = owner;
-
-            dlg.KeyDown += (_, ke) =>
-            {
-                if (ke.Key == Key.Escape) dlg.Close();
-            };
-
             dlg.ShowDialog();
         }
     }

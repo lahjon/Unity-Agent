@@ -5,3 +5,7 @@ publish/
 *.suo
 .vs/
 logs/
+*.tmp
+*.tmp.*
+*~
+*.bak

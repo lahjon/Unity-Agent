@@ -65,6 +65,57 @@
         </Setter>
     </Style>
 
+    <!-- Settings Tab Control (overflow dropdown on the left) -->
+    <Style x:Key="SettingsTabControlStyle" TargetType="TabControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <DockPanel>
+                        <Grid DockPanel.Dock="Top">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="PART_OverflowButton" Grid.Column="0"
+                                    Width="22" Height="22"
+                                    Margin="0,0,2,0"
+                                    Cursor="Hand"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Show all tabs">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="OverflowBd" Background="Transparent" CornerRadius="4">
+                                            <TextBlock Text="&#x25BE;" Foreground="{StaticResource TextSecondary}" FontSize="14"
+                                                       FontFamily="Segoe UI"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="OverflowBd" Property="Background" Value="{StaticResource BorderMedium}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <ScrollViewer Grid.Column="1"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          CanContentScroll="False"
+                                          Padding="0" Margin="0">
+                                <TabPanel IsItemsHost="True"/>
+                            </ScrollViewer>
+                        </Grid>
+                        <Border Background="Transparent">
+                            <ContentPresenter ContentSource="SelectedContent"/>
+                        </Border>
+                    </DockPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Output Tab Control (horizontal scroll, Chrome-style) -->
     <Style x:Key="OutputTabControlStyle" TargetType="TabControl">
         <Setter Property="Background" Value="Transparent"/>

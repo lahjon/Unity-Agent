@@ -16,6 +16,9 @@ namespace AgenticEngine.Models
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
         public McpStatus McpStatus { get; set; } = McpStatus.Disabled;
+        public string McpServerName { get; set; } = "mcp-for-unity-server";
+        public string McpAddress { get; set; } = "http://127.0.0.1:8080/mcp";
+        public string McpStartCommand { get; set; } = "";
         public string ShortDescription { get; set; } = "";
         public string LongDescription { get; set; } = "";
         public string RuleInstruction { get; set; } = "";

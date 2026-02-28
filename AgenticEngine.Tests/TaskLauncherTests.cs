@@ -63,7 +63,7 @@ namespace AgenticEngine.Tests
         public void CreateTask_WithImages_CopiesImagePaths()
         {
             var images = new List<string> { "img1.png", "img2.jpg" };
-            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, false, false, images);
+            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, false, false, false, images);
 
             Assert.Equal(2, task.ImagePaths.Count);
             Assert.Contains("img1.png", task.ImagePaths);
@@ -215,19 +215,19 @@ namespace AgenticEngine.Tests
         }
 
         [Fact]
-        public void BuildClaudeCommand_SpawnTeam_IncludesFlag()
+        public void BuildClaudeCommand_NoSpawnTeamFlag()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(false, false, spawnTeam: true);
-            Assert.Contains("--spawn-team", cmd);
+            var cmd = TaskLauncher.BuildClaudeCommand(false, false);
+            Assert.DoesNotContain("--spawn-team", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_AllFlags()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(true, true, true);
+            var cmd = TaskLauncher.BuildClaudeCommand(true, true);
             Assert.Contains("--dangerously-skip-permissions", cmd);
             Assert.Contains("--remote", cmd);
-            Assert.Contains("--spawn-team", cmd);
+            Assert.DoesNotContain("--spawn-team", cmd);
             Assert.Contains("--verbose", cmd);
             Assert.Contains("--output-format stream-json", cmd);
         }
@@ -298,10 +298,18 @@ namespace AgenticEngine.Tests
         }
 
         [Fact]
-        public void BuildHeadlessPowerShellScript_SpawnTeam()
+        public void BuildHeadlessPowerShellScript_NoSpawnTeamFlag()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false, true);
-            Assert.Contains("--spawn-team", script);
+            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            Assert.DoesNotContain("--spawn-team", script);
+        }
+
+        [Fact]
+        public void SpawnTeam_AddsTeamDecompositionPromptBlock()
+        {
+            var prompt = TaskLauncher.BuildBasePrompt("system", "my task", false, false, spawnTeam: true);
+            Assert.Contains("TEAM SPAWN MODE", prompt);
+            Assert.Contains("```TEAM", prompt);
         }
 
         [Fact]

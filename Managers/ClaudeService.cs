@@ -46,10 +46,10 @@ namespace AgenticEngine.Managers
                     messages.Add(new
                     {
                         role = msg.Role == "model" ? "assistant" : "user",
-                        content = msg.Text
+                        content = BuildClaudeContent(msg.Text, msg.ImagePaths)
                     });
                 }
-                messages.Add(new { role = "user", content = userMessage });
+                messages.Add(new { role = "user", content = BuildClaudeContent(userMessage, null) });
 
                 var requestObj = new Dictionary<string, object>
                 {
@@ -129,6 +129,41 @@ namespace AgenticEngine.Managers
             {
                 return $"[Error] {ex.Message}";
             }
+        }
+
+        private static object BuildClaudeContent(string text, List<string>? imagePaths)
+        {
+            if (imagePaths == null || imagePaths.Count == 0)
+                return text;
+
+            var contentParts = new List<object>();
+            foreach (var path in imagePaths)
+            {
+                try
+                {
+                    var bytes = File.ReadAllBytes(path);
+                    var base64 = Convert.ToBase64String(bytes);
+                    var ext = Path.GetExtension(path).ToLowerInvariant();
+                    var mediaType = ext switch
+                    {
+                        ".jpg" or ".jpeg" => "image/jpeg",
+                        ".gif" => "image/gif",
+                        ".webp" => "image/webp",
+                        _ => "image/png"
+                    };
+                    contentParts.Add(new
+                    {
+                        type = "image",
+                        source = new { type = "base64", media_type = mediaType, data = base64 }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("ClaudeService", $"Failed to read image {path}: {ex.Message}");
+                }
+            }
+            contentParts.Add(new { type = "text", text });
+            return contentParts;
         }
     }
 }

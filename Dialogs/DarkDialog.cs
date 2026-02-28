@@ -10,33 +10,7 @@ namespace AgenticEngine.Dialogs
     {
         public static bool ShowConfirm(string message, string title)
         {
-            Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("DarkDialog", $"MainWindow not available: {ex.Message}"); }
-
-            var dlg = new Window
-            {
-                Title = title,
-                Width = 420,
-                Height = 190,
-                WindowStartupLocation = owner != null
-                    ? WindowStartupLocation.CenterOwner
-                    : WindowStartupLocation.CenterScreen,
-                ResizeMode = ResizeMode.NoResize,
-                Background = Brushes.Transparent,
-                WindowStyle = WindowStyle.None,
-                AllowsTransparency = true,
-                Topmost = true,
-                ShowInTaskbar = true
-            };
-
-            var outerBorder = new Border
-            {
-                Background = (Brush)Application.Current.FindResource("BgSurface"),
-                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12)
-            };
-            outerBorder.MouseLeftButtonDown += (_, me) => { if (me.ClickCount == 1) dlg.DragMove(); };
+            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow(title, 420, 190);
 
             var result = false;
             var stack = new StackPanel { Margin = new Thickness(24) };
@@ -93,11 +67,9 @@ namespace AgenticEngine.Dialogs
             stack.Children.Add(btnPanel);
 
             outerBorder.Child = stack;
-            dlg.Content = outerBorder;
-            if (owner != null) dlg.Owner = owner;
+
             dlg.KeyDown += (_, ke) =>
             {
-                if (ke.Key == Key.Escape) { result = false; dlg.Close(); }
                 if (ke.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control) confirmBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             };
             dlg.ShowDialog();
@@ -106,33 +78,7 @@ namespace AgenticEngine.Dialogs
 
         public static void ShowAlert(string message, string title)
         {
-            Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("DarkDialog", $"MainWindow not available: {ex.Message}"); }
-
-            var dlg = new Window
-            {
-                Title = title,
-                Width = 420,
-                Height = 170,
-                WindowStartupLocation = owner != null
-                    ? WindowStartupLocation.CenterOwner
-                    : WindowStartupLocation.CenterScreen,
-                ResizeMode = ResizeMode.NoResize,
-                Background = Brushes.Transparent,
-                WindowStyle = WindowStyle.None,
-                AllowsTransparency = true,
-                Topmost = true,
-                ShowInTaskbar = true
-            };
-
-            var outerBorder = new Border
-            {
-                Background = (Brush)Application.Current.FindResource("BgSurface"),
-                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12)
-            };
-            outerBorder.MouseLeftButtonDown += (_, me) => { if (me.ClickCount == 1) dlg.DragMove(); };
+            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow(title, 420, 170);
 
             var stack = new StackPanel { Margin = new Thickness(24) };
 
@@ -178,41 +124,13 @@ namespace AgenticEngine.Dialogs
             stack.Children.Add(btnPanel);
 
             outerBorder.Child = stack;
-            dlg.Content = outerBorder;
-            if (owner != null) dlg.Owner = owner;
-            dlg.KeyDown += (_, ke) => { if (ke.Key == Key.Escape || ke.Key == Key.Enter) dlg.Close(); };
+            dlg.KeyDown += (_, ke) => { if (ke.Key == Key.Enter) dlg.Close(); };
             dlg.ShowDialog();
         }
 
         public static string? ShowTextInput(string title, string prompt, string defaultValue = "")
         {
-            Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("DarkDialog", $"MainWindow not available: {ex.Message}"); }
-
-            var dlg = new Window
-            {
-                Title = title,
-                Width = 420,
-                Height = 200,
-                WindowStartupLocation = owner != null
-                    ? WindowStartupLocation.CenterOwner
-                    : WindowStartupLocation.CenterScreen,
-                ResizeMode = ResizeMode.NoResize,
-                Background = Brushes.Transparent,
-                WindowStyle = WindowStyle.None,
-                AllowsTransparency = true,
-                Topmost = true,
-                ShowInTaskbar = true
-            };
-
-            var outerBorder = new Border
-            {
-                Background = (Brush)Application.Current.FindResource("BgSurface"),
-                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12)
-            };
-            outerBorder.MouseLeftButtonDown += (_, me) => { if (me.ClickCount == 1) dlg.DragMove(); };
+            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow(title, 420, 200);
 
             string? result = null;
             var stack = new StackPanel { Margin = new Thickness(24) };
@@ -288,12 +206,9 @@ namespace AgenticEngine.Dialogs
             stack.Children.Add(btnPanel);
 
             outerBorder.Child = stack;
-            dlg.Content = outerBorder;
-            if (owner != null) dlg.Owner = owner;
 
             dlg.KeyDown += (_, ke) =>
             {
-                if (ke.Key == Key.Escape) dlg.Close();
                 if (ke.Key == Key.Enter) okBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             };
 

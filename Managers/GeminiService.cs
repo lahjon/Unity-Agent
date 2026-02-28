@@ -345,13 +345,13 @@ namespace AgenticEngine.Managers
                 contents.Add(new
                 {
                     role = msg.Role,
-                    parts = new[] { new { text = msg.Text } }
+                    parts = BuildGeminiParts(msg.Text, msg.ImagePaths)
                 });
             }
             contents.Add(new
             {
                 role = "user",
-                parts = new[] { new { text = userMessage } }
+                parts = BuildGeminiParts(userMessage, null)
             });
 
             if (!string.IsNullOrEmpty(systemInstruction))
@@ -366,6 +366,37 @@ namespace AgenticEngine.Managers
                 };
             }
             return new { contents };
+        }
+
+        private static List<object> BuildGeminiParts(string text, List<string>? imagePaths)
+        {
+            var parts = new List<object>();
+            if (imagePaths != null)
+            {
+                foreach (var path in imagePaths)
+                {
+                    try
+                    {
+                        var bytes = File.ReadAllBytes(path);
+                        var base64 = Convert.ToBase64String(bytes);
+                        var ext = Path.GetExtension(path).ToLowerInvariant();
+                        var mimeType = ext switch
+                        {
+                            ".jpg" or ".jpeg" => "image/jpeg",
+                            ".gif" => "image/gif",
+                            ".webp" => "image/webp",
+                            _ => "image/png"
+                        };
+                        parts.Add(new { inline_data = new { mime_type = mimeType, data = base64 } });
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("GeminiService", $"Failed to read image {path}: {ex.Message}");
+                    }
+                }
+            }
+            parts.Add(new { text });
+            return parts;
         }
 
         private static string? ExtractTextFromResponse(string responseBody)
@@ -398,6 +429,7 @@ namespace AgenticEngine.Managers
     {
         public string Role { get; set; } = "user";
         public string Text { get; set; } = "";
+        public List<string>? ImagePaths { get; set; }
     }
 
     public class GeminiImageResult

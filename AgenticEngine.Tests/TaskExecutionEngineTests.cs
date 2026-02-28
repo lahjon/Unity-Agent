@@ -10,8 +10,8 @@ using System.Windows.Threading;
 using AgenticEngine.Managers;
 using Xunit;
 
-using OvernightAction = AgenticEngine.Managers.TaskExecutionManager.OvernightAction;
-using OvernightDecision = AgenticEngine.Managers.TaskExecutionManager.OvernightDecision;
+using OvernightAction = AgenticEngine.Managers.OvernightModeHandler.OvernightAction;
+using OvernightDecision = AgenticEngine.Managers.OvernightModeHandler.OvernightDecision;
 
 namespace AgenticEngine.Tests
 {

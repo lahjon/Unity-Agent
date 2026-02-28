@@ -5,6 +5,7 @@
     <conv:InvertBoolConverter x:Key="InvertBool"/>
     <conv:NestingDepthToMarginConverter x:Key="NestingDepthToMargin"/>
     <conv:StringToVisibilityConverter x:Key="StringToVisibility"/>
+    <conv:WrapTooltipTextConverter x:Key="WrapTooltipText"/>
     <!-- ── Backgrounds (darkest → lightest) ── -->
     <SolidColorBrush x:Key="BgAbyss" Color="#0A0A0A"/>
     <SolidColorBrush x:Key="BgPit" Color="#0E0E0E"/>
@@ -54,7 +55,6 @@
     <SolidColorBrush x:Key="WarningYellow" Color="#FFD600"/>
     <SolidColorBrush x:Key="WarningAmber" Color="#E0A030"/>
     <SolidColorBrush x:Key="WarningOrange" Color="#CC8800"/>
-    <SolidColorBrush x:Key="HighScoreGold" Color="#FFD700"/>
 
     <!-- ── Specialty ── -->
     <SolidColorBrush x:Key="PlanBadgeBg" Color="#2A1F3D"/>

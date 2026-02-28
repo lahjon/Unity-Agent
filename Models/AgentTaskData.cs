@@ -25,6 +25,7 @@ namespace AgenticEngine
         public bool PlanOnly { get; set; }
         public bool UseMessageBus { get; set; }
         public bool AutoDecompose { get; set; }
+        public string AdditionalInstructions { get; set; } = "";
         public string? StoredPrompt { get; set; }
         public string? ConversationId { get; set; }
         public string? FullOutput { get; set; }
