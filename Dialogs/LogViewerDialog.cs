@@ -12,7 +12,7 @@ namespace AgenticEngine.Dialogs
         public static void Show()
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { }
+            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("LogViewer", $"MainWindow not available: {ex.Message}"); }
 
             var dlg = new Window
             {
@@ -133,7 +133,7 @@ namespace AgenticEngine.Dialogs
                 }
                 catch (Exception ex)
                 {
-                    AppLogger.Warn("LogViewer", $"Failed to open log file: {ex.Message}", ex);
+                    AppLogger.Warn("LogViewer", "Failed to open log file", ex);
                 }
             };
 

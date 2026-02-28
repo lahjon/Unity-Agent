@@ -84,7 +84,7 @@ namespace AgenticEngine.Managers
             sendBtn.Click += (_, _) => InputSent?.Invoke(task, inputBox);
             inputBox.KeyDown += (_, ke) =>
             {
-                if (ke.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+                if (ke.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control))
                 {
                     InputSent?.Invoke(task, inputBox);
                     ke.Handled = true;
@@ -377,7 +377,11 @@ namespace AgenticEngine.Managers
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
             if (!_outputBoxes.TryGetValue(taskId, out var box)) return;
-            box.AppendText(text);
+            var run = new Run(text) { Foreground = (Brush)Application.Current.FindResource("TextBody") };
+            if (box.Document.Blocks.LastBlock is Paragraph lastPara)
+                lastPara.Inlines.Add(run);
+            else
+                box.Document.Blocks.Add(new Paragraph(run));
             box.ScrollToEnd();
 
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId)

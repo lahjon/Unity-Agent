@@ -213,7 +213,7 @@ namespace AgenticEngine.Games
                     int.TryParse(File.ReadAllText(HighScoreFile).Trim(), out int saved) && saved > 0)
                     _highScore = saved;
             }
-            catch (Exception ex) { Managers.AppLogger.Debug("BirdHunterGame", $"Failed to load high score: {ex.Message}"); }
+            catch (Exception ex) { Managers.AppLogger.Debug("BirdHunterGame", "Failed to load high score", ex); }
         }
 
         private void SaveHighScore()
@@ -223,7 +223,7 @@ namespace AgenticEngine.Games
                 Directory.CreateDirectory(Path.GetDirectoryName(HighScoreFile)!);
                 File.WriteAllText(HighScoreFile, _highScore.ToString());
             }
-            catch (Exception ex) { Managers.AppLogger.Debug("BirdHunterGame", $"Failed to save high score: {ex.Message}"); }
+            catch (Exception ex) { Managers.AppLogger.Debug("BirdHunterGame", "Failed to save high score", ex); }
         }
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)

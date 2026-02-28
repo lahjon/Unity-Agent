@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,7 +11,7 @@ namespace AgenticEngine.Dialogs
         public static void Show(AgentTask task)
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { }
+            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("StoredTaskViewer", $"MainWindow not available: {ex.Message}"); }
 
             var dlg = new Window
             {

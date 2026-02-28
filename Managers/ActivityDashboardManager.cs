@@ -631,18 +631,9 @@ namespace AgenticEngine.Managers
             return $"{ts.Seconds}s";
         }
 
-        internal static string FormatTokenCount(long count)
-        {
-            if (count >= 1_000_000) return $"{count / 1_000_000.0:F1}M";
-            if (count >= 1_000) return $"{count / 1_000.0:F1}K";
-            return count.ToString();
-        }
+        internal static string FormatTokenCount(long count) => Helpers.FormatHelpers.FormatTokenCount(count);
 
-        private static string NormalizePath(string? path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return "";
-            return path.Replace('/', '\\').TrimEnd('\\').ToLowerInvariant();
-        }
+        private static string NormalizePath(string? path) => Helpers.FormatHelpers.NormalizePath(path);
 
         private static SolidColorBrush Brush(string hex)
         {

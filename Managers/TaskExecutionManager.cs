@@ -5,9 +5,11 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -38,6 +40,9 @@ namespace AgenticEngine.Managers
 
         /// <summary>Fires when a task's process exits (with the task ID). Used to resume dependency-queued tasks.</summary>
         public event Action<string>? TaskCompleted;
+
+        /// <summary>Fires when a subtask is spawned (parent, child). MainWindow subscribes to wire the subtask into _activeTasks and create its output tab.</summary>
+        public event Action<AgentTask, AgentTask>? SubTaskSpawned;
 
         public TaskExecutionManager(
             string scriptDir,
@@ -108,6 +113,8 @@ namespace AgenticEngine.Managers
                 AppendOutput(task.Id, $"[AgenticEngine] Message Bus: ON\n", activeTasks, historyTasks);
             if (task.ExtendedPlanning)
                 AppendOutput(task.Id, $"[AgenticEngine] Extended planning: ON\n", activeTasks, historyTasks);
+            if (task.AutoDecompose)
+                AppendOutput(task.Id, $"[AgenticEngine] Auto-decompose: ON (will spawn subtasks)\n", activeTasks, historyTasks);
             if (task.IsOvernight)
             {
                 AppendOutput(task.Id, $"[AgenticEngine] Overnight mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
@@ -139,6 +146,15 @@ namespace AgenticEngine.Managers
                     return;
                 }
 
+                // Auto-decompose: decomposition phase complete — spawn subtasks
+                if (task.AutoDecompose && task.Status == AgentTaskStatus.Running)
+                {
+                    HandleDecompositionCompletion(task, activeTasks, historyTasks, moveToHistory);
+                    _fileLockManager.CheckQueuedTasks(activeTasks);
+                    TaskCompleted?.Invoke(task.Id);
+                    return;
+                }
+
                 // Already queued or cancelled — skip normal completion
                 if (task.Status is AgentTaskStatus.Queued or AgentTaskStatus.Cancelled)
                 {
@@ -167,6 +183,7 @@ namespace AgenticEngine.Managers
                     task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
                     task.EndTime = DateTime.Now;
                     AppendCompletionSummary(task, activeTasks, historyTasks);
+                    TryInjectSubtaskResult(task, activeTasks, historyTasks);
                     var statusColor = exitCode == 0
                         ? (Brush)Application.Current.FindResource("Success")
                         : (Brush)Application.Current.FindResource("DangerBright");
@@ -268,7 +285,6 @@ namespace AgenticEngine.Managers
             task.EndTime = null;
             task.Cts?.Dispose();
             task.Cts = new System.Threading.CancellationTokenSource();
-            task.LastIterationOutputStart = task.OutputBuilder.Length;
             _outputTabManager.UpdateTabHeader(task);
 
             // Use --resume with session ID when available, fall back to --continue
@@ -281,6 +297,11 @@ namespace AgenticEngine.Managers
                 : "--continue";
 
             AppendOutput(task.Id, $"\n> {text}\n[AgenticEngine] Sending follow-up with {resumeLabel}...\n\n", activeTasks, historyTasks);
+
+            // Set iteration start AFTER the echo so the echoed prompt text
+            // (which contains recommendation keywords) is excluded from
+            // recommendation extraction when the follow-up completes.
+            task.LastIterationOutputStart = task.OutputBuilder.Length;
 
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
             var followUpFile = Path.Combine(_scriptDir, $"followup_{task.Id}_{DateTime.Now.Ticks}.txt");
@@ -299,6 +320,7 @@ namespace AgenticEngine.Managers
                 task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
                 AppendCompletionSummary(task, activeTasks, historyTasks);
+                TryInjectSubtaskResult(task, activeTasks, historyTasks);
                 AppendOutput(task.Id, "\n[AgenticEngine] Follow-up complete.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             });
@@ -335,6 +357,11 @@ namespace AgenticEngine.Managers
             {
                 task.OvernightIterationTimer.Stop();
                 task.OvernightIterationTimer = null;
+            }
+            if (task.TokenLimitRetryTimer != null)
+            {
+                task.TokenLimitRetryTimer.Stop();
+                task.TokenLimitRetryTimer = null;
             }
             task.Status = AgentTaskStatus.Cancelled;
             task.EndTime = DateTime.Now;
@@ -394,7 +421,7 @@ namespace AgenticEngine.Managers
                 _dispatcher.BeginInvoke(() =>
                 {
                     var exitCode = -1;
-                    try { exitCode = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get exit code for task {taskId}: {ex.Message}"); }
+                    try { exitCode = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get exit code for task {taskId}", ex); }
                     onExited(exitCode);
                 });
             };
@@ -508,15 +535,23 @@ namespace AgenticEngine.Managers
                     var p = Process.GetProcessById(pid);
                     foreach (ProcessThread thread in p.Threads)
                     {
-                        var handle = OpenThread(THREAD_SUSPEND_RESUME, false, (uint)thread.Id);
-                        if (handle != IntPtr.Zero)
+                        var handle = IntPtr.Zero;
+                        try
                         {
-                            SuspendThread(handle);
-                            CloseHandle(handle);
+                            handle = OpenThread(THREAD_SUSPEND_RESUME, false, (uint)thread.Id);
+                            if (handle != IntPtr.Zero)
+                                SuspendThread(handle);
+                        }
+                        finally
+                        {
+                            if (handle != IntPtr.Zero)
+                                CloseHandle(handle);
                         }
                     }
                 }
-                catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to suspend PID {pid}: {ex.Message}"); }
+                catch (Win32Exception ex) { AppLogger.Warn("TaskExecution", $"Win32 error suspending PID {pid}: {ex.Message} (code {ex.NativeErrorCode})"); }
+                catch (ArgumentException ex) { AppLogger.Debug("TaskExecution", $"Process {pid} no longer exists: {ex.Message}"); }
+                catch (InvalidOperationException ex) { AppLogger.Debug("TaskExecution", $"Process {pid} has exited: {ex.Message}"); }
             }
         }
 
@@ -529,15 +564,23 @@ namespace AgenticEngine.Managers
                     var p = Process.GetProcessById(pid);
                     foreach (ProcessThread thread in p.Threads)
                     {
-                        var handle = OpenThread(THREAD_SUSPEND_RESUME, false, (uint)thread.Id);
-                        if (handle != IntPtr.Zero)
+                        var handle = IntPtr.Zero;
+                        try
                         {
-                            ResumeThread(handle);
-                            CloseHandle(handle);
+                            handle = OpenThread(THREAD_SUSPEND_RESUME, false, (uint)thread.Id);
+                            if (handle != IntPtr.Zero)
+                                ResumeThread(handle);
+                        }
+                        finally
+                        {
+                            if (handle != IntPtr.Zero)
+                                CloseHandle(handle);
                         }
                     }
                 }
-                catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to resume PID {pid}: {ex.Message}"); }
+                catch (Win32Exception ex) { AppLogger.Warn("TaskExecution", $"Win32 error resuming PID {pid}: {ex.Message} (code {ex.NativeErrorCode})"); }
+                catch (ArgumentException ex) { AppLogger.Debug("TaskExecution", $"Process {pid} no longer exists: {ex.Message}"); }
+                catch (InvalidOperationException ex) { AppLogger.Debug("TaskExecution", $"Process {pid} has exited: {ex.Message}"); }
             }
         }
 
@@ -748,7 +791,7 @@ namespace AgenticEngine.Managers
                                         }
                                     }
                                 }
-                                catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to parse streaming tool args for task {taskId}: {ex.Message}"); }
+                                catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to parse streaming tool args for task {taskId}", ex); }
                             }
                         }
                         _streamingToolState.TryRemove(taskId, out _);
@@ -945,6 +988,7 @@ namespace AgenticEngine.Managers
             var duration = task.EndTime.Value - task.StartTime;
             AppendOutput(task.Id, $"[Overnight] Total runtime: {(int)duration.TotalHours}h {duration.Minutes}m across {task.CurrentIteration} iteration(s).\n", activeTasks, historyTasks);
             AppendCompletionSummary(task, activeTasks, historyTasks);
+            TryInjectSubtaskResult(task, activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
             moveToHistory(task);
         }
@@ -1047,12 +1091,94 @@ namespace AgenticEngine.Managers
                 AppendOutput(task.Id, "[AgenticEngine] Retrying after token limit...\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
 
-                // Use --continue to resume the conversation
-                var continuePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
-                SendFollowUp(task, continuePrompt, activeTasks, historyTasks);
+                SendTokenLimitRetryContinuation(task, activeTasks, historyTasks, moveToHistory);
             };
             timer.Start();
             return true;
+        }
+
+        /// <summary>
+        /// Sends a --continue/--resume follow-up after a token limit retry, with an exit handler
+        /// that re-checks for token limits so retries can chain indefinitely.
+        /// </summary>
+        private void SendTokenLimitRetryContinuation(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            Action<AgentTask> moveToHistory)
+        {
+            task.Status = AgentTaskStatus.Running;
+            task.EndTime = null;
+            task.Cts?.Dispose();
+            task.Cts = new System.Threading.CancellationTokenSource();
+            task.LastIterationOutputStart = task.OutputBuilder.Length;
+            _outputTabManager.UpdateTabHeader(task);
+
+            var hasSessionId = !string.IsNullOrEmpty(task.ConversationId);
+            var resumeFlag = hasSessionId
+                ? $" --resume {task.ConversationId}"
+                : " --continue";
+            var resumeLabel = hasSessionId
+                ? $"--resume {task.ConversationId}"
+                : "--continue";
+
+            var continuePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
+            AppendOutput(task.Id, $"\n[AgenticEngine] Sending retry with {resumeLabel}...\n\n", activeTasks, historyTasks);
+
+            var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
+            var followUpFile = Path.Combine(_scriptDir, $"retry_{task.Id}_{DateTime.Now.Ticks}.txt");
+            File.WriteAllText(followUpFile, continuePrompt, Encoding.UTF8);
+
+            var ps1File = Path.Combine(_scriptDir, $"retry_{task.Id}.ps1");
+            File.WriteAllText(ps1File,
+                "$env:CLAUDECODE = $null\n" +
+                $"Set-Location -LiteralPath '{task.ProjectPath}'\n" +
+                $"$prompt = Get-Content -Raw -LiteralPath '{followUpFile}'\n" +
+                $"claude -p{skipFlag}{resumeFlag} --verbose --output-format stream-json $prompt\n",
+                Encoding.UTF8);
+
+            var process = CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
+            {
+                CleanupScripts(task.Id);
+
+                if (task.Status is AgentTaskStatus.Queued or AgentTaskStatus.Cancelled)
+                {
+                    _fileLockManager.CheckQueuedTasks(activeTasks);
+                    TaskCompleted?.Invoke(task.Id);
+                    return;
+                }
+
+                // Check if this retry also hit a token limit — chain another retry
+                if (exitCode != 0 && task.Status == AgentTaskStatus.Running && HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory))
+                    return;
+
+                _fileLockManager.ReleaseTaskLocks(task.Id);
+                if (task.UseMessageBus)
+                    _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
+                task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+                task.EndTime = DateTime.Now;
+                AppendCompletionSummary(task, activeTasks, historyTasks);
+                TryInjectSubtaskResult(task, activeTasks, historyTasks);
+                var statusColor = exitCode == 0
+                    ? (Brush)Application.Current.FindResource("Success")
+                    : (Brush)Application.Current.FindResource("DangerBright");
+                AppendColoredOutput(task.Id,
+                    $"\n[AgenticEngine] Process finished (exit code: {exitCode}).\n",
+                    statusColor, activeTasks, historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+                _fileLockManager.CheckQueuedTasks(activeTasks);
+                TaskCompleted?.Invoke(task.Id);
+            });
+
+            try
+            {
+                StartManagedProcess(task, process);
+            }
+            catch (Exception ex)
+            {
+                AppendOutput(task.Id, $"[AgenticEngine] Retry error: {ex.Message}\n", activeTasks, historyTasks);
+                task.Status = AgentTaskStatus.Failed;
+                task.EndTime = DateTime.Now;
+                _outputTabManager.UpdateTabHeader(task);
+            }
         }
 
         private void HandlePlanBeforeQueueCompletion(AgentTask task,
@@ -1069,9 +1195,10 @@ namespace AgenticEngine.Managers
                 task.StoredPrompt = executionPrompt;
 
             // Check dependency-based queue
-            if (task.DependencyTaskIds.Count > 0)
+            var depSnapshot = task.DependencyTaskIds;
+            if (depSnapshot.Count > 0)
             {
-                var allResolved = task.DependencyTaskIds.All(depId =>
+                var allResolved = depSnapshot.All(depId =>
                 {
                     var dep = activeTasks.FirstOrDefault(t => t.Id == depId);
                     return dep == null || dep.IsFinished;
@@ -1082,7 +1209,7 @@ namespace AgenticEngine.Managers
                     task.Status = AgentTaskStatus.Queued;
                     task.QueuedReason = "Plan complete, waiting for dependencies";
                     var blocker = activeTasks.FirstOrDefault(t =>
-                        task.DependencyTaskIds.Contains(t.Id) && !t.IsFinished);
+                        depSnapshot.Contains(t.Id) && !t.IsFinished);
                     task.BlockedByTaskId = blocker?.Id;
                     task.BlockedByTaskNumber = blocker?.TaskNumber;
                     AppendOutput(task.Id,
@@ -1094,8 +1221,8 @@ namespace AgenticEngine.Managers
                 }
                 // Dependencies resolved during planning — gather context before clearing
                 task.DependencyContext = TaskLauncher.BuildDependencyContext(
-                    task.DependencyTaskIds, activeTasks, historyTasks);
-                task.DependencyTaskIds.Clear();
+                    depSnapshot, activeTasks, historyTasks);
+                task.ClearDependencyTaskIds();
                 task.DependencyTaskNumbers.Clear();
             }
 
@@ -1158,9 +1285,53 @@ namespace AgenticEngine.Managers
                 ? fullOutput[task.LastIterationOutputStart..]
                 : fullOutput;
             var recommendations = TaskLauncher.ExtractRecommendations(outputText);
-            task.Recommendations = recommendations ?? "";
+            task.ContinueReason = "";
 
             var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
+
+            // If heuristic found recommendations, verify with LLM whether they represent real unfinished work
+            if (!string.IsNullOrEmpty(recommendations))
+            {
+                try
+                {
+                    var verification = await TaskLauncher.VerifyContinueNeededAsync(
+                        outputText, recommendations, task.Description, ct);
+
+                    if (verification != null)
+                    {
+                        if (verification.ShouldContinue)
+                        {
+                            task.Recommendations = recommendations;
+                            task.ContinueReason = verification.Reason;
+                            AppLogger.Debug("TaskExecution", $"Task {task.Id}: LLM verified continue needed — {verification.Reason}");
+                        }
+                        else
+                        {
+                            // LLM says task is complete — suppress the continue button
+                            task.Recommendations = "";
+                            AppLogger.Debug("TaskExecution", $"Task {task.Id}: LLM verified complete — {verification.Reason}");
+                        }
+                    }
+                    else
+                    {
+                        // Verification failed to parse — fall back to heuristic result
+                        task.Recommendations = recommendations;
+                        task.ContinueReason = "Agent left recommendations (verification unavailable)";
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TaskExecution", "Continue verification failed, falling back to heuristic", ex);
+                    task.Recommendations = recommendations;
+                    task.ContinueReason = "Agent left recommendations (verification unavailable)";
+                }
+            }
+            else
+            {
+                task.Recommendations = "";
+            }
+
             var duration = (task.EndTime ?? DateTime.Now) - task.StartTime;
             try
             {
@@ -1184,7 +1355,7 @@ namespace AgenticEngine.Managers
                 foreach (var f in Directory.GetFiles(_scriptDir, $"*_{taskId}*"))
                     File.Delete(f);
             }
-            catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to cleanup scripts for task {taskId}: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to cleanup scripts for task {taskId}", ex); }
         }
 
         // ── Overnight iteration decision logic (extracted for testability) ──
@@ -1246,6 +1417,290 @@ namespace AgenticEngine.Managers
                 ConsecutiveFailures = newFailures,
                 TrimOutput = outputLength > OvernightOutputCapChars
             };
+        }
+
+        // ── Subtask spawning ──────────────────────────────────────────
+
+        /// <summary>
+        /// Creates a new subtask from a parent task, inheriting project path, permissions, and model settings.
+        /// Sets up the parent-child relationship and builds a DependencyContext from the parent's current output.
+        /// </summary>
+        public AgentTask SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true)
+        {
+            var child = inheritSettings
+                ? TaskLauncher.CreateTask(
+                    description,
+                    parent.ProjectPath,
+                    parent.SkipPermissions,
+                    parent.RemoteSession,
+                    parent.Headless,
+                    parent.IsOvernight,
+                    parent.IgnoreFileLocks,
+                    parent.UseMcp,
+                    parent.SpawnTeam,
+                    parent.ExtendedPlanning,
+                    parent.NoGitWrite,
+                    planOnly: false,
+                    parent.UseMessageBus,
+                    model: parent.Model)
+                : TaskLauncher.CreateTask(
+                    description,
+                    parent.ProjectPath,
+                    skipPermissions: false,
+                    remoteSession: false,
+                    headless: false,
+                    isOvernight: false,
+                    ignoreFileLocks: false,
+                    useMcp: false);
+
+            child.ParentTaskId = parent.Id;
+            child.ProjectColor = parent.ProjectColor;
+            child.ProjectDisplayName = parent.ProjectDisplayName;
+
+            parent.SubTaskCounter++;
+            parent.ChildTaskIds.Add(child.Id);
+
+            // Build dependency context from parent's current output
+            var parentOutput = parent.OutputBuilder.ToString();
+            if (!string.IsNullOrWhiteSpace(parentOutput))
+            {
+                const int maxContextChars = 20_000;
+                var trimmed = parentOutput.Length > maxContextChars
+                    ? parentOutput[^maxContextChars..]
+                    : parentOutput;
+                child.DependencyContext =
+                    $"# Context from parent task #{parent.TaskNumber}\n" +
+                    $"Parent description: {parent.Description}\n\n" +
+                    $"## Recent parent output:\n{trimmed}";
+            }
+
+            SubTaskSpawned?.Invoke(parent, child);
+            return child;
+        }
+
+        /// <summary>
+        /// Creates a subtask and sets it to Queued status, blocked by the parent task.
+        /// The subtask will only start after the parent finishes.
+        /// </summary>
+        public AgentTask SpawnSubtaskAndQueue(AgentTask parent, string description)
+        {
+            var child = SpawnSubtask(parent, description);
+            child.Status = AgentTaskStatus.Queued;
+            child.QueuedReason = $"Waiting for parent task #{parent.TaskNumber}";
+            child.BlockedByTaskId = parent.Id;
+            child.BlockedByTaskNumber = parent.TaskNumber;
+            child.DependencyTaskIds = new List<string> { parent.Id };
+            child.DependencyTaskNumbers = new List<int> { parent.TaskNumber };
+            return child;
+        }
+
+        /// <summary>
+        /// If the completing task has a ParentTaskId, finds the parent and injects the subtask result.
+        /// </summary>
+        private void TryInjectSubtaskResult(AgentTask child,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            if (child.ParentTaskId == null) return;
+
+            var parent = activeTasks.FirstOrDefault(t => t.Id == child.ParentTaskId)
+                      ?? historyTasks.FirstOrDefault(t => t.Id == child.ParentTaskId);
+            if (parent == null)
+            {
+                AppLogger.Warn("TaskExecution", $"Subtask {child.Id} completed but parent {child.ParentTaskId} not found");
+                return;
+            }
+
+            InjectSubtaskResult(parent, child);
+        }
+
+        /// <summary>
+        /// Injects a subtask's result into the parent task's message bus inbox.
+        /// Writes a JSON file with type='subtask_result' containing the child's
+        /// summary, status, file changes, and recommendations.
+        /// </summary>
+        public void InjectSubtaskResult(AgentTask parent, AgentTask child)
+        {
+            try
+            {
+                var busDir = Path.Combine(parent.ProjectPath, ".agent-bus");
+                var inboxDir = Path.Combine(busDir, "inbox");
+                Directory.CreateDirectory(inboxDir);
+
+                // Gather file changes from git diff
+                List<object>? fileChangesList = null;
+                try
+                {
+                    var changes = TaskLauncher.GetGitFileChanges(child.ProjectPath, child.GitStartHash);
+                    if (changes != null)
+                    {
+                        fileChangesList = new List<object>();
+                        foreach (var (name, added, removed) in changes)
+                            fileChangesList.Add(new { file = name, added, removed });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TaskExecution", $"Failed to get file changes for subtask result {child.Id}", ex);
+                }
+
+                // Extract recommendations from child output
+                var childOutput = child.OutputBuilder.ToString();
+                var recommendations = TaskLauncher.ExtractRecommendations(childOutput) ?? "";
+
+                var payload = new
+                {
+                    from = child.Id,
+                    type = "subtask_result",
+                    topic = $"Subtask #{child.TaskNumber} result",
+                    parent_task_id = parent.Id,
+                    child_task_id = child.Id,
+                    child_task_number = child.TaskNumber,
+                    child_description = child.Description,
+                    status = child.Status.ToString(),
+                    summary = child.CompletionSummary,
+                    recommendations,
+                    file_changes = fileChangesList,
+                    body = $"Subtask #{child.TaskNumber} ({child.Status}): {child.Description}"
+                };
+
+                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+                var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                var fileName = $"{timestamp}_{child.Id}_subtask_result.json";
+                var filePath = Path.Combine(inboxDir, fileName);
+
+                File.WriteAllText(filePath, json);
+                AppLogger.Info("TaskExecution", $"Injected subtask result for #{child.TaskNumber} into parent #{parent.TaskNumber} bus at {filePath}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("TaskExecution", $"Failed to inject subtask result for {child.Id} into parent {parent.Id}", ex);
+            }
+        }
+        // ── Auto-decomposition ──────────────────────────────────────
+
+        /// <summary>
+        /// Parses the ```SUBTASKS``` JSON block from agent output, spawns child tasks,
+        /// and wires up inter-subtask dependencies from the depends_on fields.
+        /// Returns the list of spawned subtasks, or null if no valid block was found.
+        /// </summary>
+        public List<AgentTask>? ExtractAndSpawnSubtasks(AgentTask parent, string output)
+        {
+            var match = Regex.Match(output, @"```SUBTASKS\s*\n([\s\S]*?)```", RegexOptions.Multiline);
+            if (!match.Success)
+            {
+                AppLogger.Warn("TaskExecution", $"No ```SUBTASKS``` block found in decomposition output for task {parent.Id}");
+                return null;
+            }
+
+            var json = match.Groups[1].Value.Trim();
+
+            List<SubtaskEntry>? entries;
+            try
+            {
+                entries = JsonSerializer.Deserialize<List<SubtaskEntry>>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("TaskExecution", $"Failed to deserialize SUBTASKS JSON for task {parent.Id}", ex);
+                return null;
+            }
+
+            if (entries == null || entries.Count == 0)
+            {
+                AppLogger.Warn("TaskExecution", $"Empty SUBTASKS array for task {parent.Id}");
+                return null;
+            }
+
+            // Cap at 5 subtasks
+            if (entries.Count > 5)
+                entries = entries.GetRange(0, 5);
+
+            // Spawn all subtasks
+            var children = new List<AgentTask>();
+            foreach (var entry in entries)
+            {
+                var child = SpawnSubtask(parent, entry.Description);
+                child.AutoDecompose = false; // Subtasks don't auto-decompose
+                children.Add(child);
+            }
+
+            // Wire up inter-subtask dependencies
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var deps = entries[i].DependsOn;
+                if (deps == null || deps.Count == 0) continue;
+
+                var depIds = new List<string>();
+                var depNumbers = new List<int>();
+                foreach (var depIdx in deps)
+                {
+                    if (depIdx < 0 || depIdx >= children.Count || depIdx == i) continue;
+                    depIds.Add(children[depIdx].Id);
+                    depNumbers.Add(children[depIdx].TaskNumber);
+                }
+
+                if (depIds.Count > 0)
+                {
+                    children[i].Status = AgentTaskStatus.Queued;
+                    children[i].DependencyTaskIds = depIds;
+                    children[i].DependencyTaskNumbers = depNumbers;
+                    children[i].QueuedReason = $"Waiting for subtask(s): {string.Join(", ", depNumbers.Select(n => $"#{n}"))}";
+                    children[i].BlockedByTaskId = depIds[0];
+                    children[i].BlockedByTaskNumber = depNumbers[0];
+                }
+            }
+
+            return children;
+        }
+
+        /// <summary>
+        /// Handles completion of the decomposition phase: extracts subtasks from output,
+        /// spawns them, and transitions the parent into coordinator mode.
+        /// </summary>
+        public void HandleDecompositionCompletion(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            Action<AgentTask> moveToHistory)
+        {
+            var output = task.OutputBuilder.ToString();
+            var children = ExtractAndSpawnSubtasks(task, output);
+
+            if (children == null || children.Count == 0)
+            {
+                AppendOutput(task.Id,
+                    "\n[AgenticEngine] Decomposition produced no valid subtasks — completing parent task.\n",
+                    activeTasks, historyTasks);
+                task.AutoDecompose = false;
+                task.Status = AgentTaskStatus.Failed;
+                task.EndTime = DateTime.Now;
+                _outputTabManager.UpdateTabHeader(task);
+                return;
+            }
+
+            // Mark parent as coordinator
+            task.AutoDecompose = false; // Decomposition phase done
+            task.Status = AgentTaskStatus.Completed;
+            task.EndTime = DateTime.Now;
+            task.CompletionSummary = $"Decomposed into {children.Count} subtask(s)";
+            AppendOutput(task.Id,
+                $"\n[AgenticEngine] Task decomposed into {children.Count} subtask(s). Parent is now a coordinator.\n",
+                activeTasks, historyTasks);
+            _outputTabManager.UpdateTabHeader(task);
+
+            // Fire SubTaskSpawned for each child so the UI picks them up
+            foreach (var child in children)
+                SubTaskSpawned?.Invoke(task, child);
+        }
+
+        private class SubtaskEntry
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("description")]
+            public string Description { get; set; } = "";
+
+            [System.Text.Json.Serialization.JsonPropertyName("depends_on")]
+            public List<int>? DependsOn { get; set; }
         }
     }
 }

@@ -66,7 +66,7 @@ namespace AgenticEngine
         private static Brush GetBrush(string key, Color fallback)
         {
             try { return (Brush)Current.FindResource(key); }
-            catch { return new SolidColorBrush(fallback); }
+            catch (Exception ex) { Managers.AppLogger.Debug("App", $"Resource '{key}' not found, using fallback: {ex.Message}"); return new SolidColorBrush(fallback); }
         }
 
         private static void ShowDarkError(string message, string title)
@@ -140,7 +140,7 @@ namespace AgenticEngine
             outerBorder.Child = stack;
             dlg.Content = outerBorder;
 
-            try { dlg.Owner = Current.MainWindow; } catch { /* MainWindow may not be available */ }
+            try { dlg.Owner = Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("App", $"Could not set dialog owner: {ex.Message}"); }
             dlg.ShowDialog();
         }
 
@@ -169,7 +169,7 @@ namespace AgenticEngine
                 {
                     var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] SLOW OP: {_currentOpName} took {elapsed.TotalMilliseconds:F0}ms (priority={e.Operation.Priority})\n";
                     try { File.AppendAllText(HangLogFile, entry); }
-                    catch { }
+                    catch (Exception ex) { Managers.AppLogger.Warn("Watchdog", $"Failed to write slow-op entry to hang log: {ex.Message}"); }
                 }
                 _currentOpName = null;
             };
@@ -228,15 +228,15 @@ namespace AgenticEngine
                                         entry += $"  Thread {pt.Id}: state={pt.ThreadState}, cpu={pt.TotalProcessorTime.TotalSeconds:F1}s, " +
                                                  $"wait={pt.WaitReason}\n";
                                 }
-                                catch { }
+                                catch (Exception ex) { Managers.AppLogger.Debug("Watchdog", $"Failed to read thread {pt.Id} info: {ex.Message}"); }
                             }
                         }
-                        catch { }
+                        catch (Exception ex) { Managers.AppLogger.Debug("Watchdog", $"Failed to enumerate process threads: {ex.Message}"); }
 
                         entry += $"{"".PadRight(80, '=')}\n";
 
                         try { File.AppendAllText(HangLogFile, entry); }
-                        catch { }
+                        catch (Exception ex) { Managers.AppLogger.Warn("Watchdog", $"Failed to write hang entry to hang log: {ex.Message}"); }
                         Managers.AppLogger.Error("Watchdog", $"UI thread hang detected! Last action: {lastAction}. Details in hang.log");
 
                         // Wait for recovery, then log how long it lasted
@@ -244,7 +244,7 @@ namespace AgenticEngine
                         var duration = DateTime.Now - hangStart;
                         var recovery = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] UI RECOVERED after {duration.TotalSeconds:F1}s\n{"".PadRight(80, '-')}\n";
                         try { File.AppendAllText(HangLogFile, recovery); }
-                        catch { }
+                        catch (Exception ex) { Managers.AppLogger.Warn("Watchdog", $"Failed to write recovery entry to hang log: {ex.Message}"); }
                         Managers.AppLogger.Warn("Watchdog", $"UI thread recovered after {duration.TotalSeconds:F1}s");
                     }
                 }
@@ -265,6 +265,10 @@ namespace AgenticEngine
         protected override void OnExit(ExitEventArgs e)
         {
             Managers.AppLogger.Info("App", "OnExit: starting final cleanup");
+
+            // Flush buffered log entries to disk before anything else
+            try { Managers.AppLogger.Flush(); }
+            catch (Exception ex) { LogCrash("OnExit.AppLoggerFlush", ex); }
 
             // Flush any file writes that were queued after OnWindowClosing
             try { Managers.SafeFileWriter.FlushAll(timeoutMs: 3000); }
@@ -287,7 +291,7 @@ namespace AgenticEngine
             var currentPid = Environment.ProcessId;
             Process[] allProcesses;
             try { allProcesses = Process.GetProcesses(); }
-            catch { return; }
+            catch (Exception ex) { Managers.AppLogger.Warn("App", $"Failed to enumerate processes during orphan cleanup: {ex.Message}"); return; }
 
             foreach (var proc in allProcesses)
             {
@@ -303,10 +307,10 @@ namespace AgenticEngine
                         proc.Kill(entireProcessTree: true);
                     }
                 }
-                catch { /* process may have exited between check and kill */ }
+                catch (Exception ex) { Managers.AppLogger.Debug("App", $"Failed to kill orphaned process: {ex.Message}"); }
                 finally
                 {
-                    try { proc.Dispose(); } catch { }
+                    try { proc.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("App", $"Failed to dispose process handle: {ex.Message}"); }
                 }
             }
         }
@@ -340,7 +344,7 @@ namespace AgenticEngine
                 if (status == 0)
                     return pbi.InheritedFromUniqueProcessId.ToInt32();
             }
-            catch { }
+            catch (Exception ex) { Managers.AppLogger.Debug("App", $"Failed to query parent PID for process {pid}: {ex.Message}"); }
             return -1;
         }
 

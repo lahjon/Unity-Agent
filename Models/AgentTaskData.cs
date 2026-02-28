@@ -24,6 +24,7 @@ namespace AgenticEngine
         public bool NoGitWrite { get; set; }
         public bool PlanOnly { get; set; }
         public bool UseMessageBus { get; set; }
+        public bool AutoDecompose { get; set; }
         public string? StoredPrompt { get; set; }
         public string? ConversationId { get; set; }
         public string? FullOutput { get; set; }
@@ -37,11 +38,23 @@ namespace AgenticEngine
         public List<string> GeneratedImagePaths { get; set; } = new();
         public string CompletionSummary { get; set; } = "";
         public string Recommendations { get; set; } = "";
+        public string ContinueReason { get; set; } = "";
         public string Summary { get; set; } = "";
         public string? DependencyContext { get; set; }
         public AgentTaskStatus Status { get; set; } = AgentTaskStatus.Running;
         public DateTime? EndTime { get; set; }
         public string? GitStartHash { get; set; }
+
+        /// <summary>Scheduling priority. Higher values run sooner among peer tasks at the same DAG depth.</summary>
+        public int Priority { get; set; }
+
+        // Parent-child task hierarchy
+        public string? ParentTaskId { get; set; }
+        public List<string> ChildTaskIds { get; set; } = new();
+
+        // Task group tracking
+        public string? GroupId { get; set; }
+        public string? GroupName { get; set; }
 
         // Token usage tracking
         public long InputTokens { get; set; }

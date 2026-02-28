@@ -3,6 +3,8 @@
                     xmlns:conv="clr-namespace:AgenticEngine.Converters">
     <conv:StringToBrushConverter x:Key="StringToBrush"/>
     <conv:InvertBoolConverter x:Key="InvertBool"/>
+    <conv:NestingDepthToMarginConverter x:Key="NestingDepthToMargin"/>
+    <conv:StringToVisibilityConverter x:Key="StringToVisibility"/>
     <!-- ── Backgrounds (darkest → lightest) ── -->
     <SolidColorBrush x:Key="BgAbyss" Color="#0A0A0A"/>
     <SolidColorBrush x:Key="BgPit" Color="#0E0E0E"/>

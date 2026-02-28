@@ -105,14 +105,24 @@ namespace AgenticEngine.Managers
             return false;
         }
 
-        public void ClearImages()
+        /// <summary>
+        /// Clears all attached images. Returns the number of files that could not be deleted.
+        /// </summary>
+        public int ClearImages()
         {
+            int failures = 0;
             foreach (var path in _attachedImages)
             {
-                try { File.Delete(path); } catch (Exception ex) { AppLogger.Debug("ImageAttachment", $"Failed to delete image {path}: {ex.Message}"); }
+                try { File.Delete(path); }
+                catch (Exception ex)
+                {
+                    failures++;
+                    AppLogger.Warn("ImageAttachment", $"Failed to delete image {Path.GetFileName(path)}: {ex.Message}");
+                }
             }
             _attachedImages.Clear();
             UpdateImageIndicator();
+            return failures;
         }
 
         public List<string>? DetachImages()

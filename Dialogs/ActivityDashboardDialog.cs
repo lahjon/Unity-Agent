@@ -18,7 +18,7 @@ namespace AgenticEngine.Dialogs
             List<ProjectEntry> savedProjects)
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { }
+            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("ActivityDashboard", $"MainWindow not available: {ex.Message}"); }
 
             var dlg = new Window
             {

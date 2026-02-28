@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,7 +11,7 @@ namespace AgenticEngine.Dialogs
         public static bool ShowConfirm(string message, string title)
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { /* MainWindow may not be available yet */ }
+            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("DarkDialog", $"MainWindow not available: {ex.Message}"); }
 
             var dlg = new Window
             {
@@ -94,7 +95,11 @@ namespace AgenticEngine.Dialogs
             outerBorder.Child = stack;
             dlg.Content = outerBorder;
             if (owner != null) dlg.Owner = owner;
-            dlg.KeyDown += (_, ke) => { if (ke.Key == Key.Escape) { result = false; dlg.Close(); } };
+            dlg.KeyDown += (_, ke) =>
+            {
+                if (ke.Key == Key.Escape) { result = false; dlg.Close(); }
+                if (ke.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control) confirmBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            };
             dlg.ShowDialog();
             return result;
         }
@@ -102,7 +107,7 @@ namespace AgenticEngine.Dialogs
         public static void ShowAlert(string message, string title)
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { /* MainWindow may not be available yet */ }
+            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("DarkDialog", $"MainWindow not available: {ex.Message}"); }
 
             var dlg = new Window
             {
@@ -182,7 +187,7 @@ namespace AgenticEngine.Dialogs
         public static string? ShowTextInput(string title, string prompt, string defaultValue = "")
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { }
+            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("DarkDialog", $"MainWindow not available: {ex.Message}"); }
 
             var dlg = new Window
             {

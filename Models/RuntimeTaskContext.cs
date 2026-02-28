@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Threading;
 
@@ -10,7 +12,7 @@ namespace AgenticEngine
     /// overnight-mode timers, output buffer, and queue/planning bookkeeping.
     /// None of this state is persisted.
     /// </summary>
-    public class RuntimeTaskContext
+    public class RuntimeTaskContext : IDisposable
     {
         // Process management
         public Process? Process { get; set; }
@@ -30,13 +32,54 @@ namespace AgenticEngine
         public string? QueuedReason { get; set; }
         public string? BlockedByTaskId { get; set; }
         public int? BlockedByTaskNumber { get; set; }
-        public List<string> DependencyTaskIds { get; set; } = new();
+
+        // Thread-safe dependency tracking
+        private readonly object _depLock = new();
+        private List<string> _dependencyTaskIds = new();
+
+        /// <summary>
+        /// Gets a snapshot (copy) of the dependency task IDs for safe iteration,
+        /// or replaces the entire list under lock.
+        /// </summary>
+        public List<string> DependencyTaskIds
+        {
+            get { lock (_depLock) return _dependencyTaskIds.ToList(); }
+            set { lock (_depLock) _dependencyTaskIds = value ?? new List<string>(); }
+        }
+
+        public void AddDependencyTaskId(string id) { lock (_depLock) _dependencyTaskIds.Add(id); }
+        public bool RemoveDependencyTaskId(string id) { lock (_depLock) return _dependencyTaskIds.Remove(id); }
+        public bool ContainsDependencyTaskId(string id) { lock (_depLock) return _dependencyTaskIds.Contains(id); }
+        public int DependencyTaskIdCount { get { lock (_depLock) return _dependencyTaskIds.Count; } }
+        public void ClearDependencyTaskIds() { lock (_depLock) _dependencyTaskIds.Clear(); }
+
         public List<int> DependencyTaskNumbers { get; set; } = new();
+
+        // Parent-child hierarchy
+        public int SubTaskCounter { get; set; }
+        public int SubTaskIndex { get; set; }
 
         // Plan-before-queue workflow
         public bool IsPlanningBeforeQueue { get; set; }
         public bool NeedsPlanRestart { get; set; }
         public string? PendingFileLockPath { get; set; }
         public string? PendingFileLockBlocker { get; set; }
+
+        public void Dispose()
+        {
+            OvernightRetryTimer?.Stop();
+            OvernightRetryTimer = null;
+            OvernightIterationTimer?.Stop();
+            OvernightIterationTimer = null;
+            TokenLimitRetryTimer?.Stop();
+            TokenLimitRetryTimer = null;
+
+            try { Cts?.Cancel(); } catch (ObjectDisposedException) { }
+            Cts?.Dispose();
+            Cts = null;
+
+            try { Process?.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("RuntimeTaskContext", $"Failed to dispose process: {ex.Message}"); }
+            Process = null;
+        }
     }
 }

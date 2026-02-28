@@ -20,7 +20,8 @@ namespace AgenticEngine.Managers
         /// Queue a background write to the specified file path.
         /// Serializes writes to the same path and tracks completion for shutdown flush.
         /// </summary>
-        public static void WriteInBackground(string filePath, string content, string callerName)
+        /// <param name="onError">Optional callback invoked on failure with the error message, for surfacing write failures to the UI.</param>
+        public static void WriteInBackground(string filePath, string content, string callerName, Action<string>? onError = null)
         {
             IncrementPending();
             var sem = _locks.GetOrAdd(filePath, _ => new SemaphoreSlim(1, 1));
@@ -40,7 +41,9 @@ namespace AgenticEngine.Managers
                 }
                 catch (Exception ex)
                 {
-                    AppLogger.Warn(callerName, $"Background save failed for {Path.GetFileName(filePath)}", ex);
+                    var errorMsg = $"Background save failed for {Path.GetFileName(filePath)}: {ex.Message}";
+                    AppLogger.Warn(callerName, errorMsg, ex);
+                    onError?.Invoke(errorMsg);
                 }
                 finally
                 {

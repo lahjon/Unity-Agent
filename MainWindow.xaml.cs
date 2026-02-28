@@ -55,6 +55,8 @@ namespace AgenticEngine
         private ClaudeService _claudeService = null!;
         private HelperManager _helperManager = null!;
         private ActivityDashboardManager _activityDashboard = null!;
+        private readonly TaskGroupTracker _taskGroupTracker;
+        private readonly TaskOrchestrator _taskOrchestrator;
         private DispatcherTimer? _helperAnimTimer;
         private int _helperAnimTick;
 
@@ -116,8 +118,8 @@ namespace AgenticEngine
                 ProjectRulesList,
                 RegenerateDescBtn, Dispatcher);
             _projectManager.McpInvestigationRequested += OnMcpInvestigationRequested;
-            _projectManager.ProjectSwapStarted += () => LoadingOverlay.Visibility = Visibility.Visible;
-            _projectManager.ProjectSwapCompleted += () => LoadingOverlay.Visibility = Visibility.Collapsed;
+            _projectManager.ProjectSwapStarted += OnProjectSwapStarted;
+            _projectManager.ProjectSwapCompleted += OnProjectSwapCompleted;
             _projectManager.ProjectRenamed += OnProjectRenamed;
 
             _imageManager = new ImageAttachmentManager(appDataDir, ImageIndicator, ClearImagesBtn);
@@ -125,8 +127,7 @@ namespace AgenticEngine
             _claudeService = new ClaudeService(appDataDir);
             _chatManager = new ChatManager(
                 ChatMessagesPanel, ChatScrollViewer, ChatInput, ChatSendBtn,
-                ChatModelCombo, ChatExpandedPanel, ChatCollapsedStrip,
-                ChatSplitter, ChatPanelCol, _claudeService, _geminiService);
+                ChatModelCombo, _claudeService, _geminiService);
             _helperManager = new HelperManager(appDataDir, _projectManager.ProjectPath);
             _helperManager.SetActiveTaskSource(() =>
             {
@@ -149,6 +150,13 @@ namespace AgenticEngine
                 Dispatcher,
                 () => _settingsManager.TokenLimitRetryMinutes);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
+            _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
+
+            _taskOrchestrator = new TaskOrchestrator();
+            _taskOrchestrator.TaskReady += OnOrchestratorTaskReady;
+
+            _taskGroupTracker = new TaskGroupTracker();
+            _taskGroupTracker.GroupCompleted += OnTaskGroupCompleted;
 
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
             _projectManager.SetTaskCollections(_activeTasks, _historyTasks);
@@ -166,12 +174,13 @@ namespace AgenticEngine
             FileLocksListView.ItemsSource = _fileLockManager.FileLocksView;
             SuggestionsListView.ItemsSource = _helperManager.Suggestions;
 
-            _activeTasks.CollectionChanged += (_, _) => UpdateTabCounts();
-            _historyTasks.CollectionChanged += (_, _) => UpdateTabCounts();
-            _storedTasks.CollectionChanged += (_, _) => UpdateTabCounts();
+            _activeTasks.CollectionChanged += OnCollectionChangedUpdateTabs;
+            _historyTasks.CollectionChanged += OnCollectionChangedUpdateTabs;
+            _storedTasks.CollectionChanged += OnCollectionChangedUpdateTabs;
             UpdateTabCounts();
+            InitializeNodeGraphPanel();
 
-            _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(Constants.AppConstants.StatusTimerIntervalSeconds) };
             _statusTimer.Tick += (_, _) =>
             {
                 App.TraceUi("StatusTimer.Tick");
@@ -218,7 +227,7 @@ namespace AgenticEngine
                         lastSelected = sp.GetString();
                 }
             }
-            catch { /* best-effort */ }
+            catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to read settings.json: {ex.Message}"); }
 
             var projectsFile = Path.Combine(appDataDir, "projects.json");
             var savedProjects = new List<ProjectEntry>();
@@ -231,7 +240,7 @@ namespace AgenticEngine
                         new System.Text.Json.JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }) ?? new();
                 }
             }
-            catch { /* best-effort */ }
+            catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to read projects.json: {ex.Message}"); }
 
             var restored = lastSelected != null && savedProjects.Any(p => p.Path == lastSelected);
             return restored ? lastSelected! :
@@ -248,7 +257,7 @@ namespace AgenticEngine
                 var value = 1;
                 DwmSetWindowAttribute(hwnd, 20, ref value, sizeof(int));
             }
-            catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", $"DWM dark mode attribute failed: {ex.Message}"); }
+            catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", "DWM dark mode attribute failed", ex); }
 
             await LoadSystemPromptAsync();
             SystemPromptBox.Text = SystemPrompt;
@@ -367,15 +376,20 @@ namespace AgenticEngine
 
                 await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask);
 
-                // Populate collections on the UI thread
+                // Populate collections on the UI thread — pin Row 0 to prevent layout jitter
                 var historyItems = historyTask.Result;
                 var storedItems = storedTask.Result;
+
+                var topRow = RootGrid.RowDefinitions[0];
+                if (topRow.ActualHeight > 0)
+                    topRow.Height = new GridLength(topRow.ActualHeight);
 
                 foreach (var item in historyItems)
                     _historyTasks.Add(item);
                 foreach (var item in storedItems)
                     _storedTasks.Add(item);
 
+                RestoreStarRow();
                 RefreshFilterCombos();
                 RefreshActivityDashboard();
                 _projectManager.RefreshProjectList(
@@ -464,6 +478,12 @@ namespace AgenticEngine
             try
             {
                 App.TraceUi("SyncSettingsForProject");
+
+                // Pin Row 0 to prevent prompt panel resize jitter during layout changes
+                var topRow = RootGrid.RowDefinitions[0];
+                if (topRow.ActualHeight > 0)
+                    topRow.Height = new GridLength(topRow.ActualHeight);
+
                 _projectManager.RefreshProjectCombo();
                 _projectManager.RefreshProjectList(
                     p => _terminalManager?.UpdateWorkingDirectory(p),
@@ -484,6 +504,7 @@ namespace AgenticEngine
                 }
 
                 UpdateStatus();
+                RestoreStarRow();
             }
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to sync settings for project", ex); }
         }
@@ -559,7 +580,7 @@ namespace AgenticEngine
 
         private void NewRuleInput_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter)
+            if (e.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control))
             {
                 AddProjectRule_Click(sender, e);
                 e.Handled = true;
@@ -622,7 +643,7 @@ namespace AgenticEngine
 
         private void MaxConcurrentTasks_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter) ApplyMaxConcurrentTasks();
+            if (e.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control)) ApplyMaxConcurrentTasks();
         }
 
         private void ApplyMaxConcurrentTasks()
@@ -648,7 +669,7 @@ namespace AgenticEngine
 
         private void TokenLimitRetry_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter) ApplyTokenLimitRetry();
+            if (e.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control)) ApplyTokenLimitRetry();
         }
 
         private void ApplyTokenLimitRetry()
@@ -676,9 +697,241 @@ namespace AgenticEngine
             Dialogs.ActivityDashboardDialog.Show(_activeTasks, _historyTasks, _projectManager.SavedProjects);
         }
 
-        private void ViewDependencyGraph_Click(object sender, RoutedEventArgs e)
+        private void InitializeNodeGraphPanel()
         {
-            Dialogs.DependencyGraphDialog.Show(_activeTasks, _fileLockManager);
+            NodeGraphPanel.Initialize(_activeTasks, _fileLockManager);
+            NodeGraphPanel.ShowOutputRequested += task =>
+            {
+                if (_outputTabManager.HasTab(task.Id))
+                    OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
+            };
+            NodeGraphPanel.CancelRequested += task => CancelTask(task);
+            NodeGraphPanel.PauseResumeRequested += task =>
+            {
+                if (task.Status == AgentTaskStatus.Paused)
+                    _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
+                else if (task.IsRunning)
+                {
+                    _taskExecutionManager.PauseTask(task);
+                    _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task paused.\n", _activeTasks, _historyTasks);
+                }
+            };
+            NodeGraphPanel.CopyPromptRequested += task =>
+            {
+                if (!string.IsNullOrEmpty(task.Description))
+                    Clipboard.SetText(task.Description);
+            };
+            NodeGraphPanel.RevertRequested += task => RevertTaskFromGraph(task);
+            NodeGraphPanel.ContinueRequested += task =>
+            {
+                if (!task.HasRecommendations) return;
+                if (!_outputTabManager.HasTab(task.Id))
+                    _outputTabManager.CreateTab(task);
+                _outputTabManager.AppendOutput(task.Id, "[AgenticEngine] Continuing with recommended next steps\n", _activeTasks, _historyTasks);
+                OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
+                if (_historyTasks.Remove(task))
+                {
+                    var topRow = RootGrid.RowDefinitions[0];
+                    if (topRow.ActualHeight > 0)
+                        topRow.Height = new GridLength(topRow.ActualHeight);
+                    _activeTasks.Insert(0, task);
+                    RestoreStarRow();
+                }
+                UpdateStatus();
+                var prompt = "Continue with the recommended next steps from the previous task. Specifically:\n\n" + task.Recommendations;
+                task.Recommendations = "";
+                _taskExecutionManager.SendFollowUp(task, prompt, _activeTasks, _historyTasks);
+            };
+            NodeGraphPanel.ForceStartRequested += task =>
+            {
+                if (task.Status == AgentTaskStatus.InitQueued)
+                {
+                    task.Status = AgentTaskStatus.Running;
+                    task.QueuedReason = null;
+                    task.StartTime = DateTime.Now;
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n",
+                        _activeTasks, _historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                    UpdateStatus();
+                }
+                else if (task.Status == AgentTaskStatus.Queued)
+                {
+                    if (task.DependencyTaskIdCount > 0)
+                    {
+                        _taskOrchestrator.MarkResolved(task.Id);
+                        task.QueuedReason = null;
+                        task.BlockedByTaskId = null;
+                        task.BlockedByTaskNumber = null;
+                        task.ClearDependencyTaskIds();
+                        task.DependencyTaskNumbers.Clear();
+
+                        if (task.Process is { HasExited: false })
+                        {
+                            _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
+                            _outputTabManager.AppendOutput(task.Id,
+                                $"\n[AgenticEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
+                                _activeTasks, _historyTasks);
+                        }
+                        else
+                        {
+                            task.Status = AgentTaskStatus.Running;
+                            task.StartTime = DateTime.Now;
+                            _outputTabManager.AppendOutput(task.Id,
+                                $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
+                                _activeTasks, _historyTasks);
+                            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                        }
+                    }
+                    else
+                    {
+                        _fileLockManager.ForceStartQueuedTask(task);
+                    }
+                    _outputTabManager.UpdateTabHeader(task);
+                    UpdateStatus();
+                }
+            };
+            NodeGraphPanel.DependencyCreated += (source, target) =>
+            {
+                if (target.ContainsDependencyTaskId(source.Id)) return;
+                if (_taskOrchestrator.ContainsTask(target.Id) && _taskOrchestrator.ContainsTask(source.Id))
+                {
+                    if (_taskOrchestrator.DetectCycle(target.Id, source.Id)) return;
+                }
+                else if (WouldCreateCircularDependency(target, source)) return;
+
+                target.AddDependencyTaskId(source.Id);
+                target.DependencyTaskNumbers.Add(source.TaskNumber);
+                _taskOrchestrator.AddTask(target, new List<string> { source.Id });
+                target.BlockedByTaskId = source.Id;
+                target.BlockedByTaskNumber = source.TaskNumber;
+                target.QueuedReason = $"Waiting for #{source.TaskNumber} to complete";
+
+                if (target.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning)
+                {
+                    _taskExecutionManager.PauseTask(target);
+                    target.Status = AgentTaskStatus.Queued;
+                }
+                else if (target.Status is AgentTaskStatus.Paused)
+                {
+                    target.Status = AgentTaskStatus.Queued;
+                }
+                else if (target.Status is AgentTaskStatus.InitQueued)
+                {
+                    target.Status = AgentTaskStatus.Queued;
+                }
+
+                _outputTabManager.AppendOutput(target.Id,
+                    $"\n[AgenticEngine] Task #{target.TaskNumber} queued — waiting for #{source.TaskNumber} to complete.\n",
+                    _activeTasks, _historyTasks);
+                _outputTabManager.UpdateTabHeader(target);
+                UpdateStatus();
+            };
+            NodeGraphPanel.DependenciesRemoved += task =>
+            {
+                // Remove this task's own dependencies
+                if (task.DependencyTaskIdCount > 0)
+                {
+                    _taskOrchestrator.MarkResolved(task.Id);
+                    task.ClearDependencyTaskIds();
+                    task.DependencyTaskNumbers.Clear();
+                    task.BlockedByTaskId = null;
+                    task.BlockedByTaskNumber = null;
+                    task.QueuedReason = null;
+
+                    if (task.Status == AgentTaskStatus.Queued)
+                    {
+                        if (task.Process is { HasExited: false })
+                        {
+                            _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
+                            _outputTabManager.AppendOutput(task.Id,
+                                $"\n[AgenticEngine] Dependencies removed — resuming task #{task.TaskNumber}.\n",
+                                _activeTasks, _historyTasks);
+                        }
+                        else
+                        {
+                            task.Status = AgentTaskStatus.Running;
+                            task.StartTime = DateTime.Now;
+                            _outputTabManager.AppendOutput(task.Id,
+                                $"\n[AgenticEngine] Dependencies removed — starting task #{task.TaskNumber}...\n",
+                                _activeTasks, _historyTasks);
+                            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                        }
+                    }
+                }
+
+                // Remove this task from other tasks' dependency lists
+                foreach (var other in _activeTasks)
+                {
+                    if (other.Id == task.Id) continue;
+                    if (other.RemoveDependencyTaskId(task.Id))
+                    {
+                        other.DependencyTaskNumbers.Remove(task.TaskNumber);
+                        if (other.BlockedByTaskId == task.Id)
+                        {
+                            other.BlockedByTaskId = null;
+                            other.BlockedByTaskNumber = null;
+                        }
+                        if (other.DependencyTaskIdCount == 0)
+                        {
+                            other.QueuedReason = null;
+                        }
+                    }
+                }
+
+                _outputTabManager.UpdateTabHeader(task);
+                UpdateStatus();
+            };
+        }
+
+        private async void RevertTaskFromGraph(AgentTask task)
+        {
+            if (string.IsNullOrEmpty(task.GitStartHash))
+            {
+                Dialogs.DarkDialog.ShowAlert("No git snapshot was captured when this task started.\nRevert is not available.", "Revert Unavailable");
+                return;
+            }
+            if (!Directory.Exists(task.ProjectPath))
+            {
+                Dialogs.DarkDialog.ShowAlert("The project path for this task no longer exists.", "Revert Unavailable");
+                return;
+            }
+            var shortHash = task.GitStartHash[..Math.Min(8, task.GitStartHash.Length)];
+            if (!Dialogs.DarkDialog.ShowConfirm(
+                $"This will run 'git reset --hard {shortHash}' in:\n{task.ProjectPath}\n\nAll uncommitted changes will be lost. Continue?",
+                "Revert Task Changes"))
+                return;
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("git", $"reset --hard {task.GitStartHash}")
+                {
+                    WorkingDirectory = task.ProjectPath,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                var proc = System.Diagnostics.Process.Start(psi);
+                if (proc != null)
+                {
+                    await proc.WaitForExitAsync();
+                    if (proc.ExitCode == 0)
+                    {
+                        _outputTabManager.AppendOutput(task.Id,
+                            $"\n[AgenticEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
+                        Dialogs.DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
+                    }
+                    else
+                    {
+                        Dialogs.DarkDialog.ShowAlert("Git reset failed. The commit may no longer exist or the repository state may have changed.", "Revert Failed");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Dialogs.DarkDialog.ShowAlert($"Revert failed: {ex.Message}", "Revert Error");
+            }
         }
 
         // ── Gemini Settings ─────────────────────────────────────────
@@ -801,6 +1054,7 @@ namespace AgenticEngine
             if (OvernightToggle != null) OvernightToggle.IsEnabled = !isGemini;
             if (SpawnTeamToggle != null) SpawnTeamToggle.IsEnabled = !isGemini;
             if (ExtendedPlanningToggle != null) ExtendedPlanningToggle.IsEnabled = !isGemini;
+            if (AutoDecomposeToggle != null) AutoDecomposeToggle.IsEnabled = !isGemini;
         }
 
         // ── Input Events ───────────────────────────────────────────
@@ -835,7 +1089,12 @@ namespace AgenticEngine
 
         private void TaskInput_Drop(object sender, DragEventArgs e) => _imageManager.HandleDrop(e);
 
-        private void ClearImages_Click(object sender, RoutedEventArgs e) => _imageManager.ClearImages();
+        private void ClearImages_Click(object sender, RoutedEventArgs e)
+        {
+            var failures = _imageManager.ClearImages();
+            if (failures > 0)
+                Managers.AppLogger.Warn("MainWindow", $"{failures} image file(s) could not be deleted from disk");
+        }
 
         private void ClearPrompt_Click(object sender, RoutedEventArgs e)
         {
@@ -1006,14 +1265,19 @@ namespace AgenticEngine
             if (dragged.Id == target.Id || target.IsFinished || dragged.IsFinished) return;
 
             // Prevent duplicate dependency
-            if (dragged.DependencyTaskIds.Contains(target.Id)) return;
+            if (dragged.ContainsDependencyTaskId(target.Id)) return;
 
-            // Prevent circular dependency
-            if (WouldCreateCircularDependency(dragged, target)) return;
+            // Prevent circular dependency (use orchestrator if both tracked, else local check)
+            if (_taskOrchestrator.ContainsTask(dragged.Id) && _taskOrchestrator.ContainsTask(target.Id))
+            {
+                if (_taskOrchestrator.DetectCycle(dragged.Id, target.Id)) return;
+            }
+            else if (WouldCreateCircularDependency(dragged, target)) return;
 
-            // Add dependency: dragged waits for target
-            dragged.DependencyTaskIds.Add(target.Id);
+            // Add dependency: dragged waits for target — register with orchestrator
+            dragged.AddDependencyTaskId(target.Id);
             dragged.DependencyTaskNumbers.Add(target.TaskNumber);
+            _taskOrchestrator.AddTask(dragged, new List<string> { target.Id });
             dragged.BlockedByTaskId = target.Id;
             dragged.BlockedByTaskNumber = target.TaskNumber;
             dragged.QueuedReason = $"Waiting for #{target.TaskNumber} to complete";
@@ -1088,7 +1352,8 @@ namespace AgenticEngine
                 DefaultNoGitWriteToggle.IsChecked == true,
                 PlanOnlyToggle.IsChecked == true,
                 imagePaths: _imageManager.DetachImages(),
-                model: selectedModel);
+                model: selectedModel,
+                autoDecompose: AutoDecomposeToggle.IsChecked == true);
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
 
@@ -1104,6 +1369,7 @@ namespace AgenticEngine
             OvernightToggle.IsChecked = false;
             ExtendedPlanningToggle.IsChecked = false;
             PlanOnlyToggle.IsChecked = false;
+            AutoDecomposeToggle.IsChecked = false;
 
             if (selectedModel == ModelType.Gemini)
             {
@@ -1128,6 +1394,9 @@ namespace AgenticEngine
             {
                 task.DependencyTaskIds = activeDeps.Select(d => d.Id).ToList();
                 task.DependencyTaskNumbers = activeDeps.Select(d => d.TaskNumber).ToList();
+
+                // Register with orchestrator so it tracks the DAG edges
+                _taskOrchestrator.AddTask(task, task.DependencyTaskIds.ToList());
 
                 if (!task.PlanOnly)
                 {
@@ -1382,13 +1651,14 @@ namespace AgenticEngine
 
             if (task.Status == AgentTaskStatus.Queued)
             {
-                if (task.DependencyTaskIds.Count > 0)
+                if (task.DependencyTaskIdCount > 0)
                 {
-                    // Force-start a dependency-queued task
+                    // Force-start a dependency-queued task — remove from orchestrator tracking
+                    _taskOrchestrator.MarkResolved(task.Id);
                     task.QueuedReason = null;
                     task.BlockedByTaskId = null;
                     task.BlockedByTaskNumber = null;
-                    task.DependencyTaskIds.Clear();
+                    task.ClearDependencyTaskIds();
                     task.DependencyTaskNumbers.Clear();
 
                     if (task.Process is { HasExited: false })
@@ -1613,7 +1883,11 @@ namespace AgenticEngine
             _outputTabManager.AppendOutput(task.Id, $"\n[AgenticEngine] Type a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
 
             _historyTasks.Remove(task);
+            var topRow = RootGrid.RowDefinitions[0];
+            if (topRow.ActualHeight > 0)
+                topRow.Height = new GridLength(topRow.ActualHeight);
             _activeTasks.Insert(0, task);
+            RestoreStarRow();
             UpdateStatus();
         }
 
@@ -1631,12 +1905,53 @@ namespace AgenticEngine
             OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
 
             if (_historyTasks.Remove(task))
+            {
+                var topRow = RootGrid.RowDefinitions[0];
+                if (topRow.ActualHeight > 0)
+                    topRow.Height = new GridLength(topRow.ActualHeight);
                 _activeTasks.Insert(0, task);
+                RestoreStarRow();
+            }
             UpdateStatus();
 
             var prompt = "Continue with the recommended next steps from the previous task. Specifically:\n\n" + task.Recommendations;
             task.Recommendations = "";
+            task.ContinueReason = "";
             _taskExecutionManager.SendFollowUp(task, prompt, _activeTasks, _historyTasks);
+        }
+
+        private void RetryTask_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            if (!task.IsRetryable) return;
+
+            var prompt = task.StoredPrompt ?? task.Description;
+            var newTask = TaskLauncher.CreateTask(
+                prompt,
+                task.ProjectPath,
+                task.SkipPermissions,
+                task.RemoteSession,
+                task.Headless,
+                task.IsOvernight,
+                task.IgnoreFileLocks,
+                task.UseMcp,
+                task.SpawnTeam,
+                task.ExtendedPlanning,
+                task.NoGitWrite,
+                task.PlanOnly,
+                task.UseMessageBus,
+                model: task.Model);
+            newTask.ProjectColor = task.ProjectColor;
+            newTask.ProjectDisplayName = task.ProjectDisplayName;
+            newTask.Summary = TaskLauncher.GenerateLocalSummary(prompt);
+
+            AddActiveTask(newTask);
+            _outputTabManager.CreateTab(newTask);
+            _outputTabManager.AppendOutput(newTask.Id,
+                $"[AgenticEngine] Retrying failed task #{task.TaskNumber}\n", _activeTasks, _historyTasks);
+
+            _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
+            UpdateStatus();
         }
 
         // ── Stored Tasks ──────────────────────────────────────────
@@ -1703,7 +2018,8 @@ namespace AgenticEngine
                 DefaultNoGitWriteToggle.IsChecked == true,
                 PlanOnlyToggle.IsChecked == true,
                 imagePaths: _imageManager.DetachImages(),
-                model: selectedModel);
+                model: selectedModel,
+                autoDecompose: AutoDecomposeToggle.IsChecked == true);
             newTask.ProjectColor = _projectManager.GetProjectColor(newTask.ProjectPath);
             newTask.ProjectDisplayName = _projectManager.GetProjectDisplayName(newTask.ProjectPath);
             newTask.Summary = $"Executing stored plan: {task.ShortDescription}";
@@ -1715,6 +2031,7 @@ namespace AgenticEngine
             OvernightToggle.IsChecked = false;
             ExtendedPlanningToggle.IsChecked = false;
             PlanOnlyToggle.IsChecked = false;
+            AutoDecomposeToggle.IsChecked = false;
 
             if (selectedModel == ModelType.Gemini)
             {
@@ -1824,8 +2141,46 @@ namespace AgenticEngine
 
         private void AddActiveTask(AgentTask task)
         {
+            // Pin Row 0 to pixel height to prevent layout jitter when populating the task list
+            var topRow = RootGrid.RowDefinitions[0];
+            if (topRow.ActualHeight > 0)
+                topRow.Height = new GridLength(topRow.ActualHeight);
+
             task.TaskNumber = _nextTaskNumber;
             _nextTaskNumber = _nextTaskNumber >= 9999 ? 1 : _nextTaskNumber + 1;
+
+            // Register with group tracker if this task belongs to a group
+            _taskGroupTracker.RegisterTask(task);
+
+            if (task.IsSubTask)
+            {
+                // Find the parent and insert immediately after it (and its existing children)
+                var parentIndex = -1;
+                for (int i = 0; i < _activeTasks.Count; i++)
+                {
+                    if (_activeTasks[i].Id == task.ParentTaskId)
+                    {
+                        parentIndex = i;
+                        _activeTasks[i].SubTaskCounter++;
+                        task.Runtime.SubTaskIndex = _activeTasks[i].SubTaskCounter;
+                        _activeTasks[i].ChildTaskIds.Add(task.Id);
+                        break;
+                    }
+                }
+
+                if (parentIndex >= 0)
+                {
+                    // Insert after parent and all its existing children
+                    int insertAfter = parentIndex + 1;
+                    while (insertAfter < _activeTasks.Count &&
+                           _activeTasks[insertAfter].ParentTaskId == task.ParentTaskId)
+                        insertAfter++;
+                    _activeTasks.Insert(insertAfter, task);
+                    RefreshActivityDashboard();
+                    RestoreStarRow();
+                    return;
+                }
+            }
 
             // Insert below all finished tasks so finished stay on top
             int insertIndex = 0;
@@ -1833,6 +2188,16 @@ namespace AgenticEngine
                 insertIndex++;
             _activeTasks.Insert(insertIndex, task);
             RefreshActivityDashboard();
+            RestoreStarRow();
+        }
+
+        /// <summary>Restores Row 0 to star sizing after layout settles, preventing resize jitter.</summary>
+        private void RestoreStarRow()
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+            {
+                RootGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+            });
         }
 
         private void AnimateRemoval(FrameworkElement sender, Action onComplete)
@@ -1900,7 +2265,10 @@ namespace AgenticEngine
 
             // Resume tasks that were waiting on file locks or dependencies
             _fileLockManager.CheckQueuedTasks(_activeTasks);
-            CheckDependencyQueuedTasks(task.Id);
+            _taskOrchestrator.OnTaskCompleted(task.Id);
+
+            // Notify group tracker
+            _taskGroupTracker.OnTaskCompleted(task);
 
             // Launch init-queued tasks now that a slot may be free
             DrainInitQueue();
@@ -1949,36 +2317,26 @@ namespace AgenticEngine
             if (toStart.Count > 0) UpdateStatus();
         }
 
-        private void CheckDependencyQueuedTasks(string completedTaskId)
+        /// <summary>
+        /// Called by the TaskOrchestrator when a task's dependencies are all resolved
+        /// and it is ready to run.
+        /// </summary>
+        private void OnOrchestratorTaskReady(AgentTask task)
         {
-            var toResume = new List<AgentTask>();
-
-            foreach (var task in _activeTasks)
-            {
-                if (task.Status != AgentTaskStatus.Queued || task.DependencyTaskIds.Count == 0) continue;
-                if (!task.DependencyTaskIds.Contains(completedTaskId)) continue;
-
-                // Check if all dependency tasks are no longer active (running/queued)
-                var allDepsResolved = task.DependencyTaskIds.All(depId =>
-                {
-                    var dep = _activeTasks.FirstOrDefault(t => t.Id == depId);
-                    return dep == null || dep.IsFinished;
-                });
-
-                if (allDepsResolved)
-                    toResume.Add(task);
-            }
-
-            foreach (var task in toResume)
+            Dispatcher.Invoke(() =>
             {
                 // Gather context from completed dependencies before clearing them
-                task.DependencyContext = TaskLauncher.BuildDependencyContext(
-                    task.DependencyTaskIds, _activeTasks, _historyTasks);
+                var depSnapshot = task.DependencyTaskIds;
+                if (depSnapshot.Count > 0)
+                {
+                    task.DependencyContext = TaskLauncher.BuildDependencyContext(
+                        depSnapshot, _activeTasks, _historyTasks);
+                }
 
                 task.QueuedReason = null;
                 task.BlockedByTaskId = null;
                 task.BlockedByTaskNumber = null;
-                task.DependencyTaskIds.Clear();
+                task.ClearDependencyTaskIds();
                 task.DependencyTaskNumbers.Clear();
 
                 if (task.Process is { HasExited: false })
@@ -2002,7 +2360,7 @@ namespace AgenticEngine
 
                 _outputTabManager.UpdateTabHeader(task);
                 UpdateStatus();
-            }
+            });
         }
 
         private void OnQueuedTaskResumed(string taskId)
@@ -2026,7 +2384,49 @@ namespace AgenticEngine
                     _activeTasks.Move(idx, 0);
             }
 
-            CheckDependencyQueuedTasks(taskId);
+            _taskOrchestrator.OnTaskCompleted(taskId);
+        }
+
+        private void OnTaskGroupCompleted(object? sender, GroupCompletedEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var state = e.GroupState;
+                var statusWord = state.FailedCount > 0 ? "with failures" : "successfully";
+                DarkDialog.ShowAlert(
+                    $"Task group \"{state.GroupName}\" completed {statusWord}.\n" +
+                    $"{state.CompletedCount} completed, {state.FailedCount} failed out of {state.TotalCount} tasks.",
+                    "Group Completed");
+                GroupSummaryDialog.Show(state);
+            });
+        }
+
+        private void OnSubTaskSpawned(AgentTask parent, AgentTask child)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                AddActiveTask(child);
+                _outputTabManager.CreateTab(child);
+
+                _outputTabManager.AppendOutput(parent.Id,
+                    $"\n[AgenticEngine] Spawned subtask #{child.TaskNumber}: {child.Description}\n",
+                    _activeTasks, _historyTasks);
+
+                _outputTabManager.AppendOutput(child.Id,
+                    $"[AgenticEngine] Subtask of #{parent.TaskNumber}: {parent.Description}\n",
+                    _activeTasks, _historyTasks);
+
+                _outputTabManager.UpdateTabHeader(child);
+
+                // If the child isn't queued, start it immediately
+                if (child.Status != AgentTaskStatus.Queued)
+                {
+                    _ = _taskExecutionManager.StartProcess(child, _activeTasks, _historyTasks, MoveToHistory);
+                }
+
+                RefreshFilterCombos();
+                UpdateStatus();
+            });
         }
 
         private void OnMcpInvestigationRequested(AgentTask task)
@@ -2086,7 +2486,59 @@ namespace AgenticEngine
                 OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
         }
 
+        // ── Named handlers for anonymous lambdas (needed for cleanup) ──
+
+        private void OnProjectSwapStarted() => LoadingOverlay.Visibility = Visibility.Visible;
+        private void OnProjectSwapCompleted() => LoadingOverlay.Visibility = Visibility.Collapsed;
+
+        private void OnCollectionChangedUpdateTabs(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+            => UpdateTabCounts();
+
         // ── Window Close ───────────────────────────────────────────
+
+        /// <summary>
+        /// Unsubscribes every event handler subscribed in the constructor / LoadStartupDataAsync,
+        /// mirroring the subscription order to prevent memory leaks.
+        /// </summary>
+        private void UnsubscribeAllEvents()
+        {
+            // FileLockManager
+            _fileLockManager.QueuedTaskResumed -= OnQueuedTaskResumed;
+
+            // OutputTabManager
+            _outputTabManager.TabCloseRequested -= OnTabCloseRequested;
+            _outputTabManager.TabStoreRequested -= OnTabStoreRequested;
+            _outputTabManager.InputSent -= OnTabInputSent;
+
+            // ProjectManager
+            _projectManager.McpInvestigationRequested -= OnMcpInvestigationRequested;
+            _projectManager.ProjectSwapStarted -= OnProjectSwapStarted;
+            _projectManager.ProjectSwapCompleted -= OnProjectSwapCompleted;
+            _projectManager.ProjectRenamed -= OnProjectRenamed;
+
+            // HelperManager
+            _helperManager.GenerationStarted -= OnHelperGenerationStarted;
+            _helperManager.GenerationCompleted -= OnHelperGenerationCompleted;
+            _helperManager.GenerationFailed -= OnHelperGenerationFailed;
+
+            // TaskExecutionManager
+            _taskExecutionManager.TaskCompleted -= OnTaskProcessCompleted;
+            _taskExecutionManager.SubTaskSpawned -= OnSubTaskSpawned;
+
+            // TaskOrchestrator
+            _taskOrchestrator.TaskReady -= OnOrchestratorTaskReady;
+
+            // TaskGroupTracker
+            _taskGroupTracker.GroupCompleted -= OnTaskGroupCompleted;
+
+            // CollectionChanged
+            _activeTasks.CollectionChanged -= OnCollectionChangedUpdateTabs;
+            _historyTasks.CollectionChanged -= OnCollectionChangedUpdateTabs;
+            _storedTasks.CollectionChanged -= OnCollectionChangedUpdateTabs;
+
+            // MainTabs
+            MainTabs.SelectionChanged -= MainTabs_SelectionChanged;
+        }
 
         private void OnWindowClosing(object? sender, CancelEventArgs e)
         {
@@ -2105,44 +2557,36 @@ namespace AgenticEngine
                 }
             }
 
-            // ── 1. Stop all timers so no callbacks fire during teardown ──
+            // ── 1. Unsubscribe all event handlers to prevent leaks ──
+            UnsubscribeAllEvents();
+
+            // ── 2. Stop all timers so no callbacks fire during teardown ──
             _statusTimer.Stop();
             _helperAnimTimer?.Stop();
 
-            // ── 2. Cancel in-flight async work ──
+            // ── 3. Cancel in-flight async work ──
             _chatManager.CancelAndDispose();
 
             _helperManager?.CancelGeneration();
 
-            // ── 3. Persist state (queues background writes via SafeFileWriter) ──
+            // ── 4. Persist state (queues background writes via SafeFileWriter) ──
             _projectManager.SaveProjects();
             _settingsManager.SaveSettings(_projectManager.ProjectPath);
             _historyManager.SaveHistory(_historyTasks);
             PersistSavedPrompts();
 
-            // ── 4. Wait for all background file writes to complete ──
+            // ── 5. Wait for all background file writes to complete ──
             Managers.SafeFileWriter.FlushAll(timeoutMs: 5000);
 
-            // ── 5. Cancel CTS, stop overnight timers, kill & dispose processes ──
+            // ── 6. Cancel CTS, stop overnight timers, kill & dispose processes ──
             foreach (var task in _activeTasks)
             {
-                try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
-
-                task.OvernightRetryTimer?.Stop();
-                task.OvernightRetryTimer = null;
-                task.OvernightIterationTimer?.Stop();
-                task.OvernightIterationTimer = null;
-
                 TaskExecutionManager.KillProcess(task);
-
-                try { task.Process?.Dispose(); } catch { }
-                task.Process = null;
-
-                task.Cts?.Dispose();
-                task.Cts = null;
+                task.Runtime.Dispose();
             }
 
-            // ── 6. Clean up remaining state ──
+            // ── 7. Clean up remaining state ──
+            _messageBusManager.Dispose();
             _fileLockManager.ClearAll();
             _taskExecutionManager.StreamingToolState.Clear();
 
@@ -2184,13 +2628,8 @@ namespace AgenticEngine
 
         private void ChatSplitter_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
         {
-            double newSaved = SavedPanelCol.Width.Value + e.HorizontalChange;
             double newChat = ChatPanelCol.Width.Value - e.HorizontalChange;
-
-            if (newSaved < SavedPanelCol.MinWidth || newChat < 0)
-                return;
-
-            SavedPanelCol.Width = new GridLength(newSaved);
+            if (newChat < 60) newChat = 60;
             ChatPanelCol.Width = new GridLength(newChat);
         }
 
@@ -2321,6 +2760,36 @@ namespace AgenticEngine
                 StoredFilterCombo.SelectionChanged += StoredFilter_Changed;
             }
 
+            // Group filter combo
+            if (HistoryGroupFilterCombo != null)
+            {
+                var groupTag = (HistoryGroupFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+
+                HistoryGroupFilterCombo.SelectionChanged -= HistoryGroupFilter_Changed;
+                HistoryGroupFilterCombo.Items.Clear();
+                HistoryGroupFilterCombo.Items.Add(new ComboBoxItem { Content = "All Groups", Tag = "" });
+
+                var groups = _historyTasks.Concat(_activeTasks)
+                    .Where(t => !string.IsNullOrEmpty(t.GroupId))
+                    .Select(t => new { Id = t.GroupId!, Name = t.GroupName ?? t.GroupId! })
+                    .DistinctBy(g => g.Id)
+                    .OrderBy(g => g.Name)
+                    .ToList();
+                foreach (var g in groups)
+                    HistoryGroupFilterCombo.Items.Add(new ComboBoxItem { Content = g.Name, Tag = g.Id });
+
+                found = false;
+                if (!string.IsNullOrEmpty(groupTag))
+                {
+                    foreach (ComboBoxItem item in HistoryGroupFilterCombo.Items)
+                    {
+                        if (item.Tag as string == groupTag) { HistoryGroupFilterCombo.SelectedItem = item; found = true; break; }
+                    }
+                }
+                if (!found) HistoryGroupFilterCombo.SelectedIndex = 0;
+                HistoryGroupFilterCombo.SelectionChanged += HistoryGroupFilter_Changed;
+            }
+
             RefreshStatusFilterCombos();
         }
 
@@ -2400,12 +2869,14 @@ namespace AgenticEngine
             if (_historyView == null) return;
             var projectTag = (HistoryFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string;
             var statusTag = (HistoryStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
+            var groupTag = (HistoryGroupFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
             var hasProject = !string.IsNullOrEmpty(projectTag);
             var hasStatus = !string.IsNullOrEmpty(statusTag);
+            var hasGroup = !string.IsNullOrEmpty(groupTag);
             var searchText = HistorySearchBox?.Text?.Trim() ?? "";
             var hasSearch = searchText.Length > 0;
 
-            if (!hasProject && !hasStatus && !hasSearch)
+            if (!hasProject && !hasStatus && !hasGroup && !hasSearch)
                 _historyView.Filter = null;
             else
                 _historyView.Filter = obj =>
@@ -2413,6 +2884,7 @@ namespace AgenticEngine
                     if (obj is not AgentTask t) return false;
                     if (hasProject && t.ProjectPath != projectTag) return false;
                     if (hasStatus && t.Status.ToString() != statusTag) return false;
+                    if (hasGroup && t.GroupId != groupTag) return false;
                     if (hasSearch && !TaskMatchesSearch(t, searchText)) return false;
                     return true;
                 };
@@ -2425,6 +2897,8 @@ namespace AgenticEngine
         private void ActiveStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyActiveFilters();
 
         private void HistoryStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
+
+        private void HistoryGroupFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
 
         private void ActiveSearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyActiveFilters();
 
@@ -2620,6 +3094,15 @@ namespace AgenticEngine
             await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance);
         }
 
+        private void SuggestionGuidanceInput_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                GenerateSuggestions_Click(sender, e);
+                e.Handled = true;
+            }
+        }
+
         private void ClearSuggestions_Click(object sender, RoutedEventArgs e)
         {
             _helperManager.ClearSuggestions();
@@ -2674,6 +3157,7 @@ namespace AgenticEngine
             OvernightToggle.IsChecked = false;
             ExtendedPlanningToggle.IsChecked = false;
             PlanOnlyToggle.IsChecked = false;
+            AutoDecomposeToggle.IsChecked = false;
 
             if (selectedModel == ModelType.Gemini)
             {
@@ -2875,18 +3359,32 @@ namespace AgenticEngine
                 RemoteSession = RemoteSessionToggle.IsChecked == true,
                 Headless = HeadlessToggle.IsChecked == true,
                 SpawnTeam = SpawnTeamToggle.IsChecked == true,
-                Overnight = OvernightToggle.IsChecked == true,
+                IsOvernight = OvernightToggle.IsChecked == true,
                 ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true,
                 PlanOnly = PlanOnlyToggle.IsChecked == true,
                 IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true,
                 UseMcp = UseMcpToggle.IsChecked == true,
                 NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true,
+                UseMessageBus = MessageBusToggle.IsChecked == true,
+                AutoDecompose = AutoDecomposeToggle.IsChecked == true,
+                AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
             };
 
             _savedPrompts.Insert(0, entry);
             PersistSavedPrompts();
             RenderSavedPrompts();
             TaskInput.Text = string.Empty;
+            AdditionalInstructionsInput.Clear();
+
+            // Reset per-task toggles
+            RemoteSessionToggle.IsChecked = false;
+            HeadlessToggle.IsChecked = false;
+            SpawnTeamToggle.IsChecked = false;
+            OvernightToggle.IsChecked = false;
+            ExtendedPlanningToggle.IsChecked = false;
+            PlanOnlyToggle.IsChecked = false;
+            MessageBusToggle.IsChecked = false;
+            AutoDecomposeToggle.IsChecked = false;
         }
 
         private void RenderSavedPrompts()
@@ -2959,6 +3457,19 @@ namespace AgenticEngine
                 };
 
                 var contextMenu = new ContextMenu();
+                var entryId = entry.Id;
+                var runItem = new MenuItem { Header = "Run" };
+                runItem.Click += (s, _) =>
+                {
+                    var prompt = _savedPrompts.FirstOrDefault(p => p.Id == entryId);
+                    if (prompt == null) return;
+                    LoadSavedPromptIntoUi(prompt);
+                    _savedPrompts.RemoveAll(p => p.Id == entryId);
+                    PersistSavedPrompts();
+                    RenderSavedPrompts();
+                    Execute_Click(this, new RoutedEventArgs());
+                };
+                contextMenu.Items.Add(runItem);
                 var copyItem = new MenuItem { Header = "Copy Prompt" };
                 var promptText = entry.PromptText;
                 copyItem.Click += (s, _) => Clipboard.SetText(promptText);
@@ -2974,7 +3485,11 @@ namespace AgenticEngine
             if (sender is not Border card || card.Tag is not string id) return;
             var entry = _savedPrompts.FirstOrDefault(p => p.Id == id);
             if (entry == null) return;
+            LoadSavedPromptIntoUi(entry);
+        }
 
+        private void LoadSavedPromptIntoUi(SavedPromptEntry entry)
+        {
             TaskInput.Text = entry.PromptText;
 
             // Restore model selection
@@ -2991,12 +3506,15 @@ namespace AgenticEngine
             RemoteSessionToggle.IsChecked = entry.RemoteSession;
             HeadlessToggle.IsChecked = entry.Headless;
             SpawnTeamToggle.IsChecked = entry.SpawnTeam;
-            OvernightToggle.IsChecked = entry.Overnight;
+            OvernightToggle.IsChecked = entry.IsOvernight;
             ExtendedPlanningToggle.IsChecked = entry.ExtendedPlanning;
             PlanOnlyToggle.IsChecked = entry.PlanOnly;
             IgnoreFileLocksToggle.IsChecked = entry.IgnoreFileLocks;
             UseMcpToggle.IsChecked = entry.UseMcp;
             DefaultNoGitWriteToggle.IsChecked = entry.NoGitWrite;
+            MessageBusToggle.IsChecked = entry.UseMessageBus;
+            AutoDecomposeToggle.IsChecked = entry.AutoDecompose;
+            AdditionalInstructionsInput.Text = entry.AdditionalInstructions ?? "";
         }
 
         private void DeleteSavedPrompt_Click(object sender, RoutedEventArgs e)
@@ -3034,6 +3552,7 @@ namespace AgenticEngine
                 UseMcp = UseMcpToggle.IsChecked == true,
                 NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true,
                 UseMessageBus = MessageBusToggle.IsChecked == true,
+                AutoDecompose = AutoDecomposeToggle.IsChecked == true,
                 Model = modelTag,
             };
 
@@ -3078,6 +3597,7 @@ namespace AgenticEngine
             if (t.ExtendedPlanning) flags.Add("ExtPlanning");
             if (t.PlanOnly) flags.Add("PlanOnly");
             if (t.UseMessageBus) flags.Add("MsgBus");
+            if (t.AutoDecompose) flags.Add("AutoDecompose");
             if (t.NoGitWrite) flags.Add("NoGitWrite");
             if (t.IgnoreFileLocks) flags.Add("IgnoreLocks");
             if (t.UseMcp) flags.Add("MCP");
@@ -3120,6 +3640,7 @@ namespace AgenticEngine
             UseMcpToggle.IsChecked = template.UseMcp;
             DefaultNoGitWriteToggle.IsChecked = template.NoGitWrite;
             MessageBusToggle.IsChecked = template.UseMessageBus;
+            AutoDecomposeToggle.IsChecked = template.AutoDecompose;
 
             // Apply additional instructions
             AdditionalInstructionsInput.Text = template.AdditionalInstructions ?? "";
@@ -3163,7 +3684,6 @@ namespace AgenticEngine
 
         // ── Chat Panel (delegated to ChatManager) ─────────────────
 
-        private void ChatToggle_Click(object sender, RoutedEventArgs e) => _chatManager.HandleToggleClick();
         private void NewChat_Click(object sender, RoutedEventArgs e) => _chatManager.HandleNewChat();
         private void ChatSend_Click(object sender, RoutedEventArgs e) => _chatManager.HandleSendClick();
         private void ChatInput_PreviewKeyDown(object sender, KeyEventArgs e) => _chatManager.HandleInputKeyDown(e);

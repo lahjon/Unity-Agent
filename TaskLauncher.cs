@@ -147,6 +147,56 @@ namespace AgenticEngine
             return block;
         }
 
+        public const string SubtaskCoordinatorBlock =
+            "# SUBTASK COORDINATOR\n" +
+            "You are a parent task that has spawned subtasks. Subtask results are delivered to you\n" +
+            "via the message bus at `.agent-bus/inbox/` as JSON files with `\"type\": \"subtask_result\"`.\n\n" +
+            "## Reading Subtask Results\n" +
+            "Check `.agent-bus/inbox/` for files matching `*_subtask_result.json`.\n" +
+            "Each result contains:\n" +
+            "- `child_task_id`: The subtask identifier\n" +
+            "- `status`: Whether the subtask Completed or Failed\n" +
+            "- `summary`: A completion summary with file changes and duration\n" +
+            "- `recommendations`: Any follow-up suggestions from the subtask\n" +
+            "- `file_changes`: List of files modified with line counts\n\n" +
+            "## Decision Protocol\n" +
+            "After reading subtask results:\n" +
+            "1. Assess whether each subtask succeeded and met its objectives\n" +
+            "2. If a subtask failed or has critical recommendations, decide whether to:\n" +
+            "   - Retry the work yourself\n" +
+            "   - Report the failure in your own output\n" +
+            "3. If all subtasks succeeded, integrate their results and finalize your work\n" +
+            "4. Summarize what each subtask accomplished in your final output\n\n";
+
+        public const string DecompositionPromptBlock =
+            "# TASK DECOMPOSITION MODE\n" +
+            "Before implementing anything, you MUST analyze this task and break it into smaller subtasks.\n\n" +
+            "## Instructions\n" +
+            "1. Read the task description carefully\n" +
+            "2. Explore the codebase to understand the scope\n" +
+            "3. Break the task into 2-5 independent, actionable subtasks\n" +
+            "4. Each subtask should be completable by a single agent session\n" +
+            "5. Identify dependencies between subtasks (which must finish before others can start)\n\n" +
+            "## Output Format\n" +
+            "Output your subtasks as a JSON array inside a ```SUBTASKS``` code block.\n" +
+            "Each entry must have:\n" +
+            "- `description`: A clear, self-contained prompt for the subtask\n" +
+            "- `depends_on`: An array of zero-based indices of subtasks that must complete first (use [] for no dependencies)\n\n" +
+            "Example:\n" +
+            "```SUBTASKS\n" +
+            "[\n" +
+            "  {\"description\": \"Add the new data model class with validation\", \"depends_on\": []},\n" +
+            "  {\"description\": \"Create the API endpoint for the new model\", \"depends_on\": [0]},\n" +
+            "  {\"description\": \"Add unit tests for the model and endpoint\", \"depends_on\": [0, 1]}\n" +
+            "]\n" +
+            "```\n\n" +
+            "IMPORTANT:\n" +
+            "- Do NOT implement anything. Only produce the subtask list.\n" +
+            "- Do NOT write, edit, or create any files.\n" +
+            "- Each subtask description must be detailed enough to execute independently.\n" +
+            "- Keep dependencies minimal — prefer parallel subtasks where possible.\n\n" +
+            "---\n";
+
         public const string OvernightInitialTemplate =
             "You are running as an OVERNIGHT AUTONOMOUS TASK. This means you will be called repeatedly " +
             "to iterate on the work until it is complete. Follow these instructions carefully:\n\n" +
@@ -263,7 +313,9 @@ namespace AgenticEngine
             bool planOnly = false,
             bool useMessageBus = false,
             List<string>? imagePaths = null,
-            ModelType model = ModelType.ClaudeCode)
+            ModelType model = ModelType.ClaudeCode,
+            string? parentTaskId = null,
+            bool autoDecompose = false)
         {
             var task = new AgentTask
             {
@@ -279,9 +331,11 @@ namespace AgenticEngine
                 NoGitWrite = noGitWrite,
                 PlanOnly = planOnly,
                 UseMessageBus = useMessageBus,
+                AutoDecompose = autoDecompose,
                 Model = model,
                 MaxIterations = 50,
-                ProjectPath = projectPath
+                ProjectPath = projectPath,
+                ParentTaskId = parentTaskId
             };
             if (imagePaths != null)
                 task.ImagePaths.AddRange(imagePaths);
@@ -290,7 +344,7 @@ namespace AgenticEngine
 
         // ── Prompt Building ──────────────────────────────────────────
 
-        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, bool planOnly = false, string projectDescription = "", string projectRulesBlock = "", bool isGameProject = false)
+        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, bool planOnly = false, string projectDescription = "", string projectRulesBlock = "", bool isGameProject = false, bool autoDecompose = false)
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
@@ -304,13 +358,14 @@ namespace AgenticEngine
             var planOnlyBlock = planOnly ? PlanOnlyBlock : "";
             var gitBlock = noGitWrite ? NoGitWriteBlock : "";
             var gameBlock = (isGameProject || IsGameCreationTask(description)) ? GameRulesBlock : "";
-            return descBlock + systemPrompt + gitBlock + projectRulesBlock + mcpBlock + planningBlock + planOnlyBlock + gameBlock + description;
+            var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
+            return descBlock + systemPrompt + gitBlock + projectRulesBlock + mcpBlock + planningBlock + planOnlyBlock + decomposeBlock + gameBlock + description;
         }
 
         public static string BuildFullPrompt(string systemPrompt, AgentTask task, string projectDescription = "", string projectRulesBlock = "", bool isGameProject = false)
         {
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, isGameProject);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, isGameProject, task.AutoDecompose);
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 basePrompt = $"# Task: {task.Summary}\n{basePrompt}";
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
@@ -410,7 +465,7 @@ namespace AgenticEngine
         public static bool CheckOvernightComplete(string output)
         {
             var lines = output.Split('\n');
-            var start = Math.Max(0, lines.Length - 50);
+            var start = Math.Max(0, lines.Length - Constants.AppConstants.MaxOutputTailLines);
             for (var i = lines.Length - 1; i >= start; i--)
             {
                 var trimmed = lines[i].Trim();
@@ -422,7 +477,7 @@ namespace AgenticEngine
 
         public static bool IsTokenLimitError(string output)
         {
-            var tail = output.Length > 3000 ? output[^3000..] : output;
+            var tail = output.Length > Constants.AppConstants.MaxOutputCharLength ? output[^Constants.AppConstants.MaxOutputCharLength..] : output;
             var lower = tail.ToLowerInvariant();
             return lower.Contains("rate limit") ||
                    lower.Contains("token limit") ||
@@ -540,14 +595,14 @@ namespace AgenticEngine
                 var longDesc = parts.Length > 1 ? CleanDescriptionSection(parts[1]) : shortDesc;
 
                 // Cap short description at 200 chars
-                if (shortDesc.Length > 200)
-                    shortDesc = shortDesc[..200];
+                if (shortDesc.Length > Constants.AppConstants.MaxShortDescriptionLength)
+                    shortDesc = shortDesc[..Constants.AppConstants.MaxShortDescriptionLength];
 
                 return (shortDesc, longDesc);
             }
             catch (OperationCanceledException)
             {
-                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
+                try { if (process is { HasExited: false }) process.Kill(true); } catch (Exception ex) { Managers.AppLogger.Debug("TaskLauncher", $"Failed to kill process on cancellation: {ex.Message}"); }
                 return ("", "");
             }
             catch (Exception ex)
@@ -670,8 +725,8 @@ namespace AgenticEngine
         /// </summary>
         internal static bool IsTaskOutputComplete(string[] lines, int recommendationLine)
         {
-            var searchStart = Math.Max(0, recommendationLine - 20);
-            var searchEnd = Math.Min(lines.Length, recommendationLine + 15);
+            var searchStart = Math.Max(0, recommendationLine - Constants.AppConstants.RecommendationContextBefore);
+            var searchEnd = Math.Min(lines.Length, recommendationLine + Constants.AppConstants.RecommendationContextAfter);
 
             bool hasCompletion = false;
             bool hasIncompletion = false;
@@ -757,6 +812,107 @@ namespace AgenticEngine
             return result.Length > 0 ? result : null;
         }
 
+        /// <summary>
+        /// Verification result from the LLM-based continue analysis.
+        /// </summary>
+        public class ContinueVerification
+        {
+            public bool ShouldContinue { get; set; }
+            public string Reason { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Uses a fast LLM call to verify whether extracted recommendations represent
+        /// genuinely unfinished work or are just optional/nice-to-have suggestions.
+        /// Returns a ContinueVerification with a short reason if continue is warranted, or null on failure.
+        /// </summary>
+        public static async Task<ContinueVerification?> VerifyContinueNeededAsync(
+            string outputTail, string recommendations, string taskDescription, CancellationToken ct = default)
+        {
+            try
+            {
+                // Take last ~2000 chars of output for context (enough to understand completion state)
+                var contextTail = outputTail.Length > 2000 ? outputTail[^2000..] : outputTail;
+
+                var prompt =
+                    "You are analyzing an AI coding agent's output to determine if the task needs more work.\n\n" +
+                    $"TASK DESCRIPTION:\n{taskDescription}\n\n" +
+                    $"AGENT'S FINAL OUTPUT (tail):\n{contextTail}\n\n" +
+                    $"EXTRACTED RECOMMENDATIONS:\n{recommendations}\n\n" +
+                    "QUESTION: Did the agent complete the core task, or is there genuinely unfinished work?\n\n" +
+                    "Rules:\n" +
+                    "- If the agent completed what was asked and the recommendations are just optional improvements, " +
+                    "nice-to-haves, testing suggestions, or future enhancements → COMPLETE\n" +
+                    "- If the agent explicitly states it couldn't finish something, hit errors, left work undone, " +
+                    "or the recommendations describe work that was part of the original request → INCOMPLETE\n" +
+                    "- Suggestions like \"add tests\", \"consider adding\", \"you might want to\" are optional → COMPLETE\n" +
+                    "- Items like \"still need to implement X\", \"couldn't fix Y\", \"remaining: Z\" are unfinished → INCOMPLETE\n\n" +
+                    "Respond with EXACTLY one line in this format:\n" +
+                    "COMPLETE|<one-sentence summary of what was done>\n" +
+                    "or\n" +
+                    "INCOMPLETE|<one-sentence summary of what still needs to be done>\n\n" +
+                    "Examples:\n" +
+                    "COMPLETE|All requested changes implemented successfully\n" +
+                    "INCOMPLETE|Error handling for the API endpoint was not implemented due to build errors";
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "claude",
+                    Arguments = "-p --output-format text --model claude-haiku-4-5-20251001 --max-turns 1",
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8
+                };
+                psi.Environment.Remove("CLAUDECODE");
+
+                using var process = new Process { StartInfo = psi };
+                process.Start();
+
+                await process.StandardInput.WriteAsync(prompt.AsMemory(), ct);
+                process.StandardInput.Close();
+
+                var output = await process.StandardOutput.ReadToEndAsync(ct);
+                await process.WaitForExitAsync(ct);
+
+                var text = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
+
+                // Parse the COMPLETE|reason or INCOMPLETE|reason response
+                foreach (var line in text.Split('\n'))
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("COMPLETE|", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new ContinueVerification
+                        {
+                            ShouldContinue = false,
+                            Reason = trimmed["COMPLETE|".Length..].Trim()
+                        };
+                    }
+                    if (trimmed.StartsWith("INCOMPLETE|", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new ContinueVerification
+                        {
+                            ShouldContinue = true,
+                            Reason = trimmed["INCOMPLETE|".Length..].Trim()
+                        };
+                    }
+                }
+
+                // Fallback: couldn't parse response, return null to fall back to heuristic
+                Managers.AppLogger.Debug("TaskLauncher", $"Could not parse continue verification response: {text}");
+                return null;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Debug("TaskLauncher", "Continue verification failed", ex);
+                return null;
+            }
+        }
+
         public static string GenerateCompletionSummary(string projectPath, string? gitStartHash, AgentTaskStatus status, TimeSpan duration)
         {
             try
@@ -766,7 +922,7 @@ namespace AgenticEngine
             }
             catch (Exception ex)
             {
-                Managers.AppLogger.Debug("TaskLauncher", $"Failed to get git file changes for completion summary: {ex.Message}");
+                Managers.AppLogger.Debug("TaskLauncher", "Failed to get git file changes for completion summary", ex);
                 return FormatCompletionSummary(status, duration, null);
             }
         }
@@ -792,7 +948,7 @@ namespace AgenticEngine
                 process.WaitForExit(5000);
                 if (!process.HasExited)
                 {
-                    try { process.Kill(); } catch { }
+                    try { process.Kill(); } catch (Exception ex) { Managers.AppLogger.Debug("TaskLauncher", $"Failed to kill timed-out git process: {ex.Message}"); }
                     Managers.AppLogger.Warn("TaskLauncher", $"Git command timed out: git {arguments}");
                     return null;
                 }
@@ -800,7 +956,7 @@ namespace AgenticEngine
             }
             catch (Exception ex)
             {
-                Managers.AppLogger.Debug("TaskLauncher", $"Git command failed: {ex.Message}");
+                Managers.AppLogger.Debug("TaskLauncher", "Git command failed", ex);
                 return null;
             }
             finally
@@ -834,13 +990,13 @@ namespace AgenticEngine
             }
             catch (OperationCanceledException)
             {
-                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
+                try { if (process is { HasExited: false }) process.Kill(true); } catch (Exception ex) { Managers.AppLogger.Debug("TaskLauncher", $"Failed to kill cancelled git process: {ex.Message}"); }
                 Managers.AppLogger.Warn("TaskLauncher", $"Git command timed out or cancelled: git {arguments}");
                 return null;
             }
             catch (Exception ex)
             {
-                Managers.AppLogger.Debug("TaskLauncher", $"Async git command failed: {ex.Message}");
+                Managers.AppLogger.Debug("TaskLauncher", "Async git command failed", ex);
                 return null;
             }
             finally
@@ -867,7 +1023,7 @@ namespace AgenticEngine
             }
             catch (Exception ex)
             {
-                Managers.AppLogger.Debug("TaskLauncher", $"Failed to get git file changes for completion summary: {ex.Message}");
+                Managers.AppLogger.Debug("TaskLauncher", "Failed to get git file changes for completion summary", ex);
                 return FormatCompletionSummary(status, duration, null);
             }
         }
@@ -922,10 +1078,7 @@ namespace AgenticEngine
 
         // ── Utilities ────────────────────────────────────────────────
 
-        public static string StripAnsi(string text)
-        {
-            return Regex.Replace(text, @"\x1B(?:\[[0-9;]*[a-zA-Z]|\].*?(?:\x07|\x1B\\))", "");
-        }
+        public static string StripAnsi(string text) => Helpers.FormatHelpers.StripAnsiCodes(text);
 
         private static string CleanDescriptionSection(string text)
         {
@@ -965,7 +1118,7 @@ namespace AgenticEngine
             path = path.Replace('/', '\\');
             if (!Path.IsPathRooted(path) && !string.IsNullOrEmpty(basePath))
                 path = Path.Combine(basePath, path);
-            try { path = Path.GetFullPath(path); } catch (Exception ex) { Managers.AppLogger.Debug("TaskLauncher", $"Path normalization failed for '{path}': {ex.Message}"); }
+            try { path = Path.GetFullPath(path); } catch (Exception ex) { Managers.AppLogger.Debug("TaskLauncher", $"Path normalization failed for '{path}'", ex); }
             return path.ToLowerInvariant();
         }
     }

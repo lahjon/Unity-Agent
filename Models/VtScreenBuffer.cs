@@ -16,7 +16,7 @@ namespace AgenticEngine.Models
         private int _cursorRow;
         private int _cursorCol;
         private readonly Queue<string> _scrollback = new();
-        private const int MaxScrollbackLines = 5000;
+        private const int MaxScrollbackLines = Constants.AppConstants.ScrollbackLimit;
 
         // Scroll region (DECSTBM), 0-based inclusive
         private int _scrollTop;

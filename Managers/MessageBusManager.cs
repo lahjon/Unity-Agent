@@ -38,8 +38,9 @@ namespace AgenticEngine.Managers
         public HashSet<string> ProcessedFiles { get; set; } = new();
     }
 
-    public class MessageBusManager
+    public class MessageBusManager : IDisposable
     {
+        private bool _disposed;
         private readonly Dictionary<string, BusContext> _buses = new();
         private readonly Dispatcher _dispatcher;
 
@@ -150,6 +151,15 @@ namespace AgenticEngine.Managers
             _buses.Remove(projectPath);
         }
 
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            foreach (var projectPath in _buses.Keys.ToList())
+                DestroyBus(projectPath);
+        }
+
         private void OnNewMessageFile(string projectPath, string filePath)
         {
             if (!_buses.TryGetValue(projectPath, out var ctx)) return;
@@ -185,7 +195,7 @@ namespace AgenticEngine.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("MessageBus", $"Poll error for {projectPath}: {ex.Message}");
+                AppLogger.Debug("MessageBus", $"Poll error for {projectPath}", ex);
             }
         }
 
@@ -224,7 +234,7 @@ namespace AgenticEngine.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("MessageBus", $"Failed to parse message file {filePath}: {ex.Message}");
+                AppLogger.Debug("MessageBus", $"Failed to parse message file {filePath}", ex);
                 return null;
             }
         }
@@ -284,7 +294,7 @@ namespace AgenticEngine.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("MessageBus", $"Failed to write scratchpad: {ex.Message}");
+                AppLogger.Debug("MessageBus", "Failed to write scratchpad", ex);
             }
         }
 
@@ -305,7 +315,7 @@ namespace AgenticEngine.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("MessageBus", $"Failed to update .git/info/exclude: {ex.Message}");
+                AppLogger.Debug("MessageBus", "Failed to update .git/info/exclude", ex);
             }
         }
     }

@@ -190,18 +190,9 @@ namespace AgenticEngine.Managers
             };
         }
 
-        private static string NormalizePath(string? path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return "";
-            return path.Replace('/', '\\').TrimEnd('\\').ToLowerInvariant();
-        }
+        private static string NormalizePath(string? path) => Helpers.FormatHelpers.NormalizePath(path);
 
-        private static string FormatTokenCount(long count)
-        {
-            if (count >= 1_000_000) return $"{count / 1_000_000.0:F1}M";
-            if (count >= 1_000) return $"{count / 1_000.0:F1}K";
-            return count.ToString();
-        }
+        private static string FormatTokenCount(long count) => Helpers.FormatHelpers.FormatTokenCount(count);
 
         private static string FormatRelativeTime(DateTime time)
         {
@@ -862,38 +853,61 @@ namespace AgenticEngine.Managers
                     }
                 }
 
-                var mcpColor = proj.McpStatus switch
-                {
-                    McpStatus.Disabled => Color.FromRgb(0x66, 0x66, 0x66),
-                    McpStatus.Initialized => Color.FromRgb(0xE0, 0xA0, 0x30),
-                    McpStatus.Investigating => Color.FromRgb(0xE0, 0x80, 0x30),
-                    McpStatus.Enabled => Color.FromRgb(0x4C, 0xAF, 0x50),
-                    _ => Color.FromRgb(0x66, 0x66, 0x66)
-                };
-                var mcpIndicator = new StackPanel
+                var mcpEnabled = proj.McpStatus != McpStatus.Disabled;
+                var mcpTogglePanel = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
                     Margin = new Thickness(0, 4, 0, 0),
-                    ToolTip = $"MCP: {proj.McpStatus}"
+                    ToolTip = mcpEnabled ? $"MCP: {proj.McpStatus}" : "MCP disabled"
                 };
-                mcpIndicator.Children.Add(new System.Windows.Shapes.Ellipse
+                var mcpToggle = new ToggleButton
                 {
-                    Width = 8,
-                    Height = 8,
-                    Fill = new SolidColorBrush(mcpColor),
-                    Margin = new Thickness(0, 0, 4, 0),
+                    IsChecked = mcpEnabled,
+                    Style = (Style)Application.Current.FindResource("ToggleSwitch"),
+                    Tag = proj.Path,
                     VerticalAlignment = VerticalAlignment.Center
-                });
-                mcpIndicator.Children.Add(new TextBlock
+                };
+                mcpToggle.Content = new TextBlock
                 {
                     Text = "MCP",
-                    Foreground = new SolidColorBrush(mcpColor),
+                    Foreground = (Brush)Application.Current.FindResource("TextLight"),
                     FontSize = 10,
                     FontFamily = new FontFamily("Segoe UI"),
                     VerticalAlignment = VerticalAlignment.Center
-                });
-                infoPanel.Children.Add(mcpIndicator);
+                };
+                mcpToggle.Checked += async (s, ev) =>
+                {
+                    ev.Handled = true;
+                    if (s is ToggleButton tb && tb.Tag is string path)
+                        await ConnectMcpAsync(path);
+                };
+                mcpToggle.Unchecked += (s, ev) =>
+                {
+                    ev.Handled = true;
+                    if (s is ToggleButton tb && tb.Tag is string path)
+                        DisconnectMcp(path);
+                };
+                mcpTogglePanel.Children.Add(mcpToggle);
+
+                if (mcpEnabled && proj.McpStatus != McpStatus.Enabled)
+                {
+                    var mcpStatusColor = proj.McpStatus switch
+                    {
+                        McpStatus.Initialized => Color.FromRgb(0xE0, 0xA0, 0x30),
+                        McpStatus.Investigating => Color.FromRgb(0xE0, 0x80, 0x30),
+                        _ => Color.FromRgb(0x66, 0x66, 0x66)
+                    };
+                    mcpTogglePanel.Children.Add(new System.Windows.Shapes.Ellipse
+                    {
+                        Width = 6,
+                        Height = 6,
+                        Fill = new SolidColorBrush(mcpStatusColor),
+                        Margin = new Thickness(4, 0, 0, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        ToolTip = proj.McpStatus.ToString()
+                    });
+                }
+                infoPanel.Children.Add(mcpTogglePanel);
 
                 Grid.SetColumn(infoPanel, 0);
                 grid.Children.Add(infoPanel);
@@ -926,35 +940,6 @@ namespace AgenticEngine.Managers
                         RemoveProject(path, updateTerminalWorkingDirectory, saveSettings, syncSettings);
                 };
                 btnPanel.Children.Add(closeBtn);
-
-                if (proj.McpStatus == McpStatus.Investigating)
-                {
-                    var cancelMcpBtn = new Button
-                    {
-                        Content = "Cancel MCP",
-                        Style = (Style)Application.Current.FindResource("DangerBtn"),
-                        Margin = new Thickness(0, 4, 0, 0),
-                        Tag = proj.Path
-                    };
-                    cancelMcpBtn.Click += (s, ev) => { ev.Handled = true; CancelMcp(s as Button); };
-                    btnPanel.Children.Add(cancelMcpBtn);
-                }
-                else
-                {
-                    var connectBtn = new Button
-                    {
-                        Content = proj.McpStatus == McpStatus.Enabled ? "MCP OK" : "Connect MCP",
-                        Style = (Style)Application.Current.FindResource(
-                            proj.McpStatus == McpStatus.Enabled ? "SuccessBtn" : "SmallBtn"),
-                        Background = proj.McpStatus == McpStatus.Enabled
-                            ? (Brush)Application.Current.FindResource("Success")
-                            : (Brush)Application.Current.FindResource("Accent"),
-                        Margin = new Thickness(0, 4, 0, 0),
-                        Tag = proj.Path
-                    };
-                    connectBtn.Click += async (s, ev) => { ev.Handled = true; await ConnectMcpAsync(s as Button); };
-                    btnPanel.Children.Add(connectBtn);
-                }
 
                 Grid.SetColumn(btnPanel, 1);
                 grid.Children.Add(btnPanel);
@@ -998,15 +983,10 @@ namespace AgenticEngine.Managers
             }
         }
 
-        public async System.Threading.Tasks.Task ConnectMcpAsync(Button? btn)
+        public async System.Threading.Tasks.Task ConnectMcpAsync(string projectPath)
         {
-            if (btn?.Tag is not string projectPath) return;
-
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
             if (entry == null) return;
-
-            btn.IsEnabled = false;
-            btn.Content = "Checking...";
 
             var mcpUrl = "http://127.0.0.1:8080/mcp";
             var mcpJsonPath = Path.Combine(projectPath, ".mcp.json");
@@ -1060,10 +1040,8 @@ namespace AgenticEngine.Managers
             McpInvestigationRequested?.Invoke(investigateTask);
         }
 
-        public void CancelMcp(Button? btn)
+        public void DisconnectMcp(string projectPath)
         {
-            if (btn?.Tag is not string projectPath) return;
-
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
             if (entry == null) return;
 
@@ -1082,7 +1060,7 @@ namespace AgenticEngine.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("ProjectManager", $"MCP health check failed for {url}: {ex.Message}");
+                AppLogger.Debug("ProjectManager", $"MCP health check failed for {url}", ex);
                 return false;
             }
         }

@@ -216,7 +216,7 @@ namespace AgenticEngine.Managers
             }
             catch (OperationCanceledException)
             {
-                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
+                try { if (process is { HasExited: false }) process.Kill(true); } catch (Exception ex) { AppLogger.Debug("HelperManager", $"Failed to kill process on cancellation: {ex.Message}"); }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -224,6 +224,7 @@ namespace AgenticEngine.Managers
             }
             finally
             {
+                try { process?.Dispose(); } catch (Exception ex) { AppLogger.Debug("HelperManager", $"Failed to dispose process: {ex.Message}"); }
                 IsGenerating = false;
             }
         }
@@ -403,10 +404,7 @@ namespace AgenticEngine.Managers
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to load ignored titles async", ex); }
         }
 
-        private static string StripAnsi(string text)
-        {
-            return Regex.Replace(text, @"\x1B(?:\[[0-9;]*[a-zA-Z]|\].*?(?:\x07|\x1B\\))", "");
-        }
+        private static string StripAnsi(string text) => Helpers.FormatHelpers.StripAnsiCodes(text);
 
         private class SuggestionJson
         {

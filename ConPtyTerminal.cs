@@ -171,12 +171,13 @@ namespace AgenticEngine
         private SafeKernelHandle? _processHandle, _threadHandle;
         private SafeAttributeListHandle? _attrList;
         private Thread? _readThread;
-        private volatile bool _disposed;
+        private int _disposed; // 0 = active, 1 = disposed; use Interlocked/Volatile for thread safety
 
         private readonly VtScreenBuffer _screenBuffer;
 
-        // Per-terminal command history
-        public List<string> CommandHistory { get; } = new();
+        // Per-terminal command history (thread-safe)
+        private readonly List<string> _commandHistory = new();
+        private readonly object _historyLock = new();
         public int HistoryIndex { get; set; } = -1;
 
         /// <summary>True once the user has sent at least one command.</summary>
@@ -186,10 +187,32 @@ namespace AgenticEngine
         {
             get
             {
-                if (_disposed) return true;
+                if (Volatile.Read(ref _disposed) != 0) return true;
                 var handle = _processHandle;
                 if (handle == null || handle.IsInvalid || handle.IsClosed) return true;
                 return WaitForSingleObject(handle, 0) != 258; // WAIT_TIMEOUT = 258
+            }
+        }
+
+        // ── Command History (thread-safe) ──────────────────────────
+
+        public void AddCommand(string command)
+        {
+            lock (_historyLock) _commandHistory.Add(command);
+        }
+
+        public int CommandCount
+        {
+            get { lock (_historyLock) return _commandHistory.Count; }
+        }
+
+        public string? GetCommandFromEnd(int historyIndex)
+        {
+            lock (_historyLock)
+            {
+                if (_commandHistory.Count == 0 || historyIndex < 0 || historyIndex >= _commandHistory.Count)
+                    return null;
+                return _commandHistory[_commandHistory.Count - 1 - historyIndex];
             }
         }
 
@@ -302,9 +325,9 @@ namespace AgenticEngine
 
         private void ReadOutputLoop()
         {
-            var buffer = new byte[4096];
+            var buffer = new byte[Constants.AppConstants.TerminalBufferSize];
             var pipe = _pipeOutRead!;
-            while (!_disposed)
+            while (Volatile.Read(ref _disposed) == 0)
             {
                 bool ok = ReadFile(pipe, buffer, (uint)buffer.Length, out var bytesRead, IntPtr.Zero);
                 if (!ok || bytesRead == 0)
@@ -316,7 +339,7 @@ namespace AgenticEngine
                 OutputReceived?.Invoke();
             }
 
-            if (!_disposed)
+            if (Volatile.Read(ref _disposed) == 0)
                 Exited?.Invoke();
         }
 
@@ -329,9 +352,11 @@ namespace AgenticEngine
 
         public void SendRaw(string text)
         {
-            if (_disposed) return;
+            // Capture the handle reference first — even if Dispose() nulls the field and
+            // sets _disposed between these lines, our local 'pipe' keeps the SafeHandle
+            // alive (preventing the native handle from being released under us).
             var pipe = _pipeInWrite;
-            if (pipe == null || pipe.IsClosed) return;
+            if (pipe == null || pipe.IsClosed || Volatile.Read(ref _disposed) != 0) return;
             var bytes = Encoding.UTF8.GetBytes(text);
             WriteFile(pipe, bytes, (uint)bytes.Length, out _, IntPtr.Zero);
         }
@@ -355,29 +380,50 @@ namespace AgenticEngine
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            // Atomic test-and-set: only one thread enters the cleanup path
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
-            // Close pseudo console first - this will cause ReadFile to fail and exit the read thread
-            _pseudoConsole?.Dispose();
-            _pseudoConsole = null;
+            // 1. Let the read thread exit gracefully via its Volatile.Read(_disposed) check.
+            //    If it's blocked inside ReadFile, the Join will timeout after 2 s and
+            //    subsequent steps (TerminateProcess / ClosePseudoConsole) will unblock it.
+            try { _readThread?.Join(2000); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "Read thread join failed", ex); }
 
-            // Wait for the read thread to finish so no more events fire after this point
-            try { _readThread?.Join(2000); } catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", $"Read thread join failed: {ex.Message}"); }
-
-            // Terminate the process before closing its handle
-            if (_processHandle is { IsInvalid: false, IsClosed: false })
+            // 2. Terminate the process before closing its handle
+            try
             {
-                try { TerminateProcess(_processHandle, 0); } catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", $"TerminateProcess failed: {ex.Message}"); }
+                if (_processHandle is { IsInvalid: false, IsClosed: false })
+                    TerminateProcess(_processHandle, 0);
             }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "TerminateProcess failed", ex); }
 
-            _processHandle?.Dispose();
-            _threadHandle?.Dispose();
-            _pipeInWrite?.Dispose();
-            _pipeOutRead?.Dispose();
-            _pipeInRead?.Dispose();
-            _pipeOutWrite?.Dispose();
-            _attrList?.Dispose();
+            // 3. Now close the pseudo console (safe — read thread has either exited or
+            //    will exit once this breaks its ReadFile call)
+            try { _pseudoConsole?.Dispose(); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "ClosePseudoConsole failed", ex); }
+
+            // 4. Dispose remaining handles — each in its own try-catch so one failure
+            //    doesn't skip subsequent cleanup
+            try { _processHandle?.Dispose(); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "Process handle dispose failed", ex); }
+
+            try { _threadHandle?.Dispose(); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "Thread handle dispose failed", ex); }
+
+            try { _pipeInWrite?.Dispose(); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "PipeInWrite dispose failed", ex); }
+
+            try { _pipeOutRead?.Dispose(); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "PipeOutRead dispose failed", ex); }
+
+            try { _pipeInRead?.Dispose(); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "PipeInRead dispose failed", ex); }
+
+            try { _pipeOutWrite?.Dispose(); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "PipeOutWrite dispose failed", ex); }
+
+            try { _attrList?.Dispose(); }
+            catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", "AttrList dispose failed", ex); }
         }
     }
 }

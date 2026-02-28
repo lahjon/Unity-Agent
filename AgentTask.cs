@@ -55,7 +55,11 @@ namespace AgenticEngine
         public bool ExtendedPlanning { get => Data.ExtendedPlanning; set => Data.ExtendedPlanning = value; }
         public bool NoGitWrite { get => Data.NoGitWrite; set => Data.NoGitWrite = value; }
         public bool PlanOnly { get => Data.PlanOnly; set => Data.PlanOnly = value; }
+        public int Priority { get => Data.Priority; set => Data.Priority = value; }
         public bool UseMessageBus { get => Data.UseMessageBus; set => Data.UseMessageBus = value; }
+        public bool AutoDecompose { get => Data.AutoDecompose; set => Data.AutoDecompose = value; }
+        public string? GroupId { get => Data.GroupId; set => Data.GroupId = value; }
+        public string? GroupName { get => Data.GroupName; set => Data.GroupName = value; }
         public string? StoredPrompt { get => Data.StoredPrompt; set => Data.StoredPrompt = value; }
         public string? ConversationId { get => Data.ConversationId; set => Data.ConversationId = value; }
         public string? FullOutput { get => Data.FullOutput; set => Data.FullOutput = value; }
@@ -92,6 +96,12 @@ namespace AgenticEngine
 
         public bool HasRecommendations => !string.IsNullOrWhiteSpace(Recommendations);
 
+        public string ContinueReason
+        {
+            get => Data.ContinueReason;
+            set { Data.ContinueReason = value; OnPropertyChanged(); }
+        }
+
         public string Summary
         {
             get => Data.Summary;
@@ -113,6 +123,7 @@ namespace AgenticEngine
                 OnPropertyChanged(nameof(IsPaused));
                 OnPropertyChanged(nameof(IsInitQueued));
                 OnPropertyChanged(nameof(IsFinished));
+                OnPropertyChanged(nameof(IsRetryable));
                 OnPropertyChanged(nameof(TimeInfo));
             }
         }
@@ -138,12 +149,37 @@ namespace AgenticEngine
         public string? BlockedByTaskId { get => Runtime.BlockedByTaskId; set => Runtime.BlockedByTaskId = value; }
         public int? BlockedByTaskNumber { get => Runtime.BlockedByTaskNumber; set => Runtime.BlockedByTaskNumber = value; }
         public List<string> DependencyTaskIds { get => Runtime.DependencyTaskIds; set => Runtime.DependencyTaskIds = value; }
+        public void AddDependencyTaskId(string id) => Runtime.AddDependencyTaskId(id);
+        public bool RemoveDependencyTaskId(string id) => Runtime.RemoveDependencyTaskId(id);
+        public bool ContainsDependencyTaskId(string id) => Runtime.ContainsDependencyTaskId(id);
+        public int DependencyTaskIdCount => Runtime.DependencyTaskIdCount;
+        public void ClearDependencyTaskIds() => Runtime.ClearDependencyTaskIds();
         public List<int> DependencyTaskNumbers { get => Runtime.DependencyTaskNumbers; set => Runtime.DependencyTaskNumbers = value; }
         public bool IsPlanningBeforeQueue { get => Runtime.IsPlanningBeforeQueue; set => Runtime.IsPlanningBeforeQueue = value; }
         public bool NeedsPlanRestart { get => Runtime.NeedsPlanRestart; set => Runtime.NeedsPlanRestart = value; }
         public string? DependencyContext { get => Data.DependencyContext; set => Data.DependencyContext = value; }
         public string? PendingFileLockPath { get => Runtime.PendingFileLockPath; set => Runtime.PendingFileLockPath = value; }
         public string? PendingFileLockBlocker { get => Runtime.PendingFileLockBlocker; set => Runtime.PendingFileLockBlocker = value; }
+
+        // ── Parent-child hierarchy ────────────────────────────────────
+
+        public string? ParentTaskId { get => Data.ParentTaskId; set => Data.ParentTaskId = value; }
+        public List<string> ChildTaskIds { get => Data.ChildTaskIds; set => Data.ChildTaskIds = value; }
+        public int SubTaskCounter { get => Runtime.SubTaskCounter; set => Runtime.SubTaskCounter = value; }
+
+        public bool IsSubTask => ParentTaskId != null;
+        public bool HasChildren => ChildTaskIds.Count > 0;
+
+        public string HierarchyLabel
+        {
+            get
+            {
+                if (!IsSubTask) return $"#{TaskNumber:D4}";
+                return $"#{TaskNumber:D4}.{Runtime.SubTaskIndex}";
+            }
+        }
+
+        public int NestingDepth => IsSubTask ? 1 : 0;
 
         // ── Token tracking ─────────────────────────────────────────────
 
@@ -190,12 +226,7 @@ namespace AgenticEngine
             CacheCreationTokens += cacheCreationTokens;
         }
 
-        private static string FormatTokenCount(long count)
-        {
-            if (count >= 1_000_000) return $"{count / 1_000_000.0:F1}M";
-            if (count >= 1_000) return $"{count / 1_000.0:F1}K";
-            return count.ToString();
-        }
+        private static string FormatTokenCount(long count) => Helpers.FormatHelpers.FormatTokenCount(count);
 
         // ── Tool activity feed (UI-bound) ─────────────────────────────
 
@@ -269,6 +300,8 @@ namespace AgenticEngine
         public bool IsInitQueued => Status == AgentTaskStatus.InitQueued;
 
         public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed;
+
+        public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
 
         public string TimeInfo
         {

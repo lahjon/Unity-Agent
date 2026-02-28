@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -11,10 +9,9 @@ using System.Threading.Tasks;
 
 namespace AgenticEngine.Managers
 {
-    public class GeminiService
+    public class GeminiService : BaseLlmService
     {
         private const string ApiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
-        private const string DefaultModel = "gemini-2.0-flash-exp";
 
         public static readonly string[] AvailableModels = new[]
         {
@@ -26,34 +23,20 @@ namespace AgenticEngine.Managers
             "gemini-1.5-flash",
         };
 
-        private readonly string _configFile;
         private readonly string _imageDir;
-        private readonly HttpClient _httpClient;
-        private string? _apiKey;
-        private string _selectedModel = DefaultModel;
 
-        public bool IsConfigured => !string.IsNullOrEmpty(_apiKey) && IsValidApiKeyFormat(_apiKey);
-        public bool ApiKeyDecryptionFailed { get; private set; }
-        public string SelectedModel
-        {
-            get => _selectedModel;
-            set
-            {
-                _selectedModel = value;
-                SaveConfig();
-            }
-        }
+        protected override string ServiceName => "GeminiService";
+        protected override string DefaultModelId => "gemini-2.0-flash-exp";
 
-        public GeminiService(string appDataDir)
+        public override bool IsConfigured { get { var key = GetApiKey(); return !string.IsNullOrEmpty(key) && IsValidApiKeyFormat(key); } }
+
+        public GeminiService(string appDataDir) : base(appDataDir, "gemini_config.json")
         {
-            _configFile = Path.Combine(appDataDir, "gemini_config.json");
             _imageDir = Path.Combine(appDataDir, "gemini_images");
             Directory.CreateDirectory(_imageDir);
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            LoadConfig();
         }
 
-        private void LoadConfig()
+        protected override void LoadConfig()
         {
             try
             {
@@ -63,51 +46,31 @@ namespace AgenticEngine.Managers
                 bool needsResave = false;
                 if (doc.RootElement.TryGetProperty("encryptedApiKey", out var encKey))
                 {
-                    _apiKey = DecryptString(encKey.GetString());
+                    var decrypted = DecryptString(encKey.GetString());
+                    lock (_apiKeyLock) _apiKey = decrypted;
                 }
                 else if (doc.RootElement.TryGetProperty("apiKey", out var key))
                 {
                     // Migrate plaintext key to encrypted format
-                    _apiKey = key.GetString();
+                    lock (_apiKeyLock) _apiKey = key.GetString();
                     needsResave = true;
                 }
                 if (doc.RootElement.TryGetProperty("model", out var model))
-                    _selectedModel = model.GetString() ?? DefaultModel;
-                if (needsResave && !string.IsNullOrEmpty(_apiKey))
+                    _selectedModel = model.GetString() ?? DefaultModelId;
+                if (needsResave && !string.IsNullOrEmpty(GetApiKey()))
                     SaveConfig();
             }
-            catch (Exception ex) { AppLogger.Warn("GeminiService", "Failed to load config", ex); }
+            catch (Exception ex) { AppLogger.Warn(ServiceName, "Failed to load config", ex); }
         }
 
-        public void SaveApiKey(string apiKey)
+        public override void SaveApiKey(string apiKey)
         {
             if (!IsValidApiKeyFormat(apiKey))
                 throw new ArgumentException(
                     "Invalid API key format. Google API keys should be 39 characters long and start with 'AIza'.");
-            _apiKey = apiKey;
+            lock (_apiKeyLock) _apiKey = apiKey;
             ApiKeyDecryptionFailed = false;
             SaveConfig();
-        }
-
-        private void SaveConfig()
-        {
-            try
-            {
-                var config = new Dictionary<string, string>();
-                if (!string.IsNullOrEmpty(_apiKey))
-                    config["encryptedApiKey"] = EncryptString(_apiKey);
-                config["model"] = _selectedModel;
-                var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-                SafeFileWriter.WriteInBackground(_configFile, json, "GeminiService");
-            }
-            catch (Exception ex) { AppLogger.Warn("GeminiService", "Failed to save config", ex); }
-        }
-
-        public string GetMaskedApiKey()
-        {
-            if (string.IsNullOrEmpty(_apiKey)) return "";
-            if (_apiKey.Length <= 8) return new string('*', _apiKey.Length);
-            return _apiKey[..4] + new string('*', _apiKey.Length - 8) + _apiKey[^4..];
         }
 
         /// <summary>
@@ -120,48 +83,17 @@ namespace AgenticEngine.Managers
             return key.Length == 39 && key.StartsWith("AIza", StringComparison.Ordinal);
         }
 
-        private static string EncryptString(string plainText)
-        {
-            var bytes = Encoding.UTF8.GetBytes(plainText);
-            var encrypted = ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser);
-            return Convert.ToBase64String(encrypted);
-        }
-
-        private string? DecryptString(string? cipherBase64)
-        {
-            if (string.IsNullOrEmpty(cipherBase64)) return null;
-            try
-            {
-                var encrypted = Convert.FromBase64String(cipherBase64);
-                var bytes = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(bytes);
-            }
-            catch (CryptographicException ex)
-            {
-                AppLogger.Warn("GeminiService",
-                    "Failed to decrypt API key (DPAPI scope mismatch or corrupted data). " +
-                    "Please re-enter your API key in Settings > Gemini.", ex);
-                ApiKeyDecryptionFailed = true;
-                return null;
-            }
-            catch (FormatException ex)
-            {
-                AppLogger.Warn("GeminiService",
-                    "Stored API key has invalid Base64 encoding. " +
-                    "Please re-enter your API key in Settings > Gemini.", ex);
-                ApiKeyDecryptionFailed = true;
-                return null;
-            }
-        }
+        public string GetImageDirectory() => _imageDir;
 
         public async Task<GeminiImageResult> GenerateImageAsync(string prompt, string taskId,
             IProgress<string>? progress = null, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(_apiKey))
+            var apiKey = GetApiKey();
+            if (string.IsNullOrEmpty(apiKey))
                 return GeminiImageResult.Failure(ApiKeyDecryptionFailed
                     ? "Gemini API key could not be decrypted. Please re-enter it in Settings > Gemini."
                     : "Gemini API key not configured. Set it in Settings > Gemini.");
-            if (!IsValidApiKeyFormat(_apiKey))
+            if (!IsValidApiKeyFormat(apiKey))
                 return GeminiImageResult.Failure(
                     "Gemini API key has an invalid format (expected 39-char key starting with 'AIza'). " +
                     "Please re-enter it in Settings > Gemini.");
@@ -189,7 +121,7 @@ namespace AgenticEngine.Managers
                 };
 
                 var jsonContent = JsonSerializer.Serialize(requestBody);
-                var url = $"{ApiBaseUrl}/{_selectedModel}:generateContent?key={_apiKey}";
+                var url = $"{ApiBaseUrl}/{_selectedModel}:generateContent?key={apiKey}";
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, url);
                 request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
@@ -297,24 +229,6 @@ namespace AgenticEngine.Managers
             }
         }
 
-        private static string TryExtractErrorMessage(string responseBody)
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(responseBody);
-                if (doc.RootElement.TryGetProperty("error", out var error))
-                {
-                    if (error.TryGetProperty("message", out var msg))
-                        return msg.GetString() ?? "Unknown error";
-                    return error.ToString();
-                }
-            }
-            catch (Exception ex) { AppLogger.Debug("GeminiService", $"Failed to parse error response JSON: {ex.Message}"); }
-            return responseBody.Length > 200 ? responseBody[..200] : responseBody;
-        }
-
-        public string GetImageDirectory() => _imageDir;
-
         /// <summary>
         /// Sends a text chat message to Gemini with conversation history (non-streaming).
         /// </summary>
@@ -324,17 +238,16 @@ namespace AgenticEngine.Managers
             string? systemInstruction = null,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(_apiKey))
-                return ApiKeyDecryptionFailed
-                    ? "[Error] Gemini API key could not be decrypted. Please re-enter it in Settings > Gemini."
-                    : "[Error] Gemini API key not configured. Set it in Settings > Gemini.";
-            if (!IsValidApiKeyFormat(_apiKey))
+            var apiKey = GetApiKey();
+            if (!IsConfigured)
+                return GetApiKeyError();
+            if (!IsValidApiKeyFormat(apiKey))
                 return "[Error] Gemini API key has an invalid format. Please re-enter it in Settings > Gemini.";
 
             try
             {
                 var jsonContent = JsonSerializer.Serialize(BuildChatRequestBody(history, userMessage, systemInstruction));
-                var url = $"{ApiBaseUrl}/{_selectedModel}:generateContent?key={_apiKey}";
+                var url = $"{ApiBaseUrl}/{_selectedModel}:generateContent?key={apiKey}";
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, url);
                 request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
@@ -360,28 +273,23 @@ namespace AgenticEngine.Managers
             }
         }
 
-        /// <summary>
-        /// Streams a chat response from Gemini, calling onTextChunk for each piece of text as it arrives.
-        /// Returns the full accumulated response text, or an error string starting with "[Error]" or "[Cancelled]".
-        /// </summary>
-        public async Task<string> SendChatMessageStreamingAsync(
+        public override async Task<string> SendChatMessageStreamingAsync(
             List<ChatMessage> history,
             string userMessage,
             Action<string> onTextChunk,
             string? systemInstruction = null,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(_apiKey))
-                return ApiKeyDecryptionFailed
-                    ? "[Error] Gemini API key could not be decrypted. Please re-enter it in Settings > Gemini."
-                    : "[Error] Gemini API key not configured. Set it in Settings > Gemini.";
-            if (!IsValidApiKeyFormat(_apiKey))
+            var apiKey = GetApiKey();
+            if (!IsConfigured)
+                return GetApiKeyError();
+            if (!IsValidApiKeyFormat(apiKey))
                 return "[Error] Gemini API key has an invalid format. Please re-enter it in Settings > Gemini.";
 
             try
             {
                 var jsonContent = JsonSerializer.Serialize(BuildChatRequestBody(history, userMessage, systemInstruction));
-                var url = $"{ApiBaseUrl}/{_selectedModel}:streamGenerateContent?alt=sse&key={_apiKey}";
+                var url = $"{ApiBaseUrl}/{_selectedModel}:streamGenerateContent?alt=sse&key={apiKey}";
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, url);
                 request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
@@ -481,7 +389,7 @@ namespace AgenticEngine.Managers
                     }
                 }
             }
-            catch { /* malformed chunk, skip */ }
+            catch (Exception ex) { AppLogger.Debug("GeminiService", $"Malformed SSE chunk skipped: {ex.Message}"); }
             return null;
         }
     }

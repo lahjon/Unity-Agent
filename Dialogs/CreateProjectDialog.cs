@@ -20,7 +20,7 @@ namespace AgenticEngine.Dialogs
         public static CreateProjectResult? Show()
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("CreateProjectDialog", $"Could not get MainWindow: {ex.Message}"); }
+            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("CreateProjectDialog", "Could not get MainWindow", ex); }
 
             var dlg = new Window
             {
@@ -369,6 +369,8 @@ namespace AgenticEngine.Dialogs
             dlg.KeyDown += (_, ke) =>
             {
                 if (ke.Key == Key.Escape) dlg.Close();
+                if (ke.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+                    createBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             };
 
             nameBox.Focus();

@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AgenticEngine"
+        xmlns:controls="clr-namespace:AgenticEngine.Controls"
         Title="Agentic Engine" Width="1280" Height="820"
         Background="{StaticResource BgDeep}" WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded"
@@ -10,7 +11,8 @@
     <Window.Resources>
         <!-- ═══ ACTIVE TASK ═══ -->
         <DataTemplate x:Key="ActiveTaskTemplate">
-            <Border x:Name="Card" CornerRadius="8" Padding="10" Margin="0,2"
+            <Border x:Name="Card" CornerRadius="8" Padding="10"
+                    Margin="{Binding NestingDepth, Converter={StaticResource NestingDepthToMargin}}"
                     BorderThickness="1"
                     MouseUp="TaskCard_MouseUp"
                     PreviewMouseLeftButtonDown="TaskCard_PreviewMouseDown"
@@ -250,7 +252,7 @@
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
-                        <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
+                        <TextBlock Text="{Binding HierarchyLabel}"
                                    Foreground="{StaticResource TextSubdued}"
                                    FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
@@ -378,7 +380,10 @@
                                 <Button.ToolTip>
                                     <ToolTip MaxWidth="400">
                                         <StackPanel>
-                                            <TextBlock Text="Continue will:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Why continue:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding ContinueReason}" TextWrapping="Wrap" Foreground="#FFAB40" Margin="0,0,0,6"
+                                                       Visibility="{Binding ContinueReason, Converter={StaticResource StringToVisibility}}"/>
+                                            <TextBlock Text="Recommended next steps:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
                                             <TextBlock Text="{Binding Recommendations}" TextWrapping="Wrap" Foreground="#E0E0E0"/>
                                         </StackPanel>
                                     </ToolTip>
@@ -623,7 +628,10 @@
                                 <Button.ToolTip>
                                     <ToolTip MaxWidth="400">
                                         <StackPanel>
-                                            <TextBlock Text="Continue will:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Why continue:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding ContinueReason}" TextWrapping="Wrap" Foreground="#FFAB40" Margin="0,0,0,6"
+                                                       Visibility="{Binding ContinueReason, Converter={StaticResource StringToVisibility}}"/>
+                                            <TextBlock Text="Recommended next steps:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
                                             <TextBlock Text="{Binding Recommendations}" TextWrapping="Wrap" Foreground="#E0E0E0"/>
                                         </StackPanel>
                                     </ToolTip>
@@ -633,6 +641,20 @@
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding HasRecommendations}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Content="Retry" Click="RetryTask_Click"
+                                    Background="#E07840"
+                                    Margin="0,0,4,0">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRetryable}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -754,6 +776,8 @@
             <ColumnDefinition Width="285" MinWidth="150"/>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*" MinWidth="200"/>
+            <ColumnDefinition x:Name="ChatSplitterCol" Width="0"/>
+            <ColumnDefinition x:Name="ChatPanelCol" Width="0" MinWidth="0"/>
             <ColumnDefinition x:Name="RightSplitterCol" Width="Auto"/>
             <ColumnDefinition x:Name="RightPanelCol" Width="285" MinWidth="150"/>
         </Grid.ColumnDefinitions>
@@ -817,7 +841,7 @@
         <GridSplitter Grid.Column="1" Grid.RowSpan="5" Style="{StaticResource VerticalSplitter}"/>
 
         <!-- ═══ PROMPTS (2) ═══ -->
-        <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="14"
+        <Border Grid.Row="2" Grid.Column="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="14"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="InputSectionBorder" Color="#2C2C2C"/>
@@ -846,8 +870,6 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition x:Name="SavedPanelCol" Width="200" MinWidth="120"/>
-                        <ColumnDefinition x:Name="ChatSplitterCol" Width="Auto"/>
-                        <ColumnDefinition x:Name="ChatPanelCol" Width="280" MinWidth="0"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Left: Prompt input area + collapsible Advanced side panel -->
@@ -960,7 +982,7 @@
                             </DockPanel>
                         </Border>
                         <!-- Additional instructions (saved with templates) -->
-                        <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                             <TextBlock DockPanel.Dock="Top" Text="ADDITIONAL INSTRUCTIONS" Foreground="{StaticResource TextMuted}"
                                        FontWeight="Bold" FontSize="9" FontFamily="Segoe UI" Margin="0,0,0,4"/>
                             <TextBox x:Name="AdditionalInstructionsInput" AcceptsReturn="True" TextWrapping="Wrap"
@@ -971,12 +993,15 @@
                                      FontSize="12" FontFamily="Consolas" Padding="8"
                                      ToolTip="Additional instructions saved with templates (e.g. coding standards, constraints)"/>
                         </DockPanel>
+                        <!-- Divider between additional instructions and prompt -->
+                        <Border DockPanel.Dock="Bottom" Margin="0,8,0,4" Height="1"
+                                Background="{StaticResource BorderSubtle}" Opacity="0.4"/>
                         <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
                                  MinHeight="80" MaxHeight="150"
                                  VerticalScrollBarVisibility="Auto"
                                  Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
                                  CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                 FontSize="13" FontFamily="Consolas" Padding="10"
+                                 FontSize="13" FontFamily="Consolas" Padding="8"
                                  PreviewKeyDown="TaskInput_PreviewKeyDown"
                                  AllowDrop="True" PreviewDragOver="TaskInput_DragOver"
                                  Drop="TaskInput_Drop"/>
@@ -1045,6 +1070,10 @@
                                                   Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
                                         <TextBlock Text="Message Bus" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
+                                    <ToggleButton x:Name="AutoDecomposeToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Auto-Decompose" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
                                 </StackPanel>
                             </ScrollViewer>
                         </DockPanel>
@@ -1063,99 +1092,11 @@
                             </ScrollViewer>
                         </DockPanel>
                     </Border>
-
-                    <!-- Splitter: Content ↔ Chat (Thumb-based to avoid GridSplitter star-sizing inversion) -->
-                    <Thumb x:Name="ChatSplitter" Grid.Column="2"
-                           Style="{StaticResource VerticalSplitterThumb}"
-                           DragDelta="ChatSplitter_DragDelta"/>
-
-                    <!-- Right: Collapsible Chat panel -->
-                    <Grid Grid.Column="3" Margin="4,0,0,0">
-                        <!-- Collapsed strip -->
-                        <Border x:Name="ChatCollapsedStrip" Visibility="Collapsed"
-                                Background="{StaticResource BgSurface}" CornerRadius="6"
-                                BorderBrush="{StaticResource BgElevated}" BorderThickness="1"
-                                Padding="4" Width="28" Cursor="Hand"
-                                MouseLeftButtonUp="ChatToggle_Click">
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <TextBlock Text="&#xE76B;" FontFamily="Segoe MDL2 Assets" FontSize="12"
-                                           Foreground="{StaticResource Accent}" HorizontalAlignment="Center"
-                                           Margin="0,0,0,6"/>
-                                <TextBlock Text="C&#x0A;H&#x0A;A&#x0A;T" Foreground="{StaticResource Accent}"
-                                           FontWeight="Bold" FontSize="9" FontFamily="Segoe UI"
-                                           TextAlignment="Center" LineHeight="14"/>
-                            </StackPanel>
-                        </Border>
-                        <!-- Expanded panel -->
-                        <Border x:Name="ChatExpandedPanel" Background="{StaticResource BgSurface}" CornerRadius="6"
-                                BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Padding="8">
-                            <DockPanel>
-                                <!-- Header with collapse + New Chat buttons -->
-                                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-                                    <Button Content="&#xE76C;" Click="ChatToggle_Click"
-                                            FontFamily="Segoe MDL2 Assets" FontSize="10"
-                                            Style="{StaticResource IconBtn}" Foreground="{StaticResource Accent}"
-                                            Padding="4,2" ToolTip="Collapse chat" Margin="0,0,6,0"
-                                            VerticalAlignment="Center"/>
-                                    <TextBlock Text="CHAT" Foreground="{StaticResource Accent}" FontWeight="Bold"
-                                               FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                                    <Button x:Name="NewChatBtn" Content="New Chat" Click="NewChat_Click"
-                                            Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
-                                            HorizontalAlignment="Right" FontSize="10"/>
-                                </DockPanel>
-                                <!-- Input area at the bottom -->
-                                <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
-                                    <Button x:Name="ChatSendBtn" Content="&#xE724;" Click="ChatSend_Click"
-                                            DockPanel.Dock="Right" Margin="4,0,0,0" VerticalAlignment="Center"
-                                            Padding="6,6" FontSize="13" ToolTip="Send message">
-                                        <Button.Style>
-                                            <Style TargetType="Button">
-                                                <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
-                                                <Setter Property="Foreground" Value="White"/>
-                                                <Setter Property="Cursor" Value="Hand"/>
-                                                <Setter Property="BorderThickness" Value="0"/>
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Border x:Name="Bd" Background="{StaticResource Accent}" CornerRadius="6"
-                                                                    Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
-                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                            </Border>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHover}"/>
-                                                                </Trigger>
-                                                                <Trigger Property="IsPressed" Value="True">
-                                                                    <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-                                    <TextBox x:Name="ChatInput" AcceptsReturn="True" TextWrapping="Wrap"
-                                             MaxHeight="60" MinHeight="28"
-                                             VerticalScrollBarVisibility="Auto"
-                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
-                                             CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
-                                             BorderThickness="1" FontSize="12" FontFamily="Segoe UI" Padding="6,4"
-                                             PreviewKeyDown="ChatInput_PreviewKeyDown"
-                                             VerticalContentAlignment="Center"/>
-                                </DockPanel>
-                                <!-- Chat messages -->
-                                <ScrollViewer x:Name="ChatScrollViewer" VerticalScrollBarVisibility="Auto">
-                                    <StackPanel x:Name="ChatMessagesPanel"/>
-                                </ScrollViewer>
-                            </DockPanel>
-                        </Border>
-                    </Grid>
                 </Grid>
             </Border>
 
         <!-- Horizontal Splitter: Top ↔ Middle (Thumb-based to avoid GridSplitter star-sizing jitter) -->
-        <Thumb x:Name="TopMiddleSplitter" Grid.Row="1" Grid.ColumnSpan="5"
+        <Thumb x:Name="TopMiddleSplitter" Grid.Row="1" Grid.ColumnSpan="7"
                Style="{StaticResource HorizontalSplitterThumb}"
                DragStarted="TopMiddleSplitter_DragStarted"
                DragDelta="TopMiddleSplitter_DragDelta"
@@ -1195,10 +1136,6 @@
                     <DockPanel Grid.Row="0" Margin="4,2,4,6">
                         <TextBlock Text="TASK LIST" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                    FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                        <Button Content="Graph View" Click="ViewDependencyGraph_Click"
-                                Style="{StaticResource GhostBtn}" FontSize="10" Padding="6,2"
-                                DockPanel.Dock="Right" VerticalAlignment="Center"
-                                ToolTip="View task dependency graph"/>
                     </DockPanel>
                 <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0"
                            SelectionChanged="TaskListTab_SelectionChanged">
@@ -1279,6 +1216,9 @@
                                               FontSize="10" Padding="6,3" Margin="0,0,4,0"
                                               HorizontalAlignment="Left"/>
                                     <ComboBox x:Name="HistoryStatusFilterCombo" SelectionChanged="HistoryStatusFilter_Changed"
+                                              FontSize="10" Padding="6,3" Margin="0,0,4,0"
+                                              HorizontalAlignment="Left"/>
+                                    <ComboBox x:Name="HistoryGroupFilterCombo" SelectionChanged="HistoryGroupFilter_Changed"
                                               FontSize="10" Padding="6,3"
                                               HorizontalAlignment="Left"/>
                                 </StackPanel>
@@ -1342,9 +1282,25 @@
                 </Grid>
             </Border>
 
-        <!-- ═══ TASK OUTPUT (4) ═══ -->
-        <Border Grid.Row="0" Grid.Column="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
-                BorderThickness="1">
+        <!-- ═══ GRAPH + TASK OUTPUT (4) ═══ -->
+        <Grid Grid.Row="0" Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="GraphPanelRow" Height="180" MinHeight="60"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*" MinHeight="120"/>
+            </Grid.RowDefinitions>
+
+            <!-- Node Graph Panel -->
+            <controls:TaskNodeGraphPanel x:Name="NodeGraphPanel" Grid.Row="0"/>
+
+            <!-- Splitter between graph and output -->
+            <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"
+                          VerticalAlignment="Center" Background="Transparent"
+                          Style="{StaticResource HorizontalSplitter}"/>
+
+            <!-- Task Output -->
+            <Border Grid.Row="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
+                    BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="MainContentBorder" Color="#2C2C2C"/>
                 </Border.BorderBrush>
@@ -1375,13 +1331,81 @@
                                 SizeChanged="OutputTabs_SizeChanged"/>
                 </DockPanel>
             </Border>
+        </Grid>
+
+        <!-- ═══ CHAT PANEL ═══ -->
+        <Thumb x:Name="ChatSplitter" Grid.Column="3" Grid.Row="0" Grid.RowSpan="5"
+               Style="{StaticResource VerticalSplitterThumb}"
+               DragDelta="ChatSplitter_DragDelta" Visibility="Collapsed"/>
+
+        <Grid Grid.Column="6" Grid.Row="2" Grid.RowSpan="3">
+            <!-- Chat panel -->
+            <Border x:Name="ChatExpandedPanel" Background="{StaticResource BgSurface}" CornerRadius="8"
+                    BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Padding="8">
+                <DockPanel>
+                    <!-- Header with New Chat button -->
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                        <TextBlock Text="CHAT" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                   FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                        <Button x:Name="NewChatBtn" Content="New Chat" Click="NewChat_Click"
+                                Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
+                                HorizontalAlignment="Right" FontSize="10"/>
+                    </DockPanel>
+                    <!-- Input area at the bottom -->
+                    <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                        <Button x:Name="ChatSendBtn" Content="&#xE724;" Click="ChatSend_Click"
+                                DockPanel.Dock="Right" Margin="4,0,0,0" VerticalAlignment="Center"
+                                Padding="6,6" FontSize="13" ToolTip="Send message">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="Cursor" Value="Hand"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="Bd" Background="{StaticResource Accent}" CornerRadius="6"
+                                                        Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHover}"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <TextBox x:Name="ChatInput" AcceptsReturn="True" TextWrapping="Wrap"
+                                 MaxHeight="60" MinHeight="28"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
+                                 CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
+                                 BorderThickness="1" FontSize="12" FontFamily="Segoe UI" Padding="6,4"
+                                 PreviewKeyDown="ChatInput_PreviewKeyDown"
+                                 VerticalContentAlignment="Center"/>
+                    </DockPanel>
+                    <!-- Chat messages -->
+                    <ScrollViewer x:Name="ChatScrollViewer" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="ChatMessagesPanel"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
 
         <!-- Vertical Splitter: Center ↔ Right -->
-        <GridSplitter x:Name="RightSplitter" Grid.Column="3" Grid.Row="0" Style="{StaticResource VerticalSplitter}"/>
+        <GridSplitter x:Name="RightSplitter" Grid.Column="5" Grid.Row="0" Grid.RowSpan="5" Style="{StaticResource VerticalSplitter}"/>
 
         <!-- ═══ SETTINGS (5) ═══ -->
         <!-- Collapsed strip (shown when panel is collapsed) -->
-        <Border x:Name="SettingsCollapsedStrip" Grid.Row="0" Grid.Column="4"
+        <Border x:Name="SettingsCollapsedStrip" Grid.Row="0" Grid.Column="6"
                 Background="{StaticResource BgSurface}" CornerRadius="8" Padding="0" Visibility="Collapsed"
                 BorderThickness="1" BorderBrush="{StaticResource BgElevated}" Width="32">
             <Button x:Name="ExpandSettingsBtn" Click="ToggleSettingsPanel_Click"
@@ -1397,7 +1421,7 @@
             </Button>
         </Border>
         <!-- Expanded settings panel -->
-        <Border x:Name="SettingsExpandedPanel" Grid.Row="0" Grid.Column="4" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
+        <Border x:Name="SettingsExpandedPanel" Grid.Row="0" Grid.Column="6" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="RightPanelBorder" Color="#2C2C2C"/>
@@ -1476,7 +1500,8 @@
                                                  FontSize="11" FontFamily="Segoe UI" Padding="6,4"
                                                  Background="{StaticResource BgSection}" Foreground="{StaticResource TextLight}"
                                                  BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                                 VerticalAlignment="Center"/>
+                                                 VerticalAlignment="Center"
+                                                 PreviewKeyDown="SuggestionGuidanceInput_PreviewKeyDown"/>
                                         <TextBlock Text="Optional: guide the suggestions (e.g. &quot;focus on error handling&quot;)"
                                                    Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"
                                                    Padding="8,5" IsHitTestVisible="False" VerticalAlignment="Center">
@@ -2108,10 +2133,10 @@
             </Border>
 
         <!-- Horizontal Splitter: Output ↔ Terminal -->
-        <GridSplitter x:Name="TerminalSplitter" Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="3" Style="{StaticResource HorizontalSplitter}" Visibility="Collapsed"/>
+        <GridSplitter x:Name="TerminalSplitter" Grid.Row="3" Grid.Column="2" Style="{StaticResource HorizontalSplitter}" Visibility="Collapsed"/>
 
         <!-- ═══ TERMINAL (6) ═══ -->
-        <Border Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
+        <Border Grid.Row="4" Grid.Column="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
                 BorderThickness="1">
             <Border.BorderBrush>
                 <SolidColorBrush x:Name="TerminalPanelBorder" Color="#2C2C2C"/>
@@ -2182,7 +2207,7 @@
         </Border>
 
         <!-- ═══ STATUS BAR ═══ -->
-        <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="5" Background="{StaticResource BgSurface}" CornerRadius="6" Padding="12,7" Margin="0,8,0,0"
+        <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="7" Background="{StaticResource BgSurface}" CornerRadius="6" Padding="12,7" Margin="0,8,0,0"
                 BorderThickness="1">
             <Border.BorderBrush>
                 <SolidColorBrush x:Name="StatusBarBorder" Color="#2C2C2C"/>
@@ -2212,7 +2237,7 @@
         </Border>
 
         <!-- Loading overlay shown during async startup -->
-        <Border x:Name="LoadingOverlay" Grid.RowSpan="6" Grid.ColumnSpan="5"
+        <Border x:Name="LoadingOverlay" Grid.RowSpan="6" Grid.ColumnSpan="7"
                 Background="{StaticResource BgOverlay}" CornerRadius="8"
                 Visibility="Visible" Panel.ZIndex="1000">
             <TextBlock Text="Loading..." Foreground="{StaticResource TextSubdued}"

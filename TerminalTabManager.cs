@@ -13,6 +13,7 @@ namespace AgenticEngine
     public class TerminalTabManager
     {
         private readonly List<ConPtyTerminal> _terminals = new();
+        private readonly Dictionary<ConPtyTerminal, DispatcherTimer> _renderTimers = new();
         private int _activeIndex = -1;
         private int _nextTabNumber = 1;
 
@@ -70,8 +71,12 @@ namespace AgenticEngine
                 {
                     var terminal = _terminals[i];
                     _terminals.RemoveAt(i);
+
+                    if (_renderTimers.Remove(terminal, out var rt))
+                        rt.Stop();
+
                     // Dispose on background thread to avoid Thread.Join(2000) blocking the UI
-                    _ = System.Threading.Tasks.Task.Run(() => { try { terminal.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", $"Background terminal dispose failed: {ex.Message}"); } }, System.Threading.CancellationToken.None);
+                    _ = System.Threading.Tasks.Task.Run(() => { try { terminal.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", "Background terminal dispose failed", ex); } }, System.Threading.CancellationToken.None);
 
                     if (_activeIndex > i) _activeIndex--;
                     else if (_activeIndex == i) _activeIndex = -1;
@@ -173,6 +178,7 @@ namespace AgenticEngine
                             if (idx >= 0 && idx == _activeIndex)
                                 RenderActiveTerminal();
                         };
+                        _renderTimers[terminal] = renderTimer;
                     }
                     if (!renderTimer.IsEnabled)
                         renderTimer.Start();
@@ -219,6 +225,10 @@ namespace AgenticEngine
 
             var terminal = _terminals[index];
             _terminals.RemoveAt(index);
+
+            if (_renderTimers.Remove(terminal, out var timer))
+                timer.Stop();
+
             terminal.Dispose();
 
             if (_terminals.Count == 0)
@@ -290,7 +300,7 @@ namespace AgenticEngine
             terminal.HasBeenUsed = true;
 
             if (!string.IsNullOrWhiteSpace(cmd))
-                terminal.CommandHistory.Add(cmd);
+                terminal.AddCommand(cmd);
 
             if (terminal.HasExited)
             {
@@ -334,12 +344,17 @@ namespace AgenticEngine
                 if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
                 {
                     var t = _terminals[_activeIndex];
-                    if (t.CommandHistory.Count > 0)
+                    var count = t.CommandCount;
+                    if (count > 0)
                     {
-                        if (t.HistoryIndex < t.CommandHistory.Count - 1)
+                        if (t.HistoryIndex < count - 1)
                             t.HistoryIndex++;
-                        _input.Text = t.CommandHistory[t.CommandHistory.Count - 1 - t.HistoryIndex];
-                        _input.CaretIndex = _input.Text.Length;
+                        var cmd2 = t.GetCommandFromEnd(t.HistoryIndex);
+                        if (cmd2 != null)
+                        {
+                            _input.Text = cmd2;
+                            _input.CaretIndex = _input.Text.Length;
+                        }
                     }
                 }
                 e.Handled = true;
@@ -352,8 +367,12 @@ namespace AgenticEngine
                     if (t.HistoryIndex > 0)
                     {
                         t.HistoryIndex--;
-                        _input.Text = t.CommandHistory[t.CommandHistory.Count - 1 - t.HistoryIndex];
-                        _input.CaretIndex = _input.Text.Length;
+                        var cmd2 = t.GetCommandFromEnd(t.HistoryIndex);
+                        if (cmd2 != null)
+                        {
+                            _input.Text = cmd2;
+                            _input.CaretIndex = _input.Text.Length;
+                        }
                     }
                     else
                     {
@@ -513,9 +532,15 @@ namespace AgenticEngine
 
         public void DisposeAll()
         {
+            foreach (var timer in _renderTimers.Values)
+            {
+                try { timer.Stop(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", $"Failed to stop render timer: {ex.Message}"); }
+            }
+            _renderTimers.Clear();
+
             foreach (var t in _terminals)
             {
-                try { t.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", $"Terminal dispose failed: {ex.Message}"); }
+                try { t.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", "Terminal dispose failed", ex); }
             }
             _terminals.Clear();
             _activeIndex = -1;

@@ -14,18 +14,12 @@ namespace AgenticEngine.Managers
         private readonly TextBox _input;
         private readonly Button _sendBtn;
         private readonly ComboBox _modelCombo;
-        private readonly Border _expandedPanel;
-        private readonly Border _collapsedStrip;
-        private readonly FrameworkElement _splitter;
-        private readonly ColumnDefinition _panelCol;
         private readonly ClaudeService _claudeService;
         private readonly GeminiService _geminiService;
 
         private List<ChatMessage> _chatHistory = new();
         private CancellationTokenSource? _chatCts;
-        private bool _chatBusy;
-        private bool _chatCollapsed;
-        private double _chatExpandedWidth = 280;
+        private int _chatBusy; // 0 = idle, 1 = busy; use Interlocked for thread-safe check-and-set
 
         public ChatManager(
             StackPanel messagesPanel,
@@ -33,10 +27,6 @@ namespace AgenticEngine.Managers
             TextBox input,
             Button sendBtn,
             ComboBox modelCombo,
-            Border expandedPanel,
-            Border collapsedStrip,
-            FrameworkElement splitter,
-            ColumnDefinition panelCol,
             ClaudeService claudeService,
             GeminiService geminiService)
         {
@@ -45,10 +35,6 @@ namespace AgenticEngine.Managers
             _input = input;
             _sendBtn = sendBtn;
             _modelCombo = modelCombo;
-            _expandedPanel = expandedPanel;
-            _collapsedStrip = collapsedStrip;
-            _splitter = splitter;
-            _panelCol = panelCol;
             _claudeService = claudeService;
             _geminiService = geminiService;
         }
@@ -79,35 +65,12 @@ namespace AgenticEngine.Managers
                 _modelCombo.SelectedIndex = 0;
         }
 
-        public void HandleToggleClick()
-        {
-            _chatCollapsed = !_chatCollapsed;
-            if (_chatCollapsed)
-            {
-                _chatExpandedWidth = _panelCol.Width.Value > 0 ? _panelCol.Width.Value : 280;
-                _expandedPanel.Visibility = Visibility.Collapsed;
-                _collapsedStrip.Visibility = Visibility.Visible;
-                _splitter.Visibility = Visibility.Collapsed;
-                _panelCol.Width = new GridLength(0, GridUnitType.Auto);
-                _panelCol.MinWidth = 0;
-            }
-            else
-            {
-                _expandedPanel.Visibility = Visibility.Visible;
-                _collapsedStrip.Visibility = Visibility.Collapsed;
-                _splitter.Visibility = Visibility.Visible;
-                _panelCol.Width = new GridLength(_chatExpandedWidth);
-                _panelCol.MinWidth = 0;
-                _input.Focus();
-            }
-        }
-
         public void HandleNewChat()
         {
             _chatHistory.Clear();
             _messagesPanel.Children.Clear();
             _chatCts?.Cancel();
-            _chatBusy = false;
+            Interlocked.Exchange(ref _chatBusy, 0);
             _input.Focus();
         }
 
@@ -144,7 +107,10 @@ namespace AgenticEngine.Managers
         private async void SendChatMessage()
         {
             var text = _input.Text?.Trim();
-            if (string.IsNullOrEmpty(text) || _chatBusy) return;
+            if (string.IsNullOrEmpty(text)) return;
+
+            // Atomic check-and-set: only proceed if we transition from 0 (idle) to 1 (busy)
+            if (Interlocked.CompareExchange(ref _chatBusy, 1, 0) != 0) return;
 
             var selectedModel = _modelCombo.SelectedItem as string;
             if (string.IsNullOrEmpty(selectedModel) || selectedModel == "(no API key set)")
@@ -169,7 +135,7 @@ namespace AgenticEngine.Managers
                 return;
             }
 
-            _chatBusy = true;
+            // _chatBusy already set to 1 by CompareExchange above
             _input.Text = "";
             _input.IsEnabled = false;
             _sendBtn.IsEnabled = false;
@@ -234,7 +200,7 @@ namespace AgenticEngine.Managers
             }
             finally
             {
-                _chatBusy = false;
+                Interlocked.Exchange(ref _chatBusy, 0);
                 _input.IsEnabled = true;
                 _sendBtn.IsEnabled = true;
                 _input.Focus();
