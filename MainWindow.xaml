@@ -1064,10 +1064,10 @@
                         </DockPanel>
                     </Border>
 
-                    <!-- Splitter: Content ↔ Chat -->
-                    <GridSplitter x:Name="ChatSplitter" Grid.Column="2"
-                                  Style="{StaticResource VerticalSplitter}"
-                                  ResizeBehavior="PreviousAndNext"/>
+                    <!-- Splitter: Content ↔ Chat (Thumb-based to avoid GridSplitter star-sizing inversion) -->
+                    <Thumb x:Name="ChatSplitter" Grid.Column="2"
+                           Style="{StaticResource VerticalSplitterThumb}"
+                           DragDelta="ChatSplitter_DragDelta"/>
 
                     <!-- Right: Collapsible Chat panel -->
                     <Grid Grid.Column="3" Margin="4,0,0,0">
@@ -1135,7 +1135,7 @@
                                             </Style>
                                         </Button.Style>
                                     </Button>
-                                    <TextBox x:Name="ChatInput" AcceptsReturn="False" TextWrapping="Wrap"
+                                    <TextBox x:Name="ChatInput" AcceptsReturn="True" TextWrapping="Wrap"
                                              MaxHeight="60" MinHeight="28"
                                              VerticalScrollBarVisibility="Auto"
                                              Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
@@ -1154,8 +1154,12 @@
                 </Grid>
             </Border>
 
-        <!-- Horizontal Splitter: Top ↔ Middle -->
-        <GridSplitter Grid.Row="1" Grid.ColumnSpan="5" Style="{StaticResource HorizontalSplitter}"/>
+        <!-- Horizontal Splitter: Top ↔ Middle (Thumb-based to avoid GridSplitter star-sizing jitter) -->
+        <Thumb x:Name="TopMiddleSplitter" Grid.Row="1" Grid.ColumnSpan="5"
+               Style="{StaticResource HorizontalSplitterThumb}"
+               DragStarted="TopMiddleSplitter_DragStarted"
+               DragDelta="TopMiddleSplitter_DragDelta"
+               DragCompleted="TopMiddleSplitter_DragCompleted"/>
 
         <!-- ═══ TASK LIST (3) ═══ -->
         <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="10"
@@ -1188,8 +1192,14 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Text="TASK LIST" Foreground="{StaticResource Accent}" FontWeight="Bold"
-                               FontSize="10" FontFamily="Segoe UI" Margin="4,2,0,6"/>
+                    <DockPanel Grid.Row="0" Margin="4,2,4,6">
+                        <TextBlock Text="TASK LIST" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                   FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                        <Button Content="Graph View" Click="ViewDependencyGraph_Click"
+                                Style="{StaticResource GhostBtn}" FontSize="10" Padding="6,2"
+                                DockPanel.Dock="Right" VerticalAlignment="Center"
+                                ToolTip="View task dependency graph"/>
+                    </DockPanel>
                 <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0"
                            SelectionChanged="TaskListTab_SelectionChanged">
                     <TabItem>
@@ -1432,7 +1442,7 @@
                     <!-- Helper tab -->
                     <TabItem x:Name="HelperTabItem">
                         <TabItem.Header>
-                            <TextBlock Text="Helper" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Suggestions" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <DockPanel Margin="12">
                             <!-- Top controls -->
@@ -1922,6 +1932,19 @@
                                     </ComboBox>
                                 </StackPanel>
 
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBlock Text="Token limit retry (min)" Foreground="{StaticResource TextLight}"
+                                               FontSize="12" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <TextBox x:Name="TokenLimitRetryBox" Width="60" Text="30"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="12" FontFamily="Segoe UI" Padding="6,4"
+                                             TextAlignment="Center"
+                                             LostFocus="TokenLimitRetry_Changed"
+                                             KeyDown="TokenLimitRetry_KeyDown"/>
+                                </StackPanel>
+
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
 
                                 <TextBlock Text="Diagnostics" Foreground="{StaticResource Accent}" FontWeight="Bold"
@@ -1936,12 +1959,6 @@
                                         Style="{StaticResource SecondaryBtn}"
                                         HorizontalAlignment="Left"
                                         Padding="14,7" FontSize="12" Margin="0,8,0,0"/>
-                                <Button Content="Graph View"
-                                        Click="ViewDependencyGraph_Click"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        HorizontalAlignment="Left"
-                                        Padding="14,7" FontSize="12" Margin="0,8,0,0"
-                                        ToolTip="View task dependency graph"/>
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,20"/>
 

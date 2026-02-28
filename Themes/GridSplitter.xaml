@@ -50,4 +50,60 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <Style x:Key="HorizontalSplitterThumb" TargetType="Thumb">
+        <Setter Property="Height" Value="10"/>
+        <Setter Property="Cursor" Value="SizeNS"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Grid Background="Transparent">
+                        <Border x:Name="Indicator" Height="3" CornerRadius="1.5"
+                                Background="{StaticResource BgCard}" HorizontalAlignment="Center" Width="40"
+                                VerticalAlignment="Center" Opacity="0.4"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Indicator" Property="Background" Value="{StaticResource Accent}"/>
+                            <Setter TargetName="Indicator" Property="Opacity" Value="0.8"/>
+                            <Setter TargetName="Indicator" Property="Width" Value="60"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Indicator" Property="Background" Value="{StaticResource Accent}"/>
+                            <Setter TargetName="Indicator" Property="Opacity" Value="1.0"/>
+                            <Setter TargetName="Indicator" Property="Width" Value="60"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="VerticalSplitterThumb" TargetType="Thumb">
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="Cursor" Value="SizeWE"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Grid Background="Transparent">
+                        <Border x:Name="Indicator" Width="3" CornerRadius="1.5"
+                                Background="{StaticResource BgCard}" VerticalAlignment="Center" Height="40"
+                                HorizontalAlignment="Center" Opacity="0.4"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Indicator" Property="Background" Value="{StaticResource Accent}"/>
+                            <Setter TargetName="Indicator" Property="Opacity" Value="0.8"/>
+                            <Setter TargetName="Indicator" Property="Height" Value="60"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Indicator" Property="Background" Value="{StaticResource Accent}"/>
+                            <Setter TargetName="Indicator" Property="Opacity" Value="1.0"/>
+                            <Setter TargetName="Indicator" Property="Height" Value="60"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

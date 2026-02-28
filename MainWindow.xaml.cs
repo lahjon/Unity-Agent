@@ -65,9 +65,7 @@ namespace AgenticEngine
         private readonly List<SavedPromptEntry> _savedPrompts = new();
 
         // Chat
-        private List<ChatMessage> _chatHistory = new();
-        private CancellationTokenSource? _chatCts;
-        private bool _chatBusy;
+        private ChatManager _chatManager = null!;
 
 
         // Terminal collapse state
@@ -125,6 +123,10 @@ namespace AgenticEngine
             _imageManager = new ImageAttachmentManager(appDataDir, ImageIndicator, ClearImagesBtn);
             _geminiService = new GeminiService(appDataDir);
             _claudeService = new ClaudeService(appDataDir);
+            _chatManager = new ChatManager(
+                ChatMessagesPanel, ChatScrollViewer, ChatInput, ChatSendBtn,
+                ChatModelCombo, ChatExpandedPanel, ChatCollapsedStrip,
+                ChatSplitter, ChatPanelCol, _claudeService, _geminiService);
             _helperManager = new HelperManager(appDataDir, _projectManager.ProjectPath);
             _helperManager.SetActiveTaskSource(() =>
             {
@@ -144,7 +146,8 @@ namespace AgenticEngine
                 path => _projectManager.GetProjectRulesBlock(path),
                 path => _projectManager.IsGameProject(path),
                 _messageBusManager,
-                Dispatcher);
+                Dispatcher,
+                () => _settingsManager.TokenLimitRetryMinutes);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
 
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
@@ -284,7 +287,7 @@ namespace AgenticEngine
             }
 
             // Initialize Chat model selector
-            PopulateChatModelCombo();
+            _chatManager.PopulateModelCombo();
 
             // Async data loading — settings, projects, history, stored tasks, saved prompts
             await LoadStartupDataAsync();
@@ -302,6 +305,7 @@ namespace AgenticEngine
             }
 
             MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
+            TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
 
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
@@ -637,6 +641,31 @@ namespace AgenticEngine
             }
         }
 
+        private void TokenLimitRetry_Changed(object sender, RoutedEventArgs e)
+        {
+            ApplyTokenLimitRetry();
+        }
+
+        private void TokenLimitRetry_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter) ApplyTokenLimitRetry();
+        }
+
+        private void ApplyTokenLimitRetry()
+        {
+            if (_settingsManager == null || _projectManager == null) return;
+            if (int.TryParse(TokenLimitRetryBox.Text?.Trim(), out var val) && val >= 1)
+            {
+                _settingsManager.TokenLimitRetryMinutes = val;
+                TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
+                _settingsManager.SaveSettings(_projectManager.ProjectPath);
+            }
+            else
+            {
+                TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
+            }
+        }
+
         private void ViewLogs_Click(object sender, RoutedEventArgs e)
         {
             Dialogs.LogViewerDialog.Show();
@@ -728,7 +757,7 @@ namespace AgenticEngine
                 ClaudeApiKeyBox.Text = _claudeService.GetMaskedApiKey();
                 ClaudeKeyStatus.Text = "API key saved successfully";
                 ClaudeKeyStatus.Foreground = (Brush)FindResource("Success");
-                PopulateChatModelCombo();
+                _chatManager.PopulateModelCombo();
             }
             catch (Exception ex)
             {
@@ -1315,6 +1344,8 @@ namespace AgenticEngine
                     if (!DarkDialog.ShowConfirm("This task is still running. Closing will terminate it.\n\nAre you sure?", "Task Running"))
                         return;
 
+                    task.TokenLimitRetryTimer?.Stop();
+                    task.TokenLimitRetryTimer = null;
                     task.Status = AgentTaskStatus.Cancelled;
                     task.EndTime = DateTime.Now;
                     TaskExecutionManager.KillProcess(task);
@@ -1503,6 +1534,11 @@ namespace AgenticEngine
             {
                 task.OvernightIterationTimer.Stop();
                 task.OvernightIterationTimer = null;
+            }
+            if (task.TokenLimitRetryTimer != null)
+            {
+                task.TokenLimitRetryTimer.Stop();
+                task.TokenLimitRetryTimer = null;
             }
             try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
             task.Status = AgentTaskStatus.Cancelled;
@@ -2074,9 +2110,7 @@ namespace AgenticEngine
             _helperAnimTimer?.Stop();
 
             // ── 2. Cancel in-flight async work ──
-            try { _chatCts?.Cancel(); } catch (ObjectDisposedException) { }
-            _chatCts?.Dispose();
-            _chatCts = null;
+            _chatManager.CancelAndDispose();
 
             _helperManager?.CancelGeneration();
 
@@ -2114,6 +2148,50 @@ namespace AgenticEngine
 
             StopActiveGame();
             _terminalManager?.DisposeAll();
+        }
+
+        // ── Splitter drag (Thumb-based, avoids GridSplitter star-sizing jitter) ──
+
+        private void TopMiddleSplitter_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
+        {
+            // Snapshot star row to pixel so both rows are pixel-based during drag
+            var topRow = RootGrid.RowDefinitions[0];
+            topRow.Height = new GridLength(topRow.ActualHeight);
+        }
+
+        private void TopMiddleSplitter_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+        {
+            var topRow = RootGrid.RowDefinitions[0];
+            var bottomRow = RootGrid.RowDefinitions[2];
+
+            double newTop = topRow.Height.Value + e.VerticalChange;
+            double newBottom = bottomRow.Height.Value - e.VerticalChange;
+
+            if (newTop < topRow.MinHeight || newBottom < bottomRow.MinHeight)
+                return;
+
+            topRow.Height = new GridLength(newTop);
+            bottomRow.Height = new GridLength(newBottom);
+        }
+
+        private void TopMiddleSplitter_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+        {
+            // Restore star sizing so Row 0 flexes with window resizes
+            RootGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+        }
+
+        // ── Chat splitter drag (Thumb-based, avoids GridSplitter star-sizing inversion) ──
+
+        private void ChatSplitter_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+        {
+            double newSaved = SavedPanelCol.Width.Value + e.HorizontalChange;
+            double newChat = ChatPanelCol.Width.Value - e.HorizontalChange;
+
+            if (newSaved < SavedPanelCol.MinWidth || newChat < 0)
+                return;
+
+            SavedPanelCol.Width = new GridLength(newSaved);
+            ChatPanelCol.Width = new GridLength(newChat);
         }
 
         // ── Terminal ───────────────────────────────────────────────
@@ -3083,236 +3161,13 @@ namespace AgenticEngine
             }
         }
 
-        // ── Chat Panel ────────────────────────────────────────────
+        // ── Chat Panel (delegated to ChatManager) ─────────────────
 
-        private bool _chatCollapsed;
-        private double _chatExpandedWidth = 280;
-
-        private void ChatToggle_Click(object sender, RoutedEventArgs e)
-        {
-            _chatCollapsed = !_chatCollapsed;
-            if (_chatCollapsed)
-            {
-                _chatExpandedWidth = ChatPanelCol.Width.Value > 0 ? ChatPanelCol.Width.Value : 280;
-                ChatExpandedPanel.Visibility = Visibility.Collapsed;
-                ChatCollapsedStrip.Visibility = Visibility.Visible;
-                ChatSplitter.Visibility = Visibility.Collapsed;
-                ChatPanelCol.Width = new GridLength(0, GridUnitType.Auto);
-                ChatPanelCol.MinWidth = 0;
-            }
-            else
-            {
-                ChatExpandedPanel.Visibility = Visibility.Visible;
-                ChatCollapsedStrip.Visibility = Visibility.Collapsed;
-                ChatSplitter.Visibility = Visibility.Visible;
-                ChatPanelCol.Width = new GridLength(_chatExpandedWidth);
-                ChatPanelCol.MinWidth = 0;
-                ChatInput.Focus();
-            }
-        }
-
-        private void NewChat_Click(object sender, RoutedEventArgs e)
-        {
-            _chatHistory.Clear();
-            ChatMessagesPanel.Children.Clear();
-            _chatCts?.Cancel();
-            _chatBusy = false;
-            ChatInput.Focus();
-        }
-
-        private void ChatSend_Click(object sender, RoutedEventArgs e)
-        {
-            SendChatMessage();
-        }
-
-        private void ChatInput_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
-            {
-                e.Handled = true;
-                SendChatMessage();
-            }
-        }
-
-        private void PopulateChatModelCombo()
-        {
-            var prev = ChatModelCombo.SelectedItem as string;
-            ChatModelCombo.Items.Clear();
-
-            if (_geminiService.IsConfigured)
-                foreach (var m in GeminiService.AvailableModels)
-                    ChatModelCombo.Items.Add(m);
-
-            if (_claudeService.IsConfigured)
-                foreach (var m in ClaudeService.AvailableModels)
-                    ChatModelCombo.Items.Add(m);
-
-            if (ChatModelCombo.Items.Count == 0)
-            {
-                ChatModelCombo.Items.Add("(no API key set)");
-                ChatModelCombo.SelectedIndex = 0;
-                return;
-            }
-
-            if (prev != null && ChatModelCombo.Items.Contains(prev))
-                ChatModelCombo.SelectedItem = prev;
-            else
-                ChatModelCombo.SelectedIndex = 0;
-        }
-
-        private void ChatModelCombo_Changed(object sender, SelectionChangedEventArgs e) { }
-
-        private bool IsChatModelClaude()
-        {
-            var sel = ChatModelCombo.SelectedItem as string;
-            return sel != null && sel.StartsWith("claude", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private async void SendChatMessage()
-        {
-            var text = ChatInput.Text?.Trim();
-            if (string.IsNullOrEmpty(text) || _chatBusy) return;
-
-            var selectedModel = ChatModelCombo.SelectedItem as string;
-            if (string.IsNullOrEmpty(selectedModel) || selectedModel == "(no API key set)")
-            {
-                AddChatBubble("System", "No chat model available.\nConfigure a Gemini or Claude API key in Settings.", (Brush)FindResource("DangerAlert"));
-                return;
-            }
-
-            bool useClaude = IsChatModelClaude();
-
-            if (useClaude && !_claudeService.IsConfigured)
-            {
-                AddChatBubble("System", "Claude API key not configured.\nSet it in Settings > Claude.", (Brush)FindResource("DangerAlert"));
-                return;
-            }
-            if (!useClaude && !_geminiService.IsConfigured)
-            {
-                AddChatBubble("System", "Gemini API key not configured.\nSet it in Settings > Gemini.", (Brush)FindResource("DangerAlert"));
-                return;
-            }
-
-            _chatBusy = true;
-            ChatInput.Text = "";
-            ChatInput.IsEnabled = false;
-            ChatSendBtn.IsEnabled = false;
-
-            var userBubble = AddChatBubble("You", text, (Brush)FindResource("Accent"));
-
-            var senderLabel = useClaude ? "Claude" : "Gemini";
-            var responseBubble = AddChatBubble(senderLabel, "", (Brush)FindResource("AccentHover"));
-            var responseTextBlock = ((StackPanel)responseBubble.Child).Children[1] as TextBlock;
-
-            _chatCts?.Cancel();
-            _chatCts = new CancellationTokenSource();
-
-            try
-            {
-                var systemPrompt = "You are a helpful coding assistant embedded in the Agentic Engine app. " +
-                    "Give concise, practical suggestions. Keep responses short unless asked for detail. " +
-                    "The user is working on software projects, primarily Unity game development.";
-
-                if (useClaude)
-                    _claudeService.SelectedModel = selectedModel;
-                else
-                    _geminiService.SelectedModel = selectedModel;
-
-                Action<string> onChunk = chunk =>
-                {
-                    responseTextBlock!.Text += chunk;
-                    ChatScrollViewer.ScrollToEnd();
-                };
-
-                string response;
-                if (useClaude)
-                    response = await _claudeService.SendChatMessageStreamingAsync(
-                        _chatHistory, text, onChunk, systemPrompt, _chatCts.Token);
-                else
-                    response = await _geminiService.SendChatMessageStreamingAsync(
-                        _chatHistory, text, onChunk, systemPrompt, _chatCts.Token);
-
-                if (response.StartsWith("[Cancelled]") || response.StartsWith("[Error]"))
-                {
-                    ChatMessagesPanel.Children.Remove(responseBubble);
-                    ChatMessagesPanel.Children.Remove(userBubble);
-                    ChatInput.Text = text;
-                }
-                else
-                {
-                    _chatHistory.Add(new ChatMessage { Role = "user", Text = text });
-                    _chatHistory.Add(new ChatMessage { Role = "model", Text = response });
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                ChatMessagesPanel.Children.Remove(responseBubble);
-                ChatMessagesPanel.Children.Remove(userBubble);
-                ChatInput.Text = text;
-            }
-            catch (Exception ex)
-            {
-                ChatMessagesPanel.Children.Remove(responseBubble);
-                ChatMessagesPanel.Children.Remove(userBubble);
-                ChatInput.Text = text;
-            }
-            finally
-            {
-                _chatBusy = false;
-                ChatInput.IsEnabled = true;
-                ChatSendBtn.IsEnabled = true;
-                ChatInput.Focus();
-            }
-        }
-
-        private Border AddChatBubble(string sender, string message, Brush accentBrush)
-        {
-            bool isUser = sender == "You";
-
-            var bubble = new Border
-            {
-                Background = (Brush)FindResource(isUser ? "BgCard" : "BgSection"),
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(8, 6, 8, 6),
-                Margin = new Thickness(isUser ? 20 : 0, 2, isUser ? 0 : 20, 2),
-                BorderBrush = (Brush)FindResource("BorderSubtle"),
-                BorderThickness = new Thickness(1),
-                HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-            };
-
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
-            {
-                Text = sender,
-                Foreground = accentBrush,
-                FontWeight = FontWeights.Bold,
-                FontSize = 9,
-                FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 2)
-            });
-            var msgBlock = new TextBlock
-            {
-                Text = message,
-                Foreground = (Brush)FindResource("TextBright"),
-                FontSize = 12,
-                FontFamily = new FontFamily("Segoe UI"),
-                TextWrapping = TextWrapping.Wrap
-            };
-            panel.Children.Add(msgBlock);
-
-            bubble.Child = panel;
-
-            // Context menu to copy (reads current text so it works with streaming)
-            var contextMenu = new ContextMenu();
-            var copyItem = new MenuItem { Header = "Copy" };
-            copyItem.Click += (_, _) => Clipboard.SetText(msgBlock.Text);
-            contextMenu.Items.Add(copyItem);
-            bubble.ContextMenu = contextMenu;
-
-            ChatMessagesPanel.Children.Add(bubble);
-            ChatScrollViewer.ScrollToEnd();
-            return bubble;
-        }
+        private void ChatToggle_Click(object sender, RoutedEventArgs e) => _chatManager.HandleToggleClick();
+        private void NewChat_Click(object sender, RoutedEventArgs e) => _chatManager.HandleNewChat();
+        private void ChatSend_Click(object sender, RoutedEventArgs e) => _chatManager.HandleSendClick();
+        private void ChatInput_PreviewKeyDown(object sender, KeyEventArgs e) => _chatManager.HandleInputKeyDown(e);
+        private void ChatModelCombo_Changed(object sender, SelectionChangedEventArgs e) => _chatManager.HandleModelComboChanged();
 
         // ── Status ─────────────────────────────────────────────────
 

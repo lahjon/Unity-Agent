@@ -76,12 +76,14 @@ namespace AgenticEngine.Tests
             var flm = new FileLockManager(textBlock, dispatcher);
             var otm = new OutputTabManager(tabControl, dispatcher);
 
+            var mbm = new MessageBusManager(dispatcher);
             var mgr = new TaskExecutionManager(
                 tempDir, flm, otm,
                 () => "test prompt",
                 _ => "test project",
                 _ => "",
                 _ => false,
+                mbm,
                 dispatcher);
 
             return (mgr, flm, tempDir);

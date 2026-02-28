@@ -23,6 +23,9 @@ namespace AgenticEngine
         public int ConsecutiveFailures { get; set; }
         public int LastIterationOutputStart { get; set; }
 
+        // Token limit retry (all task types)
+        public System.Windows.Threading.DispatcherTimer? TokenLimitRetryTimer { get; set; }
+
         // Queue / dependency tracking
         public string? QueuedReason { get; set; }
         public string? BlockedByTaskId { get; set; }

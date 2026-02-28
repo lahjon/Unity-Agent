@@ -324,7 +324,7 @@ namespace AgenticEngine
                 }
                 e.Handled = true;
             }
-            else if (e.Key == Key.Enter)
+            else if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
             {
                 SendCommand();
                 e.Handled = true;

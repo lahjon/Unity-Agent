@@ -129,6 +129,7 @@ namespace AgenticEngine
         public string? GitStartHash { get => Data.GitStartHash; set => Data.GitStartHash = value; }
         public System.Windows.Threading.DispatcherTimer? OvernightRetryTimer { get => Runtime.OvernightRetryTimer; set => Runtime.OvernightRetryTimer = value; }
         public System.Windows.Threading.DispatcherTimer? OvernightIterationTimer { get => Runtime.OvernightIterationTimer; set => Runtime.OvernightIterationTimer = value; }
+        public System.Windows.Threading.DispatcherTimer? TokenLimitRetryTimer { get => Runtime.TokenLimitRetryTimer; set => Runtime.TokenLimitRetryTimer = value; }
         public int ConsecutiveFailures { get => Runtime.ConsecutiveFailures; set => Runtime.ConsecutiveFailures = value; }
         public int LastIterationOutputStart { get => Runtime.LastIterationOutputStart; set => Runtime.LastIterationOutputStart = value; }
         public Process? Process { get => Runtime.Process; set => Runtime.Process = value; }
@@ -228,8 +229,11 @@ namespace AgenticEngine
             !string.IsNullOrWhiteSpace(Summary) ? Summary :
             Description.Length > 45 ? Description[..45] + "..." : Description;
 
+        public bool IsWaitingForRetry => TokenLimitRetryTimer != null || OvernightRetryTimer != null;
+
         public string StatusText => Status switch
         {
+            AgentTaskStatus.Running when IsWaitingForRetry => "Retrying soon",
             AgentTaskStatus.Running => IsOvernight ? $"Running ({CurrentIteration}/{MaxIterations})" : "Running",
             AgentTaskStatus.Completed => "Finished",
             AgentTaskStatus.Cancelled => "Cancelled",

@@ -192,19 +192,32 @@ namespace AgenticEngine
             "- **NO DESTRUCTIVE OPERATIONS** — no recursive deletes, no killing processes, nothing irreversible.\n\n" +
             "## Step 1: Read context\n" +
             "Read `.overnight_log.md` to understand what has been done and what remains.\n\n" +
-            "## Step 2: Investigate\n" +
-            "Review the current implementation for flaws, bugs, incomplete work, " +
-            "and anything that doesn't match the original requirements.\n\n" +
-            "## Step 3: Fix and improve\n" +
-            "Address the issues you found. Continue working through unchecked items.\n\n" +
-            "## Step 4: Verify all checklist items\n" +
+            "## Step 2: Investigate current state\n" +
+            "Review the current implementation thoroughly:\n" +
+            "- Look for bugs, edge cases, and incomplete work\n" +
+            "- Check for code quality issues (dead code, inconsistencies, poor naming)\n" +
+            "- Identify potential improvements that are **within the original task scope**\n" +
+            "- Look for missing error handling, validation, or robustness issues\n" +
+            "- Verify that recent changes didn't break existing functionality\n\n" +
+            "## Step 3: Fix, improve, and harden\n" +
+            "Address the issues you found. Prioritize in this order:\n" +
+            "1. Fix any bugs or broken functionality first\n" +
+            "2. Complete remaining unchecked items from the checklist\n" +
+            "3. Improve code quality and robustness **within scope** — do not add unrelated features\n" +
+            "4. Add missing edge case handling if relevant to the task\n\n" +
+            "## Step 4: Suggest improvements\n" +
+            "In `.overnight_log.md`, add a **Suggestions** section with ideas for further " +
+            "improvements that are within the task scope but that you did not have time to implement. " +
+            "Keep suggestions actionable and specific.\n\n" +
+            "## Step 5: Verify all checklist items\n" +
             "Go through every checklist item and exit criterion. " +
-            "Update `.overnight_log.md` with your progress.\n\n" +
-            "## Step 5: Status\n" +
+            "Update `.overnight_log.md` with your progress and any new findings.\n\n" +
+            "## Step 6: Status\n" +
             "End your response with EXACTLY one of these markers on its own line:\n" +
             "STATUS: COMPLETE\n" +
             "STATUS: NEEDS_MORE_WORK\n\n" +
-            "Use COMPLETE only when ALL checklist items are done AND all exit criteria are met.\n\n" +
+            "Use COMPLETE only when ALL checklist items are done AND all exit criteria are met. " +
+            "If you found improvements to make in Step 2-3, use NEEDS_MORE_WORK to continue iterating.\n\n" +
             "Continue working on the task now.";
 
         // ── Game Detection ──────────────────────────────────────────
@@ -625,6 +638,69 @@ namespace AgenticEngine
             "things to consider", "to do next", "what's next"
         };
 
+        // Phrases that indicate the task was fully completed
+        private static readonly string[] CompletionIndicators = {
+            "task is complete", "completed all", "all changes have been",
+            "implementation is complete", "successfully completed",
+            "everything is set up", "changes are complete",
+            "all tasks are done", "have been implemented",
+            "is now complete", "are now complete",
+            "this completes", "that completes",
+            "finished implementing", "all requested changes",
+            "completed the", "i've made all", "i have made all",
+            "everything is working", "everything works",
+            "all the changes", "successfully implemented",
+            "has been completed", "have been completed"
+        };
+
+        // Phrases that indicate the task is NOT done and needs more work
+        private static readonly string[] IncompletionIndicators = {
+            "remaining work", "couldn't complete", "wasn't able to",
+            "could not complete", "still needs", "still need to",
+            "not yet implemented", "not yet complete", "incomplete",
+            "blocked by", "unable to complete", "failed to complete",
+            "needs to be done", "need to be done", "todo", "to-do",
+            "unfinished", "not finished", "partially"
+        };
+
+        /// <summary>
+        /// Checks whether the output around a recommendation header indicates
+        /// the task was fully completed (completion signals found, no incompletion signals).
+        /// When true, the recommendations are optional suggestions and should be suppressed.
+        /// </summary>
+        internal static bool IsTaskOutputComplete(string[] lines, int recommendationLine)
+        {
+            var searchStart = Math.Max(0, recommendationLine - 20);
+            var searchEnd = Math.Min(lines.Length, recommendationLine + 15);
+
+            bool hasCompletion = false;
+            bool hasIncompletion = false;
+
+            for (int i = searchStart; i < searchEnd; i++)
+            {
+                var lower = lines[i].ToLowerInvariant();
+
+                if (!hasCompletion)
+                {
+                    foreach (var indicator in CompletionIndicators)
+                    {
+                        if (lower.Contains(indicator)) { hasCompletion = true; break; }
+                    }
+                }
+
+                if (!hasIncompletion)
+                {
+                    foreach (var indicator in IncompletionIndicators)
+                    {
+                        if (lower.Contains(indicator)) { hasIncompletion = true; break; }
+                    }
+                }
+            }
+
+            // Task is complete only if we found completion signals AND no incompletion signals
+            return hasCompletion && !hasIncompletion;
+        }
+
         public static string? ExtractRecommendations(string output)
         {
             if (string.IsNullOrWhiteSpace(output)) return null;
@@ -655,6 +731,11 @@ namespace AgenticEngine
             }
 
             if (startLine < 0) return null;
+
+            // If the output indicates the task is fully complete, the recommendations
+            // are just optional suggestions — suppress the continue button.
+            if (IsTaskOutputComplete(lines, startLine))
+                return null;
 
             // Capture from the recommendation header, limit to ~10 lines
             var endLine = Math.Min(startLine + 10, lines.Length);

@@ -27,6 +27,7 @@ namespace AgenticEngine.Managers
         private readonly Func<string, bool> _isGameProject;
         private readonly MessageBusManager _messageBusManager;
         private readonly Dispatcher _dispatcher;
+        private readonly Func<int> _getTokenLimitRetryMinutes;
 
         private const int OvernightMaxRuntimeHours = 12;
         private const int OvernightIterationTimeoutMinutes = 30;
@@ -47,7 +48,8 @@ namespace AgenticEngine.Managers
             Func<string, string> getProjectRulesBlock,
             Func<string, bool> isGameProject,
             MessageBusManager messageBusManager,
-            Dispatcher dispatcher)
+            Dispatcher dispatcher,
+            Func<int>? getTokenLimitRetryMinutes = null)
         {
             _scriptDir = scriptDir;
             _fileLockManager = fileLockManager;
@@ -58,6 +60,7 @@ namespace AgenticEngine.Managers
             _isGameProject = isGameProject;
             _messageBusManager = messageBusManager;
             _dispatcher = dispatcher;
+            _getTokenLimitRetryMinutes = getTokenLimitRetryMinutes ?? (() => 30);
         }
 
         public async System.Threading.Tasks.Task StartProcess(AgentTask task,
@@ -150,6 +153,11 @@ namespace AgenticEngine.Managers
                     // will continue working on the same files.  Locks are released
                     // when the overnight task finishes via FinishOvernightTask → moveToHistory.
                     HandleOvernightIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
+                }
+                else if (exitCode != 0 && task.Status == AgentTaskStatus.Running && HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory))
+                {
+                    // Token limit detected on non-overnight task — retry scheduled, don't complete yet
+                    return;
                 }
                 else
                 {
@@ -879,8 +887,9 @@ namespace AgenticEngine.Managers
 
             if (TaskLauncher.IsTokenLimitError(iterationOutput))
             {
-                AppendOutput(task.Id, "\n[Overnight] Token limit hit. Retrying in 30 minutes...\n", activeTasks, historyTasks);
-                var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
+                var retryMinutes = _getTokenLimitRetryMinutes();
+                AppendOutput(task.Id, $"\n[Overnight] Token limit hit. Retrying in {retryMinutes} minutes...\n", activeTasks, historyTasks);
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(retryMinutes) };
                 task.OvernightRetryTimer = timer;
                 timer.Tick += (_, _) =>
                 {
@@ -1001,6 +1010,49 @@ namespace AgenticEngine.Managers
                 _outputTabManager.UpdateTabHeader(task);
                 moveToHistory(task);
             }
+        }
+
+        /// <summary>
+        /// Checks if a non-overnight task failed due to a token/rate limit error.
+        /// If so, schedules an automatic retry after the configured interval.
+        /// Returns true if a retry was scheduled (caller should skip normal completion).
+        /// </summary>
+        private bool HandleTokenLimitRetry(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            Action<AgentTask> moveToHistory)
+        {
+            var output = task.OutputBuilder.ToString();
+            var tail = output.Length > 3000 ? output[^3000..] : output;
+            if (!TaskLauncher.IsTokenLimitError(tail)) return false;
+
+            var retryMinutes = _getTokenLimitRetryMinutes();
+            AppendOutput(task.Id, $"\n[AgenticEngine] Token/rate limit detected. Retrying in {retryMinutes} minutes...\n", activeTasks, historyTasks);
+            _outputTabManager.UpdateTabHeader(task);
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(retryMinutes) };
+            task.TokenLimitRetryTimer = timer;
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                task.TokenLimitRetryTimer = null;
+                if (task.Status != AgentTaskStatus.Running)
+                {
+                    // Task was cancelled while waiting
+                    _fileLockManager.ReleaseTaskLocks(task.Id);
+                    if (task.UseMessageBus)
+                        _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
+                    _outputTabManager.UpdateTabHeader(task);
+                    return;
+                }
+                AppendOutput(task.Id, "[AgenticEngine] Retrying after token limit...\n", activeTasks, historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+
+                // Use --continue to resume the conversation
+                var continuePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
+                SendFollowUp(task, continuePrompt, activeTasks, historyTasks);
+            };
+            timer.Start();
+            return true;
         }
 
         private void HandlePlanBeforeQueueCompletion(AgentTask task,
