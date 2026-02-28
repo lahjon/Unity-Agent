@@ -73,21 +73,12 @@ namespace UnityAgent.Tests
             Assert.Equal("Queued", task.StatusText);
         }
 
-        [Fact]
-        public void StatusText_Ongoing()
-        {
-            var task = new AgentTask();
-            task.Status = AgentTaskStatus.Ongoing;
-            Assert.Equal("Ongoing", task.StatusText);
-        }
-
         [Theory]
         [InlineData(AgentTaskStatus.Running, "#00E676")]
         [InlineData(AgentTaskStatus.Completed, "#64B5F6")]
         [InlineData(AgentTaskStatus.Cancelled, "#E0A030")]
         [InlineData(AgentTaskStatus.Failed, "#E05555")]
         [InlineData(AgentTaskStatus.Queued, "#FFD600")]
-        [InlineData(AgentTaskStatus.Ongoing, "#00E676")]
         public void StatusColor_MatchesStatus(AgentTaskStatus status, string expectedColor)
         {
             var task = new AgentTask();
@@ -164,14 +155,6 @@ namespace UnityAgent.Tests
         public void IsRunning_TrueWhenRunning()
         {
             var task = new AgentTask();
-            Assert.True(task.IsRunning);
-        }
-
-        [Fact]
-        public void IsRunning_TrueWhenOngoing()
-        {
-            var task = new AgentTask();
-            task.Status = AgentTaskStatus.Ongoing;
             Assert.True(task.IsRunning);
         }
 

@@ -50,6 +50,32 @@ namespace UnityAgent
             "button templates, and registration steps you must follow.\n" +
             "Do NOT deviate from the patterns defined in that file. Follow them exactly.\n\n";
 
+        public const string PlanOnlyBlock =
+            "# PLAN-ONLY MODE — DO NOT EXECUTE\n" +
+            "You are in PLAN-ONLY mode. You must NEVER write, edit, create, or delete any files. " +
+            "You must NEVER execute any code, run any commands, or make any changes to the project.\n\n" +
+            "Instead, your ONLY job is to produce a detailed, actionable prompt that another agent can later execute. " +
+            "Follow these steps:\n\n" +
+            "## Step 1: Analyze the Task\n" +
+            "Read the task description carefully. Explore the codebase to understand:\n" +
+            "- The current architecture and relevant files\n" +
+            "- Existing patterns and conventions\n" +
+            "- Dependencies and constraints\n\n" +
+            "## Step 2: Produce the Execution Prompt\n" +
+            "Write a complete, self-contained prompt that includes:\n" +
+            "- A clear problem statement and objective\n" +
+            "- Specific files to modify and what changes to make\n" +
+            "- Step-by-step implementation instructions\n" +
+            "- Edge cases and acceptance criteria\n" +
+            "- Any architectural decisions already made\n\n" +
+            "## Output Format\n" +
+            "Your final output MUST be wrapped in a markdown code block labeled `EXECUTION_PROMPT`:\n" +
+            "```EXECUTION_PROMPT\n" +
+            "<your detailed execution prompt here>\n" +
+            "```\n\n" +
+            "REMEMBER: Do NOT implement anything. Only produce the prompt.\n\n" +
+            "---\n";
+
         public const string ExtendedPlanningBlock =
             "# EXTENDED PLANNING MODE\n" +
             "Before beginning any implementation, you MUST first deeply analyze and enhance the task prompt. " +
@@ -176,6 +202,7 @@ namespace UnityAgent
             bool spawnTeam = false,
             bool extendedPlanning = false,
             bool noGitWrite = false,
+            bool planOnly = false,
             List<string>? imagePaths = null,
             ModelType model = ModelType.ClaudeCode)
         {
@@ -191,6 +218,7 @@ namespace UnityAgent
                 SpawnTeam = spawnTeam,
                 ExtendedPlanning = extendedPlanning,
                 NoGitWrite = noGitWrite,
+                PlanOnly = planOnly,
                 Model = model,
                 MaxIterations = 50,
                 ProjectPath = projectPath
@@ -202,7 +230,7 @@ namespace UnityAgent
 
         // ── Prompt Building ──────────────────────────────────────────
 
-        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, string projectDescription = "")
+        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, bool planOnly = false, string projectDescription = "")
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
@@ -213,14 +241,16 @@ namespace UnityAgent
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
+            var planOnlyBlock = planOnly ? PlanOnlyBlock : "";
             var gitBlock = noGitWrite ? NoGitWriteBlock : "";
             var gameBlock = IsGameCreationTask(description) ? GameRulesBlock : "";
-            return descBlock + systemPrompt + gitBlock + mcpBlock + planningBlock + gameBlock + description;
+            return descBlock + systemPrompt + gitBlock + mcpBlock + planningBlock + planOnlyBlock + gameBlock + description;
         }
 
         public static string BuildFullPrompt(string systemPrompt, AgentTask task, string projectDescription = "")
         {
-            var basePrompt = BuildBasePrompt(systemPrompt, task.Description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, projectDescription);
+            var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription);
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 basePrompt = $"# Task: {task.Summary}\n{basePrompt}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
@@ -382,8 +412,9 @@ namespace UnityAgent
 
                 return string.IsNullOrWhiteSpace(summary) ? "" : summary;
             }
-            catch
+            catch (Exception ex)
             {
+                Managers.AppLogger.Warn("TaskLauncher", "Failed to generate summary", ex);
                 return "";
             }
         }
@@ -451,8 +482,9 @@ namespace UnityAgent
 
                 return (shortDesc, longDesc);
             }
-            catch
+            catch (Exception ex)
             {
+                Managers.AppLogger.Warn("TaskLauncher", "Failed to generate project description", ex);
                 return ("", "");
             }
         }
@@ -532,8 +564,9 @@ namespace UnityAgent
                 var fileChanges = GetGitFileChanges(projectPath, gitStartHash);
                 return FormatCompletionSummary(status, duration, fileChanges);
             }
-            catch
+            catch (Exception ex)
             {
+                Managers.AppLogger.Debug("TaskLauncher", $"Failed to get git file changes for completion summary: {ex.Message}");
                 return FormatCompletionSummary(status, duration, null);
             }
         }
@@ -558,8 +591,9 @@ namespace UnityAgent
                 process.WaitForExit(5000);
                 return process.ExitCode == 0 ? output.Trim() : null;
             }
-            catch
+            catch (Exception ex)
             {
+                Managers.AppLogger.Debug("TaskLauncher", $"Git command failed: {ex.Message}");
                 return null;
             }
         }
@@ -583,6 +617,12 @@ namespace UnityAgent
             return cleaned.Trim();
         }
 
+        public static string? ExtractExecutionPrompt(string output)
+        {
+            var match = Regex.Match(output, @"```EXECUTION_PROMPT\s*\n(.*?)```", RegexOptions.Singleline);
+            return match.Success ? match.Groups[1].Value.Trim() : null;
+        }
+
         public static bool IsImageFile(string path)
         {
             var ext = Path.GetExtension(path).ToLowerInvariant();
@@ -603,7 +643,7 @@ namespace UnityAgent
             path = path.Replace('/', '\\');
             if (!Path.IsPathRooted(path) && !string.IsNullOrEmpty(basePath))
                 path = Path.Combine(basePath, path);
-            try { path = Path.GetFullPath(path); } catch { }
+            try { path = Path.GetFullPath(path); } catch (Exception ex) { Managers.AppLogger.Debug("TaskLauncher", $"Path normalization failed for '{path}': {ex.Message}"); }
             return path.ToLowerInvariant();
         }
     }

@@ -51,25 +51,53 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <!-- Close/Remove button top-right -->
-                    <Button Grid.Row="0" Click="Cancel_Click"
-                            HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Margin="0,-2,-2,0">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
-                                <Setter Property="Content" Value="&#xE8BB;"/>
-                                <Setter Property="ToolTip" Value="Cancel task"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsFinished}" Value="True">
-                                        <Setter Property="Content" Value="&#xE73E;"/>
-                                        <Setter Property="Foreground" Value="#5CB85C"/>
-                                        <Setter Property="ToolTip" Value="Remove task"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
+                    <!-- Top-right buttons -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-2,-2,0">
+                        <!-- Pause/Resume button -->
+                        <Button Click="Pause_Click" Margin="0,0,2,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE769;"/>
+                                    <Setter Property="Foreground" Value="#CE93D8"/>
+                                    <Setter Property="ToolTip" Value="Pause task"/>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                            <Setter Property="Content" Value="&#xE768;"/>
+                                            <Setter Property="Foreground" Value="#64B5F6"/>
+                                            <Setter Property="ToolTip" Value="Resume task"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsQueued}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <!-- Close/Remove button -->
+                        <Button Click="Cancel_Click">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE8BB;"/>
+                                    <Setter Property="ToolTip" Value="Cancel task"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                            <Setter Property="Content" Value="&#xE73E;"/>
+                                            <Setter Property="Foreground" Value="#5CB85C"/>
+                                            <Setter Property="ToolTip" Value="Remove task"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse x:Name="StatusGlow" Width="8" Height="8"
@@ -132,6 +160,24 @@
                                                     <StopStoryboard BeginStoryboardName="QueuedGlowStoryboard"/>
                                                 </DataTrigger.ExitActions>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="PausedGlowStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.3" To="1.0" Duration="0:0:2.0"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="PausedGlowStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Ellipse.Style>
@@ -149,10 +195,26 @@
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
-                        <TextBlock Text="{Binding Id, StringFormat='#{0}'}"
+                        <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
                                    Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
+                        <Border CornerRadius="3" Padding="4,1" Margin="6,0,0,0"
+                                Background="#2A1F3D" BorderBrush="#7E57C2" BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PlanOnly}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="PLAN" Foreground="#CE93D8" FontSize="9"
+                                       FontFamily="Segoe UI" FontWeight="Bold"/>
+                        </Border>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
                                Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"
@@ -163,7 +225,27 @@
                             </ToolTip>
                         </TextBlock.ToolTip>
                     </TextBlock>
-                    <TextBlock Grid.Row="2" Text="{Binding TimeInfo}" Foreground="#666"
+                    <!-- Tool activity feed (last 3 actions) -->
+                    <TextBlock Grid.Row="2" Text="{Binding ToolActivityText}"
+                               Foreground="#7A9EC2" FontSize="10" FontFamily="Consolas"
+                               TextTrimming="CharacterEllipsis" Margin="0,4,0,0"
+                               LineHeight="15">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsRunning}" Value="True"/>
+                                            <Condition Binding="{Binding HasToolActivity}" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Grid.Row="3" Text="{Binding TimeInfo}" Foreground="#666"
                                FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"
                                Margin="0,6,0,0"/>
                 </Grid>
@@ -297,10 +379,26 @@
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
-                        <TextBlock Text="{Binding Id, StringFormat='#{0}'}"
+                        <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
                                    Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
+                        <Border CornerRadius="3" Padding="4,1" Margin="6,0,0,0"
+                                Background="#2A1F3D" BorderBrush="#7E57C2" BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PlanOnly}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="PLAN" Foreground="#CE93D8" FontSize="9"
+                                       FontFamily="Segoe UI" FontWeight="Bold"/>
+                        </Border>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
                                Foreground="#888" FontSize="12" FontFamily="Segoe UI"
@@ -321,13 +419,105 @@
                 </Grid>
             </Border>
         </DataTemplate>
+
+        <!-- ═══ STORED TASK ═══ -->
+        <DataTemplate x:Key="StoredTaskTemplate">
+            <Border CornerRadius="8" Padding="10" Margin="0,2"
+                    BorderThickness="1">
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy Stored Prompt" Click="CopyStoredPrompt_Click"/>
+                        <MenuItem Header="Copy Original Prompt" Click="CopyPrompt_Click"/>
+                    </ContextMenu>
+                </Border.ContextMenu>
+                <Border.Background>
+                    <SolidColorBrush x:Name="StoredCardBg" Color="#1E2428"/>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <SolidColorBrush x:Name="StoredCardBorder" Color="#2A3A3A"/>
+                </Border.BorderBrush>
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="StoredCardBg" Storyboard.TargetProperty="Color"
+                                                To="#253030" Duration="0:0:0.15"/>
+                                <ColorAnimation Storyboard.TargetName="StoredCardBorder" Storyboard.TargetProperty="Color"
+                                                To="#3A4A4A" Duration="0:0:0.15"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="StoredCardBg" Storyboard.TargetProperty="Color"
+                                                To="#1E2428" Duration="0:0:0.2"/>
+                                <ColorAnimation Storyboard.TargetName="StoredCardBorder" Storyboard.TargetProperty="Color"
+                                                To="#2A3A3A" Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <!-- Close X button top-right -->
+                    <Button Grid.Row="0" Content="&#xE8BB;" Click="RemoveStoredTask_Click"
+                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Style="{StaticResource IconBtn}" Margin="0,-2,-2,0"
+                            ToolTip="Remove stored task"/>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="#4DB6AC"/>
+                        </Grid>
+                        <TextBlock Text="Stored" Foreground="#4DB6AC"
+                                   FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text=" | " Foreground="#444" FontSize="11" FontFamily="Segoe UI"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ProjectName}" Foreground="#666"
+                                   FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="100"
+                                   ToolTip="{Binding ProjectPath}"/>
+                        <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
+                                   Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
+                                   FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
+                               Foreground="#888" FontSize="12" FontFamily="Segoe UI"
+                               TextTrimming="CharacterEllipsis" Margin="0,4,0,0">
+                        <TextBlock.ToolTip>
+                            <ToolTip MaxWidth="600" Placement="Bottom">
+                                <TextBlock Text="{Binding StoredPrompt}" TextWrapping="Wrap" MaxWidth="580"/>
+                            </ToolTip>
+                        </TextBlock.ToolTip>
+                    </TextBlock>
+                    <Grid Grid.Row="2" Margin="0,6,0,0">
+                        <TextBlock Text="{Binding TimeInfo}" Foreground="#555"
+                                   FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="View" Click="ViewStoredTask_Click"
+                                    Background="#333" Style="{StaticResource SmallBtn}"
+                                    Margin="0,0,6,0"/>
+                            <Button Content="Execute" Click="ExecuteStoredTask_Click"
+                                    Background="#4DB6AC" Style="{StaticResource SmallBtn}"
+                                    Margin="0"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid x:Name="RootGrid" Margin="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="180" MinHeight="60"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="180" MinHeight="60"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition x:Name="TerminalRow" Height="120" MinHeight="60"/>
             <RowDefinition Height="Auto"/>
@@ -336,12 +526,12 @@
             <ColumnDefinition Width="285" MinWidth="150"/>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*" MinWidth="200"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="285" MinWidth="150"/>
+            <ColumnDefinition x:Name="RightSplitterCol" Width="Auto"/>
+            <ColumnDefinition x:Name="RightPanelCol" Width="285" MinWidth="150"/>
         </Grid.ColumnDefinitions>
 
         <!-- ═══ PROJECTS (1) ═══ -->
-        <Border Grid.Row="0" Grid.Column="0" Background="#222222" CornerRadius="8" Padding="10"
+        <Border Grid.Row="2" Grid.Column="0" Grid.RowSpan="3" Background="#222222" CornerRadius="8" Padding="10"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="ProjectsPanelBorder" Color="#2C2C2C"/>
@@ -407,7 +597,7 @@
         <GridSplitter Grid.Column="1" Grid.RowSpan="5" Style="{StaticResource VerticalSplitter}"/>
 
         <!-- ═══ PROMPTS (2) ═══ -->
-        <Border Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="3" Background="#222222" CornerRadius="8" Padding="14"
+        <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Background="#222222" CornerRadius="8" Padding="14"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="InputSectionBorder" Color="#2C2C2C"/>
@@ -432,7 +622,14 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Border.Triggers>
-                <DockPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Prompt input area -->
+                <DockPanel Grid.Column="0">
                     <!-- Bottom: Advanced expander + Execute button (always visible) -->
                     <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                         <StackPanel DockPanel.Dock="Right" Margin="10,0,0,0" VerticalAlignment="Top">
@@ -440,9 +637,12 @@
                                 <TextBlock x:Name="PromptProjectLabel" Text="" Foreground="#E8E8E8" FontFamily="Segoe UI"
                                            FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"
                                            TextTrimming="CharacterEllipsis" MaxWidth="400"/>
+                                <Button Content="Save Prompt" Click="SavePromptEntry_Click"
+                                        Background="#4DB6AC" Style="{StaticResource Btn}"
+                                        FontSize="11" Padding="6,4" Margin="0,0,6,0"/>
                                 <Button x:Name="ExecuteButton" Content="Execute Task" Click="Execute_Click"
                                         Background="#DA7756" Style="{StaticResource Btn}"
-                                        FontSize="11" Padding="6,4"/>
+                                        FontSize="14" Padding="18,8" FontWeight="Bold"/>
                             </StackPanel>
                             <TextBlock Text="Ctrl+Enter to execute" Foreground="#555" FontFamily="Segoe UI"
                                        FontSize="10" Margin="0,6,0,0" HorizontalAlignment="Center"/>
@@ -456,10 +656,6 @@
                                 <StackPanel Margin="0,2,0,0">
                                     <!-- Permanent toggles -->
                                     <WrapPanel>
-                                        <ToggleButton x:Name="SkipPermissionsToggle" IsChecked="True"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
-                                            <TextBlock Text="Skip Permissions" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
                                         <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="True"
                                                       Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
                                             <TextBlock Text="Ignore File Locks" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
@@ -493,6 +689,11 @@
                                         <ToggleButton x:Name="ExtendedPlanningToggle" IsChecked="False"
                                                       Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
                                             <TextBlock Text="Extended Planning" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
+                                        </ToggleButton>
+                                        <ToggleButton x:Name="PlanOnlyToggle" IsChecked="False"
+                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8"
+                                                      Checked="PlanOnlyToggle_Changed" Unchecked="PlanOnlyToggle_Changed">
+                                            <TextBlock Text="Plan Only" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
                                         </ToggleButton>
                                     </WrapPanel>
                                 </StackPanel>
@@ -558,13 +759,27 @@
                                  Drop="TaskInput_Drop"/>
                     </DockPanel>
                 </DockPanel>
+
+                    <!-- Right: Saved Prompts panel -->
+                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="6"
+                            BorderBrush="#2C2C2C" BorderThickness="1" Margin="10,0,0,0"
+                            Padding="8" MinWidth="180" MaxWidth="220">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="SAVED" Foreground="#4DB6AC" FontWeight="Bold"
+                                       FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,6"/>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="SavedPromptsPanel"/>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+                </Grid>
             </Border>
 
         <!-- Horizontal Splitter: Top ↔ Middle -->
         <GridSplitter Grid.Row="1" Grid.ColumnSpan="5" Style="{StaticResource HorizontalSplitter}"/>
 
         <!-- ═══ TASK LIST (3) ═══ -->
-        <Border Grid.Row="2" Grid.Column="0" Grid.RowSpan="3" Background="#222222" CornerRadius="8" Padding="10"
+        <Border Grid.Row="0" Grid.Column="0" Background="#222222" CornerRadius="8" Padding="10"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="SidebarBorder" Color="#2C2C2C"/>
@@ -589,10 +804,15 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Border.Triggers>
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="TASK LIST" Foreground="#DA7756" FontWeight="Bold"
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="TASK LIST" Foreground="#DA7756" FontWeight="Bold"
                                FontSize="10" FontFamily="Segoe UI" Margin="4,2,0,6"/>
-                <TabControl Background="Transparent" BorderThickness="0">
+                <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0"
+                           SelectionChanged="TaskListTab_SelectionChanged">
                     <TabItem>
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
@@ -651,12 +871,37 @@
                                      SelectionChanged="HistoryTask_Selected"/>
                         </Grid>
                     </TabItem>
+                    <TabItem x:Name="StoredTabItem">
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="STORED" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"/>
+                                <TextBlock x:Name="StoredTabBadge" FontWeight="Bold" FontSize="11"
+                                           FontFamily="Segoe UI" Foreground="#4DB6AC" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <DockPanel Grid.Row="0" Margin="4,0,0,8">
+                                <Button Content="Clear" Click="ClearStoredTasks_Click"
+                                        Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"/>
+                                <ComboBox x:Name="StoredFilterCombo" SelectionChanged="StoredFilter_Changed"
+                                          FontSize="10" Padding="6,3"
+                                          HorizontalAlignment="Left"/>
+                            </DockPanel>
+                            <ListBox x:Name="StoredTasksList" Grid.Row="1"
+                                     Style="{StaticResource TaskListStyle}"
+                                     ItemTemplate="{StaticResource StoredTaskTemplate}"/>
+                        </Grid>
+                    </TabItem>
                 </TabControl>
-                </DockPanel>
+                </Grid>
             </Border>
 
         <!-- ═══ TASK OUTPUT (4) ═══ -->
-        <Border Grid.Row="2" Grid.Column="2" Background="#222222" CornerRadius="8" Padding="4"
+        <Border Grid.Row="0" Grid.Column="2" Background="#222222" CornerRadius="8" Padding="4"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="MainContentBorder" Color="#2C2C2C"/>
@@ -690,10 +935,27 @@
             </Border>
 
         <!-- Vertical Splitter: Center ↔ Right -->
-        <GridSplitter Grid.Column="3" Grid.Row="2" Grid.RowSpan="3" Style="{StaticResource VerticalSplitter}"/>
+        <GridSplitter x:Name="RightSplitter" Grid.Column="3" Grid.Row="0" Style="{StaticResource VerticalSplitter}"/>
 
         <!-- ═══ SETTINGS (5) ═══ -->
-        <Border Grid.Row="2" Grid.Column="4" Grid.RowSpan="3" Background="#222222" CornerRadius="8" Padding="4"
+        <!-- Collapsed strip (shown when panel is collapsed) -->
+        <Border x:Name="SettingsCollapsedStrip" Grid.Row="0" Grid.Column="4"
+                Background="#222222" CornerRadius="8" Padding="0" Visibility="Collapsed"
+                BorderThickness="1" BorderBrush="#2C2C2C" Width="32">
+            <Button x:Name="ExpandSettingsBtn" Click="ToggleSettingsPanel_Click"
+                    ToolTip="Expand Settings" VerticalAlignment="Top" HorizontalAlignment="Center"
+                    Margin="0,6,0,0">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                        <Setter Property="Content" Value="&#xE76B;"/>
+                        <Setter Property="FontSize" Value="12"/>
+                        <Setter Property="Foreground" Value="#DA7756"/>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Border>
+        <!-- Expanded settings panel -->
+        <Border x:Name="SettingsExpandedPanel" Grid.Row="0" Grid.Column="4" Background="#222222" CornerRadius="8" Padding="4"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="RightPanelBorder" Color="#2C2C2C"/>
@@ -719,9 +981,150 @@
                     </EventTrigger>
                 </Border.Triggers>
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="SETTINGS" Foreground="#DA7756" FontWeight="Bold"
-                               FontSize="10" FontFamily="Segoe UI" Margin="8,6,0,4"/>
+                    <DockPanel DockPanel.Dock="Top" Margin="8,6,4,4">
+                        <TextBlock Text="SETTINGS" Foreground="#DA7756" FontWeight="Bold"
+                                   FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                        <Button Click="ToggleSettingsPanel_Click" ToolTip="Collapse Settings"
+                                HorizontalAlignment="Right">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE76C;"/>
+                                    <Setter Property="FontSize" Value="12"/>
+                                    <Setter Property="Foreground" Value="#666"/>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </DockPanel>
                 <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0">
+                    <!-- Helper tab -->
+                    <TabItem x:Name="HelperTabItem">
+                        <TabItem.Header>
+                            <TextBlock Text="Helper" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                        </TabItem.Header>
+                        <DockPanel Margin="12">
+                            <!-- Top controls -->
+                            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                                <TextBlock Text="Project Suggestions" Foreground="#DA7756" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,6"/>
+                                <TextBlock Text="Analyze the current project and generate actionable suggestions for improvements."
+                                           Foreground="#888" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Margin="0,0,0,12"/>
+
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Category" Foreground="#CCC" FontSize="12"
+                                               FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               Margin="0,0,10,0"/>
+                                    <ComboBox x:Name="HelperCategoryCombo" Width="160"
+                                              FontSize="11" Padding="6,3" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="General" Tag="General" IsSelected="True"/>
+                                        <ComboBoxItem Content="Bug Fixes" Tag="BugFixes"/>
+                                        <ComboBoxItem Content="New Features" Tag="NewFeatures"/>
+                                        <ComboBoxItem Content="Extensions" Tag="Extensions"/>
+                                    </ComboBox>
+                                </DockPanel>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <Button x:Name="GenerateSuggestionsBtn" Content="Add Suggestions"
+                                            Click="GenerateSuggestions_Click"
+                                            Background="#DA7756" Style="{StaticResource Btn}"
+                                            FontSize="12" Padding="16,8"/>
+                                    <Button x:Name="ClearSuggestionsBtn" Content="Clear All"
+                                            Click="ClearSuggestions_Click"
+                                            Style="{StaticResource GhostBtn}"
+                                            FontSize="11" Padding="12,6" Margin="8,0,0,0"/>
+                                    <TextBlock x:Name="HelperStatusText" Text=""
+                                               Foreground="#888" FontSize="11" FontFamily="Segoe UI"
+                                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Border DockPanel.Dock="Top" Height="1" Background="#2C2C2C" Margin="0,0,0,8"/>
+
+                            <!-- Suggestions list -->
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl x:Name="SuggestionsListView">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="6" Padding="12,10" Margin="0,3"
+                                                    Background="#1E1E1E" BorderThickness="1" BorderBrush="#2C2C2C">
+                                                <DockPanel>
+                                                    <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center"
+                                                                Margin="10,0,0,0">
+                                                        <Button Content="Run" Tag="{Binding}"
+                                                                Click="RunSuggestion_Click"
+                                                                Background="#DA7756" Style="{StaticResource Btn}"
+                                                                FontSize="11" Padding="14,5" Margin="0,0,0,4"/>
+                                                        <Button Content="Copy" Tag="{Binding}"
+                                                                Click="CopySuggestion_Click"
+                                                                Style="{StaticResource GhostBtn}"
+                                                                FontSize="10" Padding="10,3" Margin="0,0,0,4"/>
+                                                        <Button Content="Save" Tag="{Binding}"
+                                                                Click="SaveSuggestion_Click"
+                                                                Style="{StaticResource GhostBtn}"
+                                                                FontSize="10" Padding="10,3" Margin="0,0,0,4"/>
+                                                        <Button Content="Remove" Tag="{Binding}"
+                                                                Click="RemoveSuggestion_Click"
+                                                                Style="{StaticResource GhostBtn}"
+                                                                FontSize="10" Padding="10,3"/>
+                                                    </StackPanel>
+                                                    <StackPanel>
+                                                        <DockPanel Margin="0,0,0,4">
+                                                            <Border CornerRadius="3" Padding="6,2" Margin="0,0,8,0"
+                                                                    VerticalAlignment="Center">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="Background" Value="#333"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Category}" Value="BugFixes">
+                                                                                <Setter Property="Background" Value="#3A2020"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Category}" Value="NewFeatures">
+                                                                                <Setter Property="Background" Value="#1A3A20"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Category}" Value="Extensions">
+                                                                                <Setter Property="Background" Value="#1A2040"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+                                                                <TextBlock FontSize="10" FontFamily="Segoe UI"
+                                                                           FontWeight="SemiBold">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Text" Value="{Binding Category}"/>
+                                                                            <Setter Property="Foreground" Value="#999"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding Category}" Value="BugFixes">
+                                                                                    <Setter Property="Foreground" Value="#E05555"/>
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding Category}" Value="NewFeatures">
+                                                                                    <Setter Property="Foreground" Value="#4EC969"/>
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding Category}" Value="Extensions">
+                                                                                    <Setter Property="Foreground" Value="#64B5F6"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Title}" Foreground="#DDD"
+                                                                       FontSize="13" FontWeight="SemiBold"
+                                                                       FontFamily="Segoe UI"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </DockPanel>
+                                                        <TextBlock Text="{Binding Description}" Foreground="#999"
+                                                                   FontSize="11" FontFamily="Segoe UI"
+                                                                   TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </TabItem>
                     <!-- File Locks tab -->
                     <TabItem x:Name="FileLocksTabHeader">
                         <TabItem.Header>
@@ -924,12 +1327,6 @@
 
                                 <TextBlock Text="Defaults" Foreground="#DA7756" FontWeight="Bold"
                                            FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,12"/>
-                                <ToggleButton x:Name="DefaultSkipPermsToggle" IsChecked="True"
-                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,14"
-                                              Checked="DefaultToggle_Changed" Unchecked="DefaultToggle_Changed">
-                                    <TextBlock Text="Skip Permissions by default" Foreground="#CCC"
-                                               FontSize="12" FontFamily="Segoe UI"/>
-                                </ToggleButton>
                                 <ToggleButton x:Name="DefaultNoGitWriteToggle" IsChecked="True"
                                               Style="{StaticResource ToggleSwitch}" Margin="0,0,0,14">
                                     <TextBlock Text="No Git Write by default" Foreground="#CCC"
@@ -950,6 +1347,16 @@
                                     </ComboBox>
                                 </StackPanel>
 
+                                <Border Height="1" Background="#2C2C2C" Margin="0,10,0,10"/>
+
+                                <TextBlock Text="Diagnostics" Foreground="#DA7756" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <Button x:Name="ViewLogsBtn" Content="View Application Log"
+                                        Click="ViewLogs_Click"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        HorizontalAlignment="Left"
+                                        Padding="14,7" FontSize="12"/>
+
                                 <Border Height="1" Background="#2C2C2C" Margin="0,10,0,20"/>
 
                                 <TextBlock Text="About" Foreground="#666" FontSize="11" FontFamily="Segoe UI"/>
@@ -961,7 +1368,7 @@
                     <!-- Gemini tab -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Gemini" Foreground="White" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Gemini" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                             <StackPanel MaxWidth="600">
@@ -1021,7 +1428,7 @@
                     <!-- Games tab -->
                     <TabItem x:Name="GamesTabItem">
                         <TabItem.Header>
-                            <TextBlock Text="Games" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12" FontWeight="Bold"/>
+                            <TextBlock Text="Games" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <Grid>
                             <!-- Game selector (shown when no game is active) -->
@@ -1037,10 +1444,10 @@
             </Border>
 
         <!-- Horizontal Splitter: Output ↔ Terminal -->
-        <GridSplitter x:Name="TerminalSplitter" Grid.Row="3" Grid.Column="2" Style="{StaticResource HorizontalSplitter}"/>
+        <GridSplitter x:Name="TerminalSplitter" Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="3" Style="{StaticResource HorizontalSplitter}"/>
 
         <!-- ═══ TERMINAL (6) ═══ -->
-        <Border Grid.Row="4" Grid.Column="2" Background="#222222" CornerRadius="8" Padding="4"
+        <Border Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Background="#222222" CornerRadius="8" Padding="4"
                 BorderThickness="1">
             <Border.BorderBrush>
                 <SolidColorBrush x:Name="TerminalPanelBorder" Color="#2C2C2C"/>

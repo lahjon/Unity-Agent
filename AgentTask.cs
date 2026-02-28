@@ -16,7 +16,7 @@ namespace UnityAgent
         Cancelled,
         Failed,
         Queued,
-        Ongoing
+        Paused
     }
 
     public enum ModelType
@@ -28,6 +28,7 @@ namespace UnityAgent
     public class AgentTask : INotifyPropertyChanged
     {
         public string Id { get; } = Guid.NewGuid().ToString("N")[..8];
+        public int TaskNumber { get; set; }
         public string Description { get; set; } = "";
         public DateTime StartTime { get; set; } = DateTime.Now;
         public bool SkipPermissions { get; set; }
@@ -39,6 +40,9 @@ namespace UnityAgent
         public bool SpawnTeam { get; set; }
         public bool ExtendedPlanning { get; set; }
         public bool NoGitWrite { get; set; }
+        public bool PlanOnly { get; set; }
+        public string? StoredPrompt { get; set; }
+        public string? FullOutput { get; set; }
         public ModelType Model { get; set; } = ModelType.ClaudeCode;
         public int MaxIterations { get; set; } = 50;
 
@@ -101,6 +105,48 @@ namespace UnityAgent
         [System.Text.Json.Serialization.JsonIgnore]
         public List<string> DependencyTaskIds { get; set; } = new();
 
+        /// <summary>True when the task is currently running in plan-only mode before being queued.</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool IsPlanningBeforeQueue { get; set; }
+
+        /// <summary>True when a killed process needs to restart in plan mode (set by file lock conflict).</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool NeedsPlanRestart { get; set; }
+
+        /// <summary>File path that caused a lock conflict, stored during planning phase.</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? PendingFileLockPath { get; set; }
+
+        /// <summary>Task ID that holds the conflicting file lock.</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? PendingFileLockBlocker { get; set; }
+
+        // Real-time tool activity feed (last 3 actions)
+        private readonly List<string> _recentToolActions = new();
+        private string _toolActivityText = "";
+
+        public string ToolActivityText
+        {
+            get => _toolActivityText;
+            private set { _toolActivityText = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasToolActivity)); }
+        }
+
+        public bool HasToolActivity => !string.IsNullOrEmpty(_toolActivityText);
+
+        public void AddToolActivity(string action)
+        {
+            _recentToolActions.Add(action);
+            if (_recentToolActions.Count > 3)
+                _recentToolActions.RemoveAt(0);
+            ToolActivityText = string.Join("\n", _recentToolActions);
+        }
+
+        public void ClearToolActivity()
+        {
+            _recentToolActions.Clear();
+            ToolActivityText = "";
+        }
+
         private AgentTaskStatus _status = AgentTaskStatus.Running;
         public AgentTaskStatus Status
         {
@@ -113,6 +159,7 @@ namespace UnityAgent
                 OnPropertyChanged(nameof(StatusColor));
                 OnPropertyChanged(nameof(IsRunning));
                 OnPropertyChanged(nameof(IsQueued));
+                OnPropertyChanged(nameof(IsPaused));
                 OnPropertyChanged(nameof(IsFinished));
                 OnPropertyChanged(nameof(TimeInfo));
             }
@@ -139,7 +186,7 @@ namespace UnityAgent
             AgentTaskStatus.Cancelled => "Cancelled",
             AgentTaskStatus.Failed => "Failed",
             AgentTaskStatus.Queued => "Queued",
-            AgentTaskStatus.Ongoing => "Ongoing",
+            AgentTaskStatus.Paused => "Paused",
             _ => "?"
         };
 
@@ -150,13 +197,15 @@ namespace UnityAgent
             AgentTaskStatus.Cancelled => "#E0A030",
             AgentTaskStatus.Failed => "#E05555",
             AgentTaskStatus.Queued => "#FFD600",
-            AgentTaskStatus.Ongoing => "#64B5F6",
+            AgentTaskStatus.Paused => "#CE93D8",
             _ => "#555555"
         };
 
-        public bool IsRunning => Status == AgentTaskStatus.Running || Status == AgentTaskStatus.Ongoing;
+        public bool IsRunning => Status == AgentTaskStatus.Running;
 
         public bool IsQueued => Status == AgentTaskStatus.Queued;
+
+        public bool IsPaused => Status == AgentTaskStatus.Paused;
 
         public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed;
 
@@ -182,6 +231,8 @@ namespace UnityAgent
                     return $"{started} | Ran {(int)duration.TotalMinutes}m {duration.Seconds}s";
                 }
                 var running = DateTime.Now - StartTime;
+                if (Status == AgentTaskStatus.Paused)
+                    return $"{started} | Paused at {(int)running.TotalMinutes}m {running.Seconds}s";
                 return $"{started} | Running {(int)running.TotalMinutes}m {running.Seconds}s";
             }
         }

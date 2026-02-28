@@ -59,7 +59,6 @@ namespace UnityAgent.Managers
         private readonly StackPanel _shortDescEditButtons;
         private readonly StackPanel _longDescEditButtons;
         private readonly Button _regenerateDescBtn;
-        private readonly ToggleButton _skipPermissionsToggle;
         private readonly Dispatcher _dispatcher;
 
         public event Action<AgentTask>? McpInvestigationRequested;
@@ -86,7 +85,6 @@ namespace UnityAgent.Managers
             StackPanel shortDescEditButtons,
             StackPanel longDescEditButtons,
             Button regenerateDescBtn,
-            ToggleButton skipPermissionsToggle,
             Dispatcher dispatcher)
         {
             _projectsFile = Path.Combine(appDataDir, "projects.json");
@@ -102,7 +100,6 @@ namespace UnityAgent.Managers
             _shortDescEditButtons = shortDescEditButtons;
             _longDescEditButtons = longDescEditButtons;
             _regenerateDescBtn = regenerateDescBtn;
-            _skipPermissionsToggle = skipPermissionsToggle;
             _dispatcher = dispatcher;
         }
 
@@ -148,7 +145,7 @@ namespace UnityAgent.Managers
                     }
                 }
             }
-            catch { _savedProjects = new(); }
+            catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed to load projects", ex); _savedProjects = new(); }
 
             // Backfill colors for projects that don't have one yet
             var needsSave = false;
@@ -170,7 +167,7 @@ namespace UnityAgent.Managers
                 File.WriteAllText(_projectsFile,
                     JsonSerializer.Serialize(_savedProjects, _projectJsonOptions));
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed to save projects", ex); }
         }
 
         public void RefreshProjectCombo()
@@ -380,8 +377,9 @@ namespace UnityAgent.Managers
                     RefreshProjectList(null, null, null);
                 });
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Warn("ProjectManager", $"Failed to generate description for {entry.Path}", ex);
                 _dispatcher.Invoke(() =>
                 {
                     entry.IsInitializing = false;
@@ -467,10 +465,13 @@ namespace UnityAgent.Managers
                 var infoPanel = new StackPanel();
 
                 var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
+                var nameColor = !string.IsNullOrEmpty(proj.Color)
+                    ? (Color)ColorConverter.ConvertFromString(proj.Color)
+                    : Color.FromRgb(0xE8, 0xE8, 0xE8);
                 var nameBlock = new TextBlock
                 {
                     Text = proj.DisplayName,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
+                    Foreground = new SolidColorBrush(nameColor),
                     FontWeight = FontWeights.Bold,
                     FontSize = 14,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -579,13 +580,10 @@ namespace UnityAgent.Managers
                 }
                 else if (!string.IsNullOrWhiteSpace(proj.ShortDescription))
                 {
-                    var descColor = !string.IsNullOrEmpty(proj.Color)
-                        ? (Color)ColorConverter.ConvertFromString(proj.Color)
-                        : Color.FromRgb(0xAA, 0xAA, 0xAA);
                     infoPanel.Children.Add(new TextBlock
                     {
                         Text = proj.ShortDescription,
-                        Foreground = new SolidColorBrush(descColor),
+                        Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
                         FontSize = 11,
                         FontFamily = new FontFamily("Segoe UI"),
                         TextTrimming = TextTrimming.CharacterEllipsis,
@@ -707,8 +705,8 @@ namespace UnityAgent.Managers
                         Style = (Style)Application.Current.FindResource(
                             proj.McpStatus == McpStatus.Enabled ? "SuccessBtn" : "SmallBtn"),
                         Background = proj.McpStatus == McpStatus.Enabled
-                            ? new SolidColorBrush(Color.FromRgb(0x3A, 0x7D, 0x3A))
-                            : new SolidColorBrush(Color.FromRgb(0x8B, 0x4A, 0x35)),
+                            ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
+                            : new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
                         Margin = new Thickness(0, 4, 0, 0),
                         Tag = proj.Path
                     };
@@ -744,7 +742,7 @@ namespace UnityAgent.Managers
                             saveSettings?.Invoke();
                             syncSettings?.Invoke();
                         }
-                        catch { }
+                        catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed during project swap", ex); }
                         finally
                         {
                             _isSwapping = false;
@@ -810,7 +808,7 @@ namespace UnityAgent.Managers
             {
                 Description = "The MCP server mcp-for-unity-server at http://127.0.0.1:8080/mcp is not responding. " +
                     "Diagnose and fix the connection. Check if the Unity Editor is running with the MCP plugin installed and enabled.",
-                SkipPermissions = _skipPermissionsToggle.IsChecked == true,
+                SkipPermissions = true,
                 ProjectPath = projectPath,
                 ProjectColor = GetProjectColor(projectPath)
             };
@@ -837,8 +835,9 @@ namespace UnityAgent.Managers
                 var response = await _httpClient.GetAsync(url);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Debug("ProjectManager", $"MCP health check failed for {url}: {ex.Message}");
                 return false;
             }
         }

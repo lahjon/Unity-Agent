@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -18,13 +19,13 @@ namespace UnityAgent.Dialogs
         public static CreateProjectResult? Show()
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { }
+            try { owner = Application.Current.MainWindow; } catch (Exception ex) { Managers.AppLogger.Debug("CreateProjectDialog", $"Could not get MainWindow: {ex.Message}"); }
 
             var dlg = new Window
             {
                 Title = "Create Project",
-                Width = 480,
-                Height = 345,
+                Width = 440,
+                Height = 295,
                 WindowStartupLocation = owner != null
                     ? WindowStartupLocation.CenterOwner
                     : WindowStartupLocation.CenterScreen,
@@ -46,7 +47,7 @@ namespace UnityAgent.Dialogs
             outerBorder.MouseLeftButtonDown += (_, me) => { if (me.ClickCount == 1) dlg.DragMove(); };
 
             CreateProjectResult? result = null;
-            var stack = new StackPanel { Margin = new Thickness(24) };
+            var stack = new StackPanel { Margin = new Thickness(20, 18, 20, 18) };
 
             // Title
             stack.Children.Add(new TextBlock
@@ -56,7 +57,7 @@ namespace UnityAgent.Dialogs
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 16)
+                Margin = new Thickness(0, 0, 0, 12)
             });
 
             // Name field
@@ -74,7 +75,9 @@ namespace UnityAgent.Dialogs
                 FontSize = 13,
                 FontFamily = new FontFamily("Segoe UI"),
                 Padding = new Thickness(8, 6, 8, 6),
-                Style = Application.Current.TryFindResource("DarkTextBox") as Style
+                Background = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
+                CaretBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8))
             };
             stack.Children.Add(nameBox);
 
@@ -85,7 +88,7 @@ namespace UnityAgent.Dialogs
                 Foreground = new SolidColorBrush(Color.FromRgb(0x99, 0x99, 0x99)),
                 FontSize = 11,
                 FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 12, 0, 4)
+                Margin = new Thickness(0, 10, 0, 4)
             });
 
             var pathGrid = new Grid();
@@ -97,7 +100,9 @@ namespace UnityAgent.Dialogs
                 FontSize = 13,
                 FontFamily = new FontFamily("Segoe UI"),
                 Padding = new Thickness(8, 6, 8, 6),
-                Style = Application.Current.TryFindResource("DarkTextBox") as Style
+                Background = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
+                CaretBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8))
             };
             Grid.SetColumn(pathBox, 0);
             pathGrid.Children.Add(pathBox);
@@ -133,7 +138,7 @@ namespace UnityAgent.Dialogs
                 FontSize = 13,
                 FontFamily = new FontFamily("Segoe UI"),
                 IsChecked = true,
-                Margin = new Thickness(0, 16, 0, 0),
+                Margin = new Thickness(0, 12, 0, 0),
                 Style = Application.Current.TryFindResource("ToggleSwitch") as Style
             };
             stack.Children.Add(gitToggle);
@@ -188,7 +193,7 @@ namespace UnityAgent.Dialogs
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(0, 16, 0, 0)
+                Margin = new Thickness(0, 14, 0, 0)
             };
 
             var cancelBtn = new Button

@@ -16,7 +16,7 @@ namespace UnityAgent.Converters
                     var color = (Color)ColorConverter.ConvertFromString(colorStr);
                     return new SolidColorBrush(color);
                 }
-                catch { }
+                catch (Exception ex) { Managers.AppLogger.Debug("StringToBrushConverter", $"Invalid color string '{colorStr}': {ex.Message}"); }
             }
             return new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
         }

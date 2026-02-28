@@ -38,7 +38,7 @@ namespace UnityAgent.Managers
                         return true;
                     }
                 }
-                catch { }
+                catch (Exception ex) { AppLogger.Warn("ImageAttachment", "Failed to paste image from clipboard", ex); }
             }
 
             if (Clipboard.ContainsFileDropList())
@@ -109,7 +109,7 @@ namespace UnityAgent.Managers
         {
             foreach (var path in _attachedImages)
             {
-                try { File.Delete(path); } catch { }
+                try { File.Delete(path); } catch (Exception ex) { AppLogger.Debug("ImageAttachment", $"Failed to delete image {path}: {ex.Message}"); }
             }
             _attachedImages.Clear();
             UpdateImageIndicator();

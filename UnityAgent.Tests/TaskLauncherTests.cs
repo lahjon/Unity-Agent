@@ -63,7 +63,7 @@ namespace UnityAgent.Tests
         public void CreateTask_WithImages_CopiesImagePaths()
         {
             var images = new List<string> { "img1.png", "img2.jpg" };
-            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, false, images);
+            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, false, false, images);
 
             Assert.Equal(2, task.ImagePaths.Count);
             Assert.Contains("img1.png", task.ImagePaths);

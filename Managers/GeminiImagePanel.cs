@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -12,15 +13,14 @@ namespace UnityAgent.Managers
 {
     public static class GeminiImagePanel
     {
-        public static DockPanel Create(AgentTask task, out TextBox outputBox, out WrapPanel imageGallery)
+        public static DockPanel Create(AgentTask task, out RichTextBox outputBox, out WrapPanel imageGallery)
         {
             var root = new DockPanel();
 
             // Bottom: status/log text box
-            outputBox = new TextBox
+            outputBox = new RichTextBox
             {
                 IsReadOnly = true,
-                TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 Background = new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0A)),
                 Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
@@ -30,6 +30,9 @@ namespace UnityAgent.Managers
                 Padding = new Thickness(8),
                 MaxHeight = 120
             };
+            var paraStyle = new Style(typeof(Paragraph));
+            paraStyle.Setters.Add(new Setter(Block.MarginProperty, new Thickness(0)));
+            outputBox.Resources.Add(typeof(Paragraph), paraStyle);
 
             DockPanel.SetDock(outputBox, Dock.Bottom);
             root.Children.Add(outputBox);
@@ -123,7 +126,7 @@ namespace UnityAgent.Managers
                 border.MouseLeftButtonDown += (_, _) =>
                 {
                     try { Process.Start(new ProcessStartInfo(capturedPath) { UseShellExecute = true }); }
-                    catch { }
+                    catch (Exception ex) { AppLogger.Warn("GeminiImagePanel", $"Failed to open image: {capturedPath}", ex); }
                 };
 
                 border.MouseEnter += (_, _) =>
@@ -133,7 +136,7 @@ namespace UnityAgent.Managers
 
                 gallery.Children.Add(border);
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("GeminiImagePanel", $"Failed to load image: {imagePath}", ex); }
         }
 
         public static void SetOpenFolderHandler(DockPanel root, string folderPath)
@@ -148,7 +151,7 @@ namespace UnityAgent.Managers
                         btn.Click += (_, _) =>
                         {
                             try { Process.Start(new ProcessStartInfo(folderPath) { UseShellExecute = true }); }
-                            catch { }
+                            catch (Exception ex) { AppLogger.Warn("GeminiImagePanel", $"Failed to open folder: {folderPath}", ex); }
                         };
                         break;
                     }

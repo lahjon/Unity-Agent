@@ -12,10 +12,12 @@ namespace UnityAgent.Managers
     public class HistoryManager
     {
         private readonly string _historyFile;
+        private readonly string _storedTasksFile;
 
         public HistoryManager(string appDataDir)
         {
             _historyFile = Path.Combine(appDataDir, "task_history.json");
+            _storedTasksFile = Path.Combine(appDataDir, "stored_tasks.json");
         }
 
         public void SaveHistory(ObservableCollection<AgentTask> historyTasks)
@@ -28,6 +30,8 @@ namespace UnityAgent.Managers
                 var entries = historyTasks.Select(t => new TaskHistoryEntry
                 {
                     Description = t.Description,
+                    Summary = t.Summary ?? "",
+                    StoredPrompt = t.StoredPrompt ?? "",
                     Status = t.Status.ToString(),
                     StartTime = t.StartTime,
                     EndTime = t.EndTime,
@@ -44,7 +48,7 @@ namespace UnityAgent.Managers
                 File.WriteAllText(_historyFile,
                     JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save task history", ex); }
         }
 
         public void LoadHistory(ObservableCollection<AgentTask> historyTasks, int retentionHours)
@@ -62,6 +66,7 @@ namespace UnityAgent.Managers
                     var task = new AgentTask
                     {
                         Description = entry.Description,
+                        StoredPrompt = string.IsNullOrEmpty(entry.StoredPrompt) ? null : entry.StoredPrompt,
                         SkipPermissions = entry.SkipPermissions,
                         RemoteSession = entry.RemoteSession,
                         ProjectPath = entry.ProjectPath ?? "",
@@ -73,20 +78,21 @@ namespace UnityAgent.Managers
                         CurrentIteration = entry.CurrentIteration,
                         CompletionSummary = entry.CompletionSummary ?? ""
                     };
+                    task.Summary = entry.Summary ?? "";
                     task.Status = Enum.TryParse<AgentTaskStatus>(entry.Status, out var s)
                         ? s : AgentTaskStatus.Completed;
 
                     historyTasks.Add(task);
                 }
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to load task history", ex); }
         }
 
         public void CleanupOldHistory(
             ObservableCollection<AgentTask> historyTasks,
             Dictionary<string, TabItem> tabs,
             TabControl outputTabs,
-            Dictionary<string, System.Windows.Controls.TextBox> outputBoxes,
+            Dictionary<string, System.Windows.Controls.RichTextBox> outputBoxes,
             int retentionHours)
         {
             var cutoff = DateTime.Now.AddHours(-retentionHours);
@@ -105,6 +111,61 @@ namespace UnityAgent.Managers
             {
                 SaveHistory(historyTasks);
             }
+        }
+
+        public void SaveStoredTasks(ObservableCollection<AgentTask> storedTasks)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(_storedTasksFile)!;
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                var entries = storedTasks.Select(t => new StoredTaskEntry
+                {
+                    Description = t.Description,
+                    Summary = t.Summary,
+                    StoredPrompt = t.StoredPrompt ?? "",
+                    FullOutput = t.FullOutput ?? "",
+                    ProjectPath = t.ProjectPath,
+                    ProjectColor = t.ProjectColor,
+                    CreatedAt = t.StartTime,
+                    SkipPermissions = t.SkipPermissions
+                }).ToList();
+
+                File.WriteAllText(_storedTasksFile,
+                    JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save stored tasks", ex); }
+        }
+
+        public void LoadStoredTasks(ObservableCollection<AgentTask> storedTasks)
+        {
+            try
+            {
+                if (!File.Exists(_storedTasksFile)) return;
+                var entries = JsonSerializer.Deserialize<List<StoredTaskEntry>>(
+                    File.ReadAllText(_storedTasksFile));
+                if (entries == null) return;
+
+                foreach (var entry in entries)
+                {
+                    var task = new AgentTask
+                    {
+                        Description = entry.Description,
+                        StoredPrompt = entry.StoredPrompt,
+                        FullOutput = entry.FullOutput,
+                        ProjectPath = entry.ProjectPath ?? "",
+                        ProjectColor = entry.ProjectColor ?? "#666666",
+                        SkipPermissions = entry.SkipPermissions,
+                        StartTime = entry.CreatedAt
+                    };
+                    task.Summary = entry.Summary ?? "";
+                    task.Status = AgentTaskStatus.Completed;
+
+                    storedTasks.Add(task);
+                }
+            }
+            catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to load stored tasks", ex); }
         }
     }
 }

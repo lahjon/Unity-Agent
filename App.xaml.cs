@@ -19,6 +19,8 @@ namespace UnityAgent
         protected override void OnStartup(StartupEventArgs e)
         {
             Directory.CreateDirectory(LogDir);
+            Managers.AppLogger.Initialize();
+            Managers.AppLogger.Info("App", "Application starting");
 
             DispatcherUnhandledException += OnDispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;

@@ -213,7 +213,7 @@ namespace UnityAgent.Games
                     int.TryParse(File.ReadAllText(HighScoreFile).Trim(), out int saved) && saved > 0)
                     _highScore = saved;
             }
-            catch { /* ignore corrupt or inaccessible file */ }
+            catch (Exception ex) { Managers.AppLogger.Debug("BirdHunterGame", $"Failed to load high score: {ex.Message}"); }
         }
 
         private void SaveHighScore()
@@ -223,7 +223,7 @@ namespace UnityAgent.Games
                 Directory.CreateDirectory(Path.GetDirectoryName(HighScoreFile)!);
                 File.WriteAllText(HighScoreFile, _highScore.ToString());
             }
-            catch { /* ignore write failures */ }
+            catch (Exception ex) { Managers.AppLogger.Debug("BirdHunterGame", $"Failed to save high score: {ex.Message}"); }
         }
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)

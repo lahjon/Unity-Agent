@@ -63,7 +63,7 @@ namespace UnityAgent.Managers
                 if (doc.RootElement.TryGetProperty("model", out var model))
                     _selectedModel = model.GetString() ?? DefaultModel;
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("GeminiService", "Failed to load config", ex); }
         }
 
         public void SaveApiKey(string apiKey)
@@ -83,7 +83,7 @@ namespace UnityAgent.Managers
                 File.WriteAllText(_configFile,
                     JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("GeminiService", "Failed to save config", ex); }
         }
 
         public string GetMaskedApiKey()
@@ -242,7 +242,7 @@ namespace UnityAgent.Managers
                     return error.ToString();
                 }
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Debug("GeminiService", $"Failed to parse error response JSON: {ex.Message}"); }
             return responseBody.Length > 200 ? responseBody[..200] : responseBody;
         }
 

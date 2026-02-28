@@ -10,7 +10,7 @@ namespace UnityAgent.Dialogs
         public static bool ShowConfirm(string message, string title)
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { }
+            try { owner = Application.Current.MainWindow; } catch { /* MainWindow may not be available yet */ }
 
             var dlg = new Window
             {
@@ -102,7 +102,7 @@ namespace UnityAgent.Dialogs
         public static void ShowAlert(string message, string title)
         {
             Window? owner = null;
-            try { owner = Application.Current.MainWindow; } catch { }
+            try { owner = Application.Current.MainWindow; } catch { /* MainWindow may not be available yet */ }
 
             var dlg = new Window
             {

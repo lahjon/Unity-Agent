@@ -110,6 +110,11 @@ namespace UnityAgent.Managers
             UpdateFileLockBadge();
         }
 
+        public bool IsFileLocked(string normalizedPath)
+        {
+            return _fileLocks.ContainsKey(normalizedPath);
+        }
+
         public void HandleFileLockConflict(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
         {
@@ -120,24 +125,37 @@ namespace UnityAgent.Managers
             var blockingLock = _fileLocks.GetValueOrDefault(normalized);
             var blockingTaskId = blockingLock?.OwnerTaskId ?? "unknown";
 
-            appendOutput(taskId, $"\n[UnityAgent] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId} ({toolName})\n");
-            appendOutput(taskId, $"[UnityAgent] Killing task #{taskId} and queuing for auto-resume...\n");
-
             KillProcess(task);
             ReleaseTaskLocks(taskId);
 
-            task.Status = AgentTaskStatus.Queued;
-            task.QueuedReason = $"File locked: {Path.GetFileName(filePath)} by #{blockingTaskId}";
-            task.BlockedByTaskId = blockingTaskId;
-
-            var blockedByIds = new HashSet<string> { blockingTaskId };
-            _queuedTaskInfo[taskId] = new QueuedTaskInfo
+            if (string.IsNullOrEmpty(task.StoredPrompt) && !task.IsPlanningBeforeQueue)
             {
-                Task = task,
-                ConflictingFilePath = normalized,
-                BlockingTaskId = blockingTaskId,
-                BlockedByTaskIds = blockedByIds
-            };
+                // No plan yet — restart in plan mode before queuing
+                appendOutput(taskId, $"\n[UnityAgent] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId}. Restarting in plan mode...\n");
+                task.NeedsPlanRestart = true;
+                task.PlanOnly = true;
+                task.PendingFileLockPath = normalized;
+                task.PendingFileLockBlocker = blockingTaskId;
+            }
+            else
+            {
+                // Already has a plan — queue immediately
+                appendOutput(taskId, $"\n[UnityAgent] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId} ({toolName})\n");
+                appendOutput(taskId, $"[UnityAgent] Queuing task #{taskId} for auto-resume...\n");
+
+                task.Status = AgentTaskStatus.Queued;
+                task.QueuedReason = $"File locked: {Path.GetFileName(filePath)} by #{blockingTaskId}";
+                task.BlockedByTaskId = blockingTaskId;
+
+                var blockedByIds = new HashSet<string> { blockingTaskId };
+                _queuedTaskInfo[taskId] = new QueuedTaskInfo
+                {
+                    Task = task,
+                    ConflictingFilePath = normalized,
+                    BlockingTaskId = blockingTaskId,
+                    BlockedByTaskIds = blockedByIds
+                };
+            }
         }
 
         public void CheckQueuedTasks(ObservableCollection<AgentTask> activeTasks)
@@ -151,7 +169,7 @@ namespace UnityAgent.Managers
                 foreach (var blockerId in qi.BlockedByTaskIds)
                 {
                     var blocker = activeTasks.FirstOrDefault(t => t.Id == blockerId);
-                    if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Ongoing)
+                    if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Paused)
                     {
                         allClear = false;
                         break;
@@ -215,7 +233,7 @@ namespace UnityAgent.Managers
                 if (task.Process is { HasExited: false })
                     task.Process.Kill(true);
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("FileLockManager", $"Failed to kill process for task {task.Id}", ex); }
         }
 
         public static string? TryExtractFilePathFromPartial(string partialJson)

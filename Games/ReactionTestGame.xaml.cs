@@ -153,7 +153,7 @@ namespace UnityAgent.Games
                 if (File.Exists(HighScoreFile) && long.TryParse(File.ReadAllText(HighScoreFile).Trim(), out long saved) && saved > 0)
                     _bestTime = saved;
             }
-            catch { /* ignore corrupt or inaccessible file */ }
+            catch (Exception ex) { Managers.AppLogger.Debug("ReactionTestGame", $"Failed to load high score: {ex.Message}"); }
         }
 
         private void SaveHighScore()
@@ -163,7 +163,7 @@ namespace UnityAgent.Games
                 Directory.CreateDirectory(Path.GetDirectoryName(HighScoreFile)!);
                 File.WriteAllText(HighScoreFile, _bestTime.ToString());
             }
-            catch { /* ignore write failures */ }
+            catch (Exception ex) { Managers.AppLogger.Debug("ReactionTestGame", $"Failed to save high score: {ex.Message}"); }
         }
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)

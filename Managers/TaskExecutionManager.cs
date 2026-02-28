@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace UnityAgent.Managers
@@ -108,9 +111,36 @@ namespace UnityAgent.Managers
                 _dispatcher.BeginInvoke(() =>
                 {
                     var exitCode = -1;
-                    try { exitCode = process.ExitCode; } catch { }
+                    try { exitCode = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get exit code for task {task.Id}: {ex.Message}"); }
 
                     CleanupScripts(task.Id);
+
+                    // Plan-before-queue: killed process needs to restart in plan mode
+                    if (task.NeedsPlanRestart)
+                    {
+                        task.NeedsPlanRestart = false;
+                        task.IsPlanningBeforeQueue = true;
+                        task.StartTime = DateTime.Now;
+                        AppendOutput(task.Id, "\n[UnityAgent] Restarting in plan mode...\n\n", activeTasks, historyTasks);
+                        _outputTabManager.UpdateTabHeader(task);
+                        StartProcess(task, activeTasks, historyTasks, moveToHistory);
+                        return;
+                    }
+
+                    // Plan-before-queue: planning phase complete
+                    if (task.IsPlanningBeforeQueue)
+                    {
+                        HandlePlanBeforeQueueCompletion(task, activeTasks, historyTasks, moveToHistory);
+                        return;
+                    }
+
+                    // Already queued or cancelled — skip normal completion
+                    if (task.Status is AgentTaskStatus.Queued or AgentTaskStatus.Cancelled)
+                    {
+                        _fileLockManager.CheckQueuedTasks(activeTasks);
+                        TaskCompleted?.Invoke(task.Id);
+                        return;
+                    }
 
                     if (task.IsOvernight && task.Status == AgentTaskStatus.Running)
                     {
@@ -125,8 +155,12 @@ namespace UnityAgent.Managers
                         task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
                         task.EndTime = DateTime.Now;
                         AppendCompletionSummary(task, activeTasks, historyTasks);
-                        AppendOutput(task.Id, $"\n[UnityAgent] Process finished (exit code: {exitCode}). " +
-                            "Use Done/Cancel to close, or send a follow-up.\n", activeTasks, historyTasks);
+                        var statusColor = exitCode == 0
+                            ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
+                            : new SolidColorBrush(Color.FromRgb(0xE0, 0x55, 0x55));
+                        AppendColoredOutput(task.Id,
+                            $"\n[UnityAgent] Process finished (exit code: {exitCode}).\n",
+                            statusColor, activeTasks, historyTasks);
                         _outputTabManager.UpdateTabHeader(task);
                     }
 
@@ -156,7 +190,7 @@ namespace UnityAgent.Managers
                         if (task.Process is { HasExited: false })
                         {
                             AppendOutput(task.Id, $"\n[Overnight] Iteration timeout ({OvernightIterationTimeoutMinutes}min). Killing stuck process.\n", activeTasks, historyTasks);
-                            try { task.Process.Kill(true); } catch { }
+                            try { task.Process.Kill(true); } catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill stuck process for task {task.Id}", ex); }
                         }
                     };
                     iterationTimer.Start();
@@ -204,7 +238,7 @@ namespace UnityAgent.Managers
             if (string.IsNullOrEmpty(text)) return;
             inputBox.Clear();
 
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Ongoing && task.Process is { HasExited: false })
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Running && task.Process is { HasExited: false })
             {
                 try
                 {
@@ -212,10 +246,10 @@ namespace UnityAgent.Managers
                     task.Process.StandardInput.WriteLine(text);
                     return;
                 }
-                catch { }
+                catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to write to stdin for task {task.Id}, starting follow-up", ex); }
             }
 
-            task.Status = AgentTaskStatus.Ongoing;
+            task.Status = AgentTaskStatus.Running;
             task.EndTime = null;
             _outputTabManager.UpdateTabHeader(task);
             AppendOutput(task.Id, $"\n> {text}\n[UnityAgent] Sending follow-up with --continue...\n\n", activeTasks, historyTasks);
@@ -261,7 +295,7 @@ namespace UnityAgent.Managers
                 _dispatcher.BeginInvoke(() =>
                 {
                     var followUpExit = -1;
-                    try { followUpExit = process.ExitCode; } catch { }
+                    try { followUpExit = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get follow-up exit code for task {task.Id}: {ex.Message}"); }
                     task.Status = followUpExit == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
                     task.EndTime = DateTime.Now;
                     AppendCompletionSummary(task, activeTasks, historyTasks);
@@ -285,6 +319,12 @@ namespace UnityAgent.Managers
         public void CancelTaskImmediate(AgentTask task)
         {
             if (task.IsFinished) return;
+
+            // Resume suspended threads before killing so the process can exit cleanly
+            if (task.Status == AgentTaskStatus.Paused && task.Process is { HasExited: false })
+            {
+                try { ResumeProcessTree(task.Process); } catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to resume process tree before cancel for task {task.Id}", ex); }
+            }
 
             if (task.OvernightRetryTimer != null)
             {
@@ -311,10 +351,175 @@ namespace UnityAgent.Managers
                 if (task.Process is { HasExited: false })
                     task.Process.Kill(true);
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill process for task {task.Id}", ex); }
         }
 
         public void RemoveStreamingState(string taskId) => _streamingToolState.Remove(taskId);
+
+        // ── Process Suspend / Resume (P/Invoke) ────────────────────
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr OpenThread(uint dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint SuspendThread(IntPtr hThread);
+
+        [DllImport("kernel32.dll")]
+        private static extern int ResumeThread(IntPtr hThread);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct PROCESSENTRY32
+        {
+            public uint dwSize;
+            public uint cntUsage;
+            public uint th32ProcessID;
+            public IntPtr th32DefaultHeapID;
+            public uint th32ModuleID;
+            public uint cntThreads;
+            public uint th32ParentProcessID;
+            public int pcPriClassBase;
+            public uint dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szExeFile;
+        }
+
+        private const uint THREAD_SUSPEND_RESUME = 0x0002;
+        private const uint TH32CS_SNAPPROCESS = 0x00000002;
+
+        private static List<int> GetProcessTree(int rootPid)
+        {
+            var result = new List<int> { rootPid };
+            var snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if (snapshot == IntPtr.Zero || snapshot == new IntPtr(-1)) return result;
+            try
+            {
+                var entry = new PROCESSENTRY32 { dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32>() };
+                var parentToChildren = new Dictionary<uint, List<uint>>();
+
+                if (Process32First(snapshot, ref entry))
+                {
+                    do
+                    {
+                        if (!parentToChildren.ContainsKey(entry.th32ParentProcessID))
+                            parentToChildren[entry.th32ParentProcessID] = new List<uint>();
+                        parentToChildren[entry.th32ParentProcessID].Add(entry.th32ProcessID);
+                    } while (Process32Next(snapshot, ref entry));
+                }
+
+                var queue = new Queue<uint>();
+                queue.Enqueue((uint)rootPid);
+                var visited = new HashSet<uint> { (uint)rootPid };
+                while (queue.Count > 0)
+                {
+                    var pid = queue.Dequeue();
+                    if (parentToChildren.TryGetValue(pid, out var children))
+                    {
+                        foreach (var child in children)
+                        {
+                            if (visited.Add(child))
+                            {
+                                result.Add((int)child);
+                                queue.Enqueue(child);
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                CloseHandle(snapshot);
+            }
+            return result;
+        }
+
+        private static void SuspendProcessTree(Process process)
+        {
+            foreach (var pid in GetProcessTree(process.Id))
+            {
+                try
+                {
+                    var p = Process.GetProcessById(pid);
+                    foreach (ProcessThread thread in p.Threads)
+                    {
+                        var handle = OpenThread(THREAD_SUSPEND_RESUME, false, (uint)thread.Id);
+                        if (handle != IntPtr.Zero)
+                        {
+                            SuspendThread(handle);
+                            CloseHandle(handle);
+                        }
+                    }
+                }
+                catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to suspend PID {pid}: {ex.Message}"); }
+            }
+        }
+
+        private static void ResumeProcessTree(Process process)
+        {
+            foreach (var pid in GetProcessTree(process.Id))
+            {
+                try
+                {
+                    var p = Process.GetProcessById(pid);
+                    foreach (ProcessThread thread in p.Threads)
+                    {
+                        var handle = OpenThread(THREAD_SUSPEND_RESUME, false, (uint)thread.Id);
+                        if (handle != IntPtr.Zero)
+                        {
+                            ResumeThread(handle);
+                            CloseHandle(handle);
+                        }
+                    }
+                }
+                catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to resume PID {pid}: {ex.Message}"); }
+            }
+        }
+
+        public void PauseTask(AgentTask task)
+        {
+            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Running)) return;
+            if (task.Process is not { HasExited: false }) return;
+
+            SuspendProcessTree(task.Process);
+            task.Status = AgentTaskStatus.Paused;
+
+            // Pause overnight timers if active
+            task.OvernightIterationTimer?.Stop();
+            task.OvernightRetryTimer?.Stop();
+
+            _outputTabManager.UpdateTabHeader(task);
+        }
+
+        public void ResumeTask(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            if (task.Status != AgentTaskStatus.Paused) return;
+            if (task.Process is not { HasExited: false }) return;
+
+            ResumeProcessTree(task.Process);
+            task.Status = AgentTaskStatus.Running;
+
+            // Restart overnight timers if applicable
+            if (task.IsOvernight)
+            {
+                task.OvernightIterationTimer?.Start();
+                task.OvernightRetryTimer?.Start();
+            }
+
+            _outputTabManager.UpdateTabHeader(task);
+            AppendOutput(task.Id, "\n[UnityAgent] Task resumed.\n", activeTasks, historyTasks);
+        }
 
         private static string FormatToolAction(string toolName, JsonElement? input)
         {
@@ -385,7 +590,10 @@ namespace UnityAgent.Managers
                                 {
                                     var toolName = block.TryGetProperty("name", out var tn) ? tn.GetString() : "unknown";
                                     JsonElement? toolInput = block.TryGetProperty("input", out var inp) ? inp : null;
-                                    AppendOutput(taskId, $"\n{FormatToolAction(toolName ?? "unknown", toolInput)}\n", activeTasks, historyTasks);
+                                    var actionText = FormatToolAction(toolName ?? "unknown", toolInput);
+                                    AppendOutput(taskId, $"\n{actionText}\n", activeTasks, historyTasks);
+                                    var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                                    actionTask?.AddToolActivity(actionText);
 
                                     if (TaskLauncher.IsFileModifyTool(toolName) && toolInput != null)
                                     {
@@ -409,7 +617,10 @@ namespace UnityAgent.Managers
                             if (cbType == "tool_use")
                             {
                                 var toolName = cb.TryGetProperty("name", out var tn) ? tn.GetString() : "tool";
-                                AppendOutput(taskId, $"\n{FormatToolAction(toolName ?? "tool", null)}...\n", activeTasks, historyTasks);
+                                var actionText = FormatToolAction(toolName ?? "tool", null);
+                                AppendOutput(taskId, $"\n{actionText}...\n", activeTasks, historyTasks);
+                                var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                                actionTask?.AddToolActivity(actionText);
 
                                 _streamingToolState[taskId] = new StreamingToolState
                                 {
@@ -482,7 +693,7 @@ namespace UnityAgent.Managers
                                         }
                                     }
                                 }
-                                catch { }
+                                catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to parse streaming tool args for task {taskId}: {ex.Message}"); }
                             }
                         }
                         _streamingToolState.Remove(taskId);
@@ -685,7 +896,7 @@ namespace UnityAgent.Managers
                 _dispatcher.BeginInvoke(() =>
                 {
                     var exitCode = -1;
-                    try { exitCode = process.ExitCode; } catch { }
+                    try { exitCode = process.ExitCode; } catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Could not get overnight exit code for task {task.Id}: {ex.Message}"); }
                     CleanupScripts(task.Id);
                     HandleOvernightIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
                 });
@@ -710,7 +921,7 @@ namespace UnityAgent.Managers
                     if (task.Process is { HasExited: false })
                     {
                         AppendOutput(task.Id, $"\n[Overnight] Iteration timeout ({OvernightIterationTimeoutMinutes}min). Killing stuck process.\n", activeTasks, historyTasks);
-                        try { task.Process.Kill(true); } catch { }
+                        try { task.Process.Kill(true); } catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill stuck overnight process for task {task.Id}", ex); }
                     }
                 };
                 iterationTimer.Start();
@@ -725,10 +936,93 @@ namespace UnityAgent.Managers
             }
         }
 
+        private void HandlePlanBeforeQueueCompletion(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            Action<AgentTask> moveToHistory)
+        {
+            task.IsPlanningBeforeQueue = false;
+            task.PlanOnly = false;
+
+            // Extract execution prompt from plan output
+            var output = task.OutputBuilder.ToString();
+            var executionPrompt = TaskLauncher.ExtractExecutionPrompt(output);
+            if (!string.IsNullOrEmpty(executionPrompt))
+                task.StoredPrompt = executionPrompt;
+
+            // Check dependency-based queue
+            if (task.DependencyTaskIds.Count > 0)
+            {
+                var allResolved = task.DependencyTaskIds.All(depId =>
+                {
+                    var dep = activeTasks.FirstOrDefault(t => t.Id == depId);
+                    return dep == null || dep.IsFinished;
+                });
+
+                if (!allResolved)
+                {
+                    task.Status = AgentTaskStatus.Queued;
+                    task.QueuedReason = "Plan complete, waiting for dependencies";
+                    task.BlockedByTaskId = task.DependencyTaskIds.FirstOrDefault(depId =>
+                    {
+                        var dep = activeTasks.FirstOrDefault(t => t.Id == depId);
+                        return dep != null && !dep.IsFinished;
+                    });
+                    AppendOutput(task.Id,
+                        $"\n[UnityAgent] Planning complete. Queued — waiting for dependencies: " +
+                        $"{string.Join(", ", task.DependencyTaskIds.Select(id => $"#{id}"))}\n",
+                        activeTasks, historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                    return;
+                }
+                // Dependencies resolved during planning
+                task.DependencyTaskIds.Clear();
+            }
+
+            // Check file-lock-based queue
+            if (!string.IsNullOrEmpty(task.PendingFileLockPath))
+            {
+                var filePath = task.PendingFileLockPath;
+                var blockerId = task.PendingFileLockBlocker!;
+                task.PendingFileLockPath = null;
+                task.PendingFileLockBlocker = null;
+
+                if (_fileLockManager.IsFileLocked(filePath))
+                {
+                    task.Status = AgentTaskStatus.Queued;
+                    task.QueuedReason = $"Plan complete, file locked by #{blockerId}";
+                    task.BlockedByTaskId = blockerId;
+                    _fileLockManager.QueuedTaskInfos[task.Id] = new QueuedTaskInfo
+                    {
+                        Task = task,
+                        ConflictingFilePath = filePath,
+                        BlockingTaskId = blockerId,
+                        BlockedByTaskIds = new HashSet<string> { blockerId }
+                    };
+                    AppendOutput(task.Id, "\n[UnityAgent] Planning complete. Queued — waiting for file lock to clear.\n", activeTasks, historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                    _fileLockManager.CheckQueuedTasks(activeTasks);
+                    return;
+                }
+                // File lock cleared during planning
+            }
+
+            // No more blockers — start execution
+            task.StartTime = DateTime.Now;
+            AppendOutput(task.Id, "\n[UnityAgent] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
+            _outputTabManager.UpdateTabHeader(task);
+            StartProcess(task, activeTasks, historyTasks, moveToHistory);
+        }
+
         private void AppendOutput(string taskId, string text,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
             _outputTabManager.AppendOutput(taskId, text, activeTasks, historyTasks);
+        }
+
+        private void AppendColoredOutput(string taskId, string text, Brush foreground,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            _outputTabManager.AppendColoredOutput(taskId, text, foreground, activeTasks, historyTasks);
         }
 
         private void AppendCompletionSummary(AgentTask task,
@@ -748,7 +1042,7 @@ namespace UnityAgent.Managers
                 foreach (var f in Directory.GetFiles(_scriptDir, $"*_{taskId}*"))
                     File.Delete(f);
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to cleanup scripts for task {taskId}: {ex.Message}"); }
         }
     }
 }

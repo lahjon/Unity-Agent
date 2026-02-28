@@ -5,6 +5,8 @@ namespace UnityAgent.Models
     internal class TaskHistoryEntry
     {
         public string Description { get; set; } = "";
+        public string Summary { get; set; } = "";
+        public string StoredPrompt { get; set; } = "";
         public string Status { get; set; } = "";
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }

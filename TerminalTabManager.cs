@@ -70,7 +70,7 @@ namespace UnityAgent
                     var terminal = _terminals[i];
                     _terminals.RemoveAt(i);
                     // Dispose on background thread to avoid Thread.Join(2000) blocking the UI
-                    _ = System.Threading.Tasks.Task.Run(() => { try { terminal.Dispose(); } catch { } });
+                    _ = System.Threading.Tasks.Task.Run(() => { try { terminal.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", $"Background terminal dispose failed: {ex.Message}"); } });
 
                     if (_activeIndex > i) _activeIndex--;
                     else if (_activeIndex == i) _activeIndex = -1;
@@ -80,9 +80,10 @@ namespace UnityAgent
                     {
                         fresh = new ConPtyTerminal(wd);
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         // If terminal creation fails, don't insert anything
+                        Managers.AppLogger.Warn("TerminalTab", $"Failed to create replacement terminal for {wd}", ex);
                         continue;
                     }
 
@@ -99,9 +100,10 @@ namespace UnityAgent
                         _activeIndex++;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Don't let a single terminal failure break the whole swap
+                    Managers.AppLogger.Warn("TerminalTab", "Terminal swap failed for one tab", ex);
                 }
             }
 
@@ -492,7 +494,7 @@ namespace UnityAgent
         {
             foreach (var t in _terminals)
             {
-                try { t.Dispose(); } catch { }
+                try { t.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", $"Terminal dispose failed: {ex.Message}"); }
             }
             _terminals.Clear();
             _activeIndex = -1;

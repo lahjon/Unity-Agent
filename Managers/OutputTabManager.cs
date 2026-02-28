@@ -5,8 +5,10 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace UnityAgent.Managers
@@ -14,18 +16,18 @@ namespace UnityAgent.Managers
     public class OutputTabManager
     {
         private readonly Dictionary<string, TabItem> _tabs = new();
-        private readonly Dictionary<string, TextBox> _outputBoxes = new();
+        private readonly Dictionary<string, RichTextBox> _outputBoxes = new();
         private readonly Dictionary<string, WrapPanel> _geminiGalleries = new();
         private Button? _overflowBtn;
         private readonly TabControl _outputTabs;
         private readonly Dispatcher _dispatcher;
 
         public event Action<AgentTask>? TabCloseRequested;
+        public event Action<AgentTask>? TabStoreRequested;
         public event Action<AgentTask, TextBox>? InputSent;
-        public event Action<AgentTask>? CancelClicked;
 
         public Dictionary<string, TabItem> Tabs => _tabs;
-        public Dictionary<string, TextBox> OutputBoxes => _outputBoxes;
+        public Dictionary<string, RichTextBox> OutputBoxes => _outputBoxes;
 
         public OutputTabManager(TabControl outputTabs, Dispatcher dispatcher)
         {
@@ -35,10 +37,9 @@ namespace UnityAgent.Managers
 
         public void CreateTab(AgentTask task)
         {
-            var outputBox = new TextBox
+            var outputBox = new RichTextBox
             {
                 IsReadOnly = true,
-                TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 Background = new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0A)),
                 Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
@@ -47,6 +48,9 @@ namespace UnityAgent.Managers
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(8)
             };
+            var paraStyle = new Style(typeof(Paragraph));
+            paraStyle.Setters.Add(new Setter(Block.MarginProperty, new Thickness(0)));
+            outputBox.Resources.Add(typeof(Paragraph), paraStyle);
             _outputBoxes[task.Id] = outputBox;
 
             var inputBox = new TextBox
@@ -72,17 +76,6 @@ namespace UnityAgent.Managers
                 Margin = new Thickness(4, 0, 0, 0)
             };
 
-            var cancelBtn = new Button
-            {
-                Content = "Cancel",
-                Style = (Style)Application.Current.FindResource("DangerBtn"),
-                FontWeight = FontWeights.Bold,
-                FontSize = 12,
-                Padding = new Thickness(14, 6, 14, 6),
-                Margin = new Thickness(4, 0, 0, 0),
-                ToolTip = "Immediately cancel this task (Escape)"
-            };
-
             sendBtn.Click += (_, _) => InputSent?.Invoke(task, inputBox);
             inputBox.KeyDown += (_, ke) =>
             {
@@ -93,12 +86,8 @@ namespace UnityAgent.Managers
                 }
             };
 
-            cancelBtn.Click += (_, _) => CancelClicked?.Invoke(task);
-
             var inputPanel = new DockPanel { Margin = new Thickness(0, 4, 0, 0) };
-            DockPanel.SetDock(cancelBtn, Dock.Right);
             DockPanel.SetDock(sendBtn, Dock.Right);
-            inputPanel.Children.Add(cancelBtn);
             inputPanel.Children.Add(sendBtn);
             inputPanel.Children.Add(inputBox);
 
@@ -173,14 +162,38 @@ namespace UnityAgent.Managers
         {
             var panel = new StackPanel { Orientation = Orientation.Horizontal };
 
-            var dot = new System.Windows.Shapes.Ellipse
+            var dotGrid = new Grid
+            {
+                Width = 8,
+                Height = 8,
+                Margin = new Thickness(0, 0, 5, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var glow = new System.Windows.Shapes.Ellipse
             {
                 Width = 8,
                 Height = 8,
                 Fill = new SolidColorBrush(ParseHexColor(task.StatusColor)),
-                Margin = new Thickness(0, 0, 5, 0),
-                VerticalAlignment = VerticalAlignment.Center
+                Effect = new System.Windows.Media.Effects.BlurEffect { Radius = 0 }
             };
+
+            var dot = new System.Windows.Shapes.Ellipse
+            {
+                Width = 8,
+                Height = 8,
+                Fill = new SolidColorBrush(ParseHexColor(task.StatusColor))
+            };
+
+            dotGrid.Children.Add(glow);
+            dotGrid.Children.Add(dot);
+
+            if (task.IsRunning)
+                ApplyPulseAnimation(glow, 0.8, 10);
+            else if (task.IsQueued)
+                ApplyPulseAnimation(glow, 1.2, 8, 0.4);
+            else if (task.IsPaused)
+                ApplyPulseAnimation(glow, 2.0, 0, 0.3);
 
             var prefix = isGemini ? "\uE91B " : "";
             var label = new TextBlock
@@ -228,19 +241,93 @@ namespace UnityAgent.Managers
             closeBtn.Template = closeBtnTemplate;
             closeBtn.Click += (_, _) => TabCloseRequested?.Invoke(task);
 
-            panel.Children.Add(dot);
+            var storeItem = new MenuItem
+            {
+                Header = "Store Task",
+                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+            };
+            storeItem.Click += (_, _) => TabStoreRequested?.Invoke(task);
+
+            var closeItem = new MenuItem
+            {
+                Header = "Close Tab",
+                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+            };
+            closeItem.Click += (_, _) => TabCloseRequested?.Invoke(task);
+
+            var ctx = new ContextMenu
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0x25, 0x25, 0x25)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+            };
+            ctx.Items.Add(storeItem);
+            ctx.Items.Add(closeItem);
+
+            panel.Children.Add(dotGrid);
             panel.Children.Add(label);
             panel.Children.Add(closeBtn);
+            panel.ContextMenu = ctx;
             return panel;
         }
 
         public void CloseTab(AgentTask task)
         {
-            if (_tabs.TryGetValue(task.Id, out var tab))
+            if (!_tabs.TryGetValue(task.Id, out var tab))
             {
-                _outputTabs.Items.Remove(tab);
-                _tabs.Remove(task.Id);
+                _outputBoxes.Remove(task.Id);
+                _geminiGalleries.Remove(task.Id);
+                return;
             }
+
+            // If tab isn't loaded or has no width yet, skip animation
+            if (tab.ActualWidth <= 0)
+            {
+                RemoveTabImmediate(task, tab);
+                return;
+            }
+
+            // Prevent interaction during animation
+            tab.IsHitTestVisible = false;
+
+            // Select an adjacent tab before animating
+            if (_outputTabs.SelectedItem == tab)
+            {
+                int idx = _outputTabs.Items.IndexOf(tab);
+                if (idx + 1 < _outputTabs.Items.Count)
+                    _outputTabs.SelectedIndex = idx + 1;
+                else if (idx > 0)
+                    _outputTabs.SelectedIndex = idx - 1;
+            }
+
+            double originalWidth = tab.ActualWidth;
+
+            // Phase 1: Fade out (200ms)
+            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+            };
+
+            // Phase 2: Shrink width to 0 (180ms, starts 80ms after fade begins)
+            var shrink = new DoubleAnimation(originalWidth, 0, TimeSpan.FromMilliseconds(180))
+            {
+                BeginTime = TimeSpan.FromMilliseconds(80),
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+            };
+
+            shrink.Completed += (_, _) => RemoveTabImmediate(task, tab);
+
+            tab.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            tab.BeginAnimation(FrameworkElement.WidthProperty, shrink);
+        }
+
+        private void RemoveTabImmediate(AgentTask task, TabItem tab)
+        {
+            // Clear animations so the tab can be cleanly removed
+            tab.BeginAnimation(UIElement.OpacityProperty, null);
+            tab.BeginAnimation(FrameworkElement.WidthProperty, null);
+
+            _outputTabs.Items.Remove(tab);
+            _tabs.Remove(task.Id);
             _outputBoxes.Remove(task.Id);
             _geminiGalleries.Remove(task.Id);
             UpdateOutputTabWidths();
@@ -249,9 +336,31 @@ namespace UnityAgent.Managers
         public void UpdateTabHeader(AgentTask task)
         {
             if (!_tabs.TryGetValue(task.Id, out var tab)) return;
-            if (tab.Header is StackPanel sp && sp.Children[0] is System.Windows.Shapes.Ellipse dot)
+            if (tab.Header is StackPanel sp && sp.Children[0] is Grid dotGrid
+                && dotGrid.Children.Count >= 2
+                && dotGrid.Children[0] is System.Windows.Shapes.Ellipse glow
+                && dotGrid.Children[1] is System.Windows.Shapes.Ellipse dot)
             {
-                dot.Fill = new SolidColorBrush(ParseHexColor(task.StatusColor));
+                var color = new SolidColorBrush(ParseHexColor(task.StatusColor));
+                dot.Fill = color;
+                glow.Fill = color;
+
+                // Stop any existing animations
+                glow.BeginAnimation(UIElement.OpacityProperty, null);
+                glow.Opacity = 1.0;
+
+                if (glow.Effect is System.Windows.Media.Effects.BlurEffect blurFx)
+                {
+                    blurFx.BeginAnimation(System.Windows.Media.Effects.BlurEffect.RadiusProperty, null);
+                    blurFx.Radius = 0;
+                }
+
+                if (task.IsRunning)
+                    ApplyPulseAnimation(glow, 0.8, 10);
+                else if (task.IsQueued)
+                    ApplyPulseAnimation(glow, 1.2, 8, 0.4);
+                else if (task.IsPaused)
+                    ApplyPulseAnimation(glow, 2.0, 0, 0.3);
 
                 if (sp.Children.Count > 1 && sp.Children[1] is TextBlock label)
                     label.Text = task.ShortDescription;
@@ -277,6 +386,47 @@ namespace UnityAgent.Managers
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
                     ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
             task?.OutputBuilder.Append(text);
+        }
+
+        public void AppendColoredOutput(string taskId, string text, Brush foreground,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            if (!_outputBoxes.TryGetValue(taskId, out var box)) return;
+            var run = new Run(text) { Foreground = foreground };
+            if (box.Document.Blocks.LastBlock is Paragraph lastPara)
+                lastPara.Inlines.Add(run);
+            else
+                box.Document.Blocks.Add(new Paragraph(run));
+            box.ScrollToEnd();
+
+            var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
+                    ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
+            task?.OutputBuilder.Append(text);
+        }
+
+        private static void ApplyPulseAnimation(System.Windows.Shapes.Ellipse glow, double durationSec, double blurTo, double opacityFrom = 0.3)
+        {
+            var duration = TimeSpan.FromSeconds(durationSec);
+            var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+
+            if (blurTo > 0 && glow.Effect is System.Windows.Media.Effects.BlurEffect blur)
+            {
+                var blurAnim = new DoubleAnimation(0, blurTo, duration)
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = ease
+                };
+                blur.BeginAnimation(System.Windows.Media.Effects.BlurEffect.RadiusProperty, blurAnim);
+            }
+
+            var opacityAnim = new DoubleAnimation(opacityFrom, 1.0, duration)
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            };
+            glow.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
         }
 
         private static Color ParseHexColor(string hex)

@@ -10,6 +10,7 @@ namespace UnityAgent.Managers
         private readonly string _settingsFile;
         private int _historyRetentionHours = 24;
         private string? _lastSelectedProject;
+        private bool _settingsPanelCollapsed;
 
         public int HistoryRetentionHours
         {
@@ -21,6 +22,12 @@ namespace UnityAgent.Managers
         {
             get => _lastSelectedProject;
             set => _lastSelectedProject = value;
+        }
+
+        public bool SettingsPanelCollapsed
+        {
+            get => _settingsPanelCollapsed;
+            set => _settingsPanelCollapsed = value;
         }
 
         public SettingsManager(string appDataDir)
@@ -41,8 +48,10 @@ namespace UnityAgent.Managers
                     _historyRetentionHours = val.GetInt32();
                 if (dict.TryGetValue("selectedProject", out var sp))
                     _lastSelectedProject = sp.GetString();
+                if (dict.TryGetValue("settingsPanelCollapsed", out var spc))
+                    _settingsPanelCollapsed = spc.GetBoolean();
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to load settings", ex); }
         }
 
         public void SaveSettings(string? projectPath)
@@ -52,12 +61,13 @@ namespace UnityAgent.Managers
                 var dict = new Dictionary<string, object>
                 {
                     ["historyRetentionHours"] = _historyRetentionHours,
-                    ["selectedProject"] = projectPath ?? ""
+                    ["selectedProject"] = projectPath ?? "",
+                    ["settingsPanelCollapsed"] = _settingsPanelCollapsed
                 };
                 File.WriteAllText(_settingsFile,
                     JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { }
+            catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to save settings", ex); }
         }
     }
 }

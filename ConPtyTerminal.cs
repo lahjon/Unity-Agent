@@ -315,7 +315,7 @@ namespace UnityAgent
             }
 
             // Wait for the read thread to finish so no more events fire after this point
-            try { _readThread?.Join(2000); } catch { }
+            try { _readThread?.Join(2000); } catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", $"Read thread join failed: {ex.Message}"); }
 
             CleanupNativeResources();
         }
@@ -325,7 +325,7 @@ namespace UnityAgent
             // Terminate the process
             if (_processHandle != IntPtr.Zero)
             {
-                try { TerminateProcess(_processHandle, 0); } catch { }
+                try { TerminateProcess(_processHandle, 0); } catch (Exception ex) { Managers.AppLogger.Debug("ConPtyTerminal", $"TerminateProcess failed: {ex.Message}"); }
                 CloseHandle(_processHandle);
                 _processHandle = IntPtr.Zero;
             }
