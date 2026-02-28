@@ -15,6 +15,10 @@ namespace AgenticEngine.Managers
 {
     public class OutputTabManager
     {
+        /// <summary>Rolling-window cap for non-overnight task output (500 KB of text).
+        /// Overnight tasks already trim at iteration boundaries via OvernightOutputCapChars.</summary>
+        internal const int OutputCapChars = 500_000;
+
         private readonly Dictionary<string, TabItem> _tabs = new();
         private readonly Dictionary<string, RichTextBox> _outputBoxes = new();
         private readonly Dictionary<string, WrapPanel> _geminiGalleries = new();
@@ -42,8 +46,8 @@ namespace AgenticEngine.Managers
                 IsReadOnly = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Background = new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0A)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                Background = (Brush)Application.Current.FindResource("BgAbyss"),
+                Foreground = (Brush)Application.Current.FindResource("TextBody"),
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 13,
                 BorderThickness = new Thickness(0),
@@ -56,10 +60,10 @@ namespace AgenticEngine.Managers
 
             var inputBox = new TextBox
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
-                CaretBrush = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+                Background = (Brush)Application.Current.FindResource("BgTerminalInput"),
+                Foreground = (Brush)Application.Current.FindResource("TextBody"),
+                CaretBrush = (Brush)Application.Current.FindResource("TextBody"),
+                BorderBrush = (Brush)Application.Current.FindResource("BgCard"),
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 13,
                 Padding = new Thickness(8, 6, 8, 6),
@@ -70,7 +74,7 @@ namespace AgenticEngine.Managers
             {
                 Content = "Send",
                 Style = (Style)Application.Current.FindResource("Btn"),
-                Background = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                Background = (Brush)Application.Current.FindResource("Accent"),
                 FontWeight = FontWeights.Bold,
                 FontSize = 12,
                 Padding = new Thickness(14, 6, 14, 6),
@@ -191,6 +195,8 @@ namespace AgenticEngine.Managers
 
             if (task.IsRunning)
                 ApplyPulseAnimation(glow, 0.8, 10);
+            else if (task.IsPlanning)
+                ApplyPulseAnimation(glow, 1.0, 8, 0.4);
             else if (task.IsQueued)
                 ApplyPulseAnimation(glow, 1.2, 8, 0.4);
             else if (task.IsPaused)
@@ -204,15 +210,15 @@ namespace AgenticEngine.Managers
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = isGemini
-                    ? new SolidColorBrush(Color.FromRgb(0x4E, 0xA8, 0xDB))
-                    : new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0))
+                    ? (Brush)Application.Current.FindResource("Accent")
+                    : (Brush)Application.Current.FindResource("TextBody")
             };
 
             var closeBtn = new Button
             {
                 Content = "\uE8BB",
                 Background = Brushes.Transparent,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+                Foreground = (Brush)Application.Current.FindResource("TextDisabled"),
                 BorderThickness = new Thickness(0),
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 9,
@@ -234,8 +240,8 @@ namespace AgenticEngine.Managers
             bdFactory.AppendChild(cpFactory);
 
             var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-            hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)), "Bd"));
-            hoverTrigger.Setters.Add(new Setter(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC))));
+            hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, (Brush)Application.Current.FindResource("BorderSubtle"), "Bd"));
+            hoverTrigger.Setters.Add(new Setter(Control.ForegroundProperty, (Brush)Application.Current.FindResource("TextLight")));
 
             var closeBtnTemplate = new ControlTemplate(typeof(Button)) { VisualTree = bdFactory };
             closeBtnTemplate.Triggers.Add(hoverTrigger);
@@ -245,21 +251,21 @@ namespace AgenticEngine.Managers
             var storeItem = new MenuItem
             {
                 Header = "Store Task",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                Foreground = (Brush)Application.Current.FindResource("TextBody"),
             };
             storeItem.Click += (_, _) => TabStoreRequested?.Invoke(task);
 
             var closeItem = new MenuItem
             {
                 Header = "Close Tab",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                Foreground = (Brush)Application.Current.FindResource("TextBody"),
             };
             closeItem.Click += (_, _) => TabCloseRequested?.Invoke(task);
 
             var ctx = new ContextMenu
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x25, 0x25, 0x25)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                Background = (Brush)Application.Current.FindResource("BgPopup"),
+                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
             };
             ctx.Items.Add(storeItem);
             ctx.Items.Add(closeItem);
@@ -358,6 +364,8 @@ namespace AgenticEngine.Managers
 
                 if (task.IsRunning)
                     ApplyPulseAnimation(glow, 0.8, 10);
+                else if (task.IsPlanning)
+                    ApplyPulseAnimation(glow, 1.0, 8, 0.4);
                 else if (task.IsQueued)
                     ApplyPulseAnimation(glow, 1.2, 8, 0.4);
                 else if (task.IsPaused)
@@ -371,8 +379,8 @@ namespace AgenticEngine.Managers
                     var isDone = task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
                     closeBtn.Content = isDone ? "\uE73E" : "\uE8BB";
                     closeBtn.Foreground = isDone
-                        ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
-                        : new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+                        ? (Brush)Application.Current.FindResource("Success")
+                        : (Brush)Application.Current.FindResource("TextDisabled");
                 }
             }
         }
@@ -386,7 +394,9 @@ namespace AgenticEngine.Managers
 
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
                     ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
-            task?.OutputBuilder.Append(text);
+            if (task == null) return;
+            task.OutputBuilder.Append(text);
+            TrimOutputIfNeeded(task);
         }
 
         public void AppendColoredOutput(string taskId, string text, Brush foreground,
@@ -402,7 +412,21 @@ namespace AgenticEngine.Managers
 
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
                     ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
-            task?.OutputBuilder.Append(text);
+            if (task == null) return;
+            task.OutputBuilder.Append(text);
+            TrimOutputIfNeeded(task);
+        }
+
+        /// <summary>Keeps the last <see cref="OutputCapChars"/> characters when a non-overnight task's buffer grows too large.</summary>
+        internal static void TrimOutputIfNeeded(AgentTask task)
+        {
+            if (task.IsOvernight || task.OutputBuilder.Length <= OutputCapChars)
+                return;
+
+            var trimmed = task.OutputBuilder.ToString(
+                task.OutputBuilder.Length - OutputCapChars, OutputCapChars);
+            task.OutputBuilder.Clear();
+            task.OutputBuilder.Append(trimmed);
         }
 
         private static void ApplyPulseAnimation(System.Windows.Shapes.Ellipse glow, double durationSec, double blurTo, double opacityFrom = 0.3)
@@ -515,8 +539,8 @@ namespace AgenticEngine.Managers
 
             var border = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x25, 0x25, 0x25)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                Background = (Brush)Application.Current.FindResource("BgPopup"),
+                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(4),
@@ -553,7 +577,7 @@ namespace AgenticEngine.Managers
                     var itemBorder = new Border
                     {
                         Background = isSelected
-                            ? new SolidColorBrush(Color.FromRgb(0x35, 0x35, 0x35))
+                            ? (Brush)Application.Current.FindResource("BgHover")
                             : Brushes.Transparent,
                         CornerRadius = new CornerRadius(4),
                         Padding = new Thickness(10, 6, 10, 6),
@@ -565,8 +589,8 @@ namespace AgenticEngine.Managers
                     {
                         Text = text,
                         Foreground = isSelected
-                            ? new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56))
-                            : new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                            ? (Brush)Application.Current.FindResource("Accent")
+                            : (Brush)Application.Current.FindResource("TextBody"),
                         FontFamily = new FontFamily("Segoe UI"),
                         FontSize = 12,
                         FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal,
@@ -583,7 +607,7 @@ namespace AgenticEngine.Managers
                     itemBorder.MouseEnter += (_, _) =>
                     {
                         if (!capturedSelected)
-                            capturedBorder.Background = new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x30));
+                            capturedBorder.Background = (Brush)Application.Current.FindResource("BgCardHover");
                     };
                     itemBorder.MouseLeave += (_, _) =>
                     {

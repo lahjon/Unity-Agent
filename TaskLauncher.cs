@@ -105,6 +105,48 @@ namespace AgenticEngine
             "Only after completing steps 1-3, proceed with the implementation following your plan.\n\n" +
             "---\n";
 
+        public const string MessageBusBlockTemplate =
+            "# MULTI-AGENT MESSAGE BUS\n" +
+            "You are part of a team of concurrent agents working on the same project.\n" +
+            "A shared message bus exists at `.agent-bus/` in the project root.\n\n" +
+            "## Reading Messages\n" +
+            "Read `.agent-bus/_scratchpad.md` to see sibling tasks, recent messages, and claimed areas.\n" +
+            "Check it BEFORE starting work on a new file or component.\n\n" +
+            "## Posting Messages\n" +
+            "Write a JSON file to `.agent-bus/inbox/`.\n" +
+            "Filename: `{unix_ms}_{TASK_ID}_{type}.json`\n" +
+            "Your task ID is: **{TASK_ID}**\n\n" +
+            "Content:\n```json\n" +
+            "{\"from\":\"{TASK_ID}\",\"type\":\"finding|request|claim|response|status\"," +
+            "\"topic\":\"Brief subject\",\"body\":\"Your message\",\"mentions\":[]}\n```\n\n" +
+            "## Message Types\n" +
+            "- **finding**: Share a discovery relevant to the team\n" +
+            "- **request**: Ask for help or information\n" +
+            "- **claim**: Declare responsibility for a file/component (prevents conflicts)\n" +
+            "- **response**: Reply to a request\n" +
+            "- **status**: Progress update\n\n" +
+            "## Rules\n" +
+            "- Read the scratchpad BEFORE modifying files\n" +
+            "- Post a **claim** for files you plan to modify extensively\n" +
+            "- Post a **finding** when you discover something that affects others\n" +
+            "- Do NOT modify `_scratchpad.md` — it is engine-managed\n\n";
+
+        public static string BuildMessageBusBlock(string taskId, List<(string id, string summary)> siblings)
+        {
+            var block = MessageBusBlockTemplate.Replace("{TASK_ID}", taskId);
+
+            if (siblings.Count > 0)
+            {
+                var sb = new StringBuilder(block);
+                sb.AppendLine("## Current Sibling Tasks");
+                foreach (var (id, summary) in siblings)
+                    sb.AppendLine($"- **{id}**: {summary}");
+                sb.AppendLine();
+                return sb.ToString();
+            }
+            return block;
+        }
+
         public const string OvernightInitialTemplate =
             "You are running as an OVERNIGHT AUTONOMOUS TASK. This means you will be called repeatedly " +
             "to iterate on the work until it is complete. Follow these instructions carefully:\n\n" +
@@ -206,6 +248,7 @@ namespace AgenticEngine
             bool extendedPlanning = false,
             bool noGitWrite = false,
             bool planOnly = false,
+            bool useMessageBus = false,
             List<string>? imagePaths = null,
             ModelType model = ModelType.ClaudeCode)
         {
@@ -222,6 +265,7 @@ namespace AgenticEngine
                 ExtendedPlanning = extendedPlanning,
                 NoGitWrite = noGitWrite,
                 PlanOnly = planOnly,
+                UseMessageBus = useMessageBus,
                 Model = model,
                 MaxIterations = 50,
                 ProjectPath = projectPath
@@ -233,7 +277,7 @@ namespace AgenticEngine
 
         // ── Prompt Building ──────────────────────────────────────────
 
-        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, bool planOnly = false, string projectDescription = "", string projectRulesBlock = "")
+        public static string BuildBasePrompt(string systemPrompt, string description, bool useMcp, bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false, bool planOnly = false, string projectDescription = "", string projectRulesBlock = "", bool isGameProject = false)
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
@@ -246,16 +290,18 @@ namespace AgenticEngine
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
             var planOnlyBlock = planOnly ? PlanOnlyBlock : "";
             var gitBlock = noGitWrite ? NoGitWriteBlock : "";
-            var gameBlock = IsGameCreationTask(description) ? GameRulesBlock : "";
+            var gameBlock = (isGameProject || IsGameCreationTask(description)) ? GameRulesBlock : "";
             return descBlock + systemPrompt + gitBlock + projectRulesBlock + mcpBlock + planningBlock + planOnlyBlock + gameBlock + description;
         }
 
-        public static string BuildFullPrompt(string systemPrompt, AgentTask task, string projectDescription = "", string projectRulesBlock = "")
+        public static string BuildFullPrompt(string systemPrompt, AgentTask task, string projectDescription = "", string projectRulesBlock = "", bool isGameProject = false)
         {
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, isGameProject);
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 basePrompt = $"# Task: {task.Summary}\n{basePrompt}";
+            if (!string.IsNullOrWhiteSpace(task.DependencyContext))
+                basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
         }
 
@@ -375,57 +421,51 @@ namespace AgenticEngine
 
         // ── Summary Generation ──────────────────────────────────────
 
-        public static async System.Threading.Tasks.Task<string> GenerateSummaryAsync(string description, CancellationToken cancellationToken = default)
+        private static readonly string[] SummaryPrefixesToStrip =
         {
-            Process? process = null;
-            try
-            {
-                // Truncate very long descriptions for the summary call
-                var input = description.Length > 500 ? description[..500] : description;
+            "please ", "can you ", "could you ", "i want you to ", "i need you to ",
+            "you should ", "i'd like you to ", "go ahead and "
+        };
 
-                var psi = new ProcessStartInfo
+        /// <summary>
+        /// Generates a short title from the task description using a local heuristic
+        /// (first line, stripped of filler prefixes, truncated at a word boundary).
+        /// No external process is spawned.
+        /// </summary>
+        public static string GenerateLocalSummary(string description)
+        {
+            if (string.IsNullOrWhiteSpace(description))
+                return "";
+
+            // Take first line only
+            var line = description.Split('\n', '\r')[0].Trim();
+            if (line.Length == 0)
+                return "";
+
+            // Strip common instruction prefixes
+            var lower = line.ToLowerInvariant();
+            foreach (var prefix in SummaryPrefixesToStrip)
+            {
+                if (lower.StartsWith(prefix, StringComparison.Ordinal))
                 {
-                    FileName = "claude",
-                    Arguments = "-p --max-turns 1 --output-format text",
-                    UseShellExecute = false,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8
-                };
-                psi.Environment.Remove("CLAUDECODE");
-
-                process = new Process { StartInfo = psi };
-                process.Start();
-
-                await process.StandardInput.WriteAsync(
-                    $"Create a very short title (2-5 words) for this task. Reply with ONLY the title, nothing else.\n\nTask: {input}");
-                process.StandardInput.Close();
-
-                var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-                await process.WaitForExitAsync(cancellationToken);
-
-                var summary = StripAnsi(output).Trim();
-                // Strip quotes if the model wrapped it
-                if (summary.StartsWith('"') && summary.EndsWith('"'))
-                    summary = summary[1..^1].Trim();
-                // Sanity: cap at 40 chars
-                if (summary.Length > 40)
-                    summary = summary[..40];
-
-                return string.IsNullOrWhiteSpace(summary) ? "" : summary;
+                    line = line[prefix.Length..].TrimStart();
+                    break;
+                }
             }
-            catch (OperationCanceledException)
+
+            // Capitalize first letter
+            if (line.Length > 0)
+                line = char.ToUpper(line[0]) + line[1..];
+
+            // Truncate at word boundary within 40 chars
+            if (line.Length > 40)
             {
-                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
-                return "";
+                var cut = line[..40];
+                var lastSpace = cut.LastIndexOf(' ');
+                line = lastSpace > 15 ? cut[..lastSpace] : cut;
             }
-            catch (Exception ex)
-            {
-                Managers.AppLogger.Warn("TaskLauncher", "Failed to generate summary", ex);
-                return "";
-            }
+
+            return line;
         }
 
         // ── Project Description Generation ──────────────────────────
@@ -502,6 +542,10 @@ namespace AgenticEngine
                 Managers.AppLogger.Warn("TaskLauncher", "Failed to generate project description", ex);
                 return ("", "");
             }
+            finally
+            {
+                process?.Dispose();
+            }
         }
 
         // ── Completion Summary ──────────────────────────────────────
@@ -572,6 +616,66 @@ namespace AgenticEngine
             return sb.ToString();
         }
 
+        // ── Recommendation Detection ────────────────────────────────
+
+        private static readonly string[] RecommendationHeaders = {
+            "next steps", "next step", "recommendations", "recommended next",
+            "suggestions", "suggested next", "follow-up", "follow up",
+            "remaining work", "future improvements", "action items",
+            "things to consider", "to do next", "what's next"
+        };
+
+        public static string? ExtractRecommendations(string output)
+        {
+            if (string.IsNullOrWhiteSpace(output)) return null;
+
+            // Strip the completion summary block if present
+            var summaryIdx = output.LastIndexOf("═══════════════════════════════════════════", StringComparison.Ordinal);
+            var text = summaryIdx > 0 ? output[..summaryIdx] : output;
+
+            // Search the last ~4000 chars where recommendations typically appear
+            var searchText = text.Length > 4000 ? text[^4000..] : text;
+            var lines = searchText.Split('\n');
+
+            var startLine = -1;
+            for (int i = lines.Length - 1; i >= 0; i--)
+            {
+                var lower = lines[i].ToLowerInvariant().Trim();
+                if (string.IsNullOrEmpty(lower)) continue;
+
+                foreach (var header in RecommendationHeaders)
+                {
+                    if (lower.Contains(header))
+                    {
+                        startLine = i;
+                        break;
+                    }
+                }
+                if (startLine >= 0) break;
+            }
+
+            if (startLine < 0) return null;
+
+            // Capture from the recommendation header, limit to ~10 lines
+            var endLine = Math.Min(startLine + 10, lines.Length);
+            var captured = new List<string>();
+            for (int i = startLine; i < endLine; i++)
+            {
+                var line = lines[i].TrimEnd();
+                if (string.IsNullOrEmpty(line) && captured.Count > 0 && string.IsNullOrEmpty(captured[^1]))
+                    break; // stop at double blank
+                captured.Add(line);
+            }
+
+            // Trim trailing blanks
+            while (captured.Count > 0 && string.IsNullOrWhiteSpace(captured[^1]))
+                captured.RemoveAt(captured.Count - 1);
+
+            if (captured.Count == 0) return null;
+            var result = string.Join("\n", captured).Trim();
+            return result.Length > 0 ? result : null;
+        }
+
         public static string GenerateCompletionSummary(string projectPath, string? gitStartHash, AgentTaskStatus status, TimeSpan duration)
         {
             try
@@ -588,6 +692,7 @@ namespace AgenticEngine
 
         private static string? RunGitCommand(string workingDirectory, string arguments)
         {
+            Process? process = null;
             try
             {
                 var psi = new ProcessStartInfo
@@ -600,7 +705,7 @@ namespace AgenticEngine
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
-                var process = Process.Start(psi);
+                process = Process.Start(psi);
                 if (process == null) return null;
                 var output = process.StandardOutput.ReadToEnd();
                 process.WaitForExit(5000);
@@ -616,6 +721,10 @@ namespace AgenticEngine
             {
                 Managers.AppLogger.Debug("TaskLauncher", $"Git command failed: {ex.Message}");
                 return null;
+            }
+            finally
+            {
+                process?.Dispose();
             }
         }
 
@@ -652,6 +761,10 @@ namespace AgenticEngine
             {
                 Managers.AppLogger.Debug("TaskLauncher", $"Async git command failed: {ex.Message}");
                 return null;
+            }
+            finally
+            {
+                process?.Dispose();
             }
         }
 
@@ -694,6 +807,36 @@ namespace AgenticEngine
                 files.Add((parts[2], added, removed));
             }
             return files.Count > 0 ? files : null;
+        }
+
+        // ── Dependency Context ───────────────────────────────────────
+
+        public static string BuildDependencyContext(List<string> depIds, IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("# DEPENDENCY CONTEXT");
+            sb.AppendLine("The following tasks were completed before this task started. Use their results to inform your work.\n");
+
+            var depIndex = 0;
+            foreach (var depId in depIds)
+            {
+                var dep = activeTasks.FirstOrDefault(t => t.Id == depId)
+                       ?? historyTasks.FirstOrDefault(t => t.Id == depId);
+                if (dep == null) continue;
+
+                depIndex++;
+                var title = !string.IsNullOrWhiteSpace(dep.Summary) ? dep.Summary : "Untitled";
+                sb.AppendLine($"## Dependency #{depIndex}: #{dep.Id} — \"{title}\"");
+                sb.AppendLine($"**Task:** {dep.Description}");
+                sb.AppendLine($"**Status:** {dep.Status}");
+
+                if (!string.IsNullOrWhiteSpace(dep.CompletionSummary))
+                    sb.AppendLine($"**Changes:**\n{dep.CompletionSummary}");
+
+                sb.AppendLine();
+            }
+
+            return depIndex > 0 ? sb.ToString() : "";
         }
 
         // ── Utilities ────────────────────────────────────────────────

@@ -30,8 +30,8 @@ namespace AgenticEngine.Dialogs
 
             var outerBorder = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x19, 0x19, 0x19)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                Background = (Brush)Application.Current.FindResource("BgDeep"),
+                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12)
             };
@@ -45,7 +45,7 @@ namespace AgenticEngine.Dialogs
             var titleBlock = new TextBlock
             {
                 Text = task.ShortDescription,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x4D, 0xB6, 0xAC)),
+                Foreground = (Brush)Application.Current.FindResource("AccentTeal"),
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 FontFamily = new FontFamily("Segoe UI"),
@@ -57,7 +57,7 @@ namespace AgenticEngine.Dialogs
             var projectBlock = new TextBlock
             {
                 Text = task.ProjectName,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
+                Foreground = (Brush)Application.Current.FindResource("TextMuted"),
                 FontSize = 10,
                 FontFamily = new FontFamily("Segoe UI"),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -68,7 +68,7 @@ namespace AgenticEngine.Dialogs
             {
                 Content = "\u2715",
                 Background = Brushes.Transparent,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 14,
                 Padding = new Thickness(6, 2, 6, 2),
@@ -77,8 +77,8 @@ namespace AgenticEngine.Dialogs
                 VerticalAlignment = VerticalAlignment.Center
             };
             closeBtn.Click += (_, _) => dlg.Close();
-            closeBtn.MouseEnter += (s, _) => ((Button)s).Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8));
-            closeBtn.MouseLeave += (s, _) => ((Button)s).Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
+            closeBtn.MouseEnter += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextPrimary");
+            closeBtn.MouseLeave += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextSubdued");
 
             DockPanel.SetDock(closeBtn, Dock.Right);
             titleBar.Children.Add(closeBtn);
@@ -104,7 +104,7 @@ namespace AgenticEngine.Dialogs
                 sp.Children.Add(new TextBlock
                 {
                     Text = label + ": ",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                    Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
                     FontSize = 11,
                     FontFamily = new FontFamily("Segoe UI")
                 });
@@ -133,8 +133,8 @@ namespace AgenticEngine.Dialogs
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 12,
                 Margin = new Thickness(18, 10, 18, 0),
-                Background = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                Background = (Brush)Application.Current.FindResource("BgElevated"),
+                Foreground = (Brush)Application.Current.FindResource("TextLight"),
                 VerticalAlignment = VerticalAlignment.Center
             };
             viewCombo.Items.Add(new ComboBoxItem { Content = "Full Output", Tag = "output" });
@@ -153,8 +153,8 @@ namespace AgenticEngine.Dialogs
                 AcceptsReturn = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Background = new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0A)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                Background = (Brush)Application.Current.FindResource("BgAbyss"),
+                Foreground = (Brush)Application.Current.FindResource("TextBody"),
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 13,
                 BorderThickness = new Thickness(0),

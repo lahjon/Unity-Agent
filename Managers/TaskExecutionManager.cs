@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -7,6 +8,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -16,12 +18,14 @@ namespace AgenticEngine.Managers
     public class TaskExecutionManager
     {
         private readonly string _scriptDir;
-        private readonly System.Collections.Generic.Dictionary<string, StreamingToolState> _streamingToolState = new();
+        private readonly ConcurrentDictionary<string, StreamingToolState> _streamingToolState = new();
         private readonly FileLockManager _fileLockManager;
         private readonly OutputTabManager _outputTabManager;
         private readonly Func<string> _getSystemPrompt;
         private readonly Func<AgentTask, string> _getProjectDescription;
         private readonly Func<string, string> _getProjectRulesBlock;
+        private readonly Func<string, bool> _isGameProject;
+        private readonly MessageBusManager _messageBusManager;
         private readonly Dispatcher _dispatcher;
 
         private const int OvernightMaxRuntimeHours = 12;
@@ -29,7 +33,7 @@ namespace AgenticEngine.Managers
         private const int OvernightMaxConsecutiveFailures = 3;
         private const int OvernightOutputCapChars = 100_000;
 
-        public System.Collections.Generic.Dictionary<string, StreamingToolState> StreamingToolState => _streamingToolState;
+        public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _streamingToolState;
 
         /// <summary>Fires when a task's process exits (with the task ID). Used to resume dependency-queued tasks.</summary>
         public event Action<string>? TaskCompleted;
@@ -41,6 +45,8 @@ namespace AgenticEngine.Managers
             Func<string> getSystemPrompt,
             Func<AgentTask, string> getProjectDescription,
             Func<string, string> getProjectRulesBlock,
+            Func<string, bool> isGameProject,
+            MessageBusManager messageBusManager,
             Dispatcher dispatcher)
         {
             _scriptDir = scriptDir;
@@ -49,6 +55,8 @@ namespace AgenticEngine.Managers
             _getSystemPrompt = getSystemPrompt;
             _getProjectDescription = getProjectDescription;
             _getProjectRulesBlock = getProjectRulesBlock;
+            _isGameProject = isGameProject;
+            _messageBusManager = messageBusManager;
             _dispatcher = dispatcher;
         }
 
@@ -64,8 +72,18 @@ namespace AgenticEngine.Managers
             if (task.IsOvernight)
                 TaskLauncher.PrepareTaskForOvernightStart(task);
 
-            var fullPrompt = TaskLauncher.BuildFullPrompt(_getSystemPrompt(), task, _getProjectDescription(task), _getProjectRulesBlock(task.ProjectPath));
+            var fullPrompt = TaskLauncher.BuildFullPrompt(_getSystemPrompt(), task, _getProjectDescription(task), _getProjectRulesBlock(task.ProjectPath), _isGameProject(task.ProjectPath));
             var projectPath = task.ProjectPath;
+
+            if (task.UseMessageBus)
+            {
+                _messageBusManager.JoinBus(projectPath, task.Id, task.Summary ?? task.Description);
+                var siblings = _messageBusManager.GetParticipants(projectPath)
+                    .Where(p => p.TaskId != task.Id)
+                    .Select(p => (p.TaskId, p.Summary))
+                    .ToList();
+                fullPrompt = TaskLauncher.BuildMessageBusBlock(task.Id, siblings) + fullPrompt;
+            }
 
             var promptFile = Path.Combine(_scriptDir, $"prompt_{task.Id}.txt");
             File.WriteAllText(promptFile, fullPrompt, Encoding.UTF8);
@@ -77,12 +95,14 @@ namespace AgenticEngine.Managers
                 TaskLauncher.BuildPowerShellScript(projectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
-            AppendOutput(task.Id, $"[AgenticEngine] Task #{task.Id} starting...\n", activeTasks, historyTasks);
+            AppendOutput(task.Id, $"[AgenticEngine] Task #{task.TaskNumber} starting...\n", activeTasks, historyTasks);
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 AppendOutput(task.Id, $"[AgenticEngine] Summary: {task.Summary}\n", activeTasks, historyTasks);
             AppendOutput(task.Id, $"[AgenticEngine] Project: {projectPath}\n", activeTasks, historyTasks);
             AppendOutput(task.Id, $"[AgenticEngine] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
             AppendOutput(task.Id, $"[AgenticEngine] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
+            if (task.UseMessageBus)
+                AppendOutput(task.Id, $"[AgenticEngine] Message Bus: ON\n", activeTasks, historyTasks);
             if (task.ExtendedPlanning)
                 AppendOutput(task.Id, $"[AgenticEngine] Extended planning: ON\n", activeTasks, historyTasks);
             if (task.IsOvernight)
@@ -101,6 +121,7 @@ namespace AgenticEngine.Managers
                 {
                     task.NeedsPlanRestart = false;
                     task.IsPlanningBeforeQueue = true;
+                    task.Status = AgentTaskStatus.Planning;
                     task.StartTime = DateTime.Now;
                     AppendOutput(task.Id, "\n[AgenticEngine] Restarting in plan mode...\n\n", activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
@@ -133,12 +154,14 @@ namespace AgenticEngine.Managers
                 else
                 {
                     _fileLockManager.ReleaseTaskLocks(task.Id);
+                    if (task.UseMessageBus)
+                        _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
                     task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
                     task.EndTime = DateTime.Now;
                     AppendCompletionSummary(task, activeTasks, historyTasks);
                     var statusColor = exitCode == 0
-                        ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
-                        : new SolidColorBrush(Color.FromRgb(0xE0, 0x55, 0x55));
+                        ? (Brush)Application.Current.FindResource("Success")
+                        : (Brush)Application.Current.FindResource("DangerBright");
                     AppendColoredOutput(task.Id,
                         $"\n[AgenticEngine] Process finished (exit code: {exitCode}).\n",
                         statusColor, activeTasks, historyTasks);
@@ -185,7 +208,7 @@ namespace AgenticEngine.Managers
 
         public void LaunchHeadless(AgentTask task)
         {
-            var fullPrompt = TaskLauncher.BuildFullPrompt(_getSystemPrompt(), task, _getProjectDescription(task), _getProjectRulesBlock(task.ProjectPath));
+            var fullPrompt = TaskLauncher.BuildFullPrompt(_getSystemPrompt(), task, _getProjectDescription(task), _getProjectRulesBlock(task.ProjectPath), _isGameProject(task.ProjectPath));
             var projectPath = task.ProjectPath;
 
             var promptFile = Path.Combine(_scriptDir, $"prompt_{task.Id}.txt");
@@ -214,8 +237,15 @@ namespace AgenticEngine.Managers
             var text = inputBox.Text?.Trim();
             if (string.IsNullOrEmpty(text)) return;
             inputBox.Clear();
+            SendFollowUp(task, text, activeTasks, historyTasks);
+        }
 
-            if (task.Status is AgentTaskStatus.Running && task.Process is { HasExited: false })
+        public void SendFollowUp(AgentTask task, string text,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning && task.Process is { HasExited: false })
             {
                 try
                 {
@@ -302,7 +332,7 @@ namespace AgenticEngine.Managers
             KillProcess(task);
             _fileLockManager.ReleaseTaskLocks(task.Id);
             _fileLockManager.RemoveQueuedInfo(task.Id);
-            _streamingToolState.Remove(task.Id);
+            _streamingToolState.TryRemove(task.Id, out _);
             task.Cts?.Dispose();
             task.Cts = null;
         }
@@ -317,7 +347,7 @@ namespace AgenticEngine.Managers
             catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill process for task {task.Id}", ex); }
         }
 
-        public void RemoveStreamingState(string taskId) => _streamingToolState.Remove(taskId);
+        public void RemoveStreamingState(string taskId) => _streamingToolState.TryRemove(taskId, out _);
 
         /// <summary>
         /// Creates a Process with standard output/error/event wiring for stream-json parsing.
@@ -504,7 +534,7 @@ namespace AgenticEngine.Managers
 
         public void PauseTask(AgentTask task)
         {
-            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Running)) return;
+            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning)) return;
             if (task.Process is not { HasExited: false }) return;
 
             SuspendProcessTree(task.Process);
@@ -520,11 +550,11 @@ namespace AgenticEngine.Managers
         public void ResumeTask(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
-            if (task.Status != AgentTaskStatus.Paused) return;
+            if (task.Status is not (AgentTaskStatus.Paused or AgentTaskStatus.Queued)) return;
             if (task.Process is not { HasExited: false }) return;
 
             ResumeProcessTree(task.Process);
-            task.Status = AgentTaskStatus.Running;
+            task.Status = task.IsPlanningBeforeQueue ? AgentTaskStatus.Planning : AgentTaskStatus.Running;
 
             // Restart overnight timers if applicable
             if (task.IsOvernight)
@@ -703,7 +733,7 @@ namespace AgenticEngine.Managers
                                         if (!_fileLockManager.TryAcquireOrConflict(taskId, fp, stopState.CurrentToolName!, activeTasks,
                                             (tid, txt) => AppendOutput(tid, txt, activeTasks, historyTasks)))
                                         {
-                                            _streamingToolState.Remove(taskId);
+                                            _streamingToolState.TryRemove(taskId, out _);
                                             _outputTabManager.UpdateTabHeader(activeTasks.FirstOrDefault(t => t.Id == taskId)!);
                                             return;
                                         }
@@ -712,7 +742,7 @@ namespace AgenticEngine.Managers
                                 catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to parse streaming tool args for task {taskId}: {ex.Message}"); }
                             }
                         }
-                        _streamingToolState.Remove(taskId);
+                        _streamingToolState.TryRemove(taskId, out _);
                         AppendOutput(taskId, "\n", activeTasks, historyTasks);
                         break;
 
@@ -871,6 +901,8 @@ namespace AgenticEngine.Managers
             }
             task.Status = status;
             task.EndTime = DateTime.Now;
+            if (task.UseMessageBus)
+                _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
             var duration = task.EndTime.Value - task.StartTime;
             AppendOutput(task.Id, $"[Overnight] Total runtime: {(int)duration.TotalHours}h {duration.Minutes}m across {task.CurrentIteration} iteration(s).\n", activeTasks, historyTasks);
             AppendCompletionSummary(task, activeTasks, historyTasks);
@@ -967,20 +999,22 @@ namespace AgenticEngine.Managers
                 {
                     task.Status = AgentTaskStatus.Queued;
                     task.QueuedReason = "Plan complete, waiting for dependencies";
-                    task.BlockedByTaskId = task.DependencyTaskIds.FirstOrDefault(depId =>
-                    {
-                        var dep = activeTasks.FirstOrDefault(t => t.Id == depId);
-                        return dep != null && !dep.IsFinished;
-                    });
+                    var blocker = activeTasks.FirstOrDefault(t =>
+                        task.DependencyTaskIds.Contains(t.Id) && !t.IsFinished);
+                    task.BlockedByTaskId = blocker?.Id;
+                    task.BlockedByTaskNumber = blocker?.TaskNumber;
                     AppendOutput(task.Id,
                         $"\n[AgenticEngine] Planning complete. Queued — waiting for dependencies: " +
-                        $"{string.Join(", ", task.DependencyTaskIds.Select(id => $"#{id}"))}\n",
+                        $"{string.Join(", ", task.DependencyTaskNumbers.Select(n => $"#{n}"))}\n",
                         activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     return;
                 }
-                // Dependencies resolved during planning
+                // Dependencies resolved during planning — gather context before clearing
+                task.DependencyContext = TaskLauncher.BuildDependencyContext(
+                    task.DependencyTaskIds, activeTasks, historyTasks);
                 task.DependencyTaskIds.Clear();
+                task.DependencyTaskNumbers.Clear();
             }
 
             // Check file-lock-based queue
@@ -993,16 +1027,18 @@ namespace AgenticEngine.Managers
 
                 if (_fileLockManager.IsFileLocked(filePath))
                 {
+                    var blockerTask = activeTasks.FirstOrDefault(t => t.Id == blockerId);
                     task.Status = AgentTaskStatus.Queued;
-                    task.QueuedReason = $"Plan complete, file locked by #{blockerId}";
+                    task.QueuedReason = $"Plan complete, file locked by #{blockerTask?.TaskNumber}";
                     task.BlockedByTaskId = blockerId;
-                    _fileLockManager.QueuedTaskInfos[task.Id] = new QueuedTaskInfo
+                    task.BlockedByTaskNumber = blockerTask?.TaskNumber;
+                    _fileLockManager.AddQueuedTaskInfo(task.Id, new QueuedTaskInfo
                     {
                         Task = task,
                         ConflictingFilePath = filePath,
                         BlockingTaskId = blockerId,
                         BlockedByTaskIds = new HashSet<string> { blockerId }
-                    };
+                    });
                     AppendOutput(task.Id, "\n[AgenticEngine] Planning complete. Queued — waiting for file lock to clear.\n", activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _fileLockManager.CheckQueuedTasks(activeTasks);
@@ -1012,6 +1048,7 @@ namespace AgenticEngine.Managers
             }
 
             // No more blockers — start execution
+            task.Status = AgentTaskStatus.Running;
             task.StartTime = DateTime.Now;
             AppendOutput(task.Id, "\n[AgenticEngine] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
@@ -1033,6 +1070,11 @@ namespace AgenticEngine.Managers
         private async void AppendCompletionSummary(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
+            // Detect recommendations from the output before appending the summary block
+            var outputText = task.OutputBuilder.ToString();
+            var recommendations = TaskLauncher.ExtractRecommendations(outputText);
+            task.Recommendations = recommendations ?? "";
+
             var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
             var duration = (task.EndTime ?? DateTime.Now) - task.StartTime;
             try
@@ -1058,6 +1100,67 @@ namespace AgenticEngine.Managers
                     File.Delete(f);
             }
             catch (Exception ex) { AppLogger.Debug("TaskExecution", $"Failed to cleanup scripts for task {taskId}: {ex.Message}"); }
+        }
+
+        // ── Overnight iteration decision logic (extracted for testability) ──
+
+        internal enum OvernightAction { Skip, Finish, RetryAfterDelay, Continue }
+
+        internal struct OvernightDecision
+        {
+            public OvernightAction Action;
+            public AgentTaskStatus FinishStatus;
+            public int ConsecutiveFailures;
+            public bool TrimOutput;
+        }
+
+        /// <summary>
+        /// Pure decision function that evaluates what the overnight loop should do next.
+        /// Mirrors the logic in HandleOvernightIteration without side effects.
+        /// </summary>
+        internal static OvernightDecision EvaluateOvernightIteration(
+            AgentTaskStatus currentStatus,
+            TimeSpan totalRuntime,
+            string iterationOutput,
+            int currentIteration,
+            int maxIterations,
+            int exitCode,
+            int consecutiveFailures,
+            int outputLength)
+        {
+            if (currentStatus != AgentTaskStatus.Running)
+                return new OvernightDecision { Action = OvernightAction.Skip };
+
+            if (totalRuntime.TotalHours >= OvernightMaxRuntimeHours)
+                return new OvernightDecision { Action = OvernightAction.Finish, FinishStatus = AgentTaskStatus.Completed };
+
+            if (TaskLauncher.CheckOvernightComplete(iterationOutput))
+                return new OvernightDecision { Action = OvernightAction.Finish, FinishStatus = AgentTaskStatus.Completed };
+
+            if (currentIteration >= maxIterations)
+                return new OvernightDecision { Action = OvernightAction.Finish, FinishStatus = AgentTaskStatus.Completed };
+
+            var newFailures = consecutiveFailures;
+            if (exitCode != 0 && !TaskLauncher.IsTokenLimitError(iterationOutput))
+            {
+                newFailures++;
+                if (newFailures >= OvernightMaxConsecutiveFailures)
+                    return new OvernightDecision { Action = OvernightAction.Finish, FinishStatus = AgentTaskStatus.Failed, ConsecutiveFailures = newFailures };
+            }
+            else
+            {
+                newFailures = 0;
+            }
+
+            if (TaskLauncher.IsTokenLimitError(iterationOutput))
+                return new OvernightDecision { Action = OvernightAction.RetryAfterDelay, ConsecutiveFailures = newFailures };
+
+            return new OvernightDecision
+            {
+                Action = OvernightAction.Continue,
+                ConsecutiveFailures = newFailures,
+                TrimOutput = outputLength > OvernightOutputCapChars
+            };
         }
     }
 }

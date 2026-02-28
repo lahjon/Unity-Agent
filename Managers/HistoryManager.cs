@@ -14,11 +14,15 @@ namespace AgenticEngine.Managers
     {
         private readonly string _historyFile;
         private readonly string _storedTasksFile;
+        private readonly object _historyLock;
+        private readonly object _storedLock;
 
-        public HistoryManager(string appDataDir)
+        public HistoryManager(string appDataDir, object historyLock, object storedLock)
         {
             _historyFile = Path.Combine(appDataDir, "task_history.json");
             _storedTasksFile = Path.Combine(appDataDir, "stored_tasks.json");
+            _historyLock = historyLock;
+            _storedLock = storedLock;
         }
 
         public void SaveHistory(ObservableCollection<AgentTask> historyTasks)
@@ -28,33 +32,34 @@ namespace AgenticEngine.Managers
                 var dir = Path.GetDirectoryName(_historyFile)!;
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
-                // Snapshot data on the UI thread, write to disk on background thread
-                var entries = historyTasks.Select(t => new TaskHistoryEntry
+                // Snapshot under lock so background writes never race with collection changes
+                List<TaskHistoryEntry> entries;
+                lock (_historyLock)
                 {
-                    Description = t.Description,
-                    Summary = t.Summary ?? "",
-                    StoredPrompt = t.StoredPrompt ?? "",
-                    ConversationId = t.ConversationId ?? "",
-                    Status = t.Status.ToString(),
-                    StartTime = t.StartTime,
-                    EndTime = t.EndTime,
-                    SkipPermissions = t.SkipPermissions,
-                    RemoteSession = t.RemoteSession,
-                    ProjectPath = t.ProjectPath,
-                    ProjectColor = t.ProjectColor,
-                    IsOvernight = t.IsOvernight,
-                    MaxIterations = t.MaxIterations,
-                    CurrentIteration = t.CurrentIteration,
-                    CompletionSummary = t.CompletionSummary
-                }).ToList();
+                    entries = historyTasks.Select(t => new TaskHistoryEntry
+                    {
+                        Description = t.Description,
+                        Summary = t.Summary ?? "",
+                        StoredPrompt = t.StoredPrompt ?? "",
+                        ConversationId = t.ConversationId ?? "",
+                        Status = t.Status.ToString(),
+                        StartTime = t.StartTime,
+                        EndTime = t.EndTime,
+                        SkipPermissions = t.SkipPermissions,
+                        RemoteSession = t.RemoteSession,
+                        ProjectPath = t.ProjectPath,
+                        ProjectColor = t.ProjectColor,
+                        ProjectDisplayName = t.ProjectDisplayName,
+                        IsOvernight = t.IsOvernight,
+                        MaxIterations = t.MaxIterations,
+                        CurrentIteration = t.CurrentIteration,
+                        CompletionSummary = t.CompletionSummary,
+                        Recommendations = t.Recommendations ?? ""
+                    }).ToList();
+                }
 
                 var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
-                var path = _historyFile;
-                Task.Run(() =>
-                {
-                    try { File.WriteAllText(path, json); }
-                    catch (Exception ex) { AppLogger.Warn("HistoryManager", "Background save failed", ex); }
-                });
+                SafeFileWriter.WriteInBackground(_historyFile, json, "HistoryManager");
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save task history", ex); }
         }
@@ -81,12 +86,14 @@ namespace AgenticEngine.Managers
                         RemoteSession = entry.RemoteSession,
                         ProjectPath = entry.ProjectPath ?? "",
                         ProjectColor = entry.ProjectColor ?? "#666666",
+                        ProjectDisplayName = entry.ProjectDisplayName ?? "",
                         StartTime = entry.StartTime,
                         EndTime = entry.EndTime,
                         IsOvernight = entry.IsOvernight,
                         MaxIterations = entry.MaxIterations > 0 ? entry.MaxIterations : 50,
                         CurrentIteration = entry.CurrentIteration,
-                        CompletionSummary = entry.CompletionSummary ?? ""
+                        CompletionSummary = entry.CompletionSummary ?? "",
+                        Recommendations = entry.Recommendations ?? ""
                     };
                     task.Summary = entry.Summary ?? "";
                     task.Status = Enum.TryParse<AgentTaskStatus>(entry.Status, out var s)
@@ -107,7 +114,11 @@ namespace AgenticEngine.Managers
             int retentionHours)
         {
             var cutoff = DateTime.Now.AddHours(-retentionHours);
-            var stale = historyTasks.Where(t => t.StartTime < cutoff).ToList();
+            List<AgentTask> stale;
+            lock (_historyLock)
+            {
+                stale = historyTasks.Where(t => t.StartTime < cutoff).ToList();
+            }
             foreach (var task in stale)
             {
                 historyTasks.Remove(task);
@@ -131,27 +142,27 @@ namespace AgenticEngine.Managers
                 var dir = Path.GetDirectoryName(_storedTasksFile)!;
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
-                // Snapshot data on the UI thread, write to disk on background thread
-                var entries = storedTasks.Select(t => new StoredTaskEntry
+                // Snapshot under lock so background writes never race with collection changes
+                List<StoredTaskEntry> entries;
+                lock (_storedLock)
                 {
-                    Description = t.Description,
-                    Summary = t.Summary,
-                    StoredPrompt = t.StoredPrompt ?? "",
-                    ConversationId = t.ConversationId ?? "",
-                    FullOutput = t.FullOutput ?? "",
-                    ProjectPath = t.ProjectPath,
-                    ProjectColor = t.ProjectColor,
-                    CreatedAt = t.StartTime,
-                    SkipPermissions = t.SkipPermissions
-                }).ToList();
+                    entries = storedTasks.Select(t => new StoredTaskEntry
+                    {
+                        Description = t.Description,
+                        Summary = t.Summary,
+                        StoredPrompt = t.StoredPrompt ?? "",
+                        ConversationId = t.ConversationId ?? "",
+                        FullOutput = t.FullOutput ?? "",
+                        ProjectPath = t.ProjectPath,
+                        ProjectColor = t.ProjectColor,
+                        ProjectDisplayName = t.ProjectDisplayName,
+                        CreatedAt = t.StartTime,
+                        SkipPermissions = t.SkipPermissions
+                    }).ToList();
+                }
 
                 var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
-                var path = _storedTasksFile;
-                Task.Run(() =>
-                {
-                    try { File.WriteAllText(path, json); }
-                    catch (Exception ex) { AppLogger.Warn("HistoryManager", "Background save failed", ex); }
-                });
+                SafeFileWriter.WriteInBackground(_storedTasksFile, json, "HistoryManager");
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save stored tasks", ex); }
         }
@@ -176,6 +187,7 @@ namespace AgenticEngine.Managers
                         FullOutput = entry.FullOutput,
                         ProjectPath = entry.ProjectPath ?? "",
                         ProjectColor = entry.ProjectColor ?? "#666666",
+                        ProjectDisplayName = entry.ProjectDisplayName ?? "",
                         SkipPermissions = entry.SkipPermissions,
                         StartTime = entry.CreatedAt
                     };

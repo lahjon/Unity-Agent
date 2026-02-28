@@ -400,10 +400,9 @@ namespace AgenticEngine
                 var label = new TextBlock
                 {
                     Text = $"  Terminal {i + 1}{(hasExited ? " (exited)" : "")}  ",
-                    Foreground = new SolidColorBrush(
-                        hasExited ? Color.FromRgb(0x66, 0x55, 0x55) :
-                        isActive ? Color.FromRgb(0xE8, 0xE8, 0xE8) :
-                        Color.FromRgb(0x88, 0x88, 0x88)),
+                    Foreground = hasExited ? new SolidColorBrush(Color.FromRgb(0x66, 0x55, 0x55)) :
+                        isActive ? (Brush)Application.Current.FindResource("TextPrimary") :
+                        (Brush)Application.Current.FindResource("TextSubdued"),
                     FontSize = 11,
                     FontFamily = new FontFamily("Segoe UI"),
                     VerticalAlignment = VerticalAlignment.Center
@@ -415,7 +414,7 @@ namespace AgenticEngine
                 {
                     Content = "\u00D7",
                     FontSize = 12,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
+                    Foreground = (Brush)Application.Current.FindResource("TextMuted"),
                     Cursor = Cursors.Hand,
                     Padding = new Thickness(2, 0, 4, 0),
                     Margin = new Thickness(0),
@@ -437,8 +436,8 @@ namespace AgenticEngine
 
                 var closeIdx = idx;
                 closeBtn.Click += (_, _) => CloseTerminal(closeIdx);
-                closeBtn.MouseEnter += (s, _) => ((Button)s).Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC));
-                closeBtn.MouseLeave += (s, _) => ((Button)s).Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
+                closeBtn.MouseEnter += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextLight");
+                closeBtn.MouseLeave += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextMuted");
                 panel.Children.Add(closeBtn);
 
                 // Tab button template
@@ -446,13 +445,13 @@ namespace AgenticEngine
                 var border = new FrameworkElementFactory(typeof(Border));
                 border.SetValue(Border.BackgroundProperty,
                     isActive
-                        ? new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C))
-                        : new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E)));
+                        ? (Brush)Application.Current.FindResource("BgElevated")
+                        : (Brush)Application.Current.FindResource("BgSection"));
                 border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4, 4, 0, 0));
                 border.SetValue(Border.PaddingProperty, new Thickness(4, 3, 4, 3));
                 if (isActive)
                 {
-                    border.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)));
+                    border.SetValue(Border.BorderBrushProperty, (Brush)Application.Current.FindResource("Accent"));
                     border.SetValue(Border.BorderThicknessProperty, new Thickness(0, 0, 0, 2));
                 }
                 var content = new FrameworkElementFactory(typeof(ContentPresenter));
@@ -484,7 +483,7 @@ namespace AgenticEngine
                 Content = "+",
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
                 Cursor = Cursors.Hand,
                 Padding = new Thickness(8, 2, 8, 2),
                 Margin = new Thickness(2, 0, 0, 0),
@@ -493,7 +492,7 @@ namespace AgenticEngine
 
             var addTemplate = new ControlTemplate(typeof(Button));
             var addBorder = new FrameworkElementFactory(typeof(Border));
-            addBorder.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E)));
+            addBorder.SetValue(Border.BackgroundProperty, (Brush)Application.Current.FindResource("BgSection"));
             addBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(4, 4, 0, 0));
             addBorder.SetValue(Border.PaddingProperty, new Thickness(8, 2, 8, 2));
             var addContent = new FrameworkElementFactory(typeof(ContentPresenter));
@@ -504,8 +503,8 @@ namespace AgenticEngine
             addBtn.Template = addTemplate;
 
             addBtn.Click += (_, _) => AddTerminal();
-            addBtn.MouseEnter += (s, _) => ((Button)s).Foreground = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56));
-            addBtn.MouseLeave += (s, _) => ((Button)s).Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
+            addBtn.MouseEnter += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("Accent");
+            addBtn.MouseLeave += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextSubdued");
 
             _tabBar.Children.Add(addBtn);
         }

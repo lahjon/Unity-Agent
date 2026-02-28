@@ -17,13 +17,14 @@ namespace AgenticEngine.Managers
         private readonly ObservableCollection<FileLock> _fileLocksView = new();
         private readonly Dictionary<string, HashSet<string>> _taskLockedFiles = new();
         private readonly Dictionary<string, QueuedTaskInfo> _queuedTaskInfo = new();
+        private readonly object _lockSync = new();
         private readonly TextBlock _fileLockBadge;
         private readonly Dispatcher _dispatcher;
 
         public event Action<string>? QueuedTaskResumed;
 
         public Dictionary<string, QueuedTaskInfo> QueuedTaskInfos => _queuedTaskInfo;
-        public int LockCount => _fileLocks.Count;
+        public int LockCount { get { lock (_lockSync) { return _fileLocks.Count; } } }
         public ObservableCollection<FileLock> FileLocksView => _fileLocksView;
 
         public FileLockManager(TextBlock fileLockBadge, Dispatcher dispatcher)
@@ -35,21 +36,33 @@ namespace AgenticEngine.Managers
         public bool TryAcquireOrConflict(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
         {
-            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
-            if (task?.IgnoreFileLocks == true)
+            lock (_lockSync)
             {
-                TryAcquireFileLock(taskId, filePath, toolName, activeTasks, isIgnored: true);
+                var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                if (task?.IgnoreFileLocks == true)
+                {
+                    TryAcquireFileLockInternal(taskId, filePath, toolName, activeTasks, isIgnored: true);
+                    return true;
+                }
+                if (!TryAcquireFileLockInternal(taskId, filePath, toolName, activeTasks))
+                {
+                    HandleFileLockConflictInternal(taskId, filePath, toolName, activeTasks, appendOutput);
+                    return false;
+                }
                 return true;
             }
-            if (!TryAcquireFileLock(taskId, filePath, toolName, activeTasks))
-            {
-                HandleFileLockConflict(taskId, filePath, toolName, activeTasks, appendOutput);
-                return false;
-            }
-            return true;
         }
 
         public bool TryAcquireFileLock(string taskId, string filePath, string toolName,
+            ObservableCollection<AgentTask> activeTasks, bool isIgnored = false)
+        {
+            lock (_lockSync)
+            {
+                return TryAcquireFileLockInternal(taskId, filePath, toolName, activeTasks, isIgnored);
+            }
+        }
+
+        private bool TryAcquireFileLockInternal(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, bool isIgnored = false)
         {
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
@@ -96,6 +109,14 @@ namespace AgenticEngine.Managers
 
         public void ReleaseTaskLocks(string taskId)
         {
+            lock (_lockSync)
+            {
+                ReleaseTaskLocksInternal(taskId);
+            }
+        }
+
+        private void ReleaseTaskLocksInternal(string taskId)
+        {
             if (!_taskLockedFiles.TryGetValue(taskId, out var files)) return;
 
             foreach (var path in files)
@@ -112,10 +133,22 @@ namespace AgenticEngine.Managers
 
         public bool IsFileLocked(string normalizedPath)
         {
-            return _fileLocks.ContainsKey(normalizedPath);
+            lock (_lockSync)
+            {
+                return _fileLocks.ContainsKey(normalizedPath);
+            }
         }
 
         public void HandleFileLockConflict(string taskId, string filePath, string toolName,
+            ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
+        {
+            lock (_lockSync)
+            {
+                HandleFileLockConflictInternal(taskId, filePath, toolName, activeTasks, appendOutput);
+            }
+        }
+
+        private void HandleFileLockConflictInternal(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
         {
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
@@ -124,14 +157,16 @@ namespace AgenticEngine.Managers
             var normalized = TaskLauncher.NormalizePath(filePath, task.ProjectPath);
             var blockingLock = _fileLocks.GetValueOrDefault(normalized);
             var blockingTaskId = blockingLock?.OwnerTaskId ?? "unknown";
+            var blockerTask = activeTasks.FirstOrDefault(t => t.Id == blockingTaskId);
+            var blockerNum = blockerTask?.TaskNumber;
 
             KillProcess(task);
-            ReleaseTaskLocks(taskId);
+            ReleaseTaskLocksInternal(taskId);
 
             if (string.IsNullOrEmpty(task.StoredPrompt) && !task.IsPlanningBeforeQueue)
             {
                 // No plan yet — restart in plan mode before queuing
-                appendOutput(taskId, $"\n[AgenticEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId}. Restarting in plan mode...\n");
+                appendOutput(taskId, $"\n[AgenticEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum}. Restarting in plan mode...\n");
                 task.NeedsPlanRestart = true;
                 task.PlanOnly = true;
                 task.PendingFileLockPath = normalized;
@@ -140,12 +175,13 @@ namespace AgenticEngine.Managers
             else
             {
                 // Already has a plan — queue immediately
-                appendOutput(taskId, $"\n[AgenticEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockingTaskId} ({toolName})\n");
-                appendOutput(taskId, $"[AgenticEngine] Queuing task #{taskId} for auto-resume...\n");
+                appendOutput(taskId, $"\n[AgenticEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum} ({toolName})\n");
+                appendOutput(taskId, $"[AgenticEngine] Queuing task #{task.TaskNumber} for auto-resume...\n");
 
                 task.Status = AgentTaskStatus.Queued;
-                task.QueuedReason = $"File locked: {Path.GetFileName(filePath)} by #{blockingTaskId}";
+                task.QueuedReason = $"File locked: {Path.GetFileName(filePath)} by #{blockerNum}";
                 task.BlockedByTaskId = blockingTaskId;
+                task.BlockedByTaskNumber = blockerNum;
 
                 var blockedByIds = new HashSet<string> { blockingTaskId };
                 _queuedTaskInfo[taskId] = new QueuedTaskInfo
@@ -160,38 +196,43 @@ namespace AgenticEngine.Managers
 
         public void CheckQueuedTasks(ObservableCollection<AgentTask> activeTasks)
         {
-            var toResume = new List<string>();
-
-            foreach (var kvp in _queuedTaskInfo)
+            List<(string taskId, QueuedTaskInfo qi)> toResume;
+            lock (_lockSync)
             {
-                var qi = kvp.Value;
-                var allClear = true;
-                foreach (var blockerId in qi.BlockedByTaskIds)
+                toResume = new List<(string, QueuedTaskInfo)>();
+
+                foreach (var kvp in _queuedTaskInfo)
                 {
-                    var blocker = activeTasks.FirstOrDefault(t => t.Id == blockerId);
-                    if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Paused)
+                    var qi = kvp.Value;
+                    var allClear = true;
+                    foreach (var blockerId in qi.BlockedByTaskIds)
                     {
-                        allClear = false;
-                        break;
+                        var blocker = activeTasks.FirstOrDefault(t => t.Id == blockerId);
+                        if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused)
+                        {
+                            allClear = false;
+                            break;
+                        }
                     }
+
+                    if (allClear && _fileLocks.ContainsKey(qi.ConflictingFilePath))
+                        allClear = false;
+
+                    if (allClear)
+                        toResume.Add((kvp.Key, qi));
                 }
 
-                if (allClear && _fileLocks.ContainsKey(qi.ConflictingFilePath))
-                    allClear = false;
-
-                if (allClear)
-                    toResume.Add(kvp.Key);
+                foreach (var (taskId, _) in toResume)
+                    _queuedTaskInfo.Remove(taskId);
             }
 
-            foreach (var taskId in toResume)
+            foreach (var (taskId, qi) in toResume)
             {
-                if (!_queuedTaskInfo.TryGetValue(taskId, out var qi)) continue;
-                _queuedTaskInfo.Remove(taskId);
-
                 var task = qi.Task;
                 task.Status = AgentTaskStatus.Running;
                 task.QueuedReason = null;
                 task.BlockedByTaskId = null;
+                task.BlockedByTaskNumber = null;
                 task.StartTime = DateTime.Now;
 
                 QueuedTaskResumed?.Invoke(taskId);
@@ -200,23 +241,44 @@ namespace AgenticEngine.Managers
 
         public void ForceStartQueuedTask(AgentTask task)
         {
-            _queuedTaskInfo.Remove(task.Id);
+            lock (_lockSync)
+            {
+                _queuedTaskInfo.Remove(task.Id);
+            }
             task.Status = AgentTaskStatus.Running;
             task.QueuedReason = null;
             task.BlockedByTaskId = null;
+            task.BlockedByTaskNumber = null;
             task.StartTime = DateTime.Now;
 
             QueuedTaskResumed?.Invoke(task.Id);
         }
 
-        public void RemoveQueuedInfo(string taskId) => _queuedTaskInfo.Remove(taskId);
+        public void AddQueuedTaskInfo(string taskId, QueuedTaskInfo info)
+        {
+            lock (_lockSync)
+            {
+                _queuedTaskInfo[taskId] = info;
+            }
+        }
+
+        public void RemoveQueuedInfo(string taskId)
+        {
+            lock (_lockSync)
+            {
+                _queuedTaskInfo.Remove(taskId);
+            }
+        }
 
         public void ClearAll()
         {
-            _fileLocks.Clear();
-            _fileLocksView.Clear();
-            _taskLockedFiles.Clear();
-            _queuedTaskInfo.Clear();
+            lock (_lockSync)
+            {
+                _fileLocks.Clear();
+                _fileLocksView.Clear();
+                _taskLockedFiles.Clear();
+                _queuedTaskInfo.Clear();
+            }
         }
 
         private void UpdateFileLockBadge()

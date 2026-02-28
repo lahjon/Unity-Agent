@@ -32,8 +32,8 @@ namespace AgenticEngine.Dialogs
 
             var outerBorder = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x19, 0x19, 0x19)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                Background = (Brush)Application.Current.FindResource("BgDeep"),
+                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12)
             };
@@ -47,7 +47,7 @@ namespace AgenticEngine.Dialogs
             var titleBlock = new TextBlock
             {
                 Text = "Application Log",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                Foreground = (Brush)Application.Current.FindResource("Accent"),
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 FontFamily = new FontFamily("Segoe UI"),
@@ -57,7 +57,7 @@ namespace AgenticEngine.Dialogs
             var logPathBlock = new TextBlock
             {
                 Text = AppLogger.GetLogFilePath(),
-                Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
+                Foreground = (Brush)Application.Current.FindResource("TextMuted"),
                 FontSize = 10,
                 FontFamily = new FontFamily("Segoe UI"),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -69,7 +69,7 @@ namespace AgenticEngine.Dialogs
             {
                 Content = "\u2715",
                 Background = Brushes.Transparent,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 14,
                 Padding = new Thickness(6, 2, 6, 2),
@@ -78,8 +78,8 @@ namespace AgenticEngine.Dialogs
                 VerticalAlignment = VerticalAlignment.Center
             };
             closeBtn.Click += (_, _) => dlg.Close();
-            closeBtn.MouseEnter += (s, _) => ((Button)s).Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8));
-            closeBtn.MouseLeave += (s, _) => ((Button)s).Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
+            closeBtn.MouseEnter += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextPrimary");
+            closeBtn.MouseLeave += (s, _) => ((Button)s).Foreground = (Brush)Application.Current.FindResource("TextSubdued");
 
             DockPanel.SetDock(closeBtn, Dock.Right);
             titleBar.Children.Add(closeBtn);
@@ -101,8 +101,8 @@ namespace AgenticEngine.Dialogs
                 Content = "Refresh",
                 Padding = new Thickness(14, 6, 14, 6),
                 Margin = new Thickness(0, 0, 6, 0),
-                Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                Background = (Brush)Application.Current.FindResource("BorderSubtle"),
+                Foreground = (Brush)Application.Current.FindResource("TextTabHeader"),
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 12,
                 BorderThickness = new Thickness(0),
@@ -114,8 +114,8 @@ namespace AgenticEngine.Dialogs
                 Content = "Open Log File",
                 Padding = new Thickness(14, 6, 14, 6),
                 Margin = new Thickness(0, 0, 6, 0),
-                Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                Background = (Brush)Application.Current.FindResource("BorderSubtle"),
+                Foreground = (Brush)Application.Current.FindResource("TextTabHeader"),
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 12,
                 BorderThickness = new Thickness(0),
@@ -143,8 +143,8 @@ namespace AgenticEngine.Dialogs
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 6, 0),
-                Background = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                Background = (Brush)Application.Current.FindResource("BgElevated"),
+                Foreground = (Brush)Application.Current.FindResource("TextLight"),
                 VerticalAlignment = VerticalAlignment.Center
             };
             viewCombo.Items.Add(new ComboBoxItem { Content = "Memory Buffer", Tag = "memory" });
@@ -166,8 +166,8 @@ namespace AgenticEngine.Dialogs
                 AcceptsReturn = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Background = new SolidColorBrush(Color.FromRgb(0x0E, 0x0E, 0x0E)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                Background = (Brush)Application.Current.FindResource("BgPit"),
+                Foreground = (Brush)Application.Current.FindResource("TextBody"),
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 12,
                 BorderThickness = new Thickness(0),

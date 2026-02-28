@@ -1,6 +1,6 @@
 @echo off
 echo Building AgenticEngine...
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+dotnet publish AgenticEngine.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 if %ERRORLEVEL% NEQ 0 (
     echo Build FAILED.
     pause

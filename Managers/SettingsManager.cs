@@ -75,8 +75,8 @@ namespace AgenticEngine.Managers
                     ["settingsPanelCollapsed"] = _settingsPanelCollapsed,
                     ["maxConcurrentTasks"] = _maxConcurrentTasks
                 };
-                File.WriteAllText(_settingsFile,
-                    JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true }));
+                var json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
+                SafeFileWriter.WriteInBackground(_settingsFile, json, "SettingsManager");
             }
             catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to save settings", ex); }
         }

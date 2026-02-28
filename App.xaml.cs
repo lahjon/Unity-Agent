@@ -63,6 +63,12 @@ namespace AgenticEngine
             e.SetObserved();
         }
 
+        private static Brush GetBrush(string key, Color fallback)
+        {
+            try { return (Brush)Current.FindResource(key); }
+            catch { return new SolidColorBrush(fallback); }
+        }
+
         private static void ShowDarkError(string message, string title)
         {
             var dlg = new Window
@@ -79,8 +85,8 @@ namespace AgenticEngine
 
             var outerBorder = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x22, 0x22, 0x22)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                Background = GetBrush("BgSurface", Color.FromRgb(0x22, 0x22, 0x22)),
+                BorderBrush = GetBrush("BorderMedium", Color.FromRgb(0x3A, 0x3A, 0x3A)),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12)
             };
@@ -91,7 +97,7 @@ namespace AgenticEngine
             stack.Children.Add(new TextBlock
             {
                 Text = title,
-                Foreground = new SolidColorBrush(Color.FromRgb(0xA1, 0x52, 0x52)),
+                Foreground = GetBrush("Danger", Color.FromRgb(0xA1, 0x52, 0x52)),
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 FontFamily = new FontFamily("Segoe UI"),
@@ -101,7 +107,7 @@ namespace AgenticEngine
             stack.Children.Add(new TextBlock
             {
                 Text = message,
-                Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                Foreground = GetBrush("TextLight", Color.FromRgb(0xCC, 0xCC, 0xCC)),
                 FontSize = 13,
                 FontFamily = new FontFamily("Segoe UI"),
                 TextWrapping = TextWrapping.Wrap,
@@ -117,8 +123,8 @@ namespace AgenticEngine
             var okBtn = new Button
             {
                 Content = "OK",
-                Background = new SolidColorBrush(Color.FromRgb(0xA1, 0x52, 0x52)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xE0, 0xE0, 0xE0)),
+                Background = GetBrush("Danger", Color.FromRgb(0xA1, 0x52, 0x52)),
+                Foreground = GetBrush("TextBright", Color.FromRgb(0xE0, 0xE0, 0xE0)),
                 FontFamily = new FontFamily("Segoe UI"),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12,
@@ -249,6 +255,93 @@ namespace AgenticEngine
                 Priority = ThreadPriority.AboveNormal
             };
             watchdog.Start();
+        }
+
+        /// <summary>
+        /// Safety-net shutdown handler. Runs after the main window has closed.
+        /// Flushes any remaining background file writes and kills orphaned child processes
+        /// that may have been missed by OnWindowClosing.
+        /// </summary>
+        protected override void OnExit(ExitEventArgs e)
+        {
+            Managers.AppLogger.Info("App", "OnExit: starting final cleanup");
+
+            // Flush any file writes that were queued after OnWindowClosing
+            try { Managers.SafeFileWriter.FlushAll(timeoutMs: 3000); }
+            catch (Exception ex) { LogCrash("OnExit.FlushAll", ex); }
+
+            // Kill any child processes still running under our process tree
+            try { KillOrphanedChildProcesses(); }
+            catch (Exception ex) { LogCrash("OnExit.KillOrphans", ex); }
+
+            Managers.AppLogger.Info("App", "OnExit: cleanup complete");
+            base.OnExit(e);
+        }
+
+        /// <summary>
+        /// Enumerates child processes of the current process and kills any that are still alive.
+        /// This catches headless launches and helper processes that have no tracked reference.
+        /// </summary>
+        private static void KillOrphanedChildProcesses()
+        {
+            var currentPid = Environment.ProcessId;
+            Process[] allProcesses;
+            try { allProcesses = Process.GetProcesses(); }
+            catch { return; }
+
+            foreach (var proc in allProcesses)
+            {
+                try
+                {
+                    // Skip processes that have already exited
+                    if (proc.HasExited) { proc.Dispose(); continue; }
+
+                    // Check if this process is a direct child of ours via WMI-free parent PID query
+                    if (GetParentProcessId(proc.Id) == currentPid)
+                    {
+                        Managers.AppLogger.Info("App", $"Killing orphaned child process {proc.Id} ({proc.ProcessName})");
+                        proc.Kill(entireProcessTree: true);
+                    }
+                }
+                catch { /* process may have exited between check and kill */ }
+                finally
+                {
+                    try { proc.Dispose(); } catch { }
+                }
+            }
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct PROCESS_BASIC_INFORMATION
+        {
+            public IntPtr Reserved1;
+            public IntPtr PebBaseAddress;
+            public IntPtr Reserved2_0;
+            public IntPtr Reserved2_1;
+            public IntPtr UniqueProcessId;
+            public IntPtr InheritedFromUniqueProcessId;
+        }
+
+        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(
+            IntPtr processHandle, int processInformationClass,
+            ref PROCESS_BASIC_INFORMATION processInformation,
+            int processInformationLength, out int returnLength);
+
+        /// <summary>Returns the parent PID of the given process, or -1 on failure.</summary>
+        private static int GetParentProcessId(int pid)
+        {
+            try
+            {
+                using var proc = Process.GetProcessById(pid);
+                var pbi = new PROCESS_BASIC_INFORMATION();
+                int status = NtQueryInformationProcess(
+                    proc.Handle, 0, ref pbi, System.Runtime.InteropServices.Marshal.SizeOf(pbi), out _);
+                if (status == 0)
+                    return pbi.InheritedFromUniqueProcessId.ToInt32();
+            }
+            catch { }
+            return -1;
         }
 
         public static void LogCrash(string source, Exception? ex)

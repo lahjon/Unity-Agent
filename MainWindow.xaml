@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AgenticEngine"
         Title="Agentic Engine" Width="1280" Height="820"
-        Background="#191919" WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgDeep}" WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded"
         PreviewKeyDown="Window_PreviewKeyDown">
 
@@ -13,10 +13,15 @@
             <Border x:Name="Card" CornerRadius="8" Padding="10" Margin="0,2"
                     BorderThickness="1"
                     MouseUp="TaskCard_MouseUp"
-                    MouseMove="TaskCard_MouseMove">
+                    PreviewMouseLeftButtonDown="TaskCard_PreviewMouseDown"
+                    MouseMove="TaskCard_MouseMove"
+                    AllowDrop="True"
+                    DragOver="TaskCard_DragOver"
+                    Drop="TaskCard_Drop">
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
+                        <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
                     </ContextMenu>
                 </Border.ContextMenu>
                 <Border.Background>
@@ -63,13 +68,13 @@
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
                                     <Setter Property="Content" Value="&#xE769;"/>
-                                    <Setter Property="Foreground" Value="#DA7756"/>
+                                    <Setter Property="Foreground" Value="{StaticResource Accent}"/>
                                     <Setter Property="ToolTip" Value="Pause task"/>
                                     <Setter Property="Visibility" Value="Visible"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsPaused}" Value="True">
                                             <Setter Property="Content" Value="&#xE768;"/>
-                                            <Setter Property="Foreground" Value="#E89B7E"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentHover}"/>
                                             <Setter Property="ToolTip" Value="Resume task"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding IsFinished}" Value="True">
@@ -79,6 +84,9 @@
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding IsInitQueued}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsPlanning}" Value="True">
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -94,7 +102,7 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsFinished}" Value="True">
                                             <Setter Property="Content" Value="&#xE73E;"/>
-                                            <Setter Property="Foreground" Value="#5CB85C"/>
+                                            <Setter Property="Foreground" Value="{StaticResource Success}"/>
                                             <Setter Property="ToolTip" Value="Remove task"/>
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -200,6 +208,31 @@
                                                     <StopStoryboard BeginStoryboardName="PausedGlowStoryboard"/>
                                                 </DataTrigger.ExitActions>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsPlanning}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="PlanningGlowStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(BlurEffect.Radius)"
+                                                                             From="0" To="8" Duration="0:0:1.0"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.4" To="1.0" Duration="0:0:1.0"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="PlanningGlowStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Ellipse.Style>
@@ -211,19 +244,19 @@
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text=" | " Foreground="#444" FontSize="11" FontFamily="Segoe UI"
+                        <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="11" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding ProjectName}" Foreground="#888"
+                        <TextBlock Text="{Binding ProjectName}" Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
                         <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
-                                   Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
+                                   Foreground="{StaticResource TextSubdued}"
                                    FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
-                               Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"
+                               Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
                                TextTrimming="CharacterEllipsis" Margin="0,4,0,0">
                         <TextBlock.ToolTip>
                             <ToolTip MaxWidth="600" Placement="Bottom">
@@ -231,9 +264,9 @@
                             </ToolTip>
                         </TextBlock.ToolTip>
                     </TextBlock>
-                    <!-- Tool activity feed (last 3 actions) -->
+                    <!-- Tool activity feed (latest action) -->
                     <TextBlock Grid.Row="2" Text="{Binding ToolActivityText}"
-                               Foreground="#7A9EC2" FontSize="10" FontFamily="Consolas"
+                               Foreground="{StaticResource ToolActivityText}" FontSize="10" FontFamily="Consolas"
                                TextTrimming="CharacterEllipsis" Margin="0,4,0,0"
                                LineHeight="15">
                         <TextBlock.Style>
@@ -252,24 +285,62 @@
                         </TextBlock.Style>
                     </TextBlock>
                     <Grid Grid.Row="3" Margin="0,6,0,0">
-                        <TextBlock Text="{Binding TimeInfo}" Foreground="#666"
+                        <TextBlock Text="{Binding TimeInfo}" Foreground="{StaticResource TextMuted}"
                                    FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
-                        <Border CornerRadius="3" Padding="4,1"
-                                Background="#2A1F3D" BorderBrush="#7E57C2" BorderThickness="1"
-                                HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding PlanOnly}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <TextBlock Text="PLAN" Foreground="#CE93D8" FontSize="9"
-                                       FontFamily="Segoe UI" FontWeight="Bold"/>
-                        </Border>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <!-- File lock padlock toggle -->
+                            <Button Click="ToggleFileLock_Click" VerticalAlignment="Center" Margin="0,0,4,0">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                        <Setter Property="Content" Value="&#xE72E;"/>
+                                        <Setter Property="Foreground" Value="#64B5F6"/>
+                                        <Setter Property="ToolTip" Value="File locks enforced — click to ignore"/>
+                                        <Setter Property="FontSize" Value="11"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IgnoreFileLocks}" Value="True">
+                                                <Setter Property="Content" Value="&#xE785;"/>
+                                                <Setter Property="Foreground" Value="#666666"/>
+                                                <Setter Property="ToolTip" Value="File locks ignored — click to enforce"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Border CornerRadius="3" Padding="4,1"
+                                    Background="{StaticResource PlanBadgeBg}" BorderBrush="{StaticResource PlanBadgeBorder}" BorderThickness="1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding PlanOnly}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="PLAN" Foreground="{StaticResource PlanBadgeText}" FontSize="9"
+                                           FontFamily="Segoe UI" FontWeight="Bold"/>
+                            </Border>
+                            <!-- Continue button (visible when finished with recommendations) -->
+                            <Button Content="Continue" Click="Continue_Click"
+                                    Background="#00897B"
+                                    Margin="4,0,0,0" ToolTip="Continue with recommended next steps">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsFinished}" Value="True"/>
+                                                    <Condition Binding="{Binding HasRecommendations}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </StackPanel>
                     </Grid>
                 </Grid>
             </Border>
@@ -282,6 +353,7 @@
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
+                        <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
                     </ContextMenu>
                 </Border.ContextMenu>
                 <Border.Background>
@@ -314,6 +386,7 @@
                 </Border.Triggers>
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -396,19 +469,19 @@
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text=" | " Foreground="#444" FontSize="11" FontFamily="Segoe UI"
+                        <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="11" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding ProjectName}" Foreground="#666"
+                        <TextBlock Text="{Binding ProjectName}" Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
                         <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
-                                   Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
+                                   Foreground="{StaticResource TextMuted}"
                                    FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
-                               Foreground="#888" FontSize="12" FontFamily="Segoe UI"
+                               Foreground="{StaticResource TextSubdued}" FontSize="12" FontFamily="Segoe UI"
                                TextTrimming="CharacterEllipsis" Margin="0,4,0,0">
                         <TextBlock.ToolTip>
                             <ToolTip MaxWidth="600" Placement="Bottom">
@@ -416,12 +489,34 @@
                             </ToolTip>
                         </TextBlock.ToolTip>
                     </TextBlock>
-                    <Grid Grid.Row="2" Margin="0,6,0,0">
-                        <TextBlock Text="{Binding TimeInfo}" Foreground="#555"
+                    <!-- Recommendations / Next Steps -->
+                    <TextBlock Grid.Row="2" Text="{Binding Recommendations}"
+                               Foreground="#80CBC4" FontSize="10" FontFamily="Segoe UI"
+                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                               MaxHeight="40" Margin="0,4,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasRecommendations}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                        <TextBlock.ToolTip>
+                            <ToolTip MaxWidth="600" Placement="Bottom">
+                                <TextBlock Text="{Binding Recommendations}" TextWrapping="Wrap" MaxWidth="580"
+                                           Foreground="#B2DFDB"/>
+                            </ToolTip>
+                        </TextBlock.ToolTip>
+                    </TextBlock>
+                    <Grid Grid.Row="3" Margin="0,6,0,0">
+                        <TextBlock Text="{Binding TimeInfo}" Foreground="{StaticResource TextDisabled}"
                                    FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Border CornerRadius="3" Padding="4,1" Margin="0,0,8,0"
-                                    Background="#2A1F3D" BorderBrush="#7E57C2" BorderThickness="1"
+                                    Background="{StaticResource PlanBadgeBg}" BorderBrush="{StaticResource PlanBadgeBorder}" BorderThickness="1"
                                     VerticalAlignment="Center">
                                 <Border.Style>
                                     <Style TargetType="Border">
@@ -433,11 +528,26 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <TextBlock Text="PLAN" Foreground="#CE93D8" FontSize="9"
+                                <TextBlock Text="PLAN" Foreground="{StaticResource PlanBadgeText}" FontSize="9"
                                            FontFamily="Segoe UI" FontWeight="Bold"/>
                             </Border>
+                            <!-- Continue button (visible when recommendations exist) -->
+                            <Button Content="Continue" Click="Continue_Click"
+                                    Background="#00897B"
+                                    Margin="0,0,4,0" ToolTip="Continue with recommended next steps">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasRecommendations}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                             <Button Content="Resume" Click="Resume_Click"
-                                    Background="#DA7756" Style="{StaticResource SmallBtn}"
+                                    Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
                                     Margin="0"/>
                         </StackPanel>
                     </Grid>
@@ -496,24 +606,24 @@
                             ToolTip="Remove stored task"/>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
-                            <Ellipse Width="8" Height="8" Fill="#4DB6AC"/>
+                            <Ellipse Width="8" Height="8" Fill="{StaticResource AccentTeal}"/>
                         </Grid>
-                        <TextBlock Text="Stored" Foreground="#4DB6AC"
+                        <TextBlock Text="Stored" Foreground="{StaticResource AccentTeal}"
                                    FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text=" | " Foreground="#444" FontSize="11" FontFamily="Segoe UI"
+                        <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="11" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding ProjectName}" Foreground="#666"
+                        <TextBlock Text="{Binding ProjectName}" Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
                         <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
-                                   Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
+                                   Foreground="{StaticResource TextMuted}"
                                    FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
-                               Foreground="#888" FontSize="12" FontFamily="Segoe UI"
+                               Foreground="{StaticResource TextSubdued}" FontSize="12" FontFamily="Segoe UI"
                                TextTrimming="CharacterEllipsis" Margin="0,4,0,0">
                         <TextBlock.ToolTip>
                             <ToolTip MaxWidth="600" Placement="Bottom">
@@ -522,14 +632,14 @@
                         </TextBlock.ToolTip>
                     </TextBlock>
                     <Grid Grid.Row="2" Margin="0,6,0,0">
-                        <TextBlock Text="{Binding TimeInfo}" Foreground="#555"
+                        <TextBlock Text="{Binding TimeInfo}" Foreground="{StaticResource TextDisabled}"
                                    FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="View" Click="ViewStoredTask_Click"
-                                    Background="#333" Style="{StaticResource SmallBtn}"
+                                    Background="{StaticResource BorderSubtle}" Style="{StaticResource SmallBtn}"
                                     Margin="0,0,6,0"/>
                             <Button Content="Execute" Click="ExecuteStoredTask_Click"
-                                    Background="#4DB6AC" Style="{StaticResource SmallBtn}"
+                                    Background="{StaticResource AccentTeal}" Style="{StaticResource SmallBtn}"
                                     Margin="0"/>
                         </StackPanel>
                     </Grid>
@@ -556,7 +666,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- ═══ PROJECTS (1) ═══ -->
-        <Border Grid.Row="2" Grid.Column="0" Grid.RowSpan="3" Background="#222222" CornerRadius="8" Padding="10"
+        <Border Grid.Row="2" Grid.Column="0" Grid.RowSpan="3" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="10"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="ProjectsPanelBorder" Color="#2C2C2C"/>
@@ -583,33 +693,25 @@
                 </Border.Triggers>
                 <DockPanel>
                     <!-- Add / Create Project form -->
-                    <Border DockPanel.Dock="Bottom" Background="#1E1E1E" CornerRadius="6"
-                            BorderBrush="#333333" BorderThickness="1" Margin="0,6,0,0" Padding="8">
+                    <Border DockPanel.Dock="Bottom" Background="{StaticResource BgSection}" CornerRadius="6"
+                            BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" Margin="0,6,0,0" Padding="8">
                         <StackPanel>
-                            <DockPanel>
-                                <TextBlock Text="ADD" Foreground="#DA7756" FontWeight="Bold"
-                                           FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"
-                                           DockPanel.Dock="Left" Margin="0,0,6,0"/>
-                                <Button Content="Add" Click="AddProject_Click"
-                                        Background="#DA7756" Style="{StaticResource SmallBtn}"
-                                        DockPanel.Dock="Right" Margin="4,0,0,0" Padding="10,3"/>
-                                <Border Background="#191919" BorderBrush="#333333" BorderThickness="1"
-                                        CornerRadius="2" Cursor="Hand"
-                                        MouseLeftButtonDown="AddProjectPath_Click">
-                                    <TextBlock x:Name="AddProjectPath"
-                                               Foreground="#666" FontSize="11"
-                                               FontFamily="Segoe UI" Padding="6,4"
-                                               Text="Click to select project folder..."
-                                               VerticalAlignment="Center"/>
-                                </Border>
-                            </DockPanel>
+                            <Border Background="{StaticResource BgDeep}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                    CornerRadius="2" Cursor="Hand"
+                                    MouseLeftButtonDown="AddProjectPath_Click">
+                                <TextBlock x:Name="AddProjectPath"
+                                           Foreground="{StaticResource TextMuted}" FontSize="11"
+                                           FontFamily="Segoe UI" Padding="6,4"
+                                           Text="Click to add project folder..."
+                                           VerticalAlignment="Center"/>
+                            </Border>
                             <Button Content="Create New Project" Click="CreateProject_Click"
-                                    Background="#DA7756" Style="{StaticResource SmallBtn}"
+                                    Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
                                     HorizontalAlignment="Stretch" Margin="0,6,0,0" Padding="10,5"/>
                         </StackPanel>
                     </Border>
                     <!-- Header -->
-                    <TextBlock DockPanel.Dock="Top" Text="PROJECTS" Foreground="#DA7756" FontWeight="Bold"
+                    <TextBlock DockPanel.Dock="Top" Text="PROJECTS" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                FontSize="10" FontFamily="Segoe UI" Margin="4,2,0,6"/>
                     <!-- Project list -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -622,7 +724,7 @@
         <GridSplitter Grid.Column="1" Grid.RowSpan="5" Style="{StaticResource VerticalSplitter}"/>
 
         <!-- ═══ PROMPTS (2) ═══ -->
-        <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Background="#222222" CornerRadius="8" Padding="14"
+        <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="14"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="InputSectionBorder" Color="#2C2C2C"/>
@@ -655,90 +757,55 @@
                         <ColumnDefinition x:Name="ChatPanelCol" Width="280" MinWidth="0"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Prompt input area -->
-                <DockPanel Grid.Column="0">
-                    <!-- Bottom: Advanced expander + Execute button (always visible) -->
+                    <!-- Left: Prompt input area + collapsible Advanced side panel -->
+                <Grid Grid.Column="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Prompt area -->
+                <DockPanel Grid.Column="1">
+                    <!-- Bottom: Advanced toggle + Execute button (always visible) -->
                     <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                         <StackPanel DockPanel.Dock="Right" Margin="10,0,0,0" VerticalAlignment="Top">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock x:Name="PromptProjectLabel" Text="" Foreground="#E8E8E8" FontFamily="Segoe UI"
+                                <TextBlock x:Name="PromptProjectLabel" Text="" Foreground="{StaticResource TextPrimary}" FontFamily="Segoe UI"
                                            FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"
                                            TextTrimming="CharacterEllipsis" MaxWidth="400"/>
                                 <Button Content="Save Prompt" Click="SavePromptEntry_Click"
-                                        Background="#353535" Style="{StaticResource Btn}"
+                                        Background="{StaticResource BgHover}" Style="{StaticResource Btn}"
                                         Foreground="#A8A8A8"
                                         FontSize="11" Padding="6,4" Margin="0,0,6,0"/>
                                 <Button x:Name="ExecuteButton" Content="Execute Task" Click="Execute_Click"
-                                        Background="#DA7756" Style="{StaticResource Btn}"
+                                        Background="{StaticResource Accent}" Style="{StaticResource Btn}"
                                         FontSize="13" Padding="18,6" FontWeight="Bold"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
-                                <TextBlock Text="Ctrl+S to save" Foreground="#555" FontFamily="Segoe UI"
+                                <TextBlock Text="Ctrl+S to save" Foreground="{StaticResource TextDisabled}" FontFamily="Segoe UI"
                                            FontSize="10" Margin="0,0,12,0"/>
-                                <TextBlock Text="Ctrl+Enter to execute" Foreground="#555" FontFamily="Segoe UI"
+                                <TextBlock Text="Ctrl+Enter to execute" Foreground="{StaticResource TextDisabled}" FontFamily="Segoe UI"
                                            FontSize="10"/>
                             </StackPanel>
                         </StackPanel>
-                        <Expander Style="{StaticResource DarkExpander}" IsExpanded="False">
-                            <Expander.Header>
-                                <TextBlock Text="ADVANCED" Foreground="#DA7756" FontWeight="Bold" FontSize="10"
-                                           FontFamily="Segoe UI"/>
-                            </Expander.Header>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="200">
-                                <StackPanel Margin="0,2,0,0">
-                                    <!-- Permanent toggles -->
-                                    <WrapPanel>
-                                        <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="True"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
-                                            <TextBlock Text="Ignore File Locks" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                        <ToggleButton x:Name="UseMcpToggle" IsChecked="False"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
-                                            <TextBlock Text="Use MCP" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                    </WrapPanel>
-                                    <!-- Separator -->
-                                    <Border BorderBrush="#444" BorderThickness="0,1,0,0" Margin="0,2,0,6"/>
-                                    <!-- Per-task toggles (reset after execution) -->
-                                    <WrapPanel>
-                                        <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
-                                            <TextBlock Text="Remote Session" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                        <ToggleButton x:Name="HeadlessToggle" IsChecked="False"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
-                                            <TextBlock Text="Headless (Terminal)" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                        <ToggleButton x:Name="SpawnTeamToggle" IsChecked="False"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
-                                            <TextBlock Text="Spawn Team" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                        <ToggleButton x:Name="OvernightToggle" IsChecked="False"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8"
-                                                      Checked="OvernightToggle_Changed" Unchecked="OvernightToggle_Changed">
-                                            <TextBlock Text="Overnight Task" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                        <ToggleButton x:Name="ExtendedPlanningToggle" IsChecked="False"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8">
-                                            <TextBlock Text="Extended Planning" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                        <ToggleButton x:Name="PlanOnlyToggle" IsChecked="False"
-                                                      Style="{StaticResource ToggleSwitch}" Margin="0,0,12,8"
-                                                      Checked="PlanOnlyToggle_Changed" Unchecked="PlanOnlyToggle_Changed">
-                                            <TextBlock Text="Plan Only" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                    </WrapPanel>
-                                </StackPanel>
-                            </ScrollViewer>
-                        </Expander>
+                        <Button x:Name="AdvancedToggleBtn" Click="AdvancedToggle_Click"
+                                Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                HorizontalAlignment="Left" VerticalAlignment="Center" Padding="0,4">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="AdvancedArrow" Text="&#x25C2;" Foreground="{StaticResource Accent}"
+                                           FontSize="11" FontWeight="Bold" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="ADVANCED" Foreground="{StaticResource Accent}" FontWeight="Bold" FontSize="10"
+                                           FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </DockPanel>
                     <!-- Top: Prompt label, model selector, text input -->
                     <DockPanel>
                         <!-- Panel label + Model selector -->
                         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-                            <TextBlock Text="PROMPT" Foreground="#DA7756" FontWeight="Bold"
+                            <TextBlock Text="PROMPT" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                        FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                            <TextBlock Text="MODEL" Foreground="#666" FontWeight="Bold"
+                            <TextBlock Text="MODEL" Foreground="{StaticResource TextMuted}" FontWeight="Bold"
                                        FontSize="9" FontFamily="Segoe UI" VerticalAlignment="Center"
                                        Margin="20,0,6,0"/>
                             <ComboBox x:Name="ModelCombo" SelectedIndex="0"
@@ -751,25 +818,25 @@
                         </DockPanel>
                         <!-- Active project name removed from here; shown next to Execute button -->
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,6,0,0">
-                            <TextBlock x:Name="ImageIndicator" Foreground="#DA7756" FontSize="11"
+                            <TextBlock x:Name="ImageIndicator" Foreground="{StaticResource Accent}" FontSize="11"
                                        FontFamily="Segoe UI" VerticalAlignment="Center" Visibility="Collapsed"/>
                             <Button x:Name="ClearImagesBtn" Content="Clear" Click="ClearImages_Click"
-                                    Style="{StaticResource GhostBtn}" Foreground="#A15252"
+                                    Style="{StaticResource GhostBtn}" Foreground="{StaticResource Danger}"
                                     Margin="6,0,0,0" Visibility="Collapsed"/>
                         </StackPanel>
                         <!-- Dependency drop zone -->
                         <Border x:Name="DependencyDropZone" DockPanel.Dock="Bottom"
-                                Background="#1A1A1A" BorderBrush="#333333" BorderThickness="1"
+                                Background="#1A1A1A" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                 CornerRadius="4" MinHeight="28" Margin="0,6,0,0" Padding="6,4"
                                 AllowDrop="True"
                                 PreviewDragOver="DependencyZone_DragOver"
                                 Drop="DependencyZone_Drop">
                             <DockPanel>
-                                <TextBlock DockPanel.Dock="Left" Text="DEPS" Foreground="#DA7756" FontWeight="Bold"
+                                <TextBlock DockPanel.Dock="Left" Text="DEPS" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                            FontSize="9" FontFamily="Segoe UI" VerticalAlignment="Center"
                                            Margin="0,0,8,0"/>
                                 <TextBlock x:Name="DependencyPlaceholder" Text="Drag tasks here to add dependencies..."
-                                           Foreground="#555" FontSize="11" FontFamily="Segoe UI"
+                                           Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
                                            VerticalAlignment="Center"/>
                                 <ItemsControl x:Name="DependencyChips" Visibility="Collapsed">
                                     <ItemsControl.ItemsPanel>
@@ -783,8 +850,8 @@
                         <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
                                  MinHeight="80" MaxHeight="150"
                                  VerticalScrollBarVisibility="Auto"
-                                 Background="#191919" Foreground="#E8E8E8"
-                                 CaretBrush="#E8E8E8" BorderBrush="#333333" BorderThickness="1"
+                                 Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
+                                 CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                  FontSize="13" FontFamily="Consolas" Padding="10"
                                  PreviewKeyDown="TaskInput_PreviewKeyDown"
                                  AllowDrop="True" PreviewDragOver="TaskInput_DragOver"
@@ -792,12 +859,80 @@
                     </DockPanel>
                 </DockPanel>
 
+                    <!-- Advanced side panel (Column 0, collapsible) -->
+                    <Border x:Name="AdvancedSidePanel" Grid.Column="0" Visibility="Collapsed"
+                            Background="{StaticResource BgSurface}" CornerRadius="6"
+                            BorderBrush="{StaticResource BgElevated}" BorderThickness="1"
+                            Margin="0,0,10,0" Padding="10" Width="200">
+                        <DockPanel>
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <TextBlock Text="ADVANCED" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                <Button Content="&#xE711;" Click="AdvancedToggle_Click"
+                                        FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                        Style="{StaticResource IconBtn}" Foreground="{StaticResource TextMuted}"
+                                        HorizontalAlignment="Right" Padding="2" ToolTip="Close" Cursor="Hand"/>
+                            </DockPanel>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <!-- Permanent toggles -->
+                                    <TextBlock Text="PERSISTENT" Foreground="{StaticResource TextDisabled}" FontSize="9"
+                                               FontFamily="Segoe UI" FontWeight="Bold" Margin="0,0,0,4"/>
+                                    <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="True"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Ignore File Locks" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="UseMcpToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Use MCP" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <!-- Separator -->
+                                    <Border BorderBrush="{StaticResource SeparatorDark}" BorderThickness="0,1,0,0" Margin="0,4,0,8"/>
+                                    <!-- Per-task toggles -->
+                                    <TextBlock Text="PER-TASK" Foreground="{StaticResource TextDisabled}" FontSize="9"
+                                               FontFamily="Segoe UI" FontWeight="Bold" Margin="0,0,0,4"/>
+                                    <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Remote Session" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="HeadlessToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Headless (Terminal)" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="SpawnTeamToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Spawn Team" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="OvernightToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
+                                                  Checked="OvernightToggle_Changed" Unchecked="OvernightToggle_Changed">
+                                        <TextBlock Text="Overnight Task" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="ExtendedPlanningToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Extended Planning" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="PlanOnlyToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
+                                                  Checked="PlanOnlyToggle_Changed" Unchecked="PlanOnlyToggle_Changed">
+                                        <TextBlock Text="Plan Only" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="MessageBusToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Message Bus" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+
                     <!-- Center-right: Saved Prompts panel -->
                     <Border Grid.Column="1" Background="{StaticResource BgSurface}" CornerRadius="6"
                             BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Margin="10,0,0,0"
                             Padding="8" MinWidth="180" MaxWidth="220">
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="SAVED" Foreground="#4DB6AC" FontWeight="Bold"
+                            <TextBlock DockPanel.Dock="Top" Text="SAVED" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                        FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,6"/>
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <StackPanel x:Name="SavedPromptsPanel"/>
@@ -844,14 +979,39 @@
                                             Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
                                             HorizontalAlignment="Right" FontSize="10"/>
                                 </DockPanel>
+                                <!-- Chat model selector -->
+                                <ComboBox x:Name="ChatModelCombo" DockPanel.Dock="Top"
+                                          FontSize="10" Padding="4,2" Margin="0,0,0,6"
+                                          SelectionChanged="ChatModelCombo_Changed"/>
                                 <!-- Input area at the bottom -->
                                 <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
                                     <Button x:Name="ChatSendBtn" Content="&#xE724;" Click="ChatSend_Click"
-                                            DockPanel.Dock="Right" Margin="4,0,0,0" VerticalAlignment="Bottom"
+                                            DockPanel.Dock="Right" Margin="4,0,0,0" VerticalAlignment="Center"
                                             Padding="6,6" FontSize="13" ToolTip="Send message">
                                         <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
-                                                <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+                                            <Style TargetType="Button">
+                                                <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                                <Setter Property="Cursor" Value="Hand"/>
+                                                <Setter Property="BorderThickness" Value="0"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="Bd" Background="{StaticResource Accent}" CornerRadius="6"
+                                                                    Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHover}"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsPressed" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
                                             </Style>
                                         </Button.Style>
                                     </Button>
@@ -878,7 +1038,7 @@
         <GridSplitter Grid.Row="1" Grid.ColumnSpan="5" Style="{StaticResource HorizontalSplitter}"/>
 
         <!-- ═══ TASK LIST (3) ═══ -->
-        <Border Grid.Row="0" Grid.Column="0" Background="#222222" CornerRadius="8" Padding="10"
+        <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="10"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="SidebarBorder" Color="#2C2C2C"/>
@@ -908,7 +1068,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Text="TASK LIST" Foreground="#DA7756" FontWeight="Bold"
+                    <TextBlock Grid.Row="0" Text="TASK LIST" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                FontSize="10" FontFamily="Segoe UI" Margin="4,2,0,6"/>
                 <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0"
                            SelectionChanged="TaskListTab_SelectionChanged">
@@ -917,11 +1077,12 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="ACTIVE" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"/>
                                 <TextBlock x:Name="ActiveTabCount" FontWeight="Bold" FontSize="11"
-                                           FontFamily="Segoe UI" Foreground="#888"/>
+                                           FontFamily="Segoe UI" Foreground="{StaticResource TextSubdued}"/>
                             </StackPanel>
                         </TabItem.Header>
                         <Grid Margin="0,6,0,0">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
@@ -937,7 +1098,29 @@
                                               HorizontalAlignment="Left"/>
                                 </StackPanel>
                             </DockPanel>
-                            <ListBox x:Name="ActiveTasksList" Grid.Row="1"
+                            <Grid Grid.Row="1" Margin="4,0,4,6">
+                                <TextBox x:Name="ActiveSearchBox"
+                                         FontSize="12" Padding="6,4"
+                                         Background="{StaticResource BgElevated}"
+                                         Foreground="{StaticResource TextPrimary}"
+                                         BorderThickness="1"
+                                         TextChanged="ActiveSearchBox_TextChanged"/>
+                                <TextBlock Text="Search tasks..." IsHitTestVisible="False"
+                                           FontSize="12" Padding="8,5"
+                                           Foreground="{StaticResource TextSubdued}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=ActiveSearchBox}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                            <ListBox x:Name="ActiveTasksList" Grid.Row="2"
                                      Style="{StaticResource TaskListStyle}"
                                      ItemTemplate="{StaticResource ActiveTaskTemplate}"
                                      SelectionChanged="ActiveTask_Selected"
@@ -949,11 +1132,12 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="HISTORY" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"/>
                                 <TextBlock x:Name="HistoryTabCount" FontWeight="Bold" FontSize="11"
-                                           FontFamily="Segoe UI" Foreground="#888"/>
+                                           FontFamily="Segoe UI" Foreground="{StaticResource TextSubdued}"/>
                             </StackPanel>
                         </TabItem.Header>
                         <Grid Margin="0,6,0,0">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
@@ -969,7 +1153,29 @@
                                               HorizontalAlignment="Left"/>
                                 </StackPanel>
                             </DockPanel>
-                            <ListBox x:Name="HistoryTasksList" Grid.Row="1"
+                            <Grid Grid.Row="1" Margin="4,0,4,6">
+                                <TextBox x:Name="HistorySearchBox"
+                                         FontSize="12" Padding="6,4"
+                                         Background="{StaticResource BgElevated}"
+                                         Foreground="{StaticResource TextPrimary}"
+                                         BorderThickness="1"
+                                         TextChanged="HistorySearchBox_TextChanged"/>
+                                <TextBlock Text="Search tasks..." IsHitTestVisible="False"
+                                           FontSize="12" Padding="8,5"
+                                           Foreground="{StaticResource TextSubdued}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=HistorySearchBox}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                            <ListBox x:Name="HistoryTasksList" Grid.Row="2"
                                      Style="{StaticResource TaskListStyle}"
                                      ItemTemplate="{StaticResource HistoryTaskTemplate}"
                                      SelectionChanged="HistoryTask_Selected"
@@ -981,7 +1187,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="STORED" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"/>
                                 <TextBlock x:Name="StoredTabBadge" FontWeight="Bold" FontSize="11"
-                                           FontFamily="Segoe UI" Foreground="#4DB6AC" Visibility="Collapsed"/>
+                                           FontFamily="Segoe UI" Foreground="{StaticResource TextSubdued}" Visibility="Collapsed"/>
                             </StackPanel>
                         </TabItem.Header>
                         <Grid Margin="0,6,0,0">
@@ -1007,7 +1213,7 @@
             </Border>
 
         <!-- ═══ TASK OUTPUT (4) ═══ -->
-        <Border Grid.Row="0" Grid.Column="2" Background="#222222" CornerRadius="8" Padding="4"
+        <Border Grid.Row="0" Grid.Column="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="MainContentBorder" Color="#2C2C2C"/>
@@ -1033,7 +1239,7 @@
                     </EventTrigger>
                 </Border.Triggers>
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="TASK OUTPUT" Foreground="#DA7756" FontWeight="Bold"
+                    <TextBlock DockPanel.Dock="Top" Text="TASK OUTPUT" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                FontSize="10" FontFamily="Segoe UI" Margin="8,6,0,4"/>
                     <TabControl x:Name="OutputTabs" Style="{StaticResource OutputTabControlStyle}"
                                 SizeChanged="OutputTabs_SizeChanged"/>
@@ -1046,8 +1252,8 @@
         <!-- ═══ SETTINGS (5) ═══ -->
         <!-- Collapsed strip (shown when panel is collapsed) -->
         <Border x:Name="SettingsCollapsedStrip" Grid.Row="0" Grid.Column="4"
-                Background="#222222" CornerRadius="8" Padding="0" Visibility="Collapsed"
-                BorderThickness="1" BorderBrush="#2C2C2C" Width="32">
+                Background="{StaticResource BgSurface}" CornerRadius="8" Padding="0" Visibility="Collapsed"
+                BorderThickness="1" BorderBrush="{StaticResource BgElevated}" Width="32">
             <Button x:Name="ExpandSettingsBtn" Click="ToggleSettingsPanel_Click"
                     ToolTip="Expand Settings" VerticalAlignment="Top" HorizontalAlignment="Center"
                     Margin="0,6,0,0">
@@ -1055,13 +1261,13 @@
                     <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
                         <Setter Property="Content" Value="&#xE76B;"/>
                         <Setter Property="FontSize" Value="12"/>
-                        <Setter Property="Foreground" Value="#DA7756"/>
+                        <Setter Property="Foreground" Value="{StaticResource Accent}"/>
                     </Style>
                 </Button.Style>
             </Button>
         </Border>
         <!-- Expanded settings panel -->
-        <Border x:Name="SettingsExpandedPanel" Grid.Row="0" Grid.Column="4" Background="#222222" CornerRadius="8" Padding="4"
+        <Border x:Name="SettingsExpandedPanel" Grid.Row="0" Grid.Column="4" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
                 BorderThickness="1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="RightPanelBorder" Color="#2C2C2C"/>
@@ -1088,7 +1294,7 @@
                 </Border.Triggers>
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="8,6,4,4">
-                        <TextBlock Text="SETTINGS" Foreground="#DA7756" FontWeight="Bold"
+                        <TextBlock Text="SETTINGS" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                    FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                         <Button Click="ToggleSettingsPanel_Click" ToolTip="Collapse Settings"
                                 HorizontalAlignment="Right">
@@ -1096,28 +1302,29 @@
                                 <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
                                     <Setter Property="Content" Value="&#xE76C;"/>
                                     <Setter Property="FontSize" Value="12"/>
-                                    <Setter Property="Foreground" Value="#666"/>
+                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
                                 </Style>
                             </Button.Style>
                         </Button>
                     </DockPanel>
-                <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0">
+                <TabControl x:Name="MainTabs" Style="{StaticResource OutputTabControlStyle}"
+                            Background="Transparent" BorderThickness="0">
                     <!-- Helper tab -->
                     <TabItem x:Name="HelperTabItem">
                         <TabItem.Header>
-                            <TextBlock Text="Helper" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Helper" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <DockPanel Margin="12">
                             <!-- Top controls -->
                             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                                <TextBlock Text="Project Suggestions" Foreground="#DA7756" FontWeight="Bold"
+                                <TextBlock Text="Project Suggestions" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                            FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,6"/>
                                 <TextBlock Text="Analyze the current project and generate actionable suggestions for improvements."
-                                           Foreground="#888" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
                                            Margin="0,0,0,12"/>
 
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Category" Foreground="#CCC" FontSize="12"
+                                    <TextBlock Text="Category" Foreground="{StaticResource TextLight}" FontSize="12"
                                                FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,10,0"/>
                                     <ComboBox x:Name="HelperCategoryCombo" Width="160"
@@ -1131,21 +1338,21 @@
                                 </DockPanel>
 
                                 <StackPanel Orientation="Horizontal">
-                                    <Button x:Name="GenerateSuggestionsBtn" Content="Add Suggestions"
+                                    <Button x:Name="GenerateSuggestionsBtn" Content="Generate Suggestions"
                                             Click="GenerateSuggestions_Click"
-                                            Background="#DA7756" Style="{StaticResource Btn}"
+                                            Background="{StaticResource Accent}" Style="{StaticResource Btn}"
                                             FontSize="12" Padding="16,8"/>
                                     <Button x:Name="ClearSuggestionsBtn" Content="Clear All"
                                             Click="ClearSuggestions_Click"
                                             Style="{StaticResource GhostBtn}"
                                             FontSize="11" Padding="12,6" Margin="8,0,0,0"/>
                                     <TextBlock x:Name="HelperStatusText" Text=""
-                                               Foreground="#888" FontSize="11" FontFamily="Segoe UI"
+                                               Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"
                                                VerticalAlignment="Center" Margin="12,0,0,0"/>
                                 </StackPanel>
                             </StackPanel>
 
-                            <Border DockPanel.Dock="Top" Height="1" Background="#2C2C2C" Margin="0,0,0,8"/>
+                            <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,8"/>
 
                             <!-- Suggestions list -->
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -1153,7 +1360,7 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border CornerRadius="6" Padding="12,10" Margin="0,3"
-                                                    Background="#1E1E1E" BorderThickness="1" BorderBrush="#2C2C2C">
+                                                    Background="{StaticResource BgSection}" BorderThickness="1" BorderBrush="{StaticResource BgElevated}">
                                                 <Border.ContextMenu>
                                                     <ContextMenu>
                                                         <MenuItem Header="Copy" Tag="{Binding}"
@@ -1165,7 +1372,7 @@
                                                                 Margin="10,0,0,0">
                                                         <Button Content="Run" Tag="{Binding}"
                                                                 Click="RunSuggestion_Click"
-                                                                Background="#DA7756" Style="{StaticResource Btn}"
+                                                                Background="{StaticResource Accent}" Style="{StaticResource Btn}"
                                                                 FontSize="11" Padding="14,5" Margin="0,0,0,4"/>
                                                         <Button Content="Save" Tag="{Binding}"
                                                                 Click="SaveSuggestion_Click"
@@ -1186,7 +1393,7 @@
                                                                     VerticalAlignment="Center">
                                                                 <Border.Style>
                                                                     <Style TargetType="Border">
-                                                                        <Setter Property="Background" Value="#333"/>
+                                                                        <Setter Property="Background" Value="{StaticResource BorderSubtle}"/>
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding Category}" Value="BugFixes">
                                                                                 <Setter Property="Background" Value="#3A2020"/>
@@ -1208,16 +1415,16 @@
                                                                     <TextBlock.Style>
                                                                         <Style TargetType="TextBlock">
                                                                             <Setter Property="Text" Value="{Binding Category}"/>
-                                                                            <Setter Property="Foreground" Value="#999"/>
+                                                                            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
                                                                             <Style.Triggers>
                                                                                 <DataTrigger Binding="{Binding Category}" Value="BugFixes">
-                                                                                    <Setter Property="Foreground" Value="#E05555"/>
+                                                                                    <Setter Property="Foreground" Value="{StaticResource DangerBright}"/>
                                                                                 </DataTrigger>
                                                                                 <DataTrigger Binding="{Binding Category}" Value="NewFeatures">
                                                                                     <Setter Property="Foreground" Value="#4EC969"/>
                                                                                 </DataTrigger>
                                                                                 <DataTrigger Binding="{Binding Category}" Value="Extensions">
-                                                                                    <Setter Property="Foreground" Value="#64B5F6"/>
+                                                                                    <Setter Property="Foreground" Value="{StaticResource PausedBlue}"/>
                                                                                 </DataTrigger>
                                                                                 <DataTrigger Binding="{Binding Category}" Value="Rules">
                                                                                     <Setter Property="Foreground" Value="#D4C44D"/>
@@ -1232,7 +1439,7 @@
                                                                        FontFamily="Segoe UI"
                                                                        TextTrimming="CharacterEllipsis"/>
                                                         </DockPanel>
-                                                        <TextBlock Text="{Binding Description}" Foreground="#999"
+                                                        <TextBlock Text="{Binding Description}" Foreground="{StaticResource TextSecondary}"
                                                                    FontSize="11" FontFamily="Segoe UI"
                                                                    TextWrapping="Wrap"/>
                                                     </StackPanel>
@@ -1248,16 +1455,16 @@
                     <TabItem x:Name="FileLocksTabHeader">
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="File Locks" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                                <TextBlock Text="File Locks" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
                                 <TextBlock x:Name="FileLockBadge" Text="0" Visibility="Collapsed"
-                                           Foreground="#CC8800" FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource WarningOrange}" FontSize="10" FontWeight="Bold"
                                            FontFamily="Segoe UI" Margin="4,0,0,0"
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                         </TabItem.Header>
                         <DockPanel Margin="8">
                             <TextBlock DockPanel.Dock="Top" Text="Active file locks across all tasks"
-                                       Foreground="#666" FontSize="11" FontFamily="Segoe UI"
+                                       Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
                                        Margin="4,6,4,8"/>
                             <!-- Header row -->
                             <Grid DockPanel.Dock="Top" Margin="0,0,0,2">
@@ -1269,27 +1476,27 @@
                                     <ColumnDefinition Width="70"/>
                                     <ColumnDefinition Width="70"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="FILE" Foreground="#666" FontSize="10"
+                                <TextBlock Grid.Column="0" Text="FILE" Foreground="{StaticResource TextMuted}" FontSize="10"
                                            FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="1" Text="STATUS" Foreground="#666" FontSize="10"
+                                <TextBlock Grid.Column="1" Text="STATUS" Foreground="{StaticResource TextMuted}" FontSize="10"
                                            FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="2" Text="TOOL" Foreground="#666" FontSize="10"
+                                <TextBlock Grid.Column="2" Text="TOOL" Foreground="{StaticResource TextMuted}" FontSize="10"
                                            FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="3" Text="PATH" Foreground="#666" FontSize="10"
+                                <TextBlock Grid.Column="3" Text="PATH" Foreground="{StaticResource TextMuted}" FontSize="10"
                                            FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="4" Text="TASK" Foreground="#666" FontSize="10"
+                                <TextBlock Grid.Column="4" Text="TASK" Foreground="{StaticResource TextMuted}" FontSize="10"
                                            FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="5" Text="SINCE" Foreground="#666" FontSize="10"
+                                <TextBlock Grid.Column="5" Text="SINCE" Foreground="{StaticResource TextMuted}" FontSize="10"
                                            FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
                             </Grid>
-                            <Border DockPanel.Dock="Top" Height="1" Background="#2C2C2C" Margin="0,0,0,4"/>
+                            <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,4"/>
                             <!-- Lock rows -->
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <ItemsControl x:Name="FileLocksListView">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border Padding="8,5" Margin="0,1" CornerRadius="4"
-                                                    Background="#1E1E1E">
+                                                    Background="{StaticResource BgSection}">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="160"/>
@@ -1300,7 +1507,7 @@
                                                         <ColumnDefinition Width="70"/>
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Grid.Column="0" Text="{Binding FileName}"
-                                                               Foreground="#CCC" FontSize="11" FontFamily="Consolas"
+                                                               Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Consolas"
                                                                TextTrimming="CharacterEllipsis"
                                                                ToolTip="{Binding OriginalPath}"/>
                                                     <TextBlock Grid.Column="1" Text="{Binding StatusText}"
@@ -1310,21 +1517,21 @@
                                                                 <Setter Property="Foreground" Value="#4EC969"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsIgnored}" Value="True">
-                                                                        <Setter Property="Foreground" Value="#CC8800"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
                                                     </TextBlock>
                                                     <TextBlock Grid.Column="2" Text="{Binding ToolName}"
-                                                               Foreground="#999" FontSize="11" FontFamily="Consolas"/>
+                                                               Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Consolas"/>
                                                     <TextBlock Grid.Column="3" Text="{Binding OriginalPath}"
-                                                               Foreground="#777" FontSize="11" FontFamily="Consolas"
+                                                               Foreground="{StaticResource TextDim}" FontSize="11" FontFamily="Consolas"
                                                                TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
                                                     <TextBlock Grid.Column="4" Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
-                                                               Foreground="#DA7756" FontSize="11" FontFamily="Consolas"/>
+                                                               Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
                                                     <TextBlock Grid.Column="5" Text="{Binding TimeText}"
-                                                               Foreground="#666" FontSize="11" FontFamily="Consolas"/>
+                                                               Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas"/>
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
@@ -1333,33 +1540,40 @@
                             </ScrollViewer>
                         </DockPanel>
                     </TabItem>
+                    <!-- Activity tab -->
+                    <TabItem x:Name="ActivityTabItem">
+                        <TabItem.Header>
+                            <TextBlock Text="Activity" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                        </TabItem.Header>
+                        <ScrollViewer x:Name="ActivityTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
+                    </TabItem>
                     <!-- Advanced tab -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Advanced" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Advanced" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                             <StackPanel MaxWidth="600">
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="System Prompt" Foreground="#DA7756" FontWeight="Bold"
+                                    <TextBlock Text="System Prompt" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                                FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                     <ToggleButton x:Name="EditSystemPromptToggle"
                                                   Style="{StaticResource ToggleSwitch}" Margin="12,0,0,0"
                                                   Checked="EditSystemPromptToggle_Changed"
                                                   Unchecked="EditSystemPromptToggle_Changed">
-                                        <TextBlock Text="Edit" Foreground="#888" FontSize="11" FontFamily="Segoe UI"/>
+                                        <TextBlock Text="Edit" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
                                 </DockPanel>
                                 <TextBox x:Name="SystemPromptBox" AcceptsReturn="True" TextWrapping="Wrap"
                                          MinHeight="160" MaxHeight="300"
                                          VerticalScrollBarVisibility="Auto"
-                                         Background="#191919" Foreground="#CCC"
-                                         CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                          FontSize="12" FontFamily="Consolas" Padding="10"
                                          IsReadOnly="True" Opacity="0.6"/>
                                 <DockPanel Margin="0,6,0,0">
                                     <TextBlock Text="This prompt is prepended to every task. MCP instructions are added automatically when the MCP toggle is enabled."
-                                               Foreground="#555" FontSize="11" FontFamily="Segoe UI"
+                                               Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
                                                VerticalAlignment="Center"/>
                                     <StackPanel x:Name="PromptEditButtons" Orientation="Horizontal"
                                                 HorizontalAlignment="Right" Visibility="Collapsed">
@@ -1372,29 +1586,29 @@
                                     </StackPanel>
                                 </DockPanel>
 
-                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
                                 <!-- Short Description -->
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Short Description" Foreground="#DA7756" FontWeight="Bold"
+                                    <TextBlock Text="Short Description" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                                FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                     <ToggleButton x:Name="EditShortDescToggle"
                                                   Style="{StaticResource ToggleSwitch}" Margin="12,0,0,0"
                                                   Checked="EditShortDescToggle_Changed"
                                                   Unchecked="EditShortDescToggle_Changed">
-                                        <TextBlock Text="Edit" Foreground="#888" FontSize="11" FontFamily="Segoe UI"/>
+                                        <TextBlock Text="Edit" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
                                 </DockPanel>
                                 <TextBox x:Name="ShortDescBox" AcceptsReturn="True" TextWrapping="Wrap"
                                          MinHeight="60" MaxHeight="160"
                                          VerticalScrollBarVisibility="Auto"
-                                         Background="#191919" Foreground="#CCC"
-                                         CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                          FontSize="12" FontFamily="Consolas" Padding="10"
                                          IsReadOnly="True" Opacity="0.6"/>
                                 <DockPanel Margin="0,6,0,0">
                                     <TextBlock Text="A brief summary of the active project, sent with each task."
-                                               Foreground="#555" FontSize="11" FontFamily="Segoe UI"
+                                               Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
                                                VerticalAlignment="Center"/>
                                     <StackPanel x:Name="ShortDescEditButtons" Orientation="Horizontal"
                                                 HorizontalAlignment="Right" Visibility="Collapsed">
@@ -1404,29 +1618,29 @@
                                     </StackPanel>
                                 </DockPanel>
 
-                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
                                 <!-- Long Description -->
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Long Description" Foreground="#DA7756" FontWeight="Bold"
+                                    <TextBlock Text="Long Description" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                                FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                     <ToggleButton x:Name="EditLongDescToggle"
                                                   Style="{StaticResource ToggleSwitch}" Margin="12,0,0,0"
                                                   Checked="EditLongDescToggle_Changed"
                                                   Unchecked="EditLongDescToggle_Changed">
-                                        <TextBlock Text="Edit" Foreground="#888" FontSize="11" FontFamily="Segoe UI"/>
+                                        <TextBlock Text="Edit" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
                                 </DockPanel>
                                 <TextBox x:Name="LongDescBox" AcceptsReturn="True" TextWrapping="Wrap"
                                          MinHeight="120" MaxHeight="300"
                                          VerticalScrollBarVisibility="Auto"
-                                         Background="#191919" Foreground="#CCC"
-                                         CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                          FontSize="12" FontFamily="Consolas" Padding="10"
                                          IsReadOnly="True" Opacity="0.6"/>
                                 <DockPanel Margin="0,6,0,0">
                                     <TextBlock Text="Detailed project description used when Extended Planning is enabled."
-                                               Foreground="#555" FontSize="11" FontFamily="Segoe UI"
+                                               Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
                                                VerticalAlignment="Center"/>
                                     <StackPanel x:Name="LongDescEditButtons" Orientation="Horizontal"
                                                 HorizontalAlignment="Right" Visibility="Collapsed">
@@ -1438,33 +1652,33 @@
 
                                 <Button x:Name="RegenerateDescBtn" Content="Regenerate Descriptions"
                                         Click="RegenerateDescriptions_Click"
-                                        Background="#DA7756" Style="{StaticResource Btn}"
+                                        Background="{StaticResource Accent}" Style="{StaticResource Btn}"
                                         FontSize="12" Padding="16,8" Margin="0,16,0,0"
                                         HorizontalAlignment="Left"/>
 
-                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
                                 <!-- Rule Instruction -->
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Rule Instruction" Foreground="#DA7756" FontWeight="Bold"
+                                    <TextBlock Text="Rule Instruction" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                                FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                     <ToggleButton x:Name="EditRuleInstructionToggle"
                                                   Style="{StaticResource ToggleSwitch}" Margin="12,0,0,0"
                                                   Checked="EditRuleInstructionToggle_Changed"
                                                   Unchecked="EditRuleInstructionToggle_Changed">
-                                        <TextBlock Text="Edit" Foreground="#888" FontSize="11" FontFamily="Segoe UI"/>
+                                        <TextBlock Text="Edit" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
                                 </DockPanel>
                                 <TextBox x:Name="RuleInstructionBox" AcceptsReturn="True" TextWrapping="Wrap"
                                          MinHeight="60" MaxHeight="160"
                                          VerticalScrollBarVisibility="Auto"
-                                         Background="#191919" Foreground="#CCC"
-                                         CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                          FontSize="12" FontFamily="Consolas" Padding="10"
                                          IsReadOnly="True" Opacity="0.6"/>
                                 <DockPanel Margin="0,6,0,0">
                                     <TextBlock Text="Project-specific rules passed with every prompt."
-                                               Foreground="#555" FontSize="11" FontFamily="Segoe UI"
+                                               Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
                                                VerticalAlignment="Center"/>
                                     <StackPanel x:Name="RuleInstructionEditButtons" Orientation="Horizontal"
                                                 HorizontalAlignment="Right" Visibility="Collapsed">
@@ -1475,20 +1689,20 @@
                                 </DockPanel>
 
                                 <!-- Project Rules List -->
-                                <TextBlock Text="Project Rules" Foreground="#CCC" FontWeight="SemiBold"
+                                <TextBlock Text="Project Rules" Foreground="{StaticResource TextLight}" FontWeight="SemiBold"
                                            FontSize="12" FontFamily="Segoe UI" Margin="0,16,0,6"/>
                                 <ItemsControl x:Name="ProjectRulesList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border CornerRadius="4" Padding="8,5" Margin="0,2"
-                                                    Background="#1E1E1E" BorderThickness="1" BorderBrush="#2C2C2C">
+                                                    Background="{StaticResource BgSection}" BorderThickness="1" BorderBrush="{StaticResource BgElevated}">
                                                 <DockPanel>
                                                     <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
-                                                            FontSize="9" Foreground="#888" Background="Transparent"
+                                                            FontSize="9" Foreground="{StaticResource TextSubdued}" Background="Transparent"
                                                             BorderThickness="0" Cursor="Hand" Padding="4,2"
                                                             DockPanel.Dock="Right" VerticalAlignment="Center"
                                                             Tag="{Binding}" Click="RemoveProjectRule_Click"/>
-                                                    <TextBlock Text="{Binding}" Foreground="#CCC" FontSize="11"
+                                                    <TextBlock Text="{Binding}" Foreground="{StaticResource TextLight}" FontSize="11"
                                                                FontFamily="Segoe UI" TextWrapping="Wrap"
                                                                VerticalAlignment="Center"/>
                                                 </DockPanel>
@@ -1499,31 +1713,48 @@
                                 <DockPanel Margin="0,8,0,0">
                                     <Button Content="Add" Click="AddProjectRule_Click"
                                             Style="{StaticResource Btn}" DockPanel.Dock="Right"
-                                            Background="#DA7756" Padding="14,6" FontSize="11" Margin="6,0,0,0"/>
+                                            Background="{StaticResource Accent}" Padding="14,6" FontSize="11" Margin="6,0,0,0"/>
                                     <TextBox x:Name="NewRuleInput"
-                                             Background="#191919" Foreground="#CCC"
-                                             CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                              FontSize="12" FontFamily="Segoe UI" Padding="8,6"
                                              KeyDown="NewRuleInput_KeyDown"/>
                                 </DockPanel>
 
-                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
-                                <TextBlock Text="Defaults" Foreground="#DA7756" FontWeight="Bold"
+                                <!-- Project Type -->
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Project Type" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                               FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </DockPanel>
+                                <ToggleButton x:Name="ProjectTypeGameToggle"
+                                              Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
+                                              Checked="ProjectTypeGameToggle_Changed"
+                                              Unchecked="ProjectTypeGameToggle_Changed">
+                                    <TextBlock Text="Game project" Foreground="{StaticResource TextLight}"
+                                               FontSize="12" FontFamily="Segoe UI"/>
+                                </ToggleButton>
+                                <TextBlock Text="When enabled, game creation rules are automatically included with every task."
+                                           Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,4"/>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
+
+                                <TextBlock Text="Defaults" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                            FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,12"/>
                                 <ToggleButton x:Name="DefaultNoGitWriteToggle" IsChecked="True"
                                               Style="{StaticResource ToggleSwitch}" Margin="0,0,0,14">
-                                    <TextBlock Text="No Git Write by default" Foreground="#CCC"
+                                    <TextBlock Text="No Git Write by default" Foreground="{StaticResource TextLight}"
                                                FontSize="12" FontFamily="Segoe UI"/>
                                 </ToggleButton>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                    <TextBlock Text="Max concurrent tasks" Foreground="#CCC"
+                                    <TextBlock Text="Max concurrent tasks" Foreground="{StaticResource TextLight}"
                                                FontSize="12" FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,12,0"/>
                                     <TextBox x:Name="MaxConcurrentTasksBox" Width="60" Text="10"
-                                             Background="#191919" Foreground="#CCC"
-                                             CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                              FontSize="12" FontFamily="Segoe UI" Padding="6,4"
                                              TextAlignment="Center"
                                              LostFocus="MaxConcurrentTasks_Changed"
@@ -1531,7 +1762,7 @@
                                 </StackPanel>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                    <TextBlock Text="History retention" Foreground="#CCC"
+                                    <TextBlock Text="History retention" Foreground="{StaticResource TextLight}"
                                                FontSize="12" FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,12,0"/>
                                     <ComboBox x:Name="HistoryRetentionCombo" Width="120"
@@ -1544,20 +1775,25 @@
                                     </ComboBox>
                                 </StackPanel>
 
-                                <Border Height="1" Background="#2C2C2C" Margin="0,10,0,10"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
 
-                                <TextBlock Text="Diagnostics" Foreground="#DA7756" FontWeight="Bold"
+                                <TextBlock Text="Diagnostics" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                            FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
                                 <Button x:Name="ViewLogsBtn" Content="View Application Log"
                                         Click="ViewLogs_Click"
                                         Style="{StaticResource SecondaryBtn}"
                                         HorizontalAlignment="Left"
                                         Padding="14,7" FontSize="12"/>
+                                <Button Content="View Activity Dashboard"
+                                        Click="ViewActivity_Click"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        HorizontalAlignment="Left"
+                                        Padding="14,7" FontSize="12" Margin="0,8,0,0"/>
 
-                                <Border Height="1" Background="#2C2C2C" Margin="0,10,0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,20"/>
 
-                                <TextBlock Text="About" Foreground="#666" FontSize="11" FontFamily="Segoe UI"/>
-                                <TextBlock Text="Agentic Engine - Claude Code Task Manager" Foreground="#555"
+                                <TextBlock Text="About" Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"/>
+                                <TextBlock Text="Agentic Engine - Claude Code Task Manager" Foreground="{StaticResource TextDisabled}"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,4,0,0"/>
                             </StackPanel>
                         </ScrollViewer>
@@ -1565,67 +1801,104 @@
                     <!-- Gemini tab -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Gemini" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Gemini" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                             <StackPanel MaxWidth="600">
-                                <TextBlock Text="Gemini Image Generation" Foreground="#4EA8DB" FontWeight="Bold"
+                                <TextBlock Text="Gemini Image Generation" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                            FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
                                 <TextBlock Text="Configure Google Gemini API for AI image generation. When Gemini is selected as the model, prompts generate images instead of code."
-                                           Foreground="#888" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
                                            Margin="0,0,0,16"/>
 
-                                <TextBlock Text="API Key" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"
+                                <TextBlock Text="API Key" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
                                 <DockPanel Margin="0,0,0,4">
                                     <Button x:Name="SaveGeminiKeyBtn" Content="Save" Click="SaveGeminiKey_Click"
                                             Style="{StaticResource Btn}" DockPanel.Dock="Right"
-                                            Background="#4EA8DB" Padding="14,6" FontSize="11" Margin="6,0,0,0"/>
+                                            Background="{StaticResource Accent}" Padding="14,6" FontSize="11" Margin="6,0,0,0"/>
                                     <TextBox x:Name="GeminiApiKeyBox"
-                                             Background="#191919" Foreground="#CCC"
-                                             CaretBrush="#CCC" BorderBrush="#333" BorderThickness="1"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                              FontSize="12" FontFamily="Consolas" Padding="8,6"/>
                                 </DockPanel>
-                                <TextBlock x:Name="GeminiKeyStatus" Text="" Foreground="#5CB85C" FontSize="11"
+                                <TextBlock x:Name="GeminiKeyStatus" Text="" Foreground="{StaticResource Success}" FontSize="11"
                                            FontFamily="Segoe UI" Margin="0,4,0,0"/>
-                                <TextBlock Foreground="#555" FontSize="11" FontFamily="Segoe UI" Margin="0,8,0,0"
+                                <TextBlock Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI" Margin="0,8,0,0"
                                            TextWrapping="Wrap">
-                                    Get a free API key from Google AI Studio:
-                                    <TextBlock.ToolTip>https://aistudio.google.com/apikey</TextBlock.ToolTip>
+                                    Get a free API key from Google AI:
+                                    <TextBlock.ToolTip>https://ai.google.dev/gemini-api/docs/api-key</TextBlock.ToolTip>
                                 </TextBlock>
-                                <TextBlock Text="https://aistudio.google.com/apikey" Foreground="#4EA8DB"
+                                <TextBlock Text="https://ai.google.dev/gemini-api/docs/api-key" Foreground="{StaticResource Accent}"
                                            FontSize="11" FontFamily="Consolas" Margin="0,2,0,0"
                                            Cursor="Hand" MouseDown="GeminiApiLink_Click"
                                            TextDecorations="Underline"/>
 
-                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
-                                <TextBlock Text="Model" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"
+                                <TextBlock Text="Model" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
                                 <ComboBox x:Name="GeminiModelCombo"
                                           FontSize="11" Padding="6,3" MinWidth="280"
                                           HorizontalAlignment="Left" Margin="0,0,0,4"
                                           SelectionChanged="GeminiModelCombo_Changed"/>
                                 <TextBlock Text="Supports native image generation with text prompts. Images are saved to AppData."
-                                           Foreground="#666" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"/>
+                                           Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"/>
 
-                                <Border Height="1" Background="#2C2C2C" Margin="0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
-                                <TextBlock Text="Image Storage" Foreground="#CCC" FontSize="12" FontFamily="Segoe UI"
+                                <TextBlock Text="Image Storage" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
-                                <TextBlock Text="%LOCALAPPDATA%\AgenticEngine\gemini_images\" Foreground="#888"
+                                <TextBlock Text="%LOCALAPPDATA%\AgenticEngine\gemini_images\" Foreground="{StaticResource TextSubdued}"
                                            FontSize="11" FontFamily="Consolas" Margin="0,0,0,6"/>
                                 <Button x:Name="OpenGeminiImagesBtn" Content="Open Images Folder"
                                         Click="OpenGeminiImages_Click"
-                                        Style="{StaticResource GhostBtn}" Foreground="#4EA8DB"
+                                        Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
                                         FontSize="11" HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <!-- Claude tab -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <TextBlock Text="Claude" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                            <StackPanel MaxWidth="600">
+                                <TextBlock Text="Claude Chat API" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <TextBlock Text="Configure an Anthropic API key to use Claude models in the Chat panel."
+                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Margin="0,0,0,16"/>
+
+                                <TextBlock Text="API Key" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
+                                           Margin="0,0,0,6"/>
+                                <DockPanel Margin="0,0,0,4">
+                                    <Button x:Name="SaveClaudeKeyBtn" Content="Save" Click="SaveClaudeKey_Click"
+                                            Style="{StaticResource Btn}" DockPanel.Dock="Right"
+                                            Background="{StaticResource Accent}" Padding="14,6" FontSize="11" Margin="6,0,0,0"/>
+                                    <TextBox x:Name="ClaudeApiKeyBox"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="12" FontFamily="Consolas" Padding="8,6"/>
+                                </DockPanel>
+                                <TextBlock x:Name="ClaudeKeyStatus" Text="" Foreground="{StaticResource Success}" FontSize="11"
+                                           FontFamily="Segoe UI" Margin="0,4,0,0"/>
+                                <TextBlock Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI" Margin="0,8,0,0"
+                                           TextWrapping="Wrap">
+                                    Get an API key from Anthropic:
+                                </TextBlock>
+                                <TextBlock Text="https://console.anthropic.com/settings/keys" Foreground="{StaticResource Accent}"
+                                           FontSize="11" FontFamily="Consolas" Margin="0,2,0,0"
+                                           Cursor="Hand" MouseDown="ClaudeApiLink_Click"
+                                           TextDecorations="Underline"/>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
                     <!-- Games tab -->
                     <TabItem x:Name="GamesTabItem">
                         <TabItem.Header>
-                            <TextBlock Text="Games" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Games" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <Grid>
                             <!-- Game selector (shown when no game is active) -->
@@ -1644,7 +1917,7 @@
         <GridSplitter x:Name="TerminalSplitter" Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="3" Style="{StaticResource HorizontalSplitter}" Visibility="Collapsed"/>
 
         <!-- ═══ TERMINAL (6) ═══ -->
-        <Border Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Background="#222222" CornerRadius="8" Padding="4"
+        <Border Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
                 BorderThickness="1">
             <Border.BorderBrush>
                 <SolidColorBrush x:Name="TerminalPanelBorder" Color="#2C2C2C"/>
@@ -1671,10 +1944,10 @@
             </Border.Triggers>
             <DockPanel>
                 <!-- Root path display (very bottom) -->
-                <Border x:Name="TerminalRootBar" DockPanel.Dock="Bottom" Background="#181818" CornerRadius="0,0,6,6" Visibility="Collapsed"
+                <Border x:Name="TerminalRootBar" DockPanel.Dock="Bottom" Background="{StaticResource BgDarkTerminal}" CornerRadius="0,0,6,6" Visibility="Collapsed"
                         Padding="8,3" Margin="0,2,0,0">
                     <TextBlock x:Name="TerminalRootPath"
-                               Foreground="#666666" FontFamily="Consolas" FontSize="10"
+                               Foreground="{StaticResource TextMuted}" FontFamily="Consolas" FontSize="10"
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                 </Border>
@@ -1690,8 +1963,8 @@
                             Padding="14,4" Margin="4,0,0,0"
                             Click="TerminalSend_Click"/>
                     <TextBox x:Name="TerminalInput"
-                             Background="#141414" Foreground="#B0B0B0" CaretBrush="#B0B0B0"
-                             BorderBrush="#2A2A2A" BorderThickness="1"
+                             Background="{StaticResource BgTerminalInput}" Foreground="{StaticResource TextBody}" CaretBrush="{StaticResource TextBody}"
+                             BorderBrush="{StaticResource BgCard}" BorderThickness="1"
                              FontFamily="Consolas" FontSize="12"
                              Padding="8,4" VerticalContentAlignment="Center"
                              PreviewKeyDown="TerminalInput_PreviewKeyDown"/>
@@ -1701,21 +1974,21 @@
                             Style="{StaticResource IconBtn}" DockPanel.Dock="Left"
                             VerticalAlignment="Center" Margin="0,0,4,0"
                             Click="TerminalCollapse_Click" ToolTip="Expand terminal"/>
-                    <TextBlock Text="TERMINAL" Foreground="#DA7756" FontWeight="Bold"
+                    <TextBlock Text="TERMINAL" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"
                                Margin="0,0,8,0" MouseLeftButtonDown="TerminalHeader_MouseDown" Cursor="Hand"/>
                     <StackPanel x:Name="TerminalTabBar" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed"/>
                 </DockPanel>
                 <TextBox x:Name="TerminalOutput" IsReadOnly="True" TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
-                         Background="#0A0A0A" Foreground="#B0B0B0"
+                         Background="{StaticResource BgAbyss}" Foreground="{StaticResource TextBody}"
                          FontFamily="Consolas" FontSize="12"
                          BorderThickness="0" Padding="8,4" Visibility="Collapsed"/>
             </DockPanel>
         </Border>
 
         <!-- ═══ STATUS BAR ═══ -->
-        <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="5" Background="#222222" CornerRadius="6" Padding="12,7" Margin="0,8,0,0"
+        <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="5" Background="{StaticResource BgSurface}" CornerRadius="6" Padding="12,7" Margin="0,8,0,0"
                 BorderThickness="1">
             <Border.BorderBrush>
                 <SolidColorBrush x:Name="StatusBarBorder" Color="#2C2C2C"/>
@@ -1740,15 +2013,15 @@
                     </BeginStoryboard>
                 </EventTrigger>
             </Border.Triggers>
-            <TextBlock x:Name="StatusText" Foreground="#999" FontSize="11" FontFamily="Segoe UI"
+            <TextBlock x:Name="StatusText" Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Segoe UI"
                        TextTrimming="CharacterEllipsis"/>
         </Border>
 
         <!-- Loading overlay shown during async startup -->
         <Border x:Name="LoadingOverlay" Grid.RowSpan="6" Grid.ColumnSpan="5"
-                Background="#CC191919" CornerRadius="8"
+                Background="{StaticResource BgOverlay}" CornerRadius="8"
                 Visibility="Visible" Panel.ZIndex="1000">
-            <TextBlock Text="Loading..." Foreground="#888"
+            <TextBlock Text="Loading..." Foreground="{StaticResource TextSubdued}"
                        FontSize="16" FontFamily="Segoe UI"
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>

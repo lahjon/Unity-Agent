@@ -12,6 +12,7 @@ namespace AgenticEngine.Dialogs
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
         public bool InitGit { get; set; }
+        public bool IsGame { get; set; }
     }
 
     public static class CreateProjectDialog
@@ -25,7 +26,7 @@ namespace AgenticEngine.Dialogs
             {
                 Title = "Create Project",
                 Width = 440,
-                Height = 295,
+                Height = 390,
                 WindowStartupLocation = owner != null
                     ? WindowStartupLocation.CenterOwner
                     : WindowStartupLocation.CenterScreen,
@@ -39,8 +40,8 @@ namespace AgenticEngine.Dialogs
 
             var outerBorder = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x22, 0x22, 0x22)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                Background = (Brush)Application.Current.FindResource("BgSurface"),
+                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12)
             };
@@ -53,18 +54,118 @@ namespace AgenticEngine.Dialogs
             stack.Children.Add(new TextBlock
             {
                 Text = "Create Project",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                Foreground = (Brush)Application.Current.FindResource("Accent"),
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 FontFamily = new FontFamily("Segoe UI"),
                 Margin = new Thickness(0, 0, 0, 12)
             });
 
+            // Project type selector
+            bool isGame = false;
+            var typeGrid = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+            typeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            typeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
+            typeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var accentBrush = (Brush)Application.Current.FindResource("Accent");
+            var subtleBrush = (Brush)Application.Current.FindResource("BorderSubtle");
+            var surfaceBrush = (Brush)Application.Current.FindResource("BgElevated");
+
+            var appBorder = new Border
+            {
+                Background = surfaceBrush,
+                BorderBrush = accentBrush,
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(8),
+                Cursor = Cursors.Hand,
+                Padding = new Thickness(0, 12, 0, 12)
+            };
+            var appStack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+            appStack.Children.Add(new TextBlock
+            {
+                Text = "\uE770",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 28,
+                Foreground = accentBrush,
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+            appStack.Children.Add(new TextBlock
+            {
+                Text = "App",
+                Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new FontFamily("Segoe UI"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 6, 0, 0)
+            });
+            appBorder.Child = appStack;
+            Grid.SetColumn(appBorder, 0);
+
+            var gameBorder = new Border
+            {
+                Background = surfaceBrush,
+                BorderBrush = subtleBrush,
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(8),
+                Cursor = Cursors.Hand,
+                Padding = new Thickness(0, 12, 0, 12)
+            };
+            var gameStack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+            gameStack.Children.Add(new TextBlock
+            {
+                Text = "\uE7FC",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 28,
+                Foreground = (Brush)Application.Current.FindResource("TextDim"),
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+            gameStack.Children.Add(new TextBlock
+            {
+                Text = "Game",
+                Foreground = (Brush)Application.Current.FindResource("TextDim"),
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new FontFamily("Segoe UI"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 6, 0, 0)
+            });
+            gameBorder.Child = gameStack;
+            Grid.SetColumn(gameBorder, 2);
+
+            void SelectType(bool game)
+            {
+                isGame = game;
+                appBorder.BorderBrush = game ? subtleBrush : accentBrush;
+                ((TextBlock)appStack.Children[0]).Foreground = game
+                    ? (Brush)Application.Current.FindResource("TextDim")
+                    : accentBrush;
+                ((TextBlock)appStack.Children[1]).Foreground = game
+                    ? (Brush)Application.Current.FindResource("TextDim")
+                    : (Brush)Application.Current.FindResource("TextPrimary");
+
+                gameBorder.BorderBrush = game ? accentBrush : subtleBrush;
+                ((TextBlock)gameStack.Children[0]).Foreground = game
+                    ? accentBrush
+                    : (Brush)Application.Current.FindResource("TextDim");
+                ((TextBlock)gameStack.Children[1]).Foreground = game
+                    ? (Brush)Application.Current.FindResource("TextPrimary")
+                    : (Brush)Application.Current.FindResource("TextDim");
+            }
+
+            appBorder.MouseLeftButtonDown += (_, _) => SelectType(false);
+            gameBorder.MouseLeftButtonDown += (_, _) => SelectType(true);
+
+            typeGrid.Children.Add(appBorder);
+            typeGrid.Children.Add(gameBorder);
+            stack.Children.Add(typeGrid);
+
             // Name field
             stack.Children.Add(new TextBlock
             {
                 Text = "Project Name",
-                Foreground = new SolidColorBrush(Color.FromRgb(0x99, 0x99, 0x99)),
+                Foreground = (Brush)Application.Current.FindResource("TextSecondary"),
                 FontSize = 11,
                 FontFamily = new FontFamily("Segoe UI"),
                 Margin = new Thickness(0, 0, 0, 4)
@@ -75,9 +176,9 @@ namespace AgenticEngine.Dialogs
                 FontSize = 13,
                 FontFamily = new FontFamily("Segoe UI"),
                 Padding = new Thickness(8, 6, 8, 6),
-                Background = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
-                CaretBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8))
+                Background = (Brush)Application.Current.FindResource("BgElevated"),
+                Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
+                CaretBrush = (Brush)Application.Current.FindResource("TextPrimary")
             };
             stack.Children.Add(nameBox);
 
@@ -85,7 +186,7 @@ namespace AgenticEngine.Dialogs
             stack.Children.Add(new TextBlock
             {
                 Text = "Location",
-                Foreground = new SolidColorBrush(Color.FromRgb(0x99, 0x99, 0x99)),
+                Foreground = (Brush)Application.Current.FindResource("TextSecondary"),
                 FontSize = 11,
                 FontFamily = new FontFamily("Segoe UI"),
                 Margin = new Thickness(0, 10, 0, 4)
@@ -100,9 +201,9 @@ namespace AgenticEngine.Dialogs
                 FontSize = 13,
                 FontFamily = new FontFamily("Segoe UI"),
                 Padding = new Thickness(8, 6, 8, 6),
-                Background = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
-                CaretBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8))
+                Background = (Brush)Application.Current.FindResource("BgElevated"),
+                Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
+                CaretBrush = (Brush)Application.Current.FindResource("TextPrimary")
             };
             Grid.SetColumn(pathBox, 0);
             pathGrid.Children.Add(pathBox);
@@ -134,7 +235,7 @@ namespace AgenticEngine.Dialogs
             var gitToggle = new ToggleButton
             {
                 Content = "Initialize Git Repository",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                Foreground = (Brush)Application.Current.FindResource("TextLight"),
                 FontSize = 13,
                 FontFamily = new FontFamily("Segoe UI"),
                 IsChecked = true,
@@ -146,7 +247,7 @@ namespace AgenticEngine.Dialogs
             // Full path preview
             var fullPathBlock = new TextBlock
             {
-                Foreground = new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77)),
+                Foreground = (Brush)Application.Current.FindResource("TextDim"),
                 FontSize = 11,
                 FontFamily = new FontFamily("Segoe UI"),
                 TextWrapping = TextWrapping.NoWrap,
@@ -179,7 +280,7 @@ namespace AgenticEngine.Dialogs
             // Error label
             var errorBlock = new TextBlock
             {
-                Foreground = new SolidColorBrush(Color.FromRgb(0xA1, 0x52, 0x52)),
+                Foreground = (Brush)Application.Current.FindResource("Danger"),
                 FontSize = 11,
                 FontFamily = new FontFamily("Segoe UI"),
                 TextWrapping = TextWrapping.Wrap,
@@ -209,7 +310,7 @@ namespace AgenticEngine.Dialogs
             var createBtn = new Button
             {
                 Content = "Create",
-                Background = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                Background = (Brush)Application.Current.FindResource("Accent"),
                 Padding = new Thickness(18, 8, 18, 8),
                 Style = Application.Current.TryFindResource("Btn") as Style
             };
@@ -251,7 +352,8 @@ namespace AgenticEngine.Dialogs
                 {
                     Name = name,
                     Path = System.IO.Path.Combine(path, name),
-                    InitGit = gitToggle.IsChecked == true
+                    InitGit = gitToggle.IsChecked == true,
+                    IsGame = isGame
                 };
                 dlg.Close();
             };

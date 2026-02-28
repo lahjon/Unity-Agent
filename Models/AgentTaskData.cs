@@ -9,7 +9,7 @@ namespace AgenticEngine
     /// </summary>
     public class AgentTaskData
     {
-        public string Id { get; init; } = Guid.NewGuid().ToString("N")[..8];
+        public string Id { get; init; } = Guid.NewGuid().ToString("N")[..16];
         public int TaskNumber { get; set; }
         public string Description { get; set; } = "";
         public DateTime StartTime { get; set; } = DateTime.Now;
@@ -23,6 +23,7 @@ namespace AgenticEngine
         public bool ExtendedPlanning { get; set; }
         public bool NoGitWrite { get; set; }
         public bool PlanOnly { get; set; }
+        public bool UseMessageBus { get; set; }
         public string? StoredPrompt { get; set; }
         public string? ConversationId { get; set; }
         public string? FullOutput { get; set; }
@@ -31,11 +32,15 @@ namespace AgenticEngine
         public int CurrentIteration { get; set; }
         public string ProjectPath { get; set; } = "";
         public string ProjectColor { get; set; } = "#666666";
+        public string ProjectDisplayName { get; set; } = "";
         public List<string> ImagePaths { get; set; } = new();
         public List<string> GeneratedImagePaths { get; set; } = new();
         public string CompletionSummary { get; set; } = "";
+        public string Recommendations { get; set; } = "";
         public string Summary { get; set; } = "";
+        public string? DependencyContext { get; set; }
         public AgentTaskStatus Status { get; set; } = AgentTaskStatus.Running;
         public DateTime? EndTime { get; set; }
+        public string? GitStartHash { get; set; }
     }
 }

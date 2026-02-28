@@ -64,7 +64,7 @@ namespace AgenticEngine.Managers
             _getActiveTaskDescriptions = getDescriptions;
         }
 
-        public void SwitchProject(string projectPath)
+        public async Task SwitchProjectAsync(string projectPath)
         {
             if (string.Equals(_currentProjectPath, projectPath, StringComparison.OrdinalIgnoreCase))
                 return;
@@ -80,11 +80,11 @@ namespace AgenticEngine.Managers
             if (IsGenerating)
                 CancelGeneration();
 
-            // Load new project's suggestions
+            // Load new project's suggestions off the UI thread
             _ignoredTitles.Clear();
-            LoadIgnoredTitles();
+            await LoadIgnoredTitlesAsync();
             Suggestions.Clear();
-            LoadSuggestions();
+            await LoadSuggestionsAsync();
         }
 
         private string GetSuggestionsFilePath(string projectPath)
@@ -140,12 +140,12 @@ namespace AgenticEngine.Managers
                     "STEP 2 — SUGGEST:\n" +
                     $"Focus on: {categoryFilter}\n\n" +
                     "Generate 5-8 actionable suggestions. For each suggestion, provide:\n" +
-                    "- A short title (5-10 words)\n" +
-                    "- A detailed description (2-4 sentences) that explains what to do and why\n\n" +
+                    "- A short title starting with an action verb (e.g. \"Add\", \"Refactor\", \"Fix\", \"Implement\")\n" +
+                    "- A detailed description (2-4 sentences) written as implementation instructions: specify which files to change, what code to write, and the expected outcome. Do NOT write analytical observations — write step-by-step instructions an engineer can execute immediately.\n\n" +
                     "STEP 3 — OUTPUT:\n" +
                     "Output ONLY a JSON array with objects having \"title\" and \"description\" fields.\n" +
                     "Example:\n" +
-                    "[{\"title\": \"Add input validation\", \"description\": \"The login form accepts any input...\"}]\n\n" +
+                    "[{\"title\": \"Add email validation to login form\", \"description\": \"In LoginForm.cs, add a regex check on the email field in the Submit handler. Return an error message if the format is invalid. Add a unit test in LoginFormTests.cs to verify both valid and invalid emails.\"}]\n\n" +
                     "Output ONLY the JSON array, no other text, no markdown code blocks.";
 
                 var psi = new ProcessStartInfo
@@ -301,8 +301,13 @@ namespace AgenticEngine.Managers
                     Category = s.Category.ToString()
                 }).ToList();
 
-                File.WriteAllText(_suggestionsFile,
-                    JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true }));
+                var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
+                var path = _suggestionsFile;
+                Task.Run(() =>
+                {
+                    try { File.WriteAllText(path, json); }
+                    catch (Exception ex) { AppLogger.Warn("HelperManager", "Background save suggestions failed", ex); }
+                });
             }
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to save suggestions", ex); }
         }
@@ -334,12 +339,44 @@ namespace AgenticEngine.Managers
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to load suggestions", ex); }
         }
 
+        internal async Task LoadSuggestionsAsync()
+        {
+            try
+            {
+                if (!File.Exists(_suggestionsFile)) return;
+                var json = await Task.Run(() => File.ReadAllText(_suggestionsFile));
+                var entries = JsonSerializer.Deserialize<List<SuggestionJson>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (entries == null) return;
+
+                foreach (var entry in entries)
+                {
+                    var cat = Enum.TryParse<SuggestionCategory>(entry.Category, out var c)
+                        ? c : SuggestionCategory.General;
+                    Suggestions.Add(new Suggestion
+                    {
+                        Title = entry.Title ?? "",
+                        Description = entry.Description ?? "",
+                        Category = cat
+                    });
+                }
+
+                FilterSuggestionsAgainstActiveTasks();
+            }
+            catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to load suggestions async", ex); }
+        }
+
         private void SaveIgnoredTitles()
         {
             try
             {
-                File.WriteAllText(_ignoredFile,
-                    JsonSerializer.Serialize(_ignoredTitles.ToList(), new JsonSerializerOptions { WriteIndented = true }));
+                var json = JsonSerializer.Serialize(_ignoredTitles.ToList(), new JsonSerializerOptions { WriteIndented = true });
+                var path = _ignoredFile;
+                Task.Run(() =>
+                {
+                    try { File.WriteAllText(path, json); }
+                    catch (Exception ex) { AppLogger.Warn("HelperManager", "Background save ignored titles failed", ex); }
+                });
             }
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to save ignored titles", ex); }
         }
@@ -355,6 +392,20 @@ namespace AgenticEngine.Managers
                     _ignoredTitles.Add(t);
             }
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to load ignored titles", ex); }
+        }
+
+        internal async Task LoadIgnoredTitlesAsync()
+        {
+            try
+            {
+                if (!File.Exists(_ignoredFile)) return;
+                var json = await Task.Run(() => File.ReadAllText(_ignoredFile));
+                var titles = JsonSerializer.Deserialize<List<string>>(json);
+                if (titles == null) return;
+                foreach (var t in titles)
+                    _ignoredTitles.Add(t);
+            }
+            catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to load ignored titles async", ex); }
         }
 
         private static string StripAnsi(string text)

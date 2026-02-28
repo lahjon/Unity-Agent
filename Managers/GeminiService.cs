@@ -32,7 +32,8 @@ namespace AgenticEngine.Managers
         private string? _apiKey;
         private string _selectedModel = DefaultModel;
 
-        public bool IsConfigured => !string.IsNullOrEmpty(_apiKey);
+        public bool IsConfigured => !string.IsNullOrEmpty(_apiKey) && IsValidApiKeyFormat(_apiKey);
+        public bool ApiKeyDecryptionFailed { get; private set; }
         public string SelectedModel
         {
             get => _selectedModel;
@@ -80,7 +81,11 @@ namespace AgenticEngine.Managers
 
         public void SaveApiKey(string apiKey)
         {
+            if (!IsValidApiKeyFormat(apiKey))
+                throw new ArgumentException(
+                    "Invalid API key format. Google API keys should be 39 characters long and start with 'AIza'.");
             _apiKey = apiKey;
+            ApiKeyDecryptionFailed = false;
             SaveConfig();
         }
 
@@ -92,8 +97,8 @@ namespace AgenticEngine.Managers
                 if (!string.IsNullOrEmpty(_apiKey))
                     config["encryptedApiKey"] = EncryptString(_apiKey);
                 config["model"] = _selectedModel;
-                File.WriteAllText(_configFile,
-                    JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+                SafeFileWriter.WriteInBackground(_configFile, json, "GeminiService");
             }
             catch (Exception ex) { AppLogger.Warn("GeminiService", "Failed to save config", ex); }
         }
@@ -105,6 +110,16 @@ namespace AgenticEngine.Managers
             return _apiKey[..4] + new string('*', _apiKey.Length - 8) + _apiKey[^4..];
         }
 
+        /// <summary>
+        /// Validates that an API key matches the expected Google API key format.
+        /// Google API keys start with "AIza" and are 39 characters long.
+        /// </summary>
+        public static bool IsValidApiKeyFormat(string? key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return false;
+            return key.Length == 39 && key.StartsWith("AIza", StringComparison.Ordinal);
+        }
+
         private static string EncryptString(string plainText)
         {
             var bytes = Encoding.UTF8.GetBytes(plainText);
@@ -112,19 +127,44 @@ namespace AgenticEngine.Managers
             return Convert.ToBase64String(encrypted);
         }
 
-        private static string? DecryptString(string? cipherBase64)
+        private string? DecryptString(string? cipherBase64)
         {
             if (string.IsNullOrEmpty(cipherBase64)) return null;
-            var encrypted = Convert.FromBase64String(cipherBase64);
-            var bytes = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(bytes);
+            try
+            {
+                var encrypted = Convert.FromBase64String(cipherBase64);
+                var bytes = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+                return Encoding.UTF8.GetString(bytes);
+            }
+            catch (CryptographicException ex)
+            {
+                AppLogger.Warn("GeminiService",
+                    "Failed to decrypt API key (DPAPI scope mismatch or corrupted data). " +
+                    "Please re-enter your API key in Settings > Gemini.", ex);
+                ApiKeyDecryptionFailed = true;
+                return null;
+            }
+            catch (FormatException ex)
+            {
+                AppLogger.Warn("GeminiService",
+                    "Stored API key has invalid Base64 encoding. " +
+                    "Please re-enter your API key in Settings > Gemini.", ex);
+                ApiKeyDecryptionFailed = true;
+                return null;
+            }
         }
 
         public async Task<GeminiImageResult> GenerateImageAsync(string prompt, string taskId,
             IProgress<string>? progress = null, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(_apiKey))
-                return GeminiImageResult.Failure("Gemini API key not configured. Set it in Settings > Gemini.");
+                return GeminiImageResult.Failure(ApiKeyDecryptionFailed
+                    ? "Gemini API key could not be decrypted. Please re-enter it in Settings > Gemini."
+                    : "Gemini API key not configured. Set it in Settings > Gemini.");
+            if (!IsValidApiKeyFormat(_apiKey))
+                return GeminiImageResult.Failure(
+                    "Gemini API key has an invalid format (expected 39-char key starting with 'AIza'). " +
+                    "Please re-enter it in Settings > Gemini.");
 
             progress?.Report("[Gemini] Sending image generation request...\n");
 
@@ -174,7 +214,7 @@ namespace AgenticEngine.Managers
                 }
 
                 progress?.Report("[Gemini] Processing response...\n");
-                return ParseImageResponse(responseBody, taskId, progress);
+                return await ParseImageResponse(responseBody, taskId, progress);
             }
             catch (TaskCanceledException)
             {
@@ -190,7 +230,7 @@ namespace AgenticEngine.Managers
             }
         }
 
-        private GeminiImageResult ParseImageResponse(string responseBody, string taskId,
+        private async Task<GeminiImageResult> ParseImageResponse(string responseBody, string taskId,
             IProgress<string>? progress)
         {
             try
@@ -232,7 +272,7 @@ namespace AgenticEngine.Managers
                         var filePath = Path.Combine(_imageDir, fileName);
 
                         var imageBytes = Convert.FromBase64String(base64Data);
-                        File.WriteAllBytes(filePath, imageBytes);
+                        await Task.Run(() => File.WriteAllBytes(filePath, imageBytes));
                         imagePaths.Add(filePath);
 
                         progress?.Report($"[Gemini] Image saved: {fileName}\n");
@@ -276,7 +316,7 @@ namespace AgenticEngine.Managers
         public string GetImageDirectory() => _imageDir;
 
         /// <summary>
-        /// Sends a text chat message to Gemini with conversation history.
+        /// Sends a text chat message to Gemini with conversation history (non-streaming).
         /// </summary>
         public async Task<string> SendChatMessageAsync(
             List<ChatMessage> history,
@@ -285,43 +325,15 @@ namespace AgenticEngine.Managers
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(_apiKey))
-                return "[Error] Gemini API key not configured. Set it in Settings > Gemini.";
+                return ApiKeyDecryptionFailed
+                    ? "[Error] Gemini API key could not be decrypted. Please re-enter it in Settings > Gemini."
+                    : "[Error] Gemini API key not configured. Set it in Settings > Gemini.";
+            if (!IsValidApiKeyFormat(_apiKey))
+                return "[Error] Gemini API key has an invalid format. Please re-enter it in Settings > Gemini.";
 
             try
             {
-                var contents = new List<object>();
-                foreach (var msg in history)
-                {
-                    contents.Add(new
-                    {
-                        role = msg.Role,
-                        parts = new[] { new { text = msg.Text } }
-                    });
-                }
-                contents.Add(new
-                {
-                    role = "user",
-                    parts = new[] { new { text = userMessage } }
-                });
-
-                object requestBody;
-                if (!string.IsNullOrEmpty(systemInstruction))
-                {
-                    requestBody = new
-                    {
-                        system_instruction = new
-                        {
-                            parts = new[] { new { text = systemInstruction } }
-                        },
-                        contents
-                    };
-                }
-                else
-                {
-                    requestBody = new { contents };
-                }
-
-                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var jsonContent = JsonSerializer.Serialize(BuildChatRequestBody(history, userMessage, systemInstruction));
                 var url = $"{ApiBaseUrl}/{_selectedModel}:generateContent?key={_apiKey}";
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, url);
@@ -336,20 +348,7 @@ namespace AgenticEngine.Managers
                     return $"[Error] Gemini API ({(int)response.StatusCode}): {errorMsg}";
                 }
 
-                using var doc = JsonDocument.Parse(responseBody);
-                var root = doc.RootElement;
-                if (root.TryGetProperty("candidates", out var candidates) &&
-                    candidates.GetArrayLength() > 0)
-                {
-                    var parts = candidates[0].GetProperty("content").GetProperty("parts");
-                    foreach (var part in parts.EnumerateArray())
-                    {
-                        if (part.TryGetProperty("text", out var textProp))
-                            return textProp.GetString() ?? "";
-                    }
-                }
-
-                return "[Error] No response from Gemini.";
+                return ExtractTextFromResponse(responseBody) ?? "[Error] No response from Gemini.";
             }
             catch (TaskCanceledException)
             {
@@ -359,6 +358,131 @@ namespace AgenticEngine.Managers
             {
                 return $"[Error] {ex.Message}";
             }
+        }
+
+        /// <summary>
+        /// Streams a chat response from Gemini, calling onTextChunk for each piece of text as it arrives.
+        /// Returns the full accumulated response text, or an error string starting with "[Error]" or "[Cancelled]".
+        /// </summary>
+        public async Task<string> SendChatMessageStreamingAsync(
+            List<ChatMessage> history,
+            string userMessage,
+            Action<string> onTextChunk,
+            string? systemInstruction = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(_apiKey))
+                return ApiKeyDecryptionFailed
+                    ? "[Error] Gemini API key could not be decrypted. Please re-enter it in Settings > Gemini."
+                    : "[Error] Gemini API key not configured. Set it in Settings > Gemini.";
+            if (!IsValidApiKeyFormat(_apiKey))
+                return "[Error] Gemini API key has an invalid format. Please re-enter it in Settings > Gemini.";
+
+            try
+            {
+                var jsonContent = JsonSerializer.Serialize(BuildChatRequestBody(history, userMessage, systemInstruction));
+                var url = $"{ApiBaseUrl}/{_selectedModel}:streamGenerateContent?alt=sse&key={_apiKey}";
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var errorMsg = TryExtractErrorMessage(errorBody);
+                    return $"[Error] Gemini API ({(int)response.StatusCode}): {errorMsg}";
+                }
+
+                var fullText = new StringBuilder();
+                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                using var reader = new StreamReader(stream);
+
+                while (!reader.EndOfStream)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var line = await reader.ReadLineAsync(cancellationToken);
+                    if (line == null) break;
+
+                    if (!line.StartsWith("data: ")) continue;
+                    var json = line.Substring(6);
+                    if (string.IsNullOrWhiteSpace(json)) continue;
+
+                    var chunk = ExtractTextFromResponse(json);
+                    if (chunk != null)
+                    {
+                        fullText.Append(chunk);
+                        onTextChunk(chunk);
+                    }
+                }
+
+                return fullText.Length > 0 ? fullText.ToString() : "[Error] No response from Gemini.";
+            }
+            catch (TaskCanceledException)
+            {
+                return "[Cancelled]";
+            }
+            catch (Exception ex)
+            {
+                return $"[Error] {ex.Message}";
+            }
+        }
+
+        private object BuildChatRequestBody(List<ChatMessage> history, string userMessage, string? systemInstruction)
+        {
+            var contents = new List<object>();
+            foreach (var msg in history)
+            {
+                contents.Add(new
+                {
+                    role = msg.Role,
+                    parts = new[] { new { text = msg.Text } }
+                });
+            }
+            contents.Add(new
+            {
+                role = "user",
+                parts = new[] { new { text = userMessage } }
+            });
+
+            if (!string.IsNullOrEmpty(systemInstruction))
+            {
+                return new
+                {
+                    system_instruction = new
+                    {
+                        parts = new[] { new { text = systemInstruction } }
+                    },
+                    contents
+                };
+            }
+            return new { contents };
+        }
+
+        private static string? ExtractTextFromResponse(string responseBody)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(responseBody);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("candidates", out var candidates) &&
+                    candidates.GetArrayLength() > 0)
+                {
+                    var firstCandidate = candidates[0];
+                    if (firstCandidate.TryGetProperty("content", out var content) &&
+                        content.TryGetProperty("parts", out var parts))
+                    {
+                        foreach (var part in parts.EnumerateArray())
+                        {
+                            if (part.TryGetProperty("text", out var textProp))
+                                return textProp.GetString() ?? "";
+                        }
+                    }
+                }
+            }
+            catch { /* malformed chunk, skip */ }
+            return null;
         }
     }
 

@@ -1,7 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Style x:Key="DarkExpander" TargetType="Expander">
-        <Setter Property="Foreground" Value="#CCC"/>
+        <Setter Property="Foreground" Value="{StaticResource TextLight}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Template">
@@ -15,7 +15,7 @@
                                 <ControlTemplate TargetType="ToggleButton">
                                     <Border Background="Transparent" Padding="0,4">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock x:Name="Arrow" Text="&#x25B8;" Foreground="#DA7756"
+                                            <TextBlock x:Name="Arrow" Text="&#x25B8;" Foreground="{StaticResource Accent}"
                                                        FontSize="11" FontWeight="Bold" Margin="0,0,6,0"
                                                        VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
                                                 <TextBlock.RenderTransform>

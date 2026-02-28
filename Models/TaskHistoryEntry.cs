@@ -15,9 +15,11 @@ namespace AgenticEngine.Models
         public bool RemoteSession { get; set; }
         public string? ProjectPath { get; set; }
         public string ProjectColor { get; set; } = "#666666";
+        public string ProjectDisplayName { get; set; } = "";
         public bool IsOvernight { get; set; }
         public int MaxIterations { get; set; }
         public int CurrentIteration { get; set; }
         public string CompletionSummary { get; set; } = "";
+        public string Recommendations { get; set; } = "";
     }
 }

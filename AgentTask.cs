@@ -17,7 +17,8 @@ namespace AgenticEngine
         Failed,
         Queued,
         Paused,
-        InitQueued
+        InitQueued,
+        Planning
     }
 
     public enum ModelType
@@ -44,12 +45,17 @@ namespace AgenticEngine
         public bool RemoteSession { get => Data.RemoteSession; set => Data.RemoteSession = value; }
         public bool Headless { get => Data.Headless; set => Data.Headless = value; }
         public bool IsOvernight { get => Data.IsOvernight; set => Data.IsOvernight = value; }
-        public bool IgnoreFileLocks { get => Data.IgnoreFileLocks; set => Data.IgnoreFileLocks = value; }
+        public bool IgnoreFileLocks
+        {
+            get => Data.IgnoreFileLocks;
+            set { Data.IgnoreFileLocks = value; OnPropertyChanged(); }
+        }
         public bool UseMcp { get => Data.UseMcp; set => Data.UseMcp = value; }
         public bool SpawnTeam { get => Data.SpawnTeam; set => Data.SpawnTeam = value; }
         public bool ExtendedPlanning { get => Data.ExtendedPlanning; set => Data.ExtendedPlanning = value; }
         public bool NoGitWrite { get => Data.NoGitWrite; set => Data.NoGitWrite = value; }
         public bool PlanOnly { get => Data.PlanOnly; set => Data.PlanOnly = value; }
+        public bool UseMessageBus { get => Data.UseMessageBus; set => Data.UseMessageBus = value; }
         public string? StoredPrompt { get => Data.StoredPrompt; set => Data.StoredPrompt = value; }
         public string? ConversationId { get => Data.ConversationId; set => Data.ConversationId = value; }
         public string? FullOutput { get => Data.FullOutput; set => Data.FullOutput = value; }
@@ -59,6 +65,12 @@ namespace AgenticEngine
         public List<string> GeneratedImagePaths { get => Data.GeneratedImagePaths; set => Data.GeneratedImagePaths = value; }
         public string ProjectPath { get => Data.ProjectPath; set => Data.ProjectPath = value; }
         public string ProjectColor { get => Data.ProjectColor; set => Data.ProjectColor = value; }
+
+        public string ProjectDisplayName
+        {
+            get => Data.ProjectDisplayName;
+            set { Data.ProjectDisplayName = value; OnPropertyChanged(); OnPropertyChanged(nameof(ProjectName)); }
+        }
 
         public int CurrentIteration
         {
@@ -71,6 +83,14 @@ namespace AgenticEngine
             get => Data.CompletionSummary;
             set { Data.CompletionSummary = value; OnPropertyChanged(); }
         }
+
+        public string Recommendations
+        {
+            get => Data.Recommendations;
+            set { Data.Recommendations = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasRecommendations)); }
+        }
+
+        public bool HasRecommendations => !string.IsNullOrWhiteSpace(Recommendations);
 
         public string Summary
         {
@@ -88,6 +108,7 @@ namespace AgenticEngine
                 OnPropertyChanged(nameof(StatusText));
                 OnPropertyChanged(nameof(StatusColor));
                 OnPropertyChanged(nameof(IsRunning));
+                OnPropertyChanged(nameof(IsPlanning));
                 OnPropertyChanged(nameof(IsQueued));
                 OnPropertyChanged(nameof(IsPaused));
                 OnPropertyChanged(nameof(IsInitQueued));
@@ -105,7 +126,7 @@ namespace AgenticEngine
         // ── Runtime state delegation ──────────────────────────────────
 
         public StringBuilder OutputBuilder => Runtime.OutputBuilder;
-        public string? GitStartHash { get => Runtime.GitStartHash; set => Runtime.GitStartHash = value; }
+        public string? GitStartHash { get => Data.GitStartHash; set => Data.GitStartHash = value; }
         public System.Windows.Threading.DispatcherTimer? OvernightRetryTimer { get => Runtime.OvernightRetryTimer; set => Runtime.OvernightRetryTimer = value; }
         public System.Windows.Threading.DispatcherTimer? OvernightIterationTimer { get => Runtime.OvernightIterationTimer; set => Runtime.OvernightIterationTimer = value; }
         public int ConsecutiveFailures { get => Runtime.ConsecutiveFailures; set => Runtime.ConsecutiveFailures = value; }
@@ -114,15 +135,17 @@ namespace AgenticEngine
         public System.Threading.CancellationTokenSource? Cts { get => Runtime.Cts; set => Runtime.Cts = value; }
         public string? QueuedReason { get => Runtime.QueuedReason; set => Runtime.QueuedReason = value; }
         public string? BlockedByTaskId { get => Runtime.BlockedByTaskId; set => Runtime.BlockedByTaskId = value; }
+        public int? BlockedByTaskNumber { get => Runtime.BlockedByTaskNumber; set => Runtime.BlockedByTaskNumber = value; }
         public List<string> DependencyTaskIds { get => Runtime.DependencyTaskIds; set => Runtime.DependencyTaskIds = value; }
+        public List<int> DependencyTaskNumbers { get => Runtime.DependencyTaskNumbers; set => Runtime.DependencyTaskNumbers = value; }
         public bool IsPlanningBeforeQueue { get => Runtime.IsPlanningBeforeQueue; set => Runtime.IsPlanningBeforeQueue = value; }
         public bool NeedsPlanRestart { get => Runtime.NeedsPlanRestart; set => Runtime.NeedsPlanRestart = value; }
+        public string? DependencyContext { get => Data.DependencyContext; set => Data.DependencyContext = value; }
         public string? PendingFileLockPath { get => Runtime.PendingFileLockPath; set => Runtime.PendingFileLockPath = value; }
         public string? PendingFileLockBlocker { get => Runtime.PendingFileLockBlocker; set => Runtime.PendingFileLockBlocker = value; }
 
         // ── Tool activity feed (UI-bound) ─────────────────────────────
 
-        private readonly List<string> _recentToolActions = new();
         private string _toolActivityText = "";
 
         public string ToolActivityText
@@ -135,21 +158,18 @@ namespace AgenticEngine
 
         public void AddToolActivity(string action)
         {
-            _recentToolActions.Add(action);
-            if (_recentToolActions.Count > 3)
-                _recentToolActions.RemoveAt(0);
-            ToolActivityText = string.Join("\n", _recentToolActions);
+            ToolActivityText = action;
         }
 
         public void ClearToolActivity()
         {
-            _recentToolActions.Clear();
             ToolActivityText = "";
         }
 
         // ── Computed properties ───────────────────────────────────────
 
         public string ProjectName =>
+            !string.IsNullOrEmpty(ProjectDisplayName) ? ProjectDisplayName :
             string.IsNullOrEmpty(ProjectPath) ? "" : Path.GetFileName(ProjectPath);
 
         public string ShortDescription =>
@@ -165,6 +185,7 @@ namespace AgenticEngine
             AgentTaskStatus.Queued => "Queued",
             AgentTaskStatus.Paused => "Paused",
             AgentTaskStatus.InitQueued => "Waiting",
+            AgentTaskStatus.Planning => "Planning",
             _ => "?"
         };
 
@@ -177,10 +198,13 @@ namespace AgenticEngine
             AgentTaskStatus.Queued => "#FFD600",
             AgentTaskStatus.Paused => "#CE93D8",
             AgentTaskStatus.InitQueued => "#FF9800",
+            AgentTaskStatus.Planning => "#B39DDB",
             _ => "#555555"
         };
 
         public bool IsRunning => Status == AgentTaskStatus.Running;
+
+        public bool IsPlanning => Status == AgentTaskStatus.Planning;
 
         public bool IsQueued => Status == AgentTaskStatus.Queued;
 
@@ -200,10 +224,10 @@ namespace AgenticEngine
                 if (Status == AgentTaskStatus.Queued)
                 {
                     string waitInfo;
-                    if (DependencyTaskIds.Count > 0)
-                        waitInfo = "waiting for " + string.Join(", ", DependencyTaskIds.Select(id => $"#{id}"));
-                    else if (!string.IsNullOrEmpty(BlockedByTaskId))
-                        waitInfo = $"waiting for #{BlockedByTaskId}";
+                    if (DependencyTaskNumbers.Count > 0)
+                        waitInfo = "waiting for " + string.Join(", ", DependencyTaskNumbers.Select(n => $"#{n}"));
+                    else if (BlockedByTaskNumber.HasValue)
+                        waitInfo = $"waiting for #{BlockedByTaskNumber.Value}";
                     else
                         waitInfo = "waiting";
                     return $"{started} | Queued ({waitInfo})";
@@ -216,6 +240,8 @@ namespace AgenticEngine
                 var running = DateTime.Now - StartTime;
                 if (Status == AgentTaskStatus.Paused)
                     return $"{started} | Paused at {(int)running.TotalMinutes}m {running.Seconds}s";
+                if (Status == AgentTaskStatus.Planning)
+                    return $"{started} | Planning {(int)running.TotalMinutes}m {running.Seconds}s";
                 return $"{started} | Running {(int)running.TotalMinutes}m {running.Seconds}s";
             }
         }

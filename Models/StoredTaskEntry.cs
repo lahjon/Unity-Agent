@@ -11,6 +11,7 @@ namespace AgenticEngine.Models
         public string FullOutput { get; set; } = "";
         public string? ProjectPath { get; set; }
         public string ProjectColor { get; set; } = "#666666";
+        public string ProjectDisplayName { get; set; } = "";
         public DateTime CreatedAt { get; set; }
         public bool SkipPermissions { get; set; }
     }

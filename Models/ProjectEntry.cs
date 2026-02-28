@@ -21,6 +21,7 @@ namespace AgenticEngine.Models
         public string RuleInstruction { get; set; } = "";
         public List<string> ProjectRules { get; set; } = new();
         public string Color { get; set; } = "";
+        public bool IsGame { get; set; }
 
         [JsonIgnore]
         public bool IsInitializing { get; set; }

@@ -23,13 +23,12 @@ namespace AgenticEngine
         public int ConsecutiveFailures { get; set; }
         public int LastIterationOutputStart { get; set; }
 
-        // Git state captured at task start for completion summary diff
-        public string? GitStartHash { get; set; }
-
         // Queue / dependency tracking
         public string? QueuedReason { get; set; }
         public string? BlockedByTaskId { get; set; }
+        public int? BlockedByTaskNumber { get; set; }
         public List<string> DependencyTaskIds { get; set; } = new();
+        public List<int> DependencyTaskNumbers { get; set; } = new();
 
         // Plan-before-queue workflow
         public bool IsPlanningBeforeQueue { get; set; }

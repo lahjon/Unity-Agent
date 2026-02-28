@@ -67,6 +67,9 @@ namespace AgenticEngine.Managers
         private readonly Dispatcher _dispatcher;
 
         public event Action<AgentTask>? McpInvestigationRequested;
+        public event Action? ProjectSwapStarted;
+        public event Action? ProjectSwapCompleted;
+        public event Action<string, string>? ProjectRenamed; // (projectPath, newName)
 
         public string ProjectPath
         {
@@ -180,8 +183,8 @@ namespace AgenticEngine.Managers
         {
             try
             {
-                File.WriteAllText(_projectsFile,
-                    JsonSerializer.Serialize(_savedProjects, _projectJsonOptions));
+                var json = JsonSerializer.Serialize(_savedProjects, _projectJsonOptions);
+                SafeFileWriter.WriteInBackground(_projectsFile, json, "ProjectManager");
             }
             catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed to save projects", ex); }
         }
@@ -225,7 +228,7 @@ namespace AgenticEngine.Managers
             _editLongDescToggle.IsEnabled = !initializing;
         }
 
-        public void HandleAddProjectPathClick()
+        public void HandleAddProjectPathClick(Action<string> updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings)
         {
             var dialog = new System.Windows.Forms.FolderBrowserDialog
             {
@@ -236,8 +239,7 @@ namespace AgenticEngine.Managers
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
                 _addProjectSelectedPath = dialog.SelectedPath;
-                _addProjectPath.Text = dialog.SelectedPath;
-                _addProjectPath.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E8E8E8"));
+                AddProject(updateTerminalWorkingDirectory, saveSettings, syncSettings);
             }
         }
 
@@ -254,8 +256,8 @@ namespace AgenticEngine.Managers
             {
                 DarkDialog.ShowAlert("The selected path does not exist or is invalid.", "Invalid Path");
                 _addProjectSelectedPath = "";
-                _addProjectPath.Text = "Click to select project folder...";
-                _addProjectPath.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#666"));
+                _addProjectPath.Text = "Click to add project folder...";
+                _addProjectPath.Foreground = (Brush)Application.Current.FindResource("TextMuted");
                 return;
             }
             if (_savedProjects.Any(p => p.Path == path))
@@ -274,8 +276,8 @@ namespace AgenticEngine.Managers
             syncSettings();
 
             _addProjectSelectedPath = "";
-            _addProjectPath.Text = "Click to select project folder...";
-            _addProjectPath.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#666"));
+            _addProjectPath.Text = "Click to add project folder...";
+            _addProjectPath.Foreground = (Brush)Application.Current.FindResource("TextMuted");
 
             _ = GenerateProjectDescriptionInBackground(entry);
         }
@@ -332,7 +334,7 @@ namespace AgenticEngine.Managers
                 }
             }
 
-            var entry = new ProjectEntry { Name = result.Name, Path = fullPath, IsInitializing = true, Color = PickProjectColor() };
+            var entry = new ProjectEntry { Name = result.Name, Path = fullPath, IsInitializing = true, Color = PickProjectColor(), IsGame = result.IsGame };
             _savedProjects.Add(entry);
             SaveProjects();
             _projectPath = fullPath;
@@ -372,6 +374,18 @@ namespace AgenticEngine.Managers
         {
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
             return entry?.Color ?? "#666666";
+        }
+
+        public string GetProjectDisplayName(string projectPath)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
+            return entry?.DisplayName ?? Path.GetFileName(projectPath);
+        }
+
+        public bool IsGameProject(string projectPath)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
+            return entry?.IsGame == true;
         }
 
         public string GetProjectDescription(AgentTask task)
@@ -519,14 +533,14 @@ namespace AgenticEngine.Managers
 
                 var card = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C)),
+                    Background = (Brush)Application.Current.FindResource("BgElevated"),
                     CornerRadius = new CornerRadius(8),
                     Padding = new Thickness(12, 10, 12, 10),
                     Margin = new Thickness(0, 0, 0, 6),
                     BorderThickness = new Thickness(isActive ? 3 : 1, 1, 1, 1),
-                    BorderBrush = new SolidColorBrush(isActive
-                        ? Color.FromRgb(0xDA, 0x77, 0x56)
-                        : Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                    BorderBrush = isActive
+                        ? (Brush)Application.Current.FindResource("Accent")
+                        : (Brush)Application.Current.FindResource("BorderMedium"),
                     Cursor = Cursors.Hand
                 };
 
@@ -557,7 +571,7 @@ namespace AgenticEngine.Managers
                 var editIcon = new TextBlock
                 {
                     Text = "\u270E",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
+                    Foreground = (Brush)Application.Current.FindResource("TextMuted"),
                     FontSize = 12,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(5, 0, 0, 0),
@@ -574,9 +588,9 @@ namespace AgenticEngine.Managers
                     var editBox = new TextBox
                     {
                         Text = projEntry.Name ?? projEntry.FolderName,
-                        Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
-                        Background = new SolidColorBrush(Color.FromRgb(0x19, 0x19, 0x19)),
-                        BorderBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                        Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
+                        Background = (Brush)Application.Current.FindResource("BgDeep"),
+                        BorderBrush = (Brush)Application.Current.FindResource("Accent"),
                         BorderThickness = new Thickness(1),
                         FontWeight = FontWeights.Bold,
                         FontSize = 14,
@@ -584,8 +598,8 @@ namespace AgenticEngine.Managers
                         VerticalAlignment = VerticalAlignment.Center,
                         Padding = new Thickness(2, 0, 2, 0),
                         MinWidth = 80,
-                        CaretBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
-                        SelectionBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56))
+                        CaretBrush = (Brush)Application.Current.FindResource("TextPrimary"),
+                        SelectionBrush = (Brush)Application.Current.FindResource("Accent")
                     };
 
                     parent.Children.RemoveAt(idx);
@@ -602,6 +616,7 @@ namespace AgenticEngine.Managers
                             projEntry.Name = newName;
                             SaveProjects();
                             RefreshProjectCombo();
+                            ProjectRenamed?.Invoke(projEntry.Path, newName);
                         }
                         RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
                     }
@@ -629,7 +644,7 @@ namespace AgenticEngine.Managers
                 infoPanel.Children.Add(new TextBlock
                 {
                     Text = proj.Path,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                    Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
                     FontSize = 11,
                     FontFamily = new FontFamily("Segoe UI"),
                     TextTrimming = TextTrimming.CharacterEllipsis,
@@ -643,7 +658,7 @@ namespace AgenticEngine.Managers
                     initRow.Children.Add(new TextBlock
                     {
                         Text = "Initializing descriptions...",
-                        Foreground = new SolidColorBrush(Color.FromRgb(0xE0, 0xA0, 0x30)),
+                        Foreground = (Brush)Application.Current.FindResource("WarningAmber"),
                         FontSize = 11,
                         FontStyle = FontStyles.Italic,
                         FontFamily = new FontFamily("Segoe UI")
@@ -655,7 +670,7 @@ namespace AgenticEngine.Managers
                     infoPanel.Children.Add(new TextBlock
                     {
                         Text = proj.ShortDescription,
-                        Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                        Foreground = (Brush)Application.Current.FindResource("TextTabHeader"),
                         FontSize = 11,
                         FontFamily = new FontFamily("Segoe UI"),
                         TextTrimming = TextTrimming.CharacterEllipsis,
@@ -739,7 +754,7 @@ namespace AgenticEngine.Managers
                 {
                     Content = "\u2715",
                     Background = Brushes.Transparent,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                    Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
                     FontFamily = new FontFamily("Segoe UI"),
                     FontSize = 14,
                     Padding = new Thickness(4, 0, 4, 0),
@@ -777,8 +792,8 @@ namespace AgenticEngine.Managers
                         Style = (Style)Application.Current.FindResource(
                             proj.McpStatus == McpStatus.Enabled ? "SuccessBtn" : "SmallBtn"),
                         Background = proj.McpStatus == McpStatus.Enabled
-                            ? new SolidColorBrush(Color.FromRgb(0x5C, 0xB8, 0x5C))
-                            : new SolidColorBrush(Color.FromRgb(0xDA, 0x77, 0x56)),
+                            ? (Brush)Application.Current.FindResource("Success")
+                            : (Brush)Application.Current.FindResource("Accent"),
                         Margin = new Thickness(0, 4, 0, 0),
                         Tag = proj.Path
                     };
@@ -801,6 +816,7 @@ namespace AgenticEngine.Managers
                         return;
                     _isSwapping = true;
                     _projectPath = projPath;
+                    ProjectSwapStarted?.Invoke();
                     // Defer heavy work so we're not modifying the visual tree
                     // from inside the click handler of a card that will be destroyed.
                     // Use async to yield between operations and keep the UI responsive.
@@ -818,6 +834,7 @@ namespace AgenticEngine.Managers
                         finally
                         {
                             _isSwapping = false;
+                            ProjectSwapCompleted?.Invoke();
                         }
                     }));
                 };
@@ -845,7 +862,7 @@ namespace AgenticEngine.Managers
             if (reachable)
             {
                 if (!File.Exists(mcpJsonPath))
-                    File.WriteAllText(mcpJsonPath, mcpJsonContent);
+                    await Task.Run(() => File.WriteAllText(mcpJsonPath, mcpJsonContent));
 
                 entry.McpStatus = McpStatus.Enabled;
                 SaveProjects();
@@ -856,7 +873,7 @@ namespace AgenticEngine.Managers
 
             if (!File.Exists(mcpJsonPath))
             {
-                File.WriteAllText(mcpJsonPath, mcpJsonContent);
+                await Task.Run(() => File.WriteAllText(mcpJsonPath, mcpJsonContent));
                 entry.McpStatus = McpStatus.Initialized;
                 SaveProjects();
                 RefreshProjectList(null, null, null);
@@ -882,7 +899,8 @@ namespace AgenticEngine.Managers
                     "Diagnose and fix the connection. Check if the Unity Editor is running with the MCP plugin installed and enabled.",
                 SkipPermissions = true,
                 ProjectPath = projectPath,
-                ProjectColor = GetProjectColor(projectPath)
+                ProjectColor = GetProjectColor(projectPath),
+                ProjectDisplayName = GetProjectDisplayName(projectPath)
             };
             McpInvestigationRequested?.Invoke(investigateTask);
         }

@@ -49,12 +49,10 @@ namespace AgenticEngine
         private readonly OutputTabManager _outputTabManager;
         private ProjectManager _projectManager = null!;
         private TaskExecutionManager _taskExecutionManager = null!;
-        private readonly MessageBusManager _messageBusManager;
         private TerminalTabManager? _terminalManager;
         private GeminiService _geminiService = null!;
-        private ClaudeService _claudeService = null!;
         private HelperManager _helperManager = null!;
-        private ActivityDashboardManager _activityDashboard = null!;
+        private ActivityDashboardManager _activityManager = null!;
         private DispatcherTimer? _helperAnimTimer;
         private int _helperAnimTick;
 
@@ -124,7 +122,6 @@ namespace AgenticEngine
 
             _imageManager = new ImageAttachmentManager(appDataDir, ImageIndicator, ClearImagesBtn);
             _geminiService = new GeminiService(appDataDir);
-            _claudeService = new ClaudeService(appDataDir);
             _helperManager = new HelperManager(appDataDir, _projectManager.ProjectPath);
             _helperManager.SetActiveTaskSource(() =>
             {
@@ -135,19 +132,14 @@ namespace AgenticEngine
             _helperManager.GenerationCompleted += OnHelperGenerationCompleted;
             _helperManager.GenerationFailed += OnHelperGenerationFailed;
 
-            _messageBusManager = new MessageBusManager(Dispatcher);
-
             _taskExecutionManager = new TaskExecutionManager(
                 scriptDir, _fileLockManager, _outputTabManager,
                 () => SystemPrompt,
                 task => _projectManager.GetProjectDescription(task),
                 path => _projectManager.GetProjectRulesBlock(path),
                 path => _projectManager.IsGameProject(path),
-                _messageBusManager,
                 Dispatcher);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
-
-            _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
 
             // Set up collections with cross-thread synchronization
             BindingOperations.EnableCollectionSynchronization(_activeTasks, _activeTasksLock);
@@ -268,23 +260,6 @@ namespace AgenticEngine
                 GeminiModelCombo.Items.Add(model);
             GeminiModelCombo.SelectedItem = _geminiService.SelectedModel;
 
-            // Initialize Claude API key display
-            if (_claudeService.ApiKeyDecryptionFailed)
-            {
-                ClaudeApiKeyBox.Text = "";
-                ClaudeKeyStatus.Text = "API key could not be decrypted — please re-enter";
-                ClaudeKeyStatus.Foreground = (Brush)FindResource("DangerBright");
-            }
-            else if (_claudeService.IsConfigured)
-            {
-                ClaudeApiKeyBox.Text = _claudeService.GetMaskedApiKey();
-                ClaudeKeyStatus.Text = "API key configured";
-                ClaudeKeyStatus.Foreground = (Brush)FindResource("Success");
-            }
-
-            // Initialize Chat model selector
-            PopulateChatModelCombo();
-
             // Async data loading — settings, projects, history, stored tasks, saved prompts
             await LoadStartupDataAsync();
             await LoadSavedPromptsAsync();
@@ -370,7 +345,6 @@ namespace AgenticEngine
                     _storedTasks.Add(item);
 
                 RefreshFilterCombos();
-                RefreshActivityDashboard();
                 _projectManager.RefreshProjectList(
                     p => _terminalManager?.UpdateWorkingDirectory(p),
                     () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
@@ -592,14 +566,6 @@ namespace AgenticEngine
             UpdateExecuteButtonText();
         }
 
-        private bool _advancedPanelOpen;
-        private void AdvancedToggle_Click(object sender, RoutedEventArgs e)
-        {
-            _advancedPanelOpen = !_advancedPanelOpen;
-            AdvancedSidePanel.Visibility = _advancedPanelOpen ? Visibility.Visible : Visibility.Collapsed;
-            AdvancedArrow.Text = _advancedPanelOpen ? "\u25BE" : "\u25C2";
-        }
-
         private void UpdateExecuteButtonText()
         {
             if (PlanOnlyToggle.IsChecked == true)
@@ -650,11 +616,6 @@ namespace AgenticEngine
         private void ViewLogs_Click(object sender, RoutedEventArgs e)
         {
             Dialogs.LogViewerDialog.Show();
-        }
-
-        private void ViewActivity_Click(object sender, RoutedEventArgs e)
-        {
-            Dialogs.ActivityDashboardDialog.Show(_activeTasks, _historyTasks, _projectManager.SavedProjects);
         }
 
         // ── Gemini Settings ─────────────────────────────────────────
@@ -713,42 +674,6 @@ namespace AgenticEngine
         {
             if (GeminiModelCombo?.SelectedItem is not string model) return;
             _geminiService.SelectedModel = model;
-        }
-
-        // ── Claude Settings ─────────────────────────────────────────
-
-        private void SaveClaudeKey_Click(object sender, RoutedEventArgs e)
-        {
-            var key = ClaudeApiKeyBox.Text?.Trim();
-            if (string.IsNullOrEmpty(key) || key.Contains('*'))
-            {
-                ClaudeKeyStatus.Text = "Enter a valid API key";
-                ClaudeKeyStatus.Foreground = (Brush)FindResource("DangerBright");
-                return;
-            }
-
-            try
-            {
-                _claudeService.SaveApiKey(key);
-                ClaudeApiKeyBox.Text = _claudeService.GetMaskedApiKey();
-                ClaudeKeyStatus.Text = "API key saved successfully";
-                ClaudeKeyStatus.Foreground = (Brush)FindResource("Success");
-                PopulateChatModelCombo();
-            }
-            catch (Exception ex)
-            {
-                ClaudeKeyStatus.Text = $"Error saving key: {ex.Message}";
-                ClaudeKeyStatus.Foreground = (Brush)FindResource("DangerBright");
-            }
-        }
-
-        private void ClaudeApiLink_Click(object sender, MouseButtonEventArgs e)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://console.anthropic.com/settings/keys") { UseShellExecute = true });
-            }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to open Claude API link", ex); }
         }
 
         // ── Project Events ─────────────────────────────────────────
@@ -816,26 +741,13 @@ namespace AgenticEngine
         // ── Dependencies ────────────────────────────────────────────
 
         private readonly List<AgentTask> _pendingDependencies = new();
-        private Point? _dragStartPoint;
-
-        private void TaskCard_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            _dragStartPoint = e.GetPosition(null);
-        }
 
         private void TaskCard_MouseMove(object sender, MouseEventArgs e)
         {
-            if (e.LeftButton != MouseButtonState.Pressed || _dragStartPoint == null) return;
+            if (e.LeftButton != MouseButtonState.Pressed) return;
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (task.IsFinished) return;
 
-            var pos = e.GetPosition(null);
-            var diff = pos - _dragStartPoint.Value;
-            if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
-                Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
-                return;
-
-            _dragStartPoint = null;
             var data = new DataObject("AgentTask", task);
             DragDrop.DoDragDrop(el, data, DragDropEffects.Link);
         }
@@ -950,89 +862,6 @@ namespace AgenticEngine
             RefreshDependencyChips();
         }
 
-        // ── Task-to-Task Drag & Drop (add dependency) ─────────────
-
-        private void TaskCard_DragOver(object sender, DragEventArgs e)
-        {
-            if (!e.Data.GetDataPresent("AgentTask") ||
-                sender is not FrameworkElement { DataContext: AgentTask target } ||
-                e.Data.GetData("AgentTask") is not AgentTask dragged ||
-                dragged.Id == target.Id || target.IsFinished || dragged.IsFinished)
-            {
-                e.Effects = DragDropEffects.None;
-                e.Handled = true;
-                return;
-            }
-
-            e.Effects = DragDropEffects.Link;
-            e.Handled = true;
-        }
-
-        private void TaskCard_Drop(object sender, DragEventArgs e)
-        {
-            if (!e.Data.GetDataPresent("AgentTask")) return;
-            if (sender is not FrameworkElement { DataContext: AgentTask target }) return;
-            if (e.Data.GetData("AgentTask") is not AgentTask dragged) return;
-            if (dragged.Id == target.Id || target.IsFinished || dragged.IsFinished) return;
-
-            // Prevent duplicate dependency
-            if (dragged.DependencyTaskIds.Contains(target.Id)) return;
-
-            // Prevent circular dependency
-            if (WouldCreateCircularDependency(dragged, target)) return;
-
-            // Add dependency: dragged waits for target
-            dragged.DependencyTaskIds.Add(target.Id);
-            dragged.DependencyTaskNumbers.Add(target.TaskNumber);
-            dragged.BlockedByTaskId = target.Id;
-            dragged.BlockedByTaskNumber = target.TaskNumber;
-            dragged.QueuedReason = $"Waiting for #{target.TaskNumber} to complete";
-
-            // Suspend the dragged task's process if it's currently running
-            if (dragged.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning)
-            {
-                _taskExecutionManager.PauseTask(dragged);
-                dragged.Status = AgentTaskStatus.Queued; // override Paused → Queued
-            }
-            else if (dragged.Status is AgentTaskStatus.Paused)
-            {
-                dragged.Status = AgentTaskStatus.Queued; // process already suspended
-            }
-            else if (dragged.Status is AgentTaskStatus.InitQueued)
-            {
-                dragged.Status = AgentTaskStatus.Queued;
-            }
-            // If already Queued, dependency was added above — status stays Queued
-
-            _outputTabManager.AppendOutput(dragged.Id,
-                $"\n[AgenticEngine] Task #{dragged.TaskNumber} queued — waiting for #{target.TaskNumber} to complete.\n",
-                _activeTasks, _historyTasks);
-            _outputTabManager.UpdateTabHeader(dragged);
-            UpdateStatus();
-            e.Handled = true;
-        }
-
-        private bool WouldCreateCircularDependency(AgentTask dragged, AgentTask target)
-        {
-            var visited = new HashSet<string>();
-            var queue = new Queue<string>();
-            queue.Enqueue(target.Id);
-
-            while (queue.Count > 0)
-            {
-                var id = queue.Dequeue();
-                if (id == dragged.Id) return true;
-                if (!visited.Add(id)) continue;
-
-                var t = _activeTasks.FirstOrDefault(x => x.Id == id);
-                if (t == null) continue;
-                foreach (var depId in t.DependencyTaskIds)
-                    queue.Enqueue(depId);
-            }
-
-            return false;
-        }
-
         // ── Execute ────────────────────────────────────────────────
 
         private void Execute_Click(object sender, RoutedEventArgs e)
@@ -1057,8 +886,8 @@ namespace AgenticEngine
                 ExtendedPlanningToggle.IsChecked == true,
                 DefaultNoGitWriteToggle.IsChecked == true,
                 PlanOnlyToggle.IsChecked == true,
-                imagePaths: _imageManager.DetachImages(),
-                model: selectedModel);
+                _imageManager.DetachImages(),
+                selectedModel);
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
 
@@ -1293,12 +1122,6 @@ namespace AgenticEngine
             }
         }
 
-        private void ToggleFileLock_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            task.IgnoreFileLocks = !task.IgnoreFileLocks;
-        }
-
         private void CloseTab(AgentTask task)
         {
             if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.InitQueued || task.Status == AgentTaskStatus.Queued)
@@ -1353,31 +1176,18 @@ namespace AgenticEngine
                 if (task.DependencyTaskIds.Count > 0)
                 {
                     // Force-start a dependency-queued task
+                    task.Status = AgentTaskStatus.Running;
                     task.QueuedReason = null;
                     task.BlockedByTaskId = null;
                     task.BlockedByTaskNumber = null;
                     task.DependencyTaskIds.Clear();
                     task.DependencyTaskNumbers.Clear();
-
-                    if (task.Process is { HasExited: false })
-                    {
-                        // Resume suspended process (was queued via drag-drop)
-                        _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
-                        _outputTabManager.AppendOutput(task.Id,
-                            $"\n[AgenticEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
-                            _activeTasks, _historyTasks);
-                    }
-                    else
-                    {
-                        task.Status = AgentTaskStatus.Running;
-                        task.StartTime = DateTime.Now;
-                        _outputTabManager.AppendOutput(task.Id,
-                            $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
-                            _activeTasks, _historyTasks);
-                        _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-                    }
-
+                    task.StartTime = DateTime.Now;
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
+                        _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
+                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                     UpdateStatus();
                 }
                 else
@@ -1580,27 +1390,6 @@ namespace AgenticEngine
             UpdateStatus();
         }
 
-        private void Continue_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            if (!task.HasRecommendations) return;
-
-            if (!_outputTabManager.HasTab(task.Id))
-                _outputTabManager.CreateTab(task);
-
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Continuing with recommended next steps\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
-
-            OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
-
-            if (_historyTasks.Remove(task))
-                _activeTasks.Insert(0, task);
-            UpdateStatus();
-
-            var prompt = "Continue with the recommended next steps from the previous task. Specifically:\n\n" + task.Recommendations;
-            _taskExecutionManager.SendFollowUp(task, prompt, _activeTasks, _historyTasks);
-        }
-
         // ── Stored Tasks ──────────────────────────────────────────
 
         private void PlanOnlyToggle_Changed(object sender, RoutedEventArgs e)
@@ -1646,52 +1435,19 @@ namespace AgenticEngine
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (string.IsNullOrEmpty(task.StoredPrompt)) return;
 
-            var selectedModel = ModelType.ClaudeCode;
-            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem && modelItem.Tag?.ToString() == "Gemini")
-                selectedModel = ModelType.Gemini;
-
             // Create a new task using the stored prompt as the description
             var newTask = TaskLauncher.CreateTask(
                 task.StoredPrompt,
                 task.ProjectPath,
-                true,
-                RemoteSessionToggle.IsChecked == true,
-                HeadlessToggle.IsChecked == true,
-                OvernightToggle.IsChecked == true,
+                true,  // skipPermissions
+                false, // remoteSession
+                false, // headless
+                false, // isOvernight
                 IgnoreFileLocksToggle.IsChecked == true,
-                UseMcpToggle.IsChecked == true,
-                SpawnTeamToggle.IsChecked == true,
-                ExtendedPlanningToggle.IsChecked == true,
-                DefaultNoGitWriteToggle.IsChecked == true,
-                PlanOnlyToggle.IsChecked == true,
-                imagePaths: _imageManager.DetachImages(),
-                model: selectedModel);
+                UseMcpToggle.IsChecked == true);
             newTask.ProjectColor = _projectManager.GetProjectColor(newTask.ProjectPath);
             newTask.ProjectDisplayName = _projectManager.GetProjectDisplayName(newTask.ProjectPath);
             newTask.Summary = $"Executing stored plan: {task.ShortDescription}";
-
-            // Reset per-task toggles (same as Execute_Click)
-            RemoteSessionToggle.IsChecked = false;
-            HeadlessToggle.IsChecked = false;
-            SpawnTeamToggle.IsChecked = false;
-            OvernightToggle.IsChecked = false;
-            ExtendedPlanningToggle.IsChecked = false;
-            PlanOnlyToggle.IsChecked = false;
-
-            if (selectedModel == ModelType.Gemini)
-            {
-                ExecuteGeminiTask(newTask);
-                RefreshFilterCombos();
-                UpdateStatus();
-                return;
-            }
-
-            if (newTask.Headless)
-            {
-                _taskExecutionManager.LaunchHeadless(newTask);
-                UpdateStatus();
-                return;
-            }
 
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
@@ -1794,7 +1550,6 @@ namespace AgenticEngine
             while (insertIndex < _activeTasks.Count && _activeTasks[insertIndex].IsFinished)
                 insertIndex++;
             _activeTasks.Insert(insertIndex, task);
-            RefreshActivityDashboard();
         }
 
         private void AnimateRemoval(FrameworkElement sender, Action onComplete)
@@ -1855,7 +1610,6 @@ namespace AgenticEngine
                 _outputTabManager.CloseTab(task);
 
             _historyManager.SaveHistory(_historyTasks);
-            RefreshActivityDashboard();
             RefreshFilterCombos();
             UpdateStatus();
 
@@ -1936,32 +1690,19 @@ namespace AgenticEngine
                 task.DependencyContext = TaskLauncher.BuildDependencyContext(
                     task.DependencyTaskIds, _activeTasks, _historyTasks);
 
+                task.Status = AgentTaskStatus.Running;
                 task.QueuedReason = null;
                 task.BlockedByTaskId = null;
                 task.BlockedByTaskNumber = null;
                 task.DependencyTaskIds.Clear();
                 task.DependencyTaskNumbers.Clear();
+                task.StartTime = DateTime.Now;
 
-                if (task.Process is { HasExited: false })
-                {
-                    // Task was suspended via drag-drop — resume its process
-                    _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] All dependencies resolved — resuming task #{task.TaskNumber}.\n\n",
-                        _activeTasks, _historyTasks);
-                }
-                else
-                {
-                    // No running process — start fresh
-                    task.Status = AgentTaskStatus.Running;
-                    task.StartTime = DateTime.Now;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] All dependencies resolved — starting task #{task.TaskNumber}...\n\n",
-                        _activeTasks, _historyTasks);
-                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-                }
-
+                _outputTabManager.AppendOutput(task.Id,
+                    $"\n[AgenticEngine] All dependencies resolved — starting task #{task.TaskNumber}...\n\n",
+                    _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
+                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                 UpdateStatus();
             }
         }
@@ -2283,14 +2024,6 @@ namespace AgenticEngine
             HistoryStatusFilterCombo.SelectionChanged += HistoryStatusFilter_Changed;
         }
 
-        private static bool TaskMatchesSearch(AgentTask t, string search)
-        {
-            if (string.IsNullOrEmpty(search)) return true;
-            if (t.Description != null && t.Description.Contains(search, StringComparison.OrdinalIgnoreCase)) return true;
-            if (t.Summary != null && t.Summary.Contains(search, StringComparison.OrdinalIgnoreCase)) return true;
-            return false;
-        }
-
         private void ApplyActiveFilters()
         {
             if (_activeView == null) return;
@@ -2298,10 +2031,8 @@ namespace AgenticEngine
             var statusTag = (ActiveStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
             var hasProject = !string.IsNullOrEmpty(projectTag);
             var hasStatus = !string.IsNullOrEmpty(statusTag);
-            var searchText = ActiveSearchBox?.Text?.Trim() ?? "";
-            var hasSearch = searchText.Length > 0;
 
-            if (!hasProject && !hasStatus && !hasSearch)
+            if (!hasProject && !hasStatus)
                 _activeView.Filter = null;
             else
                 _activeView.Filter = obj =>
@@ -2309,7 +2040,6 @@ namespace AgenticEngine
                     if (obj is not AgentTask t) return false;
                     if (hasProject && t.ProjectPath != projectTag) return false;
                     if (hasStatus && t.Status.ToString() != statusTag) return false;
-                    if (hasSearch && !TaskMatchesSearch(t, searchText)) return false;
                     return true;
                 };
         }
@@ -2321,10 +2051,8 @@ namespace AgenticEngine
             var statusTag = (HistoryStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
             var hasProject = !string.IsNullOrEmpty(projectTag);
             var hasStatus = !string.IsNullOrEmpty(statusTag);
-            var searchText = HistorySearchBox?.Text?.Trim() ?? "";
-            var hasSearch = searchText.Length > 0;
 
-            if (!hasProject && !hasStatus && !hasSearch)
+            if (!hasProject && !hasStatus)
                 _historyView.Filter = null;
             else
                 _historyView.Filter = obj =>
@@ -2332,7 +2060,6 @@ namespace AgenticEngine
                     if (obj is not AgentTask t) return false;
                     if (hasProject && t.ProjectPath != projectTag) return false;
                     if (hasStatus && t.Status.ToString() != statusTag) return false;
-                    if (hasSearch && !TaskMatchesSearch(t, searchText)) return false;
                     return true;
                 };
         }
@@ -2344,10 +2071,6 @@ namespace AgenticEngine
         private void ActiveStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyActiveFilters();
 
         private void HistoryStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
-
-        private void ActiveSearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyActiveFilters();
-
-        private void HistorySearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyHistoryFilters();
 
         // ── Games ──────────────────────────────────────────────────
 
@@ -2450,15 +2173,6 @@ namespace AgenticEngine
             if (e.Source != MainTabs) return;
             if (MainTabs.SelectedItem != GamesTabItem)
                 StopActiveGame();
-            if (MainTabs.SelectedItem == ActivityTabItem)
-                _activityDashboard.RefreshIfNeeded(ActivityTabContent);
-        }
-
-        private void RefreshActivityDashboard()
-        {
-            _activityDashboard.MarkDirty();
-            if (MainTabs.SelectedItem == ActivityTabItem)
-                _activityDashboard.RefreshIfNeeded(ActivityTabContent);
         }
 
         // ── Settings Panel Collapse ───────────────────────────────
@@ -2548,59 +2262,21 @@ namespace AgenticEngine
                 return;
             }
 
-            var desc = $"Implement the following improvement:\n\n" +
-                       $"## {suggestion.Title}\n\n" +
-                       $"{suggestion.Description}\n\n" +
-                       "You MUST fully implement this change — write the actual code, do not just analyze or produce a plan.";
+            var desc = $"{suggestion.Title}\n\n{suggestion.Description}";
 
-            var selectedModel = ModelType.ClaudeCode;
-            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem && modelItem.Tag?.ToString() == "Gemini")
-                selectedModel = ModelType.Gemini;
-
-            // Helper suggestions must always implement — never plan-only
             var task = TaskLauncher.CreateTask(
                 desc,
                 _projectManager.ProjectPath,
                 true,
-                RemoteSessionToggle.IsChecked == true,
-                HeadlessToggle.IsChecked == true,
-                OvernightToggle.IsChecked == true,
+                false,
+                false,
+                false,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,
-                SpawnTeamToggle.IsChecked == true,
-                ExtendedPlanningToggle.IsChecked == true,
-                DefaultNoGitWriteToggle.IsChecked == true,
-                planOnly: false,
-                imagePaths: _imageManager.DetachImages(),
-                model: selectedModel);
+                noGitWrite: DefaultNoGitWriteToggle.IsChecked == true);
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
             task.Summary = suggestion.Title;
-
-            // Reset per-task toggles (same as Execute_Click)
-            RemoteSessionToggle.IsChecked = false;
-            HeadlessToggle.IsChecked = false;
-            SpawnTeamToggle.IsChecked = false;
-            OvernightToggle.IsChecked = false;
-            ExtendedPlanningToggle.IsChecked = false;
-            PlanOnlyToggle.IsChecked = false;
-
-            if (selectedModel == ModelType.Gemini)
-            {
-                ExecuteGeminiTask(task);
-                _helperManager.RemoveSuggestion(suggestion);
-                RefreshFilterCombos();
-                UpdateStatus();
-                return;
-            }
-
-            if (task.Headless)
-            {
-                _taskExecutionManager.LaunchHeadless(task);
-                _helperManager.RemoveSuggestion(suggestion);
-                UpdateStatus();
-                return;
-            }
 
             AddActiveTask(task);
             _outputTabManager.CreateTab(task);
@@ -2716,7 +2392,7 @@ namespace AgenticEngine
             {
                 StopHelperAnimation();
                 GenerateSuggestionsBtn.IsEnabled = true;
-                GenerateSuggestionsBtn.Content = "Generate Suggestions";
+                GenerateSuggestionsBtn.Content = "Add Suggestions";
                 HelperStatusText.Text = $"{_helperManager.Suggestions.Count} suggestions generated";
             });
         }
@@ -2727,7 +2403,7 @@ namespace AgenticEngine
             {
                 StopHelperAnimation();
                 GenerateSuggestionsBtn.IsEnabled = true;
-                GenerateSuggestionsBtn.Content = "Generate Suggestions";
+                GenerateSuggestionsBtn.Content = "Add Suggestions";
                 HelperStatusText.Text = error;
             });
         }
@@ -2958,60 +2634,12 @@ namespace AgenticEngine
             }
         }
 
-        private void PopulateChatModelCombo()
-        {
-            var prev = ChatModelCombo.SelectedItem as string;
-            ChatModelCombo.Items.Clear();
-
-            if (_geminiService.IsConfigured)
-                foreach (var m in GeminiService.AvailableModels)
-                    ChatModelCombo.Items.Add(m);
-
-            if (_claudeService.IsConfigured)
-                foreach (var m in ClaudeService.AvailableModels)
-                    ChatModelCombo.Items.Add(m);
-
-            if (ChatModelCombo.Items.Count == 0)
-            {
-                ChatModelCombo.Items.Add("(no API key set)");
-                ChatModelCombo.SelectedIndex = 0;
-                return;
-            }
-
-            if (prev != null && ChatModelCombo.Items.Contains(prev))
-                ChatModelCombo.SelectedItem = prev;
-            else
-                ChatModelCombo.SelectedIndex = 0;
-        }
-
-        private void ChatModelCombo_Changed(object sender, SelectionChangedEventArgs e) { }
-
-        private bool IsChatModelClaude()
-        {
-            var sel = ChatModelCombo.SelectedItem as string;
-            return sel != null && sel.StartsWith("claude", StringComparison.OrdinalIgnoreCase);
-        }
-
         private async void SendChatMessage()
         {
             var text = ChatInput.Text?.Trim();
             if (string.IsNullOrEmpty(text) || _chatBusy) return;
 
-            var selectedModel = ChatModelCombo.SelectedItem as string;
-            if (string.IsNullOrEmpty(selectedModel) || selectedModel == "(no API key set)")
-            {
-                AddChatBubble("System", "No chat model available.\nConfigure a Gemini or Claude API key in Settings.", (Brush)FindResource("DangerAlert"));
-                return;
-            }
-
-            bool useClaude = IsChatModelClaude();
-
-            if (useClaude && !_claudeService.IsConfigured)
-            {
-                AddChatBubble("System", "Claude API key not configured.\nSet it in Settings > Claude.", (Brush)FindResource("DangerAlert"));
-                return;
-            }
-            if (!useClaude && !_geminiService.IsConfigured)
+            if (!_geminiService.IsConfigured)
             {
                 AddChatBubble("System", "Gemini API key not configured.\nSet it in Settings > Gemini.", (Brush)FindResource("DangerAlert"));
                 return;
@@ -3022,10 +2650,11 @@ namespace AgenticEngine
             ChatInput.IsEnabled = false;
             ChatSendBtn.IsEnabled = false;
 
-            var userBubble = AddChatBubble("You", text, (Brush)FindResource("Accent"));
+            // Add user bubble
+            AddChatBubble("You", text, (Brush)FindResource("Accent"));
 
-            var senderLabel = useClaude ? "Claude" : "Gemini";
-            var responseBubble = AddChatBubble(senderLabel, "", (Brush)FindResource("AccentHover"));
+            // Create streaming response bubble (starts empty, text streams in)
+            var responseBubble = AddChatBubble("Gemini", "", (Brush)FindResource("AccentHover"));
             var responseTextBlock = ((StackPanel)responseBubble.Child).Children[1] as TextBlock;
 
             _chatCts?.Cancel();
@@ -3037,30 +2666,20 @@ namespace AgenticEngine
                     "Give concise, practical suggestions. Keep responses short unless asked for detail. " +
                     "The user is working on software projects, primarily Unity game development.";
 
-                if (useClaude)
-                    _claudeService.SelectedModel = selectedModel;
-                else
-                    _geminiService.SelectedModel = selectedModel;
-
-                Action<string> onChunk = chunk =>
-                {
-                    responseTextBlock!.Text += chunk;
-                    ChatScrollViewer.ScrollToEnd();
-                };
-
-                string response;
-                if (useClaude)
-                    response = await _claudeService.SendChatMessageStreamingAsync(
-                        _chatHistory, text, onChunk, systemPrompt, _chatCts.Token);
-                else
-                    response = await _geminiService.SendChatMessageStreamingAsync(
-                        _chatHistory, text, onChunk, systemPrompt, _chatCts.Token);
+                var response = await _geminiService.SendChatMessageStreamingAsync(
+                    _chatHistory, text,
+                    chunk =>
+                    {
+                        responseTextBlock!.Text += chunk;
+                        ChatScrollViewer.ScrollToEnd();
+                    },
+                    systemPrompt, _chatCts.Token);
 
                 if (response.StartsWith("[Cancelled]") || response.StartsWith("[Error]"))
                 {
                     ChatMessagesPanel.Children.Remove(responseBubble);
-                    ChatMessagesPanel.Children.Remove(userBubble);
-                    ChatInput.Text = text;
+                    if (!response.StartsWith("[Cancelled]"))
+                        AddChatBubble("Error", response, (Brush)FindResource("DangerAlert"));
                 }
                 else
                 {
@@ -3068,17 +2687,11 @@ namespace AgenticEngine
                     _chatHistory.Add(new ChatMessage { Role = "model", Text = response });
                 }
             }
-            catch (OperationCanceledException)
-            {
-                ChatMessagesPanel.Children.Remove(responseBubble);
-                ChatMessagesPanel.Children.Remove(userBubble);
-                ChatInput.Text = text;
-            }
+            catch (OperationCanceledException) { ChatMessagesPanel.Children.Remove(responseBubble); }
             catch (Exception ex)
             {
                 ChatMessagesPanel.Children.Remove(responseBubble);
-                ChatMessagesPanel.Children.Remove(userBubble);
-                ChatInput.Text = text;
+                AddChatBubble("Error", ex.Message, (Brush)FindResource("DangerAlert"));
             }
             finally
             {

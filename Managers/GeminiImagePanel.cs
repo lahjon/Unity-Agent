@@ -23,8 +23,8 @@ namespace AgenticEngine.Managers
                 IsReadOnly = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Background = new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0A)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                Background = (Brush)Application.Current.FindResource("BgAbyss"),
+                Foreground = (Brush)Application.Current.FindResource("TextBody"),
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 13,
                 BorderThickness = new Thickness(0),
@@ -43,7 +43,7 @@ namespace AgenticEngine.Managers
             var headerLabel = new TextBlock
             {
                 Text = "GEMINI IMAGE LIBRARY",
-                Foreground = new SolidColorBrush(Color.FromRgb(0x4E, 0xA8, 0xDB)),
+                Foreground = (Brush)Application.Current.FindResource("Accent"),
                 FontWeight = FontWeights.Bold,
                 FontSize = 11,
                 FontFamily = new FontFamily("Segoe UI"),
@@ -56,7 +56,7 @@ namespace AgenticEngine.Managers
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 14,
                 Background = Brushes.Transparent,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
                 BorderThickness = new Thickness(0),
                 Cursor = Cursors.Hand,
                 ToolTip = "Open images folder",
@@ -115,9 +115,9 @@ namespace AgenticEngine.Managers
                 var border = new Border
                 {
                     CornerRadius = new CornerRadius(6),
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+                    BorderBrush = (Brush)Application.Current.FindResource("BorderSubtle"),
                     BorderThickness = new Thickness(1),
-                    Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14)),
+                    Background = (Brush)Application.Current.FindResource("BgTerminalInput"),
                     Child = image,
                     Margin = new Thickness(4)
                 };
@@ -131,9 +131,9 @@ namespace AgenticEngine.Managers
                 };
 
                 border.MouseEnter += (_, _) =>
-                    border.BorderBrush = new SolidColorBrush(Color.FromRgb(0x4E, 0xA8, 0xDB));
+                    border.BorderBrush = (Brush)Application.Current.FindResource("Accent");
                 border.MouseLeave += (_, _) =>
-                    border.BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+                    border.BorderBrush = (Brush)Application.Current.FindResource("BorderSubtle");
 
                 gallery.Children.Add(border);
             }

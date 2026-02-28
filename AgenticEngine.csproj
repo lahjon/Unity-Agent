@@ -18,4 +18,8 @@
     <Compile Remove="AgenticEngine.Tests\**" />
     <None Remove="AgenticEngine.Tests\**" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgenticEngine.Tests" />
+  </ItemGroup>
 </Project>

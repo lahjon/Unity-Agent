@@ -11,12 +11,12 @@
                 <ControlTemplate TargetType="GridSplitter">
                     <Grid Background="Transparent">
                         <Border x:Name="Indicator" Height="3" CornerRadius="1.5"
-                                Background="#2A2A2A" HorizontalAlignment="Center" Width="40"
+                                Background="{StaticResource BgCard}" HorizontalAlignment="Center" Width="40"
                                 VerticalAlignment="Center" Opacity="0.4"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Indicator" Property="Background" Value="#DA7756"/>
+                            <Setter TargetName="Indicator" Property="Background" Value="{StaticResource Accent}"/>
                             <Setter TargetName="Indicator" Property="Opacity" Value="0.8"/>
                             <Setter TargetName="Indicator" Property="Width" Value="60"/>
                         </Trigger>
@@ -36,12 +36,12 @@
                 <ControlTemplate TargetType="GridSplitter">
                     <Grid Background="Transparent">
                         <Border x:Name="Indicator" Width="3" CornerRadius="1.5"
-                                Background="#2A2A2A" VerticalAlignment="Center" Height="40"
+                                Background="{StaticResource BgCard}" VerticalAlignment="Center" Height="40"
                                 HorizontalAlignment="Center" Opacity="0.4"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Indicator" Property="Background" Value="#DA7756"/>
+                            <Setter TargetName="Indicator" Property="Background" Value="{StaticResource Accent}"/>
                             <Setter TargetName="Indicator" Property="Opacity" Value="0.8"/>
                             <Setter TargetName="Indicator" Property="Height" Value="60"/>
                         </Trigger>

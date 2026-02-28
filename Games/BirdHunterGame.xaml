@@ -3,18 +3,18 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Focusable="True"
              PreviewKeyDown="OnPreviewKeyDown">
-    <Grid Background="#191919">
+    <Grid Background="{StaticResource BgDeep}">
         <!-- Menu state -->
         <StackPanel x:Name="MenuPanel" VerticalAlignment="Center" HorizontalAlignment="Center">
-            <TextBlock Text="Bird Hunter" Foreground="#DA7756" FontSize="22" FontWeight="Bold"
+            <TextBlock Text="Bird Hunter" Foreground="{StaticResource Accent}" FontSize="22" FontWeight="Bold"
                        FontFamily="Segoe UI" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-            <TextBlock Text="Shoot as many birds as you can in 10 seconds!" Foreground="#777"
+            <TextBlock Text="Shoot as many birds as you can in 10 seconds!" Foreground="{StaticResource TextDim}"
                        FontSize="13" FontFamily="Segoe UI" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-            <TextBlock x:Name="HighScoreMenuText" Foreground="#5CB85C" FontSize="14" FontWeight="SemiBold"
+            <TextBlock x:Name="HighScoreMenuText" Foreground="{StaticResource Success}" FontSize="14" FontWeight="SemiBold"
                        FontFamily="Segoe UI" HorizontalAlignment="Center" Margin="0,0,0,24"/>
             <Button Content="Start" Click="Start_Click"
                     Width="120" Height="36" FontSize="14" FontFamily="Segoe UI" FontWeight="SemiBold"
-                    Cursor="Hand" Background="#DA7756" Foreground="#FFF" BorderThickness="0">
+                    Cursor="Hand" Background="{StaticResource Accent}" Foreground="#FFF" BorderThickness="0">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
@@ -23,7 +23,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#E89B7E"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHover}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -31,7 +31,7 @@
             </Button>
             <Button Content="Quit" Click="Quit_Click"
                     Width="90" Height="34" FontSize="13" FontFamily="Segoe UI" FontWeight="SemiBold"
-                    Cursor="Hand" Background="#333" Foreground="#AAA" BorderThickness="0" Margin="0,10,0,0">
+                    Cursor="Hand" Background="{StaticResource BorderSubtle}" Foreground="{StaticResource TextTabHeader}" BorderThickness="0" Margin="0,10,0,0">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
@@ -40,7 +40,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#444"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SeparatorDark}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -53,14 +53,14 @@
             <!-- HUD overlay -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Top" HorizontalAlignment="Left"
                         Margin="16,12" Panel.ZIndex="1">
-                <TextBlock Text="Score: " Foreground="#777" FontSize="16" FontFamily="Segoe UI"/>
-                <TextBlock x:Name="ScoreText" Text="0" Foreground="#5CB85C" FontSize="16"
+                <TextBlock Text="Score: " Foreground="{StaticResource TextDim}" FontSize="16" FontFamily="Segoe UI"/>
+                <TextBlock x:Name="ScoreText" Text="0" Foreground="{StaticResource Success}" FontSize="16"
                            FontWeight="Bold" FontFamily="Segoe UI"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Top" HorizontalAlignment="Right"
                         Margin="16,12" Panel.ZIndex="1">
-                <TextBlock Text="Time: " Foreground="#777" FontSize="16" FontFamily="Segoe UI"/>
-                <TextBlock x:Name="TimerText" Text="30" Foreground="#DA7756" FontSize="16"
+                <TextBlock Text="Time: " Foreground="{StaticResource TextDim}" FontSize="16" FontFamily="Segoe UI"/>
+                <TextBlock x:Name="TimerText" Text="30" Foreground="{StaticResource Accent}" FontSize="16"
                            FontWeight="Bold" FontFamily="Segoe UI"/>
             </StackPanel>
             <!-- Bird canvas -->
@@ -71,21 +71,21 @@
         <!-- Result state -->
         <StackPanel x:Name="ResultPanel" VerticalAlignment="Center" HorizontalAlignment="Center"
                     Visibility="Collapsed">
-            <TextBlock Text="Time's Up!" Foreground="#DA7756" FontSize="20" FontWeight="Bold"
+            <TextBlock Text="Time's Up!" Foreground="{StaticResource Accent}" FontSize="20" FontWeight="Bold"
                        FontFamily="Segoe UI" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-            <TextBlock x:Name="FinalScoreText" Foreground="#5CB85C" FontSize="36" FontWeight="Bold"
+            <TextBlock x:Name="FinalScoreText" Foreground="{StaticResource Success}" FontSize="36" FontWeight="Bold"
                        FontFamily="Segoe UI" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-            <TextBlock Text="birds shot" Foreground="#666" FontSize="14" FontFamily="Segoe UI"
+            <TextBlock Text="birds shot" Foreground="{StaticResource TextMuted}" FontSize="14" FontFamily="Segoe UI"
                        HorizontalAlignment="Center" Margin="0,0,0,8"/>
-            <TextBlock x:Name="NewHighScoreText" Text="New High Score!" Foreground="#FFD700" FontSize="16"
+            <TextBlock x:Name="NewHighScoreText" Text="New High Score!" Foreground="{StaticResource HighScoreGold}" FontSize="16"
                        FontWeight="Bold" FontFamily="Segoe UI" HorizontalAlignment="Center"
                        Margin="0,0,0,8" Visibility="Collapsed"/>
-            <TextBlock x:Name="HighScoreResultText" Foreground="#777" FontSize="13" FontFamily="Segoe UI"
+            <TextBlock x:Name="HighScoreResultText" Foreground="{StaticResource TextDim}" FontSize="13" FontFamily="Segoe UI"
                        HorizontalAlignment="Center" Margin="0,0,0,24"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Button Content="Try Again" Click="TryAgain_Click"
                         Width="110" Height="34" FontSize="13" FontFamily="Segoe UI" FontWeight="SemiBold"
-                        Cursor="Hand" Background="#DA7756" Foreground="#FFF" BorderThickness="0" Margin="0,0,10,0">
+                        Cursor="Hand" Background="{StaticResource Accent}" Foreground="#FFF" BorderThickness="0" Margin="0,0,10,0">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="Bd" Background="{TemplateBinding Background}"
@@ -94,7 +94,7 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#E89B7E"/>
+                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHover}"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -102,7 +102,7 @@
                 </Button>
                 <Button Content="Quit" Click="Quit_Click"
                         Width="90" Height="34" FontSize="13" FontFamily="Segoe UI" FontWeight="SemiBold"
-                        Cursor="Hand" Background="#333" Foreground="#AAA" BorderThickness="0">
+                        Cursor="Hand" Background="{StaticResource BorderSubtle}" Foreground="{StaticResource TextTabHeader}" BorderThickness="0">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="Bd" Background="{TemplateBinding Background}"
@@ -111,7 +111,7 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#444"/>
+                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource SeparatorDark}"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
