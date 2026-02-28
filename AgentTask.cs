@@ -144,6 +144,58 @@ namespace AgenticEngine
         public string? PendingFileLockPath { get => Runtime.PendingFileLockPath; set => Runtime.PendingFileLockPath = value; }
         public string? PendingFileLockBlocker { get => Runtime.PendingFileLockBlocker; set => Runtime.PendingFileLockBlocker = value; }
 
+        // ── Token tracking ─────────────────────────────────────────────
+
+        public long InputTokens
+        {
+            get => Data.InputTokens;
+            set { Data.InputTokens = value; OnPropertyChanged(); OnPropertyChanged(nameof(TokenDisplayText)); OnPropertyChanged(nameof(HasTokenData)); }
+        }
+
+        public long OutputTokens
+        {
+            get => Data.OutputTokens;
+            set { Data.OutputTokens = value; OnPropertyChanged(); OnPropertyChanged(nameof(TokenDisplayText)); OnPropertyChanged(nameof(HasTokenData)); }
+        }
+
+        public long CacheReadTokens
+        {
+            get => Data.CacheReadTokens;
+            set { Data.CacheReadTokens = value; OnPropertyChanged(); OnPropertyChanged(nameof(TokenDisplayText)); }
+        }
+
+        public long CacheCreationTokens
+        {
+            get => Data.CacheCreationTokens;
+            set { Data.CacheCreationTokens = value; OnPropertyChanged(); OnPropertyChanged(nameof(TokenDisplayText)); }
+        }
+
+        public bool HasTokenData => InputTokens > 0 || OutputTokens > 0;
+
+        public string TokenDisplayText
+        {
+            get
+            {
+                if (!HasTokenData) return "";
+                return $"{FormatTokenCount(InputTokens)} in / {FormatTokenCount(OutputTokens)} out";
+            }
+        }
+
+        public void AddTokenUsage(long inputTokens, long outputTokens, long cacheReadTokens = 0, long cacheCreationTokens = 0)
+        {
+            InputTokens += inputTokens;
+            OutputTokens += outputTokens;
+            CacheReadTokens += cacheReadTokens;
+            CacheCreationTokens += cacheCreationTokens;
+        }
+
+        private static string FormatTokenCount(long count)
+        {
+            if (count >= 1_000_000) return $"{count / 1_000_000.0:F1}M";
+            if (count >= 1_000) return $"{count / 1_000.0:F1}K";
+            return count.ToString();
+        }
+
         // ── Tool activity feed (UI-bound) ─────────────────────────────
 
         private string _toolActivityText = "";

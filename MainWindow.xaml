@@ -264,13 +264,10 @@
                             </ToolTip>
                         </TextBlock.ToolTip>
                     </TextBlock>
-                    <!-- Tool activity feed (latest action) -->
-                    <TextBlock Grid.Row="2" Text="{Binding ToolActivityText}"
-                               Foreground="{StaticResource ToolActivityText}" FontSize="10" FontFamily="Consolas"
-                               TextTrimming="CharacterEllipsis" Margin="0,4,0,0"
-                               LineHeight="15">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
+                    <!-- Tool activity feed + token usage -->
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,0">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
                                 <Setter Property="Visibility" Value="Collapsed"/>
                                 <Style.Triggers>
                                     <MultiDataTrigger>
@@ -280,10 +277,63 @@
                                         </MultiDataTrigger.Conditions>
                                         <Setter Property="Visibility" Value="Visible"/>
                                     </MultiDataTrigger>
+                                    <DataTrigger Binding="{Binding HasTokenData}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                        </StackPanel.Style>
+                        <TextBlock Text="{Binding ToolActivityText}"
+                                   Foreground="{StaticResource ToolActivityText}" FontSize="10" FontFamily="Consolas"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="200"
+                                   LineHeight="15">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsRunning}" Value="True"/>
+                                                <Condition Binding="{Binding HasToolActivity}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="10" FontFamily="Consolas">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsRunning}" Value="True"/>
+                                                <Condition Binding="{Binding HasToolActivity}" Value="True"/>
+                                                <Condition Binding="{Binding HasTokenData}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding TokenDisplayText}"
+                                   Foreground="#8899AA" FontSize="10" FontFamily="Consolas"
+                                   LineHeight="15">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasTokenData}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
                     <Grid Grid.Row="3" Margin="0,6,0,0">
                         <TextBlock Text="{Binding TimeInfo}" Foreground="{StaticResource TextMuted}"
                                    FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
@@ -512,8 +562,35 @@
                         </TextBlock.ToolTip>
                     </TextBlock>
                     <Grid Grid.Row="3" Margin="0,6,0,0">
-                        <TextBlock Text="{Binding TimeInfo}" Foreground="{StaticResource TextDisabled}"
-                                   FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding TimeInfo}" Foreground="{StaticResource TextDisabled}"
+                                       FontSize="10" FontFamily="Segoe UI"/>
+                            <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="10" FontFamily="Segoe UI">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasTokenData}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding TokenDisplayText}" Foreground="#8899AA"
+                                       FontSize="10" FontFamily="Consolas">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasTokenData}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Border CornerRadius="3" Padding="4,1" Margin="0,0,8,0"
                                     Background="{StaticResource PlanBadgeBg}" BorderBrush="{StaticResource PlanBadgeBorder}" BorderThickness="1"
@@ -777,6 +854,11 @@
                                         Background="{StaticResource BgHover}" Style="{StaticResource Btn}"
                                         Foreground="#A8A8A8"
                                         FontSize="11" Padding="6,4" Margin="0,0,6,0"/>
+                                <Button Content="Save as Template" Click="SaveAsTemplate_Click"
+                                        Background="{StaticResource BgHover}" Style="{StaticResource Btn}"
+                                        Foreground="#A8A8A8"
+                                        FontSize="11" Padding="6,4" Margin="0,0,6,0"
+                                        ToolTip="Save current toggle states as a reusable template"/>
                                 <Button x:Name="ExecuteButton" Content="Execute Task" Click="Execute_Click"
                                         Background="{StaticResource Accent}" Style="{StaticResource Btn}"
                                         FontSize="13" Padding="18,6" FontWeight="Bold"/>
@@ -815,6 +897,20 @@
                                 <ComboBoxItem Content="Claude Code" Tag="ClaudeCode"/>
                                 <ComboBoxItem Content="Gemini (Image Gen)" Tag="Gemini"/>
                             </ComboBox>
+                            <TextBlock Text="TEMPLATE" Foreground="{StaticResource TextMuted}" FontWeight="Bold"
+                                       FontSize="9" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                       Margin="20,0,6,0"/>
+                            <ComboBox x:Name="TemplateCombo"
+                                      FontSize="11" Padding="6,3" MinWidth="170"
+                                      HorizontalAlignment="Left"
+                                      SelectionChanged="TemplateCombo_Changed">
+                                <ComboBoxItem Content="(No Template)" Tag="" IsSelected="True"/>
+                            </ComboBox>
+                            <Button Content="Clear" Click="ClearPrompt_Click"
+                                    Style="{StaticResource GhostBtn}" Foreground="{StaticResource TextMuted}"
+                                    FontSize="10" FontFamily="Segoe UI" Padding="6,2"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    ToolTip="Clear prompt text"/>
                         </DockPanel>
                         <!-- Active project name removed from here; shown next to Execute button -->
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,6,0,0">
@@ -979,10 +1075,6 @@
                                             Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
                                             HorizontalAlignment="Right" FontSize="10"/>
                                 </DockPanel>
-                                <!-- Chat model selector -->
-                                <ComboBox x:Name="ChatModelCombo" DockPanel.Dock="Top"
-                                          FontSize="10" Padding="4,2" Margin="0,0,0,6"
-                                          SelectionChanged="ChatModelCombo_Changed"/>
                                 <!-- Input area at the bottom -->
                                 <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
                                     <Button x:Name="ChatSendBtn" Content="&#xE724;" Click="ChatSend_Click"
@@ -1892,6 +1984,30 @@
                                            FontSize="11" FontFamily="Consolas" Margin="0,2,0,0"
                                            Cursor="Hand" MouseDown="ClaudeApiLink_Click"
                                            TextDecorations="Underline"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <!-- Chat tab -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <TextBlock Text="Chat" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                            <StackPanel MaxWidth="600">
+                                <TextBlock Text="Chat Model" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <TextBlock Text="Select which AI model to use in the Chat panel."
+                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Margin="0,0,0,16"/>
+
+                                <TextBlock Text="Model" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
+                                           Margin="0,0,0,6"/>
+                                <ComboBox x:Name="ChatModelCombo"
+                                          FontSize="11" Padding="6,3" MinWidth="280"
+                                          HorizontalAlignment="Left" Margin="0,0,0,4"
+                                          SelectionChanged="ChatModelCombo_Changed"/>
+                                <TextBlock Text="Available models depend on which API keys are configured (Gemini and Claude tabs)."
+                                           Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"/>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

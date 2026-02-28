@@ -54,7 +54,11 @@ namespace AgenticEngine.Managers
                         MaxIterations = t.MaxIterations,
                         CurrentIteration = t.CurrentIteration,
                         CompletionSummary = t.CompletionSummary,
-                        Recommendations = t.Recommendations ?? ""
+                        Recommendations = t.Recommendations ?? "",
+                        InputTokens = t.InputTokens,
+                        OutputTokens = t.OutputTokens,
+                        CacheReadTokens = t.CacheReadTokens,
+                        CacheCreationTokens = t.CacheCreationTokens
                     }).ToList();
                 }
 
@@ -93,7 +97,11 @@ namespace AgenticEngine.Managers
                         MaxIterations = entry.MaxIterations > 0 ? entry.MaxIterations : 50,
                         CurrentIteration = entry.CurrentIteration,
                         CompletionSummary = entry.CompletionSummary ?? "",
-                        Recommendations = entry.Recommendations ?? ""
+                        Recommendations = entry.Recommendations ?? "",
+                        InputTokens = entry.InputTokens,
+                        OutputTokens = entry.OutputTokens,
+                        CacheReadTokens = entry.CacheReadTokens,
+                        CacheCreationTokens = entry.CacheCreationTokens
                     };
                     task.Summary = entry.Summary ?? "";
                     task.Status = Enum.TryParse<AgentTaskStatus>(entry.Status, out var s)

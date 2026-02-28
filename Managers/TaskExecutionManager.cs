@@ -779,8 +779,37 @@ namespace AgenticEngine.Managers
                         AppendOutput(taskId, $"\n[Error] {errMsg}\n", activeTasks, historyTasks);
                         break;
 
+                    case "message_start":
+                        if (root.TryGetProperty("message", out var startMsg) &&
+                            startMsg.TryGetProperty("usage", out var startUsage))
+                        {
+                            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                            if (task != null)
+                            {
+                                var inTok = startUsage.TryGetProperty("input_tokens", out var sit) ? sit.GetInt64() : 0;
+                                var outTok = startUsage.TryGetProperty("output_tokens", out var sot) ? sot.GetInt64() : 0;
+                                var cacheRead = startUsage.TryGetProperty("cache_read_input_tokens", out var crt) ? crt.GetInt64() : 0;
+                                var cacheCreate = startUsage.TryGetProperty("cache_creation_input_tokens", out var cct) ? cct.GetInt64() : 0;
+                                task.AddTokenUsage(inTok, outTok, cacheRead, cacheCreate);
+                            }
+                        }
+                        break;
+
+                    case "message_delta":
+                        if (root.TryGetProperty("usage", out var deltaUsage))
+                        {
+                            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                            if (task != null)
+                            {
+                                var outTok = deltaUsage.TryGetProperty("output_tokens", out var dot) ? dot.GetInt64() : 0;
+                                if (outTok > 0)
+                                    task.AddTokenUsage(0, outTok);
+                            }
+                        }
+                        break;
+
                     default:
-                        if (type != null && type != "ping" && type != "message_start" && type != "message_stop" && type != "user")
+                        if (type != null && type != "ping" && type != "message_stop" && type != "user")
                             AppendOutput(taskId, $"[{type}]\n", activeTasks, historyTasks);
                         break;
                 }

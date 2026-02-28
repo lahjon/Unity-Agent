@@ -23,6 +23,11 @@ namespace AgenticEngine.Models
         public TimeSpan? ShortestDuration { get; set; }
         public TimeSpan? LongestDuration { get; set; }
 
+        public long TotalInputTokens { get; set; }
+        public long TotalOutputTokens { get; set; }
+        public long TotalTokens => TotalInputTokens + TotalOutputTokens;
+        public DateTime? MostRecentTaskTime { get; set; }
+
         public List<SparklinePoint> RecentActivity { get; set; } = new();
     }
 

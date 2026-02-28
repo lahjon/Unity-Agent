@@ -148,6 +148,7 @@ namespace AgenticEngine
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
 
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
+            _projectManager.SetTaskCollections(_activeTasks, _historyTasks);
 
             // Set up collections with cross-thread synchronization
             BindingOperations.EnableCollectionSynchronization(_activeTasks, _activeTasksLock);
@@ -288,6 +289,8 @@ namespace AgenticEngine
             // Async data loading — settings, projects, history, stored tasks, saved prompts
             await LoadStartupDataAsync();
             await LoadSavedPromptsAsync();
+            await _settingsManager.LoadTemplatesAsync();
+            RenderTemplateCombo();
 
             foreach (ComboBoxItem item in HistoryRetentionCombo.Items)
             {
@@ -812,6 +815,8 @@ namespace AgenticEngine
         private void TaskInput_Drop(object sender, DragEventArgs e) => _imageManager.HandleDrop(e);
 
         private void ClearImages_Click(object sender, RoutedEventArgs e) => _imageManager.ClearImages();
+
+        private void ClearPrompt_Click(object sender, RoutedEventArgs e) => TaskInput.Clear();
 
         // ── Dependencies ────────────────────────────────────────────
 
@@ -1857,6 +1862,7 @@ namespace AgenticEngine
             _historyManager.SaveHistory(_historyTasks);
             RefreshActivityDashboard();
             RefreshFilterCombos();
+            RefreshInlineProjectStats();
             UpdateStatus();
 
             // Resume tasks that were waiting on file locks or dependencies
@@ -2461,6 +2467,14 @@ namespace AgenticEngine
                 _activityDashboard.RefreshIfNeeded(ActivityTabContent);
         }
 
+        private void RefreshInlineProjectStats()
+        {
+            _projectManager.RefreshProjectList(
+                p => _terminalManager?.UpdateWorkingDirectory(p),
+                () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
+                SyncSettingsForProject);
+        }
+
         // ── Settings Panel Collapse ───────────────────────────────
 
         private void ToggleSettingsPanel_Click(object sender, RoutedEventArgs e)
@@ -2905,6 +2919,150 @@ namespace AgenticEngine
             _savedPrompts.RemoveAll(p => p.Id == id);
             PersistSavedPrompts();
             RenderSavedPrompts();
+        }
+
+        // ── Task Templates ────────────────────────────────────────
+
+        private void SaveAsTemplate_Click(object sender, RoutedEventArgs e)
+        {
+            var name = Dialogs.DarkDialog.ShowTextInput("Save as Template", "Template name:");
+            if (string.IsNullOrEmpty(name)) return;
+
+            var modelTag = "ClaudeCode";
+            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem)
+                modelTag = modelItem.Tag?.ToString() ?? "ClaudeCode";
+
+            var template = new TaskTemplate
+            {
+                Name = name,
+                Description = name,
+                RemoteSession = RemoteSessionToggle.IsChecked == true,
+                Headless = HeadlessToggle.IsChecked == true,
+                SpawnTeam = SpawnTeamToggle.IsChecked == true,
+                IsOvernight = OvernightToggle.IsChecked == true,
+                ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true,
+                PlanOnly = PlanOnlyToggle.IsChecked == true,
+                IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true,
+                UseMcp = UseMcpToggle.IsChecked == true,
+                NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true,
+                UseMessageBus = MessageBusToggle.IsChecked == true,
+                Model = modelTag,
+            };
+
+            _settingsManager.TaskTemplates.Insert(0, template);
+            _settingsManager.SaveTemplates();
+            RenderTemplateCombo();
+        }
+
+        private void RenderTemplateCombo()
+        {
+            TemplateCombo.SelectionChanged -= TemplateCombo_Changed;
+            TemplateCombo.Items.Clear();
+            TemplateCombo.Items.Add(new ComboBoxItem { Content = "(No Template)", Tag = "" });
+
+            foreach (var t in _settingsManager.TaskTemplates)
+            {
+                var item = new ComboBoxItem { Content = t.Name, Tag = t.Id };
+                item.ToolTip = BuildTemplateTooltip(t);
+                TemplateCombo.Items.Add(item);
+            }
+
+            // Add a "Manage..." option at the end
+            TemplateCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "Delete templates...",
+                Tag = "__manage__",
+                Foreground = (Brush)FindResource("TextMuted"),
+                FontStyle = FontStyles.Italic
+            });
+
+            TemplateCombo.SelectedIndex = 0;
+            TemplateCombo.SelectionChanged += TemplateCombo_Changed;
+        }
+
+        private static string BuildTemplateTooltip(TaskTemplate t)
+        {
+            var flags = new List<string>();
+            if (t.RemoteSession) flags.Add("Remote");
+            if (t.Headless) flags.Add("Headless");
+            if (t.SpawnTeam) flags.Add("Team");
+            if (t.IsOvernight) flags.Add("Overnight");
+            if (t.ExtendedPlanning) flags.Add("ExtPlanning");
+            if (t.PlanOnly) flags.Add("PlanOnly");
+            if (t.UseMessageBus) flags.Add("MsgBus");
+            if (t.NoGitWrite) flags.Add("NoGitWrite");
+            if (t.IgnoreFileLocks) flags.Add("IgnoreLocks");
+            if (t.UseMcp) flags.Add("MCP");
+            return flags.Count > 0 ? string.Join(", ", flags) : "(default settings)";
+        }
+
+        private void TemplateCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (TemplateCombo.SelectedItem is not ComboBoxItem selected) return;
+            var tag = selected.Tag?.ToString();
+
+            if (tag == "__manage__")
+            {
+                // Show template management
+                TemplateCombo.SelectionChanged -= TemplateCombo_Changed;
+                TemplateCombo.SelectedIndex = 0;
+                TemplateCombo.SelectionChanged += TemplateCombo_Changed;
+                ShowTemplateManagement();
+                return;
+            }
+
+            if (string.IsNullOrEmpty(tag)) return;
+
+            var template = _settingsManager.TaskTemplates.Find(t => t.Id == tag);
+            if (template == null) return;
+
+            // Apply template values to toggles
+            RemoteSessionToggle.IsChecked = template.RemoteSession;
+            HeadlessToggle.IsChecked = template.Headless;
+            SpawnTeamToggle.IsChecked = template.SpawnTeam;
+            OvernightToggle.IsChecked = template.IsOvernight;
+            ExtendedPlanningToggle.IsChecked = template.ExtendedPlanning;
+            PlanOnlyToggle.IsChecked = template.PlanOnly;
+            IgnoreFileLocksToggle.IsChecked = template.IgnoreFileLocks;
+            UseMcpToggle.IsChecked = template.UseMcp;
+            DefaultNoGitWriteToggle.IsChecked = template.NoGitWrite;
+            MessageBusToggle.IsChecked = template.UseMessageBus;
+
+            // Apply model selection
+            for (int i = 0; i < ModelCombo.Items.Count; i++)
+            {
+                if (ModelCombo.Items[i] is ComboBoxItem item && item.Tag?.ToString() == template.Model)
+                {
+                    ModelCombo.SelectedIndex = i;
+                    break;
+                }
+            }
+
+            UpdateExecuteButtonText();
+        }
+
+        private void ShowTemplateManagement()
+        {
+            if (_settingsManager.TaskTemplates.Count == 0)
+            {
+                Dialogs.DarkDialog.ShowAlert("No templates saved yet.", "Task Templates");
+                return;
+            }
+
+            var names = _settingsManager.TaskTemplates
+                .Select((t, i) => $"{i + 1}. {t.Name}")
+                .ToList();
+
+            var input = Dialogs.DarkDialog.ShowTextInput(
+                "Delete Template",
+                "Enter the number of the template to delete:\n\n" + string.Join("\n", names));
+
+            if (input != null && int.TryParse(input, out var idx) && idx >= 1 && idx <= _settingsManager.TaskTemplates.Count)
+            {
+                _settingsManager.TaskTemplates.RemoveAt(idx - 1);
+                _settingsManager.SaveTemplates();
+                RenderTemplateCombo();
+            }
         }
 
         // ── Chat Panel ────────────────────────────────────────────

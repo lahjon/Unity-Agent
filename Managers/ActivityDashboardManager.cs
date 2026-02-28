@@ -141,6 +141,12 @@ namespace AgenticEngine.Managers
                 })
                 .ToList();
 
+            var mostRecentEnd = tasks
+                .Where(t => t.EndTime.HasValue)
+                .Select(t => t.EndTime!.Value)
+                .DefaultIfEmpty()
+                .Max();
+
             return new ProjectActivityStats
             {
                 ProjectPath = normalizedPath,
@@ -160,6 +166,9 @@ namespace AgenticEngine.Managers
                     : TimeSpan.Zero,
                 ShortestDuration = durations.Count > 0 ? durations.Min() : null,
                 LongestDuration = durations.Count > 0 ? durations.Max() : null,
+                TotalInputTokens = tasks.Sum(t => t.InputTokens),
+                TotalOutputTokens = tasks.Sum(t => t.OutputTokens),
+                MostRecentTaskTime = mostRecentEnd != default ? mostRecentEnd : null,
                 RecentActivity = recentCompleted
             };
         }
@@ -203,18 +212,18 @@ namespace AgenticEngine.Managers
             var overallSuccessRate = totalFinished > 0 ? (double)totalCompleted / totalFinished : 0;
             var totalRuntime = TimeSpan.FromTicks(allStats.Sum(s => s.TotalDuration.Ticks));
             var activeNow = allStats.Sum(s => s.RunningTasks);
+            var totalTokens = allStats.Sum(s => s.TotalTokens);
 
             var grid = new Grid();
             if (isDialog)
             {
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                for (int c = 0; c < 5; c++)
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             }
             else
             {
-                // 2x2 grid for narrow settings panel
+                // 3-column + 2 row grid for narrow settings panel
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -228,7 +237,8 @@ namespace AgenticEngine.Managers
                 ("Total Tasks", totalTasks.ToString(), "#E8E8E8"),
                 ("Success Rate", totalFinished > 0 ? $"{overallSuccessRate:P0}" : "N/A", successColor),
                 ("Total Runtime", FormatDuration(totalRuntime), "#E8E8E8"),
-                ("Active Now", activeNow.ToString(), activeNow > 0 ? "#64B5F6" : "#888888")
+                ("Active Now", activeNow.ToString(), activeNow > 0 ? "#64B5F6" : "#888888"),
+                ("Total Tokens", totalTokens > 0 ? FormatTokenCount(totalTokens) : "N/A", totalTokens > 0 ? "#8899AA" : "#888888")
             };
 
             for (int i = 0; i < metrics.Length; i++)
@@ -258,8 +268,8 @@ namespace AgenticEngine.Managers
                 }
                 else
                 {
-                    Grid.SetColumn(cell, i % 2);
-                    Grid.SetRow(cell, i / 2);
+                    Grid.SetColumn(cell, i % 3);
+                    Grid.SetRow(cell, i / 3);
                 }
                 grid.Children.Add(cell);
             }
@@ -430,6 +440,32 @@ namespace AgenticEngine.Managers
                 card.Children.Add(durPanel);
             }
 
+            // Token usage
+            if (stats.TotalTokens > 0)
+            {
+                var tokenPanel = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
+                var tokenLabel = new TextBlock
+                {
+                    Text = "Tokens ",
+                    Foreground = Brush("#666666"),
+                    FontSize = 11,
+                    FontFamily = new FontFamily("Segoe UI"),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var tokenValue = new TextBlock
+                {
+                    Text = $"{FormatTokenCount(stats.TotalInputTokens)} in / {FormatTokenCount(stats.TotalOutputTokens)} out",
+                    Foreground = Brush("#8899AA"),
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new FontFamily("Consolas"),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                tokenPanel.Children.Add(tokenLabel);
+                tokenPanel.Children.Add(tokenValue);
+                card.Children.Add(tokenPanel);
+            }
+
             // Sparkline
             if (stats.RecentActivity.Count >= 2)
             {
@@ -593,6 +629,13 @@ namespace AgenticEngine.Managers
             if (ts.TotalMinutes >= 1)
                 return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
             return $"{ts.Seconds}s";
+        }
+
+        internal static string FormatTokenCount(long count)
+        {
+            if (count >= 1_000_000) return $"{count / 1_000_000.0:F1}M";
+            if (count >= 1_000) return $"{count / 1_000.0:F1}K";
+            return count.ToString();
         }
 
         private static string NormalizePath(string? path)

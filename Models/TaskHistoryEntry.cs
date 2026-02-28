@@ -21,5 +21,9 @@ namespace AgenticEngine.Models
         public int CurrentIteration { get; set; }
         public string CompletionSummary { get; set; } = "";
         public string Recommendations { get; set; } = "";
+        public long InputTokens { get; set; }
+        public long OutputTokens { get; set; }
+        public long CacheReadTokens { get; set; }
+        public long CacheCreationTokens { get; set; }
     }
 }

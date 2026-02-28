@@ -42,5 +42,11 @@ namespace AgenticEngine
         public AgentTaskStatus Status { get; set; } = AgentTaskStatus.Running;
         public DateTime? EndTime { get; set; }
         public string? GitStartHash { get; set; }
+
+        // Token usage tracking
+        public long InputTokens { get; set; }
+        public long OutputTokens { get; set; }
+        public long CacheReadTokens { get; set; }
+        public long CacheCreationTokens { get; set; }
     }
 }

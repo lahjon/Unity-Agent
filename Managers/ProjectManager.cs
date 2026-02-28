@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -26,6 +27,8 @@ namespace AgenticEngine.Managers
         private bool _isSwapping;
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
         private static readonly Random _rng = new();
+        private ObservableCollection<AgentTask>? _activeTasks;
+        private ObservableCollection<AgentTask>? _historyTasks;
 
         private static readonly string[] ProjectColorPalette =
         {
@@ -117,6 +120,97 @@ namespace AgenticEngine.Managers
             _projectRulesList = projectRulesList;
             _regenerateDescBtn = regenerateDescBtn;
             _dispatcher = dispatcher;
+        }
+
+        public void SetTaskCollections(
+            ObservableCollection<AgentTask> activeTasks,
+            ObservableCollection<AgentTask> historyTasks)
+        {
+            _activeTasks = activeTasks;
+            _historyTasks = historyTasks;
+        }
+
+        public ProjectActivityStats GetProjectStats(string projectPath, IEnumerable<AgentTask> allTasks)
+        {
+            var normPath = NormalizePath(projectPath);
+            var tasks = allTasks
+                .Where(t => NormalizePath(t.ProjectPath) == normPath)
+                .ToList();
+
+            var completed = tasks.Count(t => t.Status == AgentTaskStatus.Completed);
+            var failed = tasks.Count(t => t.Status == AgentTaskStatus.Failed);
+            var cancelled = tasks.Count(t => t.Status == AgentTaskStatus.Cancelled);
+            var finishedCount = completed + failed;
+
+            var durations = tasks
+                .Where(t => t.EndTime.HasValue)
+                .Select(t => t.EndTime!.Value - t.StartTime)
+                .Where(d => d > TimeSpan.Zero)
+                .ToList();
+
+            var project = _savedProjects.FirstOrDefault(p =>
+                NormalizePath(p.Path) == normPath);
+
+            var displayName = project?.DisplayName
+                ?? (string.IsNullOrEmpty(normPath) ? "Unassigned" : Path.GetFileName(normPath));
+            var color = project?.Color;
+            if (string.IsNullOrEmpty(color)) color = "#666666";
+
+            var totalInputTokens = tasks.Sum(t => t.InputTokens);
+            var totalOutputTokens = tasks.Sum(t => t.OutputTokens);
+
+            var mostRecent = tasks
+                .Where(t => t.EndTime.HasValue)
+                .Select(t => t.EndTime!.Value)
+                .DefaultIfEmpty()
+                .Max();
+
+            return new ProjectActivityStats
+            {
+                ProjectPath = normPath,
+                ProjectName = displayName,
+                ProjectColor = color,
+                TotalTasks = tasks.Count,
+                CompletedTasks = completed,
+                FailedTasks = failed,
+                CancelledTasks = cancelled,
+                SuccessRate = finishedCount > 0 ? (double)completed / finishedCount : 0,
+                FailureRate = finishedCount > 0 ? (double)failed / finishedCount : 0,
+                AverageDuration = durations.Count > 0
+                    ? TimeSpan.FromTicks((long)durations.Average(d => d.Ticks))
+                    : TimeSpan.Zero,
+                TotalDuration = durations.Count > 0
+                    ? TimeSpan.FromTicks(durations.Sum(d => d.Ticks))
+                    : TimeSpan.Zero,
+                ShortestDuration = durations.Count > 0 ? durations.Min() : null,
+                LongestDuration = durations.Count > 0 ? durations.Max() : null,
+                TotalInputTokens = totalInputTokens,
+                TotalOutputTokens = totalOutputTokens,
+                MostRecentTaskTime = mostRecent == default ? null : mostRecent
+            };
+        }
+
+        private static string NormalizePath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return "";
+            return path.Replace('/', '\\').TrimEnd('\\').ToLowerInvariant();
+        }
+
+        private static string FormatTokenCount(long count)
+        {
+            if (count >= 1_000_000) return $"{count / 1_000_000.0:F1}M";
+            if (count >= 1_000) return $"{count / 1_000.0:F1}K";
+            return count.ToString();
+        }
+
+        private static string FormatRelativeTime(DateTime time)
+        {
+            var elapsed = DateTime.Now - time;
+            if (elapsed.TotalMinutes < 1) return "just now";
+            if (elapsed.TotalHours < 1) return $"{(int)elapsed.TotalMinutes}m ago";
+            if (elapsed.TotalDays < 1) return $"{(int)elapsed.TotalHours}h ago";
+            if (elapsed.TotalDays < 7) return $"{(int)elapsed.TotalDays}d ago";
+            return time.ToString("MMM d");
         }
 
         private string PickProjectColor()
@@ -706,6 +800,67 @@ namespace AgenticEngine.Managers
                     VerticalAlignment = VerticalAlignment.Center
                 });
                 infoPanel.Children.Add(initIndicator);
+
+                // ── Inline project stats panel ──
+                if (_activeTasks != null && _historyTasks != null)
+                {
+                    var allTasks = _activeTasks
+                        .Concat(_historyTasks)
+                        .Where(t => t.IsFinished);
+                    var stats = GetProjectStats(proj.Path, allTasks);
+                    if (stats.TotalTasks > 0)
+                    {
+                        var statsPanel = new StackPanel
+                        {
+                            Margin = new Thickness(0, 4, 0, 0)
+                        };
+
+                        var line1 = new TextBlock
+                        {
+                            FontSize = 10,
+                            FontFamily = new FontFamily("Segoe UI"),
+                            Foreground = (Brush)Application.Current.FindResource("TextMuted"),
+                            TextWrapping = TextWrapping.NoWrap,
+                            TextTrimming = TextTrimming.CharacterEllipsis
+                        };
+                        line1.Inlines.Add(new System.Windows.Documents.Run($"{stats.TotalTasks} tasks"));
+                        line1.Inlines.Add(new System.Windows.Documents.Run(" \u00b7 ") { Foreground = (Brush)Application.Current.FindResource("TextSubdued") });
+                        line1.Inlines.Add(new System.Windows.Documents.Run($"{stats.SuccessRate:P0} success")
+                        {
+                            Foreground = new SolidColorBrush(stats.SuccessRate >= 0.7
+                                ? Color.FromRgb(0x4C, 0xAF, 0x50)
+                                : stats.SuccessRate >= 0.4
+                                    ? Color.FromRgb(0xE0, 0xA0, 0x30)
+                                    : Color.FromRgb(0xE0, 0x50, 0x50))
+                        });
+                        if (stats.AverageDuration > TimeSpan.Zero)
+                        {
+                            line1.Inlines.Add(new System.Windows.Documents.Run(" \u00b7 ") { Foreground = (Brush)Application.Current.FindResource("TextSubdued") });
+                            line1.Inlines.Add(new System.Windows.Documents.Run($"avg {ActivityDashboardManager.FormatDuration(stats.AverageDuration)}"));
+                        }
+                        statsPanel.Children.Add(line1);
+
+                        var line2Parts = new List<string>();
+                        if (stats.TotalTokens > 0)
+                            line2Parts.Add($"{FormatTokenCount(stats.TotalTokens)} tokens");
+                        if (stats.MostRecentTaskTime.HasValue)
+                            line2Parts.Add($"last: {FormatRelativeTime(stats.MostRecentTaskTime.Value)}");
+                        if (line2Parts.Count > 0)
+                        {
+                            statsPanel.Children.Add(new TextBlock
+                            {
+                                Text = string.Join(" \u00b7 ", line2Parts),
+                                FontSize = 10,
+                                FontFamily = new FontFamily("Segoe UI"),
+                                Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
+                                TextWrapping = TextWrapping.NoWrap,
+                                TextTrimming = TextTrimming.CharacterEllipsis
+                            });
+                        }
+
+                        infoPanel.Children.Add(statsPanel);
+                    }
+                }
 
                 var mcpColor = proj.McpStatus switch
                 {

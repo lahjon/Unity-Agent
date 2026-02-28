@@ -3,16 +3,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AgenticEngine.Models;
 
 namespace AgenticEngine.Managers
 {
     public class SettingsManager
     {
         private readonly string _settingsFile;
+        private readonly string _templatesFile;
         private int _historyRetentionHours = 24;
         private string? _lastSelectedProject;
         private bool _settingsPanelCollapsed;
         private int _maxConcurrentTasks = 10;
+
+        public List<TaskTemplate> TaskTemplates { get; } = new();
 
         public int HistoryRetentionHours
         {
@@ -41,6 +45,7 @@ namespace AgenticEngine.Managers
         public SettingsManager(string appDataDir)
         {
             _settingsFile = Path.Combine(appDataDir, "settings.json");
+            _templatesFile = Path.Combine(appDataDir, "task_templates.json");
         }
 
         public async Task LoadSettingsAsync()
@@ -79,6 +84,33 @@ namespace AgenticEngine.Managers
                 SafeFileWriter.WriteInBackground(_settingsFile, json, "SettingsManager");
             }
             catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to save settings", ex); }
+        }
+
+        public async Task LoadTemplatesAsync()
+        {
+            try
+            {
+                if (!File.Exists(_templatesFile)) return;
+                var json = await File.ReadAllTextAsync(_templatesFile).ConfigureAwait(false);
+                var entries = JsonSerializer.Deserialize<List<TaskTemplate>>(json);
+                if (entries != null)
+                {
+                    TaskTemplates.Clear();
+                    TaskTemplates.AddRange(entries);
+                }
+            }
+            catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to load task templates", ex); }
+        }
+
+        public void SaveTemplates()
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(TaskTemplates,
+                    new JsonSerializerOptions { WriteIndented = true });
+                SafeFileWriter.WriteInBackground(_templatesFile, json, "SettingsManager");
+            }
+            catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to save task templates", ex); }
         }
     }
 }

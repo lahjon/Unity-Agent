@@ -248,25 +248,13 @@ namespace AgenticEngine.Managers
             closeBtn.Template = closeBtnTemplate;
             closeBtn.Click += (_, _) => TabCloseRequested?.Invoke(task);
 
-            var storeItem = new MenuItem
-            {
-                Header = "Store Task",
-                Foreground = (Brush)Application.Current.FindResource("TextBody"),
-            };
+            var storeItem = new MenuItem { Header = "Store Task" };
             storeItem.Click += (_, _) => TabStoreRequested?.Invoke(task);
 
-            var closeItem = new MenuItem
-            {
-                Header = "Close Tab",
-                Foreground = (Brush)Application.Current.FindResource("TextBody"),
-            };
+            var closeItem = new MenuItem { Header = "Close Tab" };
             closeItem.Click += (_, _) => TabCloseRequested?.Invoke(task);
 
-            var ctx = new ContextMenu
-            {
-                Background = (Brush)Application.Current.FindResource("BgPopup"),
-                BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
-            };
+            var ctx = new ContextMenu();
             ctx.Items.Add(storeItem);
             ctx.Items.Add(closeItem);
 
