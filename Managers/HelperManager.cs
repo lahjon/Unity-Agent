@@ -106,7 +106,7 @@ namespace AgenticEngine.Managers
             return Convert.ToHexString(bytes)[..12].ToLowerInvariant();
         }
 
-        public async Task GenerateSuggestionsAsync(string projectPath, SuggestionCategory category)
+        public async Task GenerateSuggestionsAsync(string projectPath, SuggestionCategory category, string? guidance = null)
         {
             if (IsGenerating) return;
 
@@ -147,6 +147,11 @@ namespace AgenticEngine.Managers
                     "Example:\n" +
                     "[{\"title\": \"Add email validation to login form\", \"description\": \"In LoginForm.cs, add a regex check on the email field in the Submit handler. Return an error message if the format is invalid. Add a unit test in LoginFormTests.cs to verify both valid and invalid emails.\"}]\n\n" +
                     "Output ONLY the JSON array, no other text, no markdown code blocks.";
+
+                if (!string.IsNullOrWhiteSpace(guidance))
+                {
+                    prompt += $"\n\nADDITIONAL GUIDANCE FROM USER:\n{guidance}";
+                }
 
                 var psi = new ProcessStartInfo
                 {
@@ -302,12 +307,7 @@ namespace AgenticEngine.Managers
                 }).ToList();
 
                 var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
-                var path = _suggestionsFile;
-                Task.Run(() =>
-                {
-                    try { File.WriteAllText(path, json); }
-                    catch (Exception ex) { AppLogger.Warn("HelperManager", "Background save suggestions failed", ex); }
-                });
+                SafeFileWriter.WriteInBackground(_suggestionsFile, json, "HelperManager");
             }
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to save suggestions", ex); }
         }
@@ -371,12 +371,7 @@ namespace AgenticEngine.Managers
             try
             {
                 var json = JsonSerializer.Serialize(_ignoredTitles.ToList(), new JsonSerializerOptions { WriteIndented = true });
-                var path = _ignoredFile;
-                Task.Run(() =>
-                {
-                    try { File.WriteAllText(path, json); }
-                    catch (Exception ex) { AppLogger.Warn("HelperManager", "Background save ignored titles failed", ex); }
-                });
+                SafeFileWriter.WriteInBackground(_ignoredFile, json, "HelperManager");
             }
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to save ignored titles", ex); }
         }

@@ -410,11 +410,7 @@ namespace AgenticEngine
                         text = text.Replace(TaskLauncher.McpPromptBlock, "");
                         var cleanedText = text;
                         var path = SystemPromptFile;
-                        _ = System.Threading.Tasks.Task.Run(() =>
-                        {
-                            try { File.WriteAllText(path, cleanedText); }
-                            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Background save system prompt failed", ex); }
-                        });
+                        Managers.SafeFileWriter.WriteInBackground(path, cleanedText, "MainWindow");
                     }
                     SystemPrompt = text;
                     SystemPromptBox.Text = SystemPrompt;
@@ -434,18 +430,9 @@ namespace AgenticEngine
         private void SavePrompt_Click(object sender, RoutedEventArgs e)
         {
             SystemPrompt = SystemPromptBox.Text;
-            var dir = Path.GetDirectoryName(SystemPromptFile)!;
             var content = SystemPrompt;
             var path = SystemPromptFile;
-            _ = System.Threading.Tasks.Task.Run(() =>
-            {
-                try
-                {
-                    Directory.CreateDirectory(dir);
-                    File.WriteAllText(path, content);
-                }
-                catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Background save system prompt failed", ex); }
-            });
+            Managers.SafeFileWriter.WriteInBackground(path, content, "MainWindow");
             EditSystemPromptToggle.IsChecked = false;
         }
 
@@ -460,7 +447,7 @@ namespace AgenticEngine
                         File.Delete(path);
                 }
                 catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to delete system prompt file", ex); }
-            });
+            }, System.Threading.CancellationToken.None);
             SystemPrompt = DefaultSystemPrompt;
             SystemPromptBox.Text = SystemPrompt;
             EditSystemPromptToggle.IsChecked = false;
@@ -660,6 +647,11 @@ namespace AgenticEngine
             Dialogs.ActivityDashboardDialog.Show(_activeTasks, _historyTasks, _projectManager.SavedProjects);
         }
 
+        private void ViewDependencyGraph_Click(object sender, RoutedEventArgs e)
+        {
+            Dialogs.DependencyGraphDialog.Show(_activeTasks, _fileLockManager);
+        }
+
         // ── Gemini Settings ─────────────────────────────────────────
 
         private void SaveGeminiKey_Click(object sender, RoutedEventArgs e)
@@ -816,7 +808,11 @@ namespace AgenticEngine
 
         private void ClearImages_Click(object sender, RoutedEventArgs e) => _imageManager.ClearImages();
 
-        private void ClearPrompt_Click(object sender, RoutedEventArgs e) => TaskInput.Clear();
+        private void ClearPrompt_Click(object sender, RoutedEventArgs e)
+        {
+            TaskInput.Clear();
+            AdditionalInstructionsInput.Clear();
+        }
 
         // ── Dependencies ────────────────────────────────────────────
 
@@ -1603,6 +1599,7 @@ namespace AgenticEngine
             UpdateStatus();
 
             var prompt = "Continue with the recommended next steps from the previous task. Specifically:\n\n" + task.Recommendations;
+            task.Recommendations = "";
             _taskExecutionManager.SendFollowUp(task, prompt, _activeTasks, _historyTasks);
         }
 
@@ -2541,7 +2538,8 @@ namespace AgenticEngine
                 Enum.TryParse(tag, out category);
             }
 
-            await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category);
+            var guidance = SuggestionGuidanceInput.Text?.Trim();
+            await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance);
         }
 
         private void ClearSuggestions_Click(object sender, RoutedEventArgs e)
@@ -2870,6 +2868,17 @@ namespace AgenticEngine
                 card.Child = grid;
 
                 card.MouseLeftButtonDown += LoadSavedPrompt_Click;
+                card.MouseDown += (s, ev) =>
+                {
+                    if (ev.ChangedButton == MouseButton.Middle)
+                    {
+                        var promptId = card.Tag as string;
+                        _savedPrompts.RemoveAll(p => p.Id == promptId);
+                        PersistSavedPrompts();
+                        RenderSavedPrompts();
+                        ev.Handled = true;
+                    }
+                };
 
                 var contextMenu = new ContextMenu();
                 var copyItem = new MenuItem { Header = "Copy Prompt" };
@@ -2936,6 +2945,7 @@ namespace AgenticEngine
             {
                 Name = name,
                 Description = name,
+                AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
                 RemoteSession = RemoteSessionToggle.IsChecked == true,
                 Headless = HeadlessToggle.IsChecked == true,
                 SpawnTeam = SpawnTeamToggle.IsChecked == true,
@@ -2993,7 +3003,12 @@ namespace AgenticEngine
             if (t.NoGitWrite) flags.Add("NoGitWrite");
             if (t.IgnoreFileLocks) flags.Add("IgnoreLocks");
             if (t.UseMcp) flags.Add("MCP");
-            return flags.Count > 0 ? string.Join(", ", flags) : "(default settings)";
+            var tooltip = flags.Count > 0 ? string.Join(", ", flags) : "(default settings)";
+            if (!string.IsNullOrWhiteSpace(t.AdditionalInstructions))
+                tooltip += "\n\nInstructions: " + (t.AdditionalInstructions.Length > 80
+                    ? t.AdditionalInstructions[..80] + "..."
+                    : t.AdditionalInstructions);
+            return tooltip;
         }
 
         private void TemplateCombo_Changed(object sender, SelectionChangedEventArgs e)
@@ -3027,6 +3042,9 @@ namespace AgenticEngine
             UseMcpToggle.IsChecked = template.UseMcp;
             DefaultNoGitWriteToggle.IsChecked = template.NoGitWrite;
             MessageBusToggle.IsChecked = template.UseMessageBus;
+
+            // Apply additional instructions
+            AdditionalInstructionsInput.Text = template.AdditionalInstructions ?? "";
 
             // Apply model selection
             for (int i = 0; i < ModelCombo.Items.Count; i++)

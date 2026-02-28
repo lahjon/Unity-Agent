@@ -374,7 +374,15 @@
                             <!-- Continue button (visible when finished with recommendations) -->
                             <Button Content="Continue" Click="Continue_Click"
                                     Background="#00897B"
-                                    Margin="4,0,0,0" ToolTip="Continue with recommended next steps">
+                                    Margin="4,0,0,0">
+                                <Button.ToolTip>
+                                    <ToolTip MaxWidth="400">
+                                        <StackPanel>
+                                            <TextBlock Text="Continue will:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding Recommendations}" TextWrapping="Wrap" Foreground="#E0E0E0"/>
+                                        </StackPanel>
+                                    </ToolTip>
+                                </Button.ToolTip>
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -611,7 +619,15 @@
                             <!-- Continue button (visible when recommendations exist) -->
                             <Button Content="Continue" Click="Continue_Click"
                                     Background="#00897B"
-                                    Margin="0,0,4,0" ToolTip="Continue with recommended next steps">
+                                    Margin="0,0,4,0">
+                                <Button.ToolTip>
+                                    <ToolTip MaxWidth="400">
+                                        <StackPanel>
+                                            <TextBlock Text="Continue will:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding Recommendations}" TextWrapping="Wrap" Foreground="#E0E0E0"/>
+                                        </StackPanel>
+                                    </ToolTip>
+                                </Button.ToolTip>
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -829,7 +845,7 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition x:Name="SavedPanelCol" Width="200" MinWidth="120"/>
                         <ColumnDefinition x:Name="ChatSplitterCol" Width="Auto"/>
                         <ColumnDefinition x:Name="ChatPanelCol" Width="280" MinWidth="0"/>
                     </Grid.ColumnDefinitions>
@@ -943,6 +959,18 @@
                                 </ItemsControl>
                             </DockPanel>
                         </Border>
+                        <!-- Additional instructions (saved with templates) -->
+                        <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                            <TextBlock DockPanel.Dock="Top" Text="ADDITIONAL INSTRUCTIONS" Foreground="{StaticResource TextMuted}"
+                                       FontWeight="Bold" FontSize="9" FontFamily="Segoe UI" Margin="0,0,0,4"/>
+                            <TextBox x:Name="AdditionalInstructionsInput" AcceptsReturn="True" TextWrapping="Wrap"
+                                     MinHeight="40" MaxHeight="100"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
+                                     CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                     FontSize="12" FontFamily="Consolas" Padding="8"
+                                     ToolTip="Additional instructions saved with templates (e.g. coding standards, constraints)"/>
+                        </DockPanel>
                         <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
                                  MinHeight="80" MaxHeight="150"
                                  VerticalScrollBarVisibility="Auto"
@@ -1026,7 +1054,7 @@
                     <!-- Center-right: Saved Prompts panel -->
                     <Border Grid.Column="1" Background="{StaticResource BgSurface}" CornerRadius="6"
                             BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Margin="10,0,0,0"
-                            Padding="8" MinWidth="180" MaxWidth="220">
+                            Padding="8">
                         <DockPanel>
                             <TextBlock DockPanel.Dock="Top" Text="SAVED" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                        FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,6"/>
@@ -1037,9 +1065,9 @@
                     </Border>
 
                     <!-- Splitter: Content ↔ Chat -->
-                    <GridSplitter x:Name="ChatSplitter" Grid.Column="2" Width="4" Background="Transparent"
-                                  HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                                  Cursor="SizeWE"/>
+                    <GridSplitter x:Name="ChatSplitter" Grid.Column="2"
+                                  Style="{StaticResource VerticalSplitter}"
+                                  ResizeBehavior="PreviousAndNext"/>
 
                     <!-- Right: Collapsible Chat panel -->
                     <Grid Grid.Column="3" Margin="4,0,0,0">
@@ -1427,6 +1455,33 @@
                                         <ComboBoxItem Content="Extensions" Tag="Extensions"/>
                                         <ComboBoxItem Content="Rules" Tag="Rules"/>
                                     </ComboBox>
+                                </DockPanel>
+
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Guidance" Foreground="{StaticResource TextLight}" FontSize="12"
+                                               FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               Margin="0,0,10,0"/>
+                                    <Grid>
+                                        <TextBox x:Name="SuggestionGuidanceInput"
+                                                 FontSize="11" FontFamily="Segoe UI" Padding="6,4"
+                                                 Background="{StaticResource BgSection}" Foreground="{StaticResource TextLight}"
+                                                 BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                                 VerticalAlignment="Center"/>
+                                        <TextBlock Text="Optional: guide the suggestions (e.g. &quot;focus on error handling&quot;)"
+                                                   Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"
+                                                   Padding="8,5" IsHitTestVisible="False" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=SuggestionGuidanceInput}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
                                 </DockPanel>
 
                                 <StackPanel Orientation="Horizontal">
@@ -1881,6 +1936,12 @@
                                         Style="{StaticResource SecondaryBtn}"
                                         HorizontalAlignment="Left"
                                         Padding="14,7" FontSize="12" Margin="0,8,0,0"/>
+                                <Button Content="Graph View"
+                                        Click="ViewDependencyGraph_Click"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        HorizontalAlignment="Left"
+                                        Padding="14,7" FontSize="12" Margin="0,8,0,0"
+                                        ToolTip="View task dependency graph"/>
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,20"/>
 

@@ -71,7 +71,7 @@ namespace AgenticEngine
                     var terminal = _terminals[i];
                     _terminals.RemoveAt(i);
                     // Dispose on background thread to avoid Thread.Join(2000) blocking the UI
-                    _ = System.Threading.Tasks.Task.Run(() => { try { terminal.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", $"Background terminal dispose failed: {ex.Message}"); } });
+                    _ = System.Threading.Tasks.Task.Run(() => { try { terminal.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("TerminalTab", $"Background terminal dispose failed: {ex.Message}"); } }, System.Threading.CancellationToken.None);
 
                     if (_activeIndex > i) _activeIndex--;
                     else if (_activeIndex == i) _activeIndex = -1;

@@ -19,6 +19,7 @@ namespace AgenticEngine.Models
         public bool IgnoreFileLocks { get; set; } = true;
         public bool UseMcp { get; set; }
         public int MaxIterations { get; set; }
+        public string AdditionalInstructions { get; set; } = "";
         public string Model { get; set; } = "ClaudeCode";
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }

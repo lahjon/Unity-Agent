@@ -260,6 +260,7 @@ namespace AgenticEngine.Managers
             task.EndTime = null;
             task.Cts?.Dispose();
             task.Cts = new System.Threading.CancellationTokenSource();
+            task.LastIterationOutputStart = task.OutputBuilder.Length;
             _outputTabManager.UpdateTabHeader(task);
 
             // Use --resume with session ID when available, fall back to --continue
@@ -1099,8 +1100,11 @@ namespace AgenticEngine.Managers
         private async void AppendCompletionSummary(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
-            // Detect recommendations from the output before appending the summary block
-            var outputText = task.OutputBuilder.ToString();
+            // Detect recommendations from the current iteration output only (avoids re-detecting old recommendations)
+            var fullOutput = task.OutputBuilder.ToString();
+            var outputText = task.LastIterationOutputStart > 0 && task.LastIterationOutputStart < fullOutput.Length
+                ? fullOutput[task.LastIterationOutputStart..]
+                : fullOutput;
             var recommendations = TaskLauncher.ExtractRecommendations(outputText);
             task.Recommendations = recommendations ?? "";
 
