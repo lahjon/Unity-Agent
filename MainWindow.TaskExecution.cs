@@ -959,6 +959,10 @@ TextureImporter:
             _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Status: {task.StatusText}\n", _activeTasks, _historyTasks);
             if (!string.IsNullOrEmpty(task.ConversationId))
                 _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
+            if (!string.IsNullOrWhiteSpace(task.CompletionSummary))
+                _outputTabManager.AppendOutput(task.Id, $"\n{task.CompletionSummary}\n", _activeTasks, _historyTasks);
+            if (!string.IsNullOrWhiteSpace(task.Recommendations))
+                _outputTabManager.AppendOutput(task.Id, $"\n[Recommendations]\n{task.Recommendations}\n", _activeTasks, _historyTasks);
             var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
             _outputTabManager.AppendOutput(task.Id, $"\n[HappyEngine] Type a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
 

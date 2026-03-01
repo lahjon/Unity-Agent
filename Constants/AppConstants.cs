@@ -17,6 +17,9 @@ namespace HappyEngine.Constants
         /// <summary>Maximum character length for the short project description.</summary>
         public const int MaxShortDescriptionLength = 200;
 
+        /// <summary>Maximum character length for the long project description (token optimization).</summary>
+        public const int MaxLongDescriptionLength = 800;
+
         /// <summary>Lines before a recommendation header to search for completion signals.</summary>
         public const int RecommendationContextBefore = 20;
 

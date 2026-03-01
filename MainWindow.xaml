@@ -1007,11 +1007,6 @@
                                         Background="{StaticResource BgHover}" Style="{StaticResource Btn}"
                                         Foreground="#A8A8A8"
                                         FontSize="11" Padding="6,4" Margin="0,0,6,0"/>
-                                <Button Content="Save as Template" Click="SaveAsTemplate_Click"
-                                        Background="{StaticResource BgHover}" Style="{StaticResource Btn}"
-                                        Foreground="#A8A8A8"
-                                        FontSize="11" Padding="6,4" Margin="0,0,6,0"
-                                        ToolTip="Save current toggle states as a reusable template"/>
                                 <Button x:Name="ExecuteButton" Content="Execute Task" Click="Execute_Click"
                                         Background="{StaticResource Accent}" Style="{StaticResource Btn}"
                                         FontSize="13" Padding="18,6" FontWeight="Bold"/>
@@ -1071,6 +1066,11 @@
                                       SelectionChanged="TemplateCombo_Changed">
                                 <ComboBoxItem Content="(No Template)" Tag="" IsSelected="True"/>
                             </ComboBox>
+                            <Button Content="Save Template" Click="SaveAsTemplate_Click"
+                                    Style="{StaticResource GhostBtn}" Foreground="{StaticResource TextMuted}"
+                                    FontSize="9" FontFamily="Segoe UI" Padding="6,2"
+                                    VerticalAlignment="Center" Margin="8,0,0,0"
+                                    ToolTip="Save current toggle states as a reusable template"/>
                             <Button Content="Clear" Click="ClearPrompt_Click"
                                     Style="{StaticResource GhostBtn}" Foreground="{StaticResource TextMuted}"
                                     FontSize="10" FontFamily="Segoe UI" Padding="6,2"

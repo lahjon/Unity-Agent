@@ -382,7 +382,7 @@ namespace HappyEngine
         {
             get
             {
-                var started = $"Started {StartTime:HH:mm:ss}";
+                var started = $"Started {StartTime:MMM dd, HH:mm:ss}";
                 if (Status == AgentTaskStatus.InitQueued)
                     return $"{started} | Waiting (max concurrent reached)";
                 if (Status == AgentTaskStatus.Queued)

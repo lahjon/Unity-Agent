@@ -117,7 +117,7 @@ namespace HappyEngine.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = "-p --max-turns 15 --output-format text",
+                    Arguments = "-p --max-turns 10 --output-format text",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -132,23 +132,27 @@ namespace HappyEngine.Managers
                 process.Start();
 
                 await process.StandardInput.WriteAsync(
-                    "You are a codebase exploration agent. Your job is to thoroughly explore this project's actual source code before writing any description.\n\n" +
+                    "You are a codebase exploration agent. Explore this project's source code, then produce a token-efficient description.\n\n" +
                     "STEP 1 — EXPLORE (use your tools, do NOT guess):\n" +
                     "- List the top-level directory structure\n" +
                     "- Read project config files (.csproj, package.json, Cargo.toml, etc.)\n" +
                     "- Read the main entry point and key source files\n" +
-                    "- Identify the architecture, patterns, and major components from the actual code\n" +
-                    "- Check for README or docs if they exist\n\n" +
-                    "STEP 2 — After you have explored the codebase, respond with EXACTLY this format:\n\n" +
-                    "<short>\nA 1-2 sentence summary of what this project is and its tech stack (max 150 chars). Write the description directly — no preamble.\n</short>\n\n" +
-                    "<long>\nA 1-2 paragraph detailed summary covering: project purpose, tech stack, architecture, " +
-                    "key directories/files, main components, and any important patterns or conventions. Write the description directly — no preamble.\n</long>\n\n" +
-                    "CRITICAL RULES:\n" +
-                    "- Base descriptions entirely on what you found by reading the actual files, NOT assumptions or the project name.\n" +
-                    "- Output ONLY the <short> and <long> tags with description text inside. Nothing else.\n" +
-                    "- Do NOT include any conversational text, preamble, postamble, or commentary.\n" +
-                    "- Do NOT start with phrases like 'Based on my exploration', 'Here is', 'This is', 'I found', 'After reviewing', etc.\n" +
-                    "- The description should read as a factual project summary, not an agent response.");
+                    "- Identify the architecture, patterns, and major components\n\n" +
+                    "STEP 2 — Output EXACTLY this format:\n\n" +
+                    "<short>\nOne-line summary: what it is + tech stack. Max 200 chars. No preamble.\n</short>\n\n" +
+                    "<long>\nCompact bullet-point summary using this structure (keep each line terse, no filler words):\n" +
+                    "- Purpose: [what the project does]\n" +
+                    "- Stack: [languages, frameworks, runtime]\n" +
+                    "- Architecture: [pattern, e.g. MVVM, MVC, microservices]\n" +
+                    "- Key dirs: [top-level source directories]\n" +
+                    "- Components: [major classes/modules and their roles]\n" +
+                    "- Patterns: [notable conventions, DI, async, etc.]\n" +
+                    "Max 800 characters total. Omit any section that has nothing notable. No preamble.\n</long>\n\n" +
+                    "RULES:\n" +
+                    "- Base descriptions on actual files read, not assumptions.\n" +
+                    "- Output ONLY <short> and <long> tags. Nothing else.\n" +
+                    "- No conversational text, preamble, or commentary.\n" +
+                    "- Write factual project summaries, not agent responses.");
                 process.StandardInput.Close();
 
                 var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
@@ -180,6 +184,9 @@ namespace HappyEngine.Managers
 
                 if (shortDesc.Length > Constants.AppConstants.MaxShortDescriptionLength)
                     shortDesc = shortDesc[..Constants.AppConstants.MaxShortDescriptionLength];
+
+                if (longDesc.Length > Constants.AppConstants.MaxLongDescriptionLength)
+                    longDesc = longDesc[..Constants.AppConstants.MaxLongDescriptionLength];
 
                 return (shortDesc, longDesc);
             }
