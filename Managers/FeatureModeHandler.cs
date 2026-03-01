@@ -79,6 +79,16 @@ namespace HappyEngine.Managers
                 ? fullOutput[task.LastIterationOutputStart..]
                 : fullOutput;
 
+            // Trim OutputBuilder if it exceeds the feature mode cap
+            if (task.OutputBuilder.Length > FeatureModeOutputCapChars)
+            {
+                var trimmed = task.OutputBuilder.ToString(
+                    task.OutputBuilder.Length - FeatureModeOutputCapChars, FeatureModeOutputCapChars);
+                task.OutputBuilder.Clear();
+                task.OutputBuilder.Append(trimmed);
+                task.LastIterationOutputStart = Math.Min(task.LastIterationOutputStart, task.OutputBuilder.Length);
+            }
+
             // Check runtime cap
             var totalRuntime = DateTime.Now - task.StartTime;
             if (totalRuntime.TotalHours >= FeatureModeMaxRuntimeHours)
@@ -517,14 +527,12 @@ namespace HappyEngine.Managers
         /// </summary>
         private static List<FeatureStepEntry>? ExtractFeatureSteps(string output)
         {
-            var match = Regex.Match(output, @"```FEATURE_STEPS\s*\n([\s\S]*?)```", RegexOptions.Multiline);
-            if (!match.Success)
+            var json = Helpers.FormatHelpers.ExtractCodeBlockContent(output, "FEATURE_STEPS");
+            if (json == null)
             {
                 AppLogger.Warn("FeatureMode", "No ```FEATURE_STEPS``` block found in output");
                 return null;
             }
-
-            var json = match.Groups[1].Value.Trim();
 
             try
             {
@@ -609,6 +617,9 @@ namespace HappyEngine.Managers
         /// <summary>
         /// Collects completion summaries from all phase children for use as context.
         /// </summary>
+        private const int MaxPerChildChars = 2_000;
+        private const int MaxTotalResultsChars = 12_000;
+
         private string CollectChildResults(AgentTask parent,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
@@ -623,20 +634,40 @@ namespace HappyEngine.Managers
 
                 idx++;
                 var title = !string.IsNullOrWhiteSpace(child.Summary) ? child.Summary : $"Task #{child.TaskNumber}";
-                sb.AppendLine($"### Result #{idx}: {title}");
-                sb.AppendLine($"**Status:** {child.Status}");
-                sb.AppendLine($"**Task:** {child.Description}");
+
+                // Build per-child content using Summary (short title) instead of full Description
+                var childSb = new StringBuilder();
+                childSb.AppendLine($"### Result #{idx}: {title}");
+                childSb.AppendLine($"**Status:** {child.Status}");
+                childSb.AppendLine($"**Task:** {child.Summary ?? $"Task #{child.TaskNumber}"}");
 
                 if (!string.IsNullOrWhiteSpace(child.CompletionSummary))
-                    sb.AppendLine($"**Changes:**\n{child.CompletionSummary}");
+                    childSb.AppendLine($"**Changes:**\n{child.CompletionSummary}");
 
                 if (!string.IsNullOrWhiteSpace(child.Recommendations))
-                    sb.AppendLine($"**Recommendations:**\n{child.Recommendations}");
+                    childSb.AppendLine($"**Recommendations:**\n{child.Recommendations}");
 
-                sb.AppendLine();
+                childSb.AppendLine();
+
+                // Cap each child's combined output
+                var childText = childSb.ToString();
+                if (childText.Length > MaxPerChildChars)
+                    childText = childText.Substring(0, MaxPerChildChars) + "\n[...truncated]\n";
+
+                sb.Append(childText);
             }
 
-            return sb.ToString();
+            // Apply total results cap
+            var result = sb.ToString();
+            if (result.Length > MaxTotalResultsChars)
+            {
+                _outputProcessor.AppendOutput(parent.Id,
+                    $"\n[Feature Mode] Token optimization: child results truncated from {result.Length:N0} to {MaxTotalResultsChars:N0} chars ({idx} children, phase {parent.FeatureModePhase})\n",
+                    activeTasks, historyTasks);
+                result = result.Substring(0, MaxTotalResultsChars) + "\n[...remaining results truncated]\n";
+            }
+
+            return result;
         }
 
         // ── Phase timeout (stuck child detection) ─────────────────────────
@@ -768,8 +799,15 @@ namespace HappyEngine.Managers
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, finalStatus);
-            await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
+            try
+            {
+                await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, finalStatus);
+                await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("FeatureMode", $"CompleteFeatureModeWithVerificationAsync failed for task {task.Id}", ex);
+            }
 
             task.Status = finalStatus;
             task.EndTime = DateTime.Now;

@@ -87,10 +87,13 @@ namespace HappyEngine.Managers
 
             sb.AppendLine(PromptBuilder.FailureRecoveryBlock);
 
-            // Original task description
+            // Original task description (capped to avoid bloating recovery prompt)
+            const int maxDescriptionLength = 2000;
             var originalDescription = !string.IsNullOrEmpty(failedTask.StoredPrompt)
                 ? failedTask.StoredPrompt
                 : failedTask.Description;
+            if (originalDescription != null && originalDescription.Length > maxDescriptionLength)
+                originalDescription = originalDescription[..maxDescriptionLength] + "\n… [truncated]";
             sb.AppendLine("## ORIGINAL TASK");
             sb.AppendLine(originalDescription);
             sb.AppendLine();
@@ -139,7 +142,7 @@ namespace HappyEngine.Managers
             if (string.IsNullOrWhiteSpace(fullOutput))
                 return "";
 
-            const int maxContextLength = 8000;
+            const int maxContextLength = 3000;
 
             // Take the tail of the output which typically contains the final error
             var tail = fullOutput.Length > maxContextLength
@@ -169,12 +172,18 @@ namespace HappyEngine.Managers
                                   lower.Contains("syntax error");
 
                 if (isErrorLine)
+                {
                     inErrorBlock = true;
+                }
+                else if (inErrorBlock)
+                {
+                    // Non-error line after an error block — stop capturing this block
+                    inErrorBlock = false;
+                }
 
                 if (inErrorBlock)
                 {
                     sb.AppendLine(line);
-                    // Stop after enough context following the error
                     if (sb.Length > maxContextLength)
                         break;
                 }

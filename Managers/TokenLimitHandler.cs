@@ -168,14 +168,25 @@ namespace HappyEngine.Managers
         }
         /// <summary>
         /// Runs verification after a token-limit retry completes, then sets the final status.
+        /// Wrapped in try-catch to guarantee status transition and TaskCompleted firing.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteRetryWithVerificationAsync(AgentTask task, int exitCode,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
-            await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
+            try
+            {
+                await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
+                await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("TokenLimitHandler", $"CompleteRetryWithVerificationAsync failed for task {task.Id}", ex);
+            }
+
+            if (task.Status != AgentTaskStatus.Verifying)
+                return;
 
             task.Status = expectedStatus;
             task.EndTime = DateTime.Now;

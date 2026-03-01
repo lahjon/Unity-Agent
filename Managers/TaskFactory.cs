@@ -123,7 +123,7 @@ namespace HappyEngine.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = "-p --max-turns 10 --output-format text",
+                    Arguments = "-p --max-turns 3 --output-format text",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,

@@ -68,10 +68,10 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <!-- Top-right buttons -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal"
-                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                    <!-- Top-right buttons + task number -->
+                    <StackPanel Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Margin="0,-2,-2,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <!-- Force-start button (visible on queued/init-queued tasks) -->
                         <Button Click="ForceStartQueued_Click" Margin="0,0,2,0">
                             <Button.Style>
@@ -152,6 +152,11 @@
                                 </Style>
                             </Button.Style>
                         </Button>
+                    </StackPanel>
+                    <TextBlock Text="{Binding HierarchyLabel}"
+                               Foreground="{StaticResource TextSubdued}"
+                               FontSize="10" FontFamily="Consolas" Margin="0,2,2,0"
+                               HorizontalAlignment="Right"/>
                     </StackPanel>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
@@ -293,10 +298,6 @@
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
-                        <TextBlock Text="{Binding HierarchyLabel}"
-                                   Foreground="{StaticResource TextSubdued}"
-                                   FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
-                                   VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
                                Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
@@ -513,10 +514,10 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <!-- Top-right buttons -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal"
-                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                    <!-- Top-right buttons + task number -->
+                    <StackPanel Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Margin="0,-2,-2,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <!-- Verify button (visible when finished) -->
                         <Button Click="VerifyTask_Click" Margin="0,0,2,0" FontSize="11">
                             <Button.Style>
@@ -536,6 +537,11 @@
                         <Button Content="&#xE8BB;" Click="RemoveHistoryTask_Click"
                                 Style="{StaticResource IconBtn}"
                                 ToolTip="Remove from history"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
+                               Foreground="{StaticResource TextMuted}"
+                               FontSize="10" FontFamily="Consolas" Margin="0,2,2,0"
+                               HorizontalAlignment="Right"/>
                     </StackPanel>
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="14,0,0,0">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
@@ -616,10 +622,6 @@
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
-                        <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
-                                   Foreground="{StaticResource TextMuted}"
-                                   FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
-                                   VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
                                Foreground="{StaticResource TextSubdued}" FontSize="12" FontFamily="Segoe UI"
@@ -781,11 +783,17 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <!-- Close X button top-right -->
-                    <Button Grid.Row="0" Content="&#xE8BB;" Click="RemoveStoredTask_Click"
-                            HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Style="{StaticResource IconBtn}" Margin="0,-2,-2,0"
-                            ToolTip="Remove stored task"/>
+                    <!-- Close X button + task number top-right -->
+                    <StackPanel Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-2,-2,0">
+                        <Button Content="&#xE8BB;" Click="RemoveStoredTask_Click"
+                                Style="{StaticResource IconBtn}" HorizontalAlignment="Right"
+                                ToolTip="Remove stored task"/>
+                        <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
+                                   Foreground="{StaticResource TextMuted}"
+                                   FontSize="10" FontFamily="Consolas" Margin="0,2,2,0"
+                                   HorizontalAlignment="Right"/>
+                    </StackPanel>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse Width="8" Height="8" Fill="{StaticResource AccentTeal}"/>
@@ -799,10 +807,6 @@
                                    FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
-                        <TextBlock Text="{Binding TaskNumber, StringFormat='#{0:D4}'}"
-                                   Foreground="{StaticResource TextMuted}"
-                                   FontSize="10" FontFamily="Consolas" Margin="8,0,0,0"
-                                   VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
                                Foreground="{StaticResource TextSubdued}" FontSize="12" FontFamily="Segoe UI"
@@ -1454,7 +1458,7 @@
 
             <!-- Node Graph Panel -->
             <Border Grid.Row="0" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
-                    BorderThickness="1">
+                    BorderThickness="1" Margin="0,0,0,3">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="GraphPanelBorder" Color="#2C2C2C"/>
                 </Border.BorderBrush>
@@ -1499,7 +1503,7 @@
 
             <!-- Task Output -->
             <Border Grid.Row="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
-                    BorderThickness="1">
+                    BorderThickness="1" Margin="0,3,0,0">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="MainContentBorder" Color="#2C2C2C"/>
                 </Border.BorderBrush>
@@ -1538,92 +1542,110 @@
                DragDelta="ChatSplitter_DragDelta" Visibility="Collapsed"/>
 
         <Grid Grid.Column="6" Grid.Row="2" Grid.RowSpan="3">
-            <!-- File Locks panel -->
+            <!-- Statistics panel -->
             <Border x:Name="FileLocksPanel" Background="{StaticResource BgSurface}" CornerRadius="8"
                     BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Padding="8">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-                        <TextBlock Text="FILE LOCKS" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                        <TextBlock Text="STATISTICS" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                    FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                         <TextBlock x:Name="FileLockBadge" Text="0" Visibility="Collapsed"
                                    Foreground="{StaticResource WarningOrange}" FontSize="10" FontWeight="Bold"
                                    FontFamily="Segoe UI" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Active file locks across all tasks"
-                               Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
-                               Margin="0,0,0,8"/>
-                    <!-- Header row -->
-                    <Grid DockPanel.Dock="Top" Margin="0,0,0,2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="160"/>
-                            <ColumnDefinition Width="70"/>
-                            <ColumnDefinition Width="90"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="70"/>
-                            <ColumnDefinition Width="70"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="FILE" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                        <TextBlock Grid.Column="1" Text="STATUS" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                        <TextBlock Grid.Column="2" Text="TOOL" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                        <TextBlock Grid.Column="3" Text="PATH" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                        <TextBlock Grid.Column="4" Text="TASK" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                        <TextBlock Grid.Column="5" Text="SINCE" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                    </Grid>
-                    <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,4"/>
-                    <!-- Lock rows -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="FileLocksListView">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="8,5" Margin="0,1" CornerRadius="4"
-                                            Background="{StaticResource BgSection}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="160"/>
-                                                <ColumnDefinition Width="70"/>
-                                                <ColumnDefinition Width="90"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="70"/>
-                                                <ColumnDefinition Width="70"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{Binding FileName}"
-                                                       Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Consolas"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       ToolTip="{Binding OriginalPath}"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding StatusText}"
-                                                       FontSize="11" FontFamily="Consolas">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Foreground" Value="#4EC969"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsIgnored}" Value="True">
-                                                                <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                            <TextBlock Grid.Column="2" Text="{Binding ToolName}"
-                                                       Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Consolas"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding OriginalPath}"
-                                                       Foreground="{StaticResource TextDim}" FontSize="11" FontFamily="Consolas"
-                                                       TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
-                                                       Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
-                                            <TextBlock Grid.Column="5" Text="{Binding TimeText}"
-                                                       Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                    <TabControl x:Name="StatisticsTabs" Style="{StaticResource SettingsTabControlStyle}"
+                                Background="Transparent" BorderThickness="0">
+                        <!-- File Locks tab -->
+                        <TabItem x:Name="FileLocksTabItem">
+                            <TabItem.Header>
+                                <TextBlock Text="File Locks" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            </TabItem.Header>
+                            <DockPanel Margin="0,6,0,0">
+                                <TextBlock DockPanel.Dock="Top" Text="Active file locks across all tasks"
+                                           Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
+                                           Margin="0,0,0,8"/>
+                                <!-- Header row -->
+                                <Grid DockPanel.Dock="Top" Margin="0,0,0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="70"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="FILE" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                    <TextBlock Grid.Column="1" Text="STATUS" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                    <TextBlock Grid.Column="2" Text="TOOL" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                    <TextBlock Grid.Column="3" Text="PATH" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                    <TextBlock Grid.Column="4" Text="TASK" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                    <TextBlock Grid.Column="5" Text="SINCE" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                                </Grid>
+                                <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,4"/>
+                                <!-- Lock rows -->
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl x:Name="FileLocksListView">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Padding="8,5" Margin="0,1" CornerRadius="4"
+                                                        Background="{StaticResource BgSection}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="160"/>
+                                                            <ColumnDefinition Width="70"/>
+                                                            <ColumnDefinition Width="90"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="70"/>
+                                                            <ColumnDefinition Width="70"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding FileName}"
+                                                                   Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Consolas"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   ToolTip="{Binding OriginalPath}"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding StatusText}"
+                                                                   FontSize="11" FontFamily="Consolas">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="#4EC969"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsIgnored}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <TextBlock Grid.Column="2" Text="{Binding ToolName}"
+                                                                   Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Consolas"/>
+                                                        <TextBlock Grid.Column="3" Text="{Binding OriginalPath}"
+                                                                   Foreground="{StaticResource TextDim}" FontSize="11" FontFamily="Consolas"
+                                                                   TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
+                                                        <TextBlock Grid.Column="4" Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
+                                                                   Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
+                                                        <TextBlock Grid.Column="5" Text="{Binding TimeText}"
+                                                                   Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </TabItem>
+                        <!-- Activity tab -->
+                        <TabItem x:Name="ActivityTabItem">
+                            <TabItem.Header>
+                                <TextBlock Text="Activity" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            </TabItem.Header>
+                            <ScrollViewer x:Name="ActivityTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
+                        </TabItem>
+                    </TabControl>
                 </DockPanel>
             </Border>
         </Grid>
@@ -1876,13 +1898,6 @@
                                 </ItemsControl>
                             </ScrollViewer>
                         </DockPanel>
-                    </TabItem>
-                    <!-- Activity tab -->
-                    <TabItem x:Name="ActivityTabItem">
-                        <TabItem.Header>
-                            <TextBlock Text="Activity" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
-                        </TabItem.Header>
-                        <ScrollViewer x:Name="ActivityTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
                     </TabItem>
                     <!-- Advanced tab -->
                     <TabItem>

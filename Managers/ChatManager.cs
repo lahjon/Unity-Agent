@@ -13,6 +13,9 @@ namespace HappyEngine.Managers
 {
     public class ChatManager
     {
+        private const int MaxTokenBudget = 30_000;
+        private const int CharsPerToken = 4;
+
         private readonly StackPanel _messagesPanel;
         private readonly ScrollViewer _scrollViewer;
         private readonly TextBox _input;
@@ -261,6 +264,21 @@ namespace HappyEngine.Managers
             return sel != null && sel.StartsWith("claude", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static List<ChatMessage> TrimHistoryToTokenBudget(List<ChatMessage> history)
+        {
+            var totalTokens = 0;
+            var startIndex = history.Count;
+            for (var i = history.Count - 1; i >= 0; i--)
+            {
+                var msgTokens = (history[i].Text?.Length ?? 0) / CharsPerToken;
+                if (totalTokens + msgTokens > MaxTokenBudget)
+                    break;
+                totalTokens += msgTokens;
+                startIndex = i;
+            }
+            return startIndex == 0 ? history : history.GetRange(startIndex, history.Count - startIndex);
+        }
+
         private async void SendChatMessage()
         {
             var text = _input.Text?.Trim();
@@ -328,13 +346,15 @@ namespace HappyEngine.Managers
                     _scrollViewer.ScrollToEnd();
                 };
 
+                var trimmedHistory = TrimHistoryToTokenBudget(_chatHistory);
+
                 string response;
                 if (useClaude)
                     response = await _claudeService.SendChatMessageStreamingAsync(
-                        _chatHistory, text ?? "", onChunk, systemPrompt, _chatCts.Token);
+                        trimmedHistory, text ?? "", onChunk, systemPrompt, _chatCts.Token);
                 else
                     response = await _geminiService.SendChatMessageStreamingAsync(
-                        _chatHistory, text ?? "", onChunk, systemPrompt, _chatCts.Token);
+                        trimmedHistory, text ?? "", onChunk, systemPrompt, _chatCts.Token);
 
                 if (response.StartsWith("[Cancelled]") || response.StartsWith("[Error]"))
                 {

@@ -291,16 +291,25 @@ namespace HappyEngine.Managers
 
         /// <summary>
         /// Runs the completion summary, then sets the final task status.
+        /// Wrapped in try-finally to guarantee the task always transitions out of
+        /// Verifying and fires TaskCompleted, even if summary/verification throws.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteWithVerificationAsync(AgentTask task, int exitCode,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            // Generate summary (awaited, not fire-and-forget)
-            await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
+            try
+            {
+                // Generate summary (awaited, not fire-and-forget)
+                await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
 
-            await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
+                await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("TaskExecution", $"CompleteWithVerificationAsync failed for task {task.Id}", ex);
+            }
 
             // If a follow-up was started during summary generation, the status will
             // have changed from Verifying to Running — don't overwrite it.
@@ -310,12 +319,19 @@ namespace HappyEngine.Managers
             // Now set the final status after summary is complete
             task.Status = expectedStatus;
             task.EndTime = DateTime.Now;
-            var statusColor = exitCode == 0
-                ? (Brush)Application.Current.FindResource("Success")
-                : (Brush)Application.Current.FindResource("DangerBright");
-            _outputProcessor.AppendColoredOutput(task.Id,
-                $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
-                statusColor, activeTasks, historyTasks);
+            try
+            {
+                var statusColor = exitCode == 0
+                    ? (Brush)Application.Current.FindResource("Success")
+                    : (Brush)Application.Current.FindResource("DangerBright");
+                _outputProcessor.AppendColoredOutput(task.Id,
+                    $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
+                    statusColor, activeTasks, historyTasks);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("TaskExecution", $"Failed to append completion output for task {task.Id}", ex);
+            }
             _outputTabManager.UpdateTabHeader(task);
 
             _fileLockManager.CheckQueuedTasks(activeTasks);
@@ -324,14 +340,22 @@ namespace HappyEngine.Managers
 
         /// <summary>
         /// Runs the completion summary after a follow-up completes, then sets the final status.
+        /// Fires TaskCompleted so feature mode parents and the orchestrator are notified.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteFollowUpWithVerificationAsync(AgentTask task, int exitCode,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
-            await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
+            try
+            {
+                await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
+                await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("TaskExecution", $"CompleteFollowUpWithVerificationAsync failed for task {task.Id}", ex);
+            }
 
             // If a follow-up was started during summary generation, the status will
             // have changed from Verifying to Running — don't overwrite it.
@@ -342,6 +366,9 @@ namespace HappyEngine.Managers
             task.EndTime = DateTime.Now;
             _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Follow-up complete.\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
+
+            _fileLockManager.CheckQueuedTasks(activeTasks);
+            TaskCompleted?.Invoke(task.Id);
         }
 
         public void LaunchHeadless(AgentTask task)
@@ -644,19 +671,40 @@ namespace HappyEngine.Managers
             parent.SubTaskCounter++;
             parent.ChildTaskIds.Add(child.Id);
 
-            // Build dependency context from parent's current output
+            // Build structured dependency context from parent
+            var contextBuilder = new StringBuilder();
+            contextBuilder.AppendLine($"# Context from parent task #{parent.TaskNumber}");
+            contextBuilder.AppendLine($"Parent description: {parent.Description}");
+
+            // Prefer CompletionSummary; fall back to truncated description
+            if (!string.IsNullOrWhiteSpace(parent.CompletionSummary))
+            {
+                contextBuilder.AppendLine();
+                contextBuilder.AppendLine("## Parent summary:");
+                contextBuilder.AppendLine(parent.CompletionSummary);
+            }
+            else if (parent.Description?.Length > 200)
+            {
+                contextBuilder.AppendLine();
+                contextBuilder.AppendLine("## Parent summary:");
+                contextBuilder.AppendLine(parent.Description[..Math.Min(1_000, parent.Description.Length)]);
+            }
+
+            // Append only the tail of parent output, stripped of ANSI noise
             var parentOutput = parent.OutputBuilder.ToString();
             if (!string.IsNullOrWhiteSpace(parentOutput))
             {
-                const int maxContextChars = 20_000;
-                var trimmed = parentOutput.Length > maxContextChars
-                    ? parentOutput[^maxContextChars..]
+                const int maxTailChars = 2_000;
+                var tail = parentOutput.Length > maxTailChars
+                    ? parentOutput[^maxTailChars..]
                     : parentOutput;
-                child.DependencyContext =
-                    $"# Context from parent task #{parent.TaskNumber}\n" +
-                    $"Parent description: {parent.Description}\n\n" +
-                    $"## Recent parent output:\n{trimmed}";
+                tail = Helpers.FormatHelpers.StripAnsiCodes(tail);
+                contextBuilder.AppendLine();
+                contextBuilder.AppendLine("## Recent parent output (tail):");
+                contextBuilder.AppendLine(tail);
             }
+
+            child.DependencyContext = contextBuilder.ToString();
 
             // NOTE: Does NOT fire SubTaskSpawned — callers are responsible for firing the event
             // after any additional child configuration (e.g., property overrides, dependency wiring).
@@ -689,14 +737,12 @@ namespace HappyEngine.Managers
         /// </summary>
         public List<AgentTask>? ExtractAndSpawnSubtasks(AgentTask parent, string output)
         {
-            var match = Regex.Match(output, @"```SUBTASKS\s*\n([\s\S]*?)```", RegexOptions.Multiline);
-            if (!match.Success)
+            var json = Helpers.FormatHelpers.ExtractCodeBlockContent(output, "SUBTASKS");
+            if (json == null)
             {
                 AppLogger.Warn("TaskExecution", $"No ```SUBTASKS``` block found in decomposition output for task {parent.Id}");
                 return null;
             }
-
-            var json = match.Groups[1].Value.Trim();
 
             List<SubtaskEntry>? entries;
             try
@@ -837,14 +883,12 @@ namespace HappyEngine.Managers
         /// </summary>
         public List<AgentTask>? ExtractAndSpawnTeam(AgentTask parent, string output)
         {
-            var match = Regex.Match(output, @"```TEAM\s*\n([\s\S]*?)```", RegexOptions.Multiline);
-            if (!match.Success)
+            var json = Helpers.FormatHelpers.ExtractCodeBlockContent(output, "TEAM");
+            if (json == null)
             {
                 AppLogger.Warn("TaskExecution", $"No ```TEAM``` block found in team decomposition output for task {parent.Id}");
                 return null;
             }
-
-            var json = match.Groups[1].Value.Trim();
 
             List<TeamMemberEntry>? entries;
             try
@@ -1011,14 +1055,12 @@ namespace HappyEngine.Managers
         /// </summary>
         private List<AgentTask>? ExtractAndSpawnTeamForFeatureMode(AgentTask parent, string output)
         {
-            var match = Regex.Match(output, @"```TEAM\s*\n([\s\S]*?)```", RegexOptions.Multiline);
-            if (!match.Success)
+            var json = Helpers.FormatHelpers.ExtractCodeBlockContent(output, "TEAM");
+            if (json == null)
             {
                 AppLogger.Warn("FeatureMode", $"No ```TEAM``` block found in feature mode planning output for task {parent.Id}");
                 return null;
             }
-
-            var json = match.Groups[1].Value.Trim();
 
             List<TeamMemberEntry>? entries;
             try

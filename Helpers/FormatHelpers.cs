@@ -54,5 +54,18 @@ namespace HappyEngine.Helpers
         {
             return AnsiRegex.Replace(text, "");
         }
+
+        /// <summary>
+        /// Extracts the content within a fenced code block (e.g. ```SUBTASKS ... ```)
+        /// and discards any text before the opening or after the closing delimiter.
+        /// Returns null if no matching block is found.
+        /// </summary>
+        public static string? ExtractCodeBlockContent(string output, string blockName)
+        {
+            var match = Regex.Match(output, $@"```{Regex.Escape(blockName)}\s*\n([\s\S]*?)```", RegexOptions.Multiline);
+            if (!match.Success)
+                return null;
+            return match.Groups[1].Value.Trim();
+        }
     }
 }

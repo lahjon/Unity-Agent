@@ -167,12 +167,13 @@ namespace HappyEngine.Managers
                     "FAIL|<one-sentence description of what went wrong or was missed>\n\n" +
                     "Examples:\n" +
                     "PASS|Authentication endpoint added with proper JWT validation and error handling\n" +
-                    "FAIL|The database migration was created but the API endpoint was not updated to use the new schema";
+                    "FAIL|The database migration was created but the API endpoint was not updated to use the new schema\n\n" +
+                    "IMPORTANT: Output ONLY the single PASS or FAIL line. No explanation, preamble, or follow-up text.";
 
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = "-p --output-format text --model claude-haiku-4-5-20251001 --max-turns 1",
+                    Arguments = "-p --output-format text --model claude-haiku-4-5-20251001 --max-turns 1 --append-system-prompt \"Respond with exactly one line. No additional text.\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,

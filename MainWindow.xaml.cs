@@ -242,6 +242,7 @@ namespace HappyEngine
             // Saved prompts loaded async in Window_Loaded
 
             MainTabs.SelectionChanged += MainTabs_SelectionChanged;
+            StatisticsTabs.SelectionChanged += StatisticsTabs_SelectionChanged;
         }
 
         /// <summary>
@@ -1965,6 +1966,7 @@ namespace HappyEngine
 
             // MainTabs
             MainTabs.SelectionChanged -= MainTabs_SelectionChanged;
+            StatisticsTabs.SelectionChanged -= StatisticsTabs_SelectionChanged;
         }
 
         private void OnWindowClosing(object? sender, CancelEventArgs e)
@@ -2387,7 +2389,12 @@ namespace HappyEngine
         private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (e.Source != MainTabs) return;
-            if (MainTabs.SelectedItem == ActivityTabItem)
+        }
+
+        private void StatisticsTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.Source != StatisticsTabs) return;
+            if (StatisticsTabs.SelectedItem == ActivityTabItem)
                 _activityDashboard.RefreshIfNeeded(ActivityTabContent);
         }
 
@@ -2495,7 +2502,7 @@ namespace HappyEngine
         private void RefreshActivityDashboard()
         {
             _activityDashboard.MarkDirty();
-            if (MainTabs.SelectedItem == ActivityTabItem)
+            if (StatisticsTabs.SelectedItem == ActivityTabItem)
                 _activityDashboard.RefreshIfNeeded(ActivityTabContent);
         }
 

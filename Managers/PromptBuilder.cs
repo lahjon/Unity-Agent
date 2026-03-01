@@ -105,8 +105,7 @@ namespace HappyEngine.Managers
 
         public const string PlanningTeamMemberBlock =
             "# PLANNING-ONLY RESTRICTIONS\n" +
-            "You are a planning team member. You must NOT write, edit, create, or delete any project files.\n" +
-            "Do NOT create documentation files (e.g., ARCHITECTURE.md, DESIGN.md, PLAN.md, etc.).\n" +
+            "You are a planning team member.\n" +
             "Post all findings and recommendations to the message bus only.\n" +
             "Your output and completion summary are automatically collected — do not write them to files.\n\n" +
             "# AUTO-COMPLETION\n" +
@@ -239,7 +238,9 @@ namespace HappyEngine.Managers
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
             var planOnlyBlock = planOnly ? PlanOnlyBlock : "";
-            var gitBlock = noGitWrite ? NoGitWriteBlock : "";
+            // Skip NoGitWriteBlock when planOnly is active — PlanOnlyBlock already
+            // prohibits all file operations which subsumes git-write restrictions.
+            var gitBlock = (noGitWrite && !planOnly) ? NoGitWriteBlock : "";
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;
