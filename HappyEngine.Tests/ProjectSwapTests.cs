@@ -780,7 +780,7 @@ namespace HappyEngine.Tests
 
             // Prompt should contain the no-git-write block
             var prompt = TaskLauncher.BuildFullPrompt("SYS:", task);
-            Assert.Contains("NO GIT WRITE OPERATIONS", prompt);
+            Assert.Contains("NO GIT WRITES", prompt);
         }
 
         // ── PlanOnly task during swap ────────────────────────────────

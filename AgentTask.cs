@@ -250,7 +250,8 @@ namespace HappyEngine
             get
             {
                 if (!HasTokenData) return "";
-                return $"{FormatTokenCount(InputTokens)} in / {FormatTokenCount(OutputTokens)} out";
+                var total = InputTokens + OutputTokens;
+                return $"{FormatTokenCount(total)} tokens ({FormatTokenCount(InputTokens)} in / {FormatTokenCount(OutputTokens)} out)";
             }
         }
 

@@ -106,8 +106,8 @@ namespace HappyEngine.Tests
         public void BuildBasePrompt_WithMcp_IncludesMcpBlock()
         {
             var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isOvernight: false);
-            Assert.Contains("MCP VERIFICATION", result);
-            Assert.Contains("MCP USAGE", result);
+            Assert.Contains("# MCP", result);
+            Assert.Contains("mcp-for-unity-server", result);
             Assert.StartsWith("SYS:", result);
             Assert.EndsWith("task", result);
         }
@@ -116,7 +116,7 @@ namespace HappyEngine.Tests
         public void BuildBasePrompt_Overnight_UsesOvernightTemplate()
         {
             var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isOvernight: true);
-            Assert.StartsWith("You are running as an OVERNIGHT", result);
+            Assert.StartsWith("# OVERNIGHT AUTONOMOUS TASK", result);
             Assert.EndsWith("fix bugs", result);
             Assert.DoesNotContain("SYSTEM:", result);
         }
@@ -125,8 +125,8 @@ namespace HappyEngine.Tests
         public void BuildBasePrompt_WithNoGitWrite_IncludesGitBlock()
         {
             var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isOvernight: false, noGitWrite: true);
-            Assert.Contains("NO GIT WRITE OPERATIONS", result);
-            Assert.Contains("git push", result);
+            Assert.Contains("NO GIT WRITES", result);
+            Assert.Contains("modify repository state", result);
             Assert.StartsWith("SYS:", result);
             Assert.EndsWith("task", result);
         }
@@ -135,15 +135,15 @@ namespace HappyEngine.Tests
         public void BuildBasePrompt_WithoutNoGitWrite_ExcludesGitBlock()
         {
             var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isOvernight: false, noGitWrite: false);
-            Assert.DoesNotContain("NO GIT WRITE OPERATIONS", result);
+            Assert.DoesNotContain("NO GIT WRITES", result);
         }
 
         [Fact]
         public void BuildBasePrompt_Overnight_IgnoresMcp()
         {
             var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isOvernight: true);
-            Assert.DoesNotContain("MCP VERIFICATION", result);
-            Assert.StartsWith("You are running as an OVERNIGHT", result);
+            Assert.DoesNotContain("# MCP\n", result);
+            Assert.StartsWith("# OVERNIGHT AUTONOMOUS TASK", result);
         }
 
         [Fact]
@@ -460,9 +460,9 @@ namespace HappyEngine.Tests
         public void BuildOvernightContinuationPrompt_ContainsRestrictions()
         {
             var prompt = TaskLauncher.BuildOvernightContinuationPrompt(1, 10);
-            Assert.Contains("NO GIT COMMANDS", prompt);
-            Assert.Contains("NO OS-LEVEL MODIFICATIONS", prompt);
-            Assert.Contains("STAY INSIDE THE PROJECT", prompt);
+            Assert.Contains("No git", prompt);
+            Assert.Contains("no OS modifications", prompt);
+            Assert.Contains("project root", prompt);
         }
 
         [Fact]
@@ -641,7 +641,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void DefaultSystemPrompt_ContainsStrictRule()
         {
-            Assert.Contains("STRICT RULE", TaskLauncher.DefaultSystemPrompt);
+            Assert.Contains("# RULES", TaskLauncher.DefaultSystemPrompt);
         }
 
         [Fact]
@@ -653,7 +653,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void DefaultSystemPrompt_ContainsNoSecretsRule()
         {
-            Assert.Contains("NO SECRETS IN PROJECT", TaskLauncher.DefaultSystemPrompt);
+            Assert.Contains("secrets", TaskLauncher.DefaultSystemPrompt);
             Assert.Contains("API keys", TaskLauncher.DefaultSystemPrompt);
             Assert.Contains("%LOCALAPPDATA%", TaskLauncher.DefaultSystemPrompt);
         }
@@ -667,16 +667,16 @@ namespace HappyEngine.Tests
         [Fact]
         public void NoGitWriteBlock_ContainsRestrictions()
         {
-            Assert.Contains("NO GIT WRITE OPERATIONS", TaskLauncher.NoGitWriteBlock);
-            Assert.Contains("git push", TaskLauncher.NoGitWriteBlock);
-            Assert.Contains("git commit", TaskLauncher.NoGitWriteBlock);
+            Assert.Contains("NO GIT WRITES", TaskLauncher.NoGitWriteBlock);
+            Assert.Contains("commit", TaskLauncher.NoGitWriteBlock);
+            Assert.Contains("push", TaskLauncher.NoGitWriteBlock);
         }
 
         [Fact]
         public void OvernightInitialTemplate_ContainsRestrictions()
         {
-            Assert.Contains("NO GIT COMMANDS", TaskLauncher.OvernightInitialTemplate);
-            Assert.Contains("NO OS-LEVEL MODIFICATIONS", TaskLauncher.OvernightInitialTemplate);
+            Assert.Contains("No git commands", TaskLauncher.OvernightInitialTemplate);
+            Assert.Contains("No OS modifications", TaskLauncher.OvernightInitialTemplate);
             Assert.Contains("STATUS: COMPLETE", TaskLauncher.OvernightInitialTemplate);
         }
 

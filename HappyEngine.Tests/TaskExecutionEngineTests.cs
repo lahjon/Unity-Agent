@@ -1459,7 +1459,7 @@ namespace HappyEngine.Tests
         {
             var prompt = TaskLauncher.BuildOvernightContinuationPrompt(1, 50);
 
-            Assert.Contains("NO GIT COMMANDS", prompt);
+            Assert.Contains("No git", prompt);
             Assert.Contains("STATUS: COMPLETE", prompt);
         }
 
