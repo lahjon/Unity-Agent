@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -46,6 +47,18 @@ namespace HappyEngine.Managers
         private readonly TaskProcessLauncher _processLauncher;
         private readonly FeatureModeHandler _featureModeHandler;
         private readonly TokenLimitHandler _tokenLimitHandler;
+
+        // ── Static git operation serialization ──────────────────────
+        /// <summary>
+        /// Serializes git operations across all tasks to prevent concurrent git commits
+        /// from racing against each other and hitting git's index.lock.
+        /// </summary>
+        private static readonly SemaphoreSlim _gitCommitSemaphore = new SemaphoreSlim(1, 1);
+
+        /// <summary>
+        /// Gets the git commit semaphore for external use (e.g., MainWindow commit operations).
+        /// </summary>
+        public static SemaphoreSlim GitCommitSemaphore => _gitCommitSemaphore;
 
         /// <summary>Exposes the streaming tool state dictionary for external consumers.</summary>
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _processLauncher.StreamingToolState;
@@ -465,45 +478,54 @@ namespace HappyEngine.Managers
                     relativePaths.Add(rel.Replace('\\', '/'));
                 }
 
-                // Stage only the locked files (handles new/untracked files)
-                var escapedPaths = relativePaths.Select(GitHelper.EscapeGitPath).ToList();
-                var pathArgs = string.Join(" ", escapedPaths);
-                var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
-
-                // Check if git add failed
-                if (addResult == null)
+                // Serialize git operations to prevent concurrent commits from racing
+                await _gitCommitSemaphore.WaitAsync();
+                try
                 {
-                    _outputProcessor.AppendOutput(task.Id,
-                        "[HappyEngine] Failed to stage files for auto-commit\n",
-                        activeTasks, historyTasks);
-                    return;
+                    // Stage only the locked files (handles new/untracked files)
+                    var escapedPaths = relativePaths.Select(GitHelper.EscapeGitPath).ToList();
+                    var pathArgs = string.Join(" ", escapedPaths);
+                    var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
+
+                    // Check if git add failed
+                    if (addResult == null)
+                    {
+                        _outputProcessor.AppendOutput(task.Id,
+                            "[HappyEngine] Failed to stage files for auto-commit\n",
+                            activeTasks, historyTasks);
+                        return;
+                    }
+
+                    // Commit only these specific files — using the secure method to prevent shell injection
+                    var desc = task.Description?.Length > 70
+                        ? task.Description[..70] + "..."
+                        : task.Description ?? "task changes";
+                    var commitMsg = $"Task #{task.TaskNumber}: {desc}";
+                    var result = await _gitHelper.CommitSecureAsync(task.ProjectPath, commitMsg, pathArgs);
+
+                    if (result != null)
+                    {
+                        // Get the commit hash after successful commit
+                        var commitHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
+                        if (commitHash != null)
+                        {
+                            task.IsCommitted = true;
+                            task.CommitHash = commitHash;
+                            _outputProcessor.AppendOutput(task.Id,
+                                $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s). Commit: {commitHash[..8]}\n",
+                                activeTasks, historyTasks);
+                        }
+                        else
+                        {
+                            _outputProcessor.AppendOutput(task.Id,
+                                $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s) but failed to capture commit hash.\n",
+                                activeTasks, historyTasks);
+                        }
+                    }
                 }
-
-                // Commit only these specific files — using the secure method to prevent shell injection
-                var desc = task.Description?.Length > 70
-                    ? task.Description[..70] + "..."
-                    : task.Description ?? "task changes";
-                var commitMsg = $"Task #{task.TaskNumber}: {desc}";
-                var result = await _gitHelper.CommitSecureAsync(task.ProjectPath, commitMsg, pathArgs);
-
-                if (result != null)
+                finally
                 {
-                    // Get the commit hash after successful commit
-                    var commitHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
-                    if (commitHash != null)
-                    {
-                        task.IsCommitted = true;
-                        task.CommitHash = commitHash;
-                        _outputProcessor.AppendOutput(task.Id,
-                            $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s). Commit: {commitHash[..8]}\n",
-                            activeTasks, historyTasks);
-                    }
-                    else
-                    {
-                        _outputProcessor.AppendOutput(task.Id,
-                            $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s) but failed to capture commit hash.\n",
-                            activeTasks, historyTasks);
-                    }
+                    _gitCommitSemaphore.Release();
                 }
             }
             catch (Exception ex)
@@ -616,8 +638,7 @@ namespace HappyEngine.Managers
             var ps1Content =
                 "$env:CLAUDECODE = $null\n" +
                 $"Set-Location -LiteralPath '{task.ProjectPath}'\n" +
-                $"$prompt = Get-Content -Raw -LiteralPath '{followUpFile}'\n" +
-                $"claude -p{skipFlag}{resumeFlag}{modelFlag} --verbose --output-format stream-json $prompt\n";
+                $"Get-Content -Raw -LiteralPath '{followUpFile}' | claude -p{skipFlag}{resumeFlag}{modelFlag} --verbose --output-format stream-json\n";
             File.WriteAllText(ps1File, ps1Content, Encoding.UTF8);
             AppLogger.Info("FollowUp", $"[{task.Id}] Wrote PS1 script to: {ps1File}");
             AppLogger.Debug("FollowUp", $"[{task.Id}] PS1 content:\n{ps1Content}");

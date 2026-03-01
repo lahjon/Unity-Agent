@@ -130,8 +130,7 @@ namespace HappyEngine.Managers
             File.WriteAllText(ps1File,
                 "$env:CLAUDECODE = $null\n" +
                 $"Set-Location -LiteralPath '{task.ProjectPath}'\n" +
-                $"$prompt = Get-Content -Raw -LiteralPath '{followUpFile}'\n" +
-                $"claude -p{skipFlag}{resumeFlag} --verbose --output-format stream-json $prompt\n",
+                $"Get-Content -Raw -LiteralPath '{followUpFile}' | claude -p{skipFlag}{resumeFlag} --verbose --output-format stream-json\n",
                 Encoding.UTF8);
 
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>

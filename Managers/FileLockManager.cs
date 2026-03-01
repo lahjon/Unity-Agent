@@ -342,19 +342,12 @@ namespace HappyEngine.Managers
         /// </summary>
         public async Task<(bool success, string? errorMessage)> ExecuteWhileNoLocksHeldAsync(Func<Task> action, string operationName)
         {
-            // First check without locking to avoid blocking UI thread
-            if (LockCount > 0)
-            {
-                return (false, $"Cannot {operationName} while file locks are active");
-            }
-
             lock (_lockSync)
             {
-                // Re-check inside the lock to ensure no race condition
+                // Check if any locks are active
                 if (_fileLocks.Count > 0)
                 {
-                    AppLogger.Info("FileLockManager", $"Race condition detected: locks acquired between check and {operationName}");
-                    return (false, $"Cannot {operationName} while file locks are active (race detected)");
+                    return (false, $"Cannot {operationName} while file locks are active");
                 }
 
                 // Set flag to prevent new locks

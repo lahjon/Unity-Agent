@@ -1199,41 +1199,50 @@ TextureImporter:
                     relativePaths.Add(rel.Replace('\\', '/'));
                 }
 
-                // Stage only the locked files (handles new/untracked files)
-                var pathArgs = string.Join(" ", relativePaths.Select(p => $"\"{p}\""));
-                var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
-
-                // Check if git add failed
-                if (addResult == null)
+                // Serialize git operations to prevent concurrent commits from racing
+                await TaskExecutionManager.GitCommitSemaphore.WaitAsync();
+                try
                 {
-                    Debug.WriteLine($"CommitTaskAsync failed: Failed to stage files");
-                    return false;
-                }
+                    // Stage only the locked files (handles new/untracked files)
+                    var pathArgs = string.Join(" ", relativePaths.Select(p => $"\"{p}\""));
+                    var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
 
-                // Commit only these specific files — the pathspec ensures no other
-                // staged changes from concurrent tasks leak into this commit
-                var result = await _gitHelper.RunGitCommandAsync(
-                    task.ProjectPath,
-                    $"commit -F - -- {pathArgs}", commitMessage);
-
-                if (result != null)
-                {
-                    // Get the commit hash
-                    var hash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath);
-                    if (hash != null)
+                    // Check if git add failed
+                    if (addResult == null)
                     {
-                        task.IsCommitted = true;
-                        task.CommitHash = hash;
-                        _historyManager.SaveHistory(_historyTasks);
-
-                        // Mark git panel as dirty to refresh
-                        _gitPanelManager?.MarkDirty();
-
-                        // Release deferred file locks if any
-                        ReleaseTaskLocksAfterCommit(task);
-
-                        return true;
+                        Debug.WriteLine($"CommitTaskAsync failed: Failed to stage files");
+                        return false;
                     }
+
+                    // Commit only these specific files — the pathspec ensures no other
+                    // staged changes from concurrent tasks leak into this commit
+                    var result = await _gitHelper.RunGitCommandAsync(
+                        task.ProjectPath,
+                        $"commit -F - -- {pathArgs}", commitMessage);
+
+                    if (result != null)
+                    {
+                        // Get the commit hash
+                        var hash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath);
+                        if (hash != null)
+                        {
+                            task.IsCommitted = true;
+                            task.CommitHash = hash;
+                            _historyManager.SaveHistory(_historyTasks);
+
+                            // Mark git panel as dirty to refresh
+                            _gitPanelManager?.MarkDirty();
+
+                            // Release deferred file locks if any
+                            ReleaseTaskLocksAfterCommit(task);
+
+                            return true;
+                        }
+                    }
+                }
+                finally
+                {
+                    TaskExecutionManager.GitCommitSemaphore.Release();
                 }
             }
             catch (Exception ex)
