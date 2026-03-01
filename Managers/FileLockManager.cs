@@ -151,6 +151,20 @@ namespace HappyEngine.Managers
             }
         }
 
+        /// <summary>
+        /// Returns a snapshot of the normalized file paths currently locked by the given task.
+        /// Call this BEFORE ReleaseTaskLocks to capture which files the task modified.
+        /// </summary>
+        public HashSet<string> GetTaskLockedFiles(string taskId)
+        {
+            lock (_lockSync)
+            {
+                if (_taskLockedFiles.TryGetValue(taskId, out var files))
+                    return new HashSet<string>(files);
+                return new HashSet<string>();
+            }
+        }
+
         public void HandleFileLockConflict(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
         {

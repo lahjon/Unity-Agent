@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using HappyEngine.Models;
 
 namespace HappyEngine
 {
@@ -7,7 +8,7 @@ namespace HappyEngine
     /// Pure persistent data for an agent task. Safe to serialize and pass across
     /// boundaries without dragging along runtime process state.
     /// </summary>
-    public class AgentTaskData
+    public class AgentTaskData : ITaskFlags
     {
         public string Id { get; init; } = Guid.NewGuid().ToString("N")[..16];
         public int TaskNumber { get; set; }
@@ -33,6 +34,13 @@ namespace HappyEngine
         public ModelType Model { get; set; } = ModelType.ClaudeCode;
         public int MaxIterations { get; set; } = 2;
         public int CurrentIteration { get; set; }
+
+        // ITaskFlags.Iterations maps to MaxIterations
+        int ITaskFlags.Iterations
+        {
+            get => MaxIterations;
+            set => MaxIterations = value;
+        }
         public string ProjectPath { get; set; } = "";
         public string ProjectColor { get; set; } = "#666666";
         public string ProjectDisplayName { get; set; } = "";

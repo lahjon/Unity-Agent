@@ -7,6 +7,62 @@ namespace HappyEngine.Managers
 {
     public class PromptBuilder : IPromptBuilder
     {
+        // ── CLI Model Constants ─────────────────────────────────────
+
+        /// <summary>Model used for exploration tasks (codebase analysis, decomposition, team design).</summary>
+        public const string CliSonnetModel = "claude-sonnet-4-20250514";
+
+        /// <summary>Model used for planning and execution tasks.</summary>
+        public const string CliOpusModel = "claude-opus-4-20250514";
+
+        /// <summary>
+        /// Determines the CLI model ID for a task based on its flags.
+        /// Exploration-only tasks (decompose, team design) use Sonnet.
+        /// Planning and execution tasks use Opus.
+        /// </summary>
+        public static string GetCliModelForTask(AgentTask task)
+        {
+            // Exploration tasks → Sonnet (fast, cost-effective for codebase analysis)
+            if (task.AutoDecompose || task.SpawnTeam)
+                return CliSonnetModel;
+
+            // Feature mode initial planning = exploration (designs planning team)
+            if (task.IsFeatureMode && task.FeatureModePhase == FeatureModePhase.None)
+                return CliSonnetModel;
+
+            // Planning team members: explore codebase, post findings (NoGitWrite + subtask + no ExtendedPlanning)
+            if (task.NoGitWrite && task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly)
+                return CliSonnetModel;
+
+            // Everything else: planning + execution → Opus
+            return CliOpusModel;
+        }
+
+        /// <summary>
+        /// Returns a human-friendly label for a CLI model ID (e.g. "Opus" or "Sonnet").
+        /// </summary>
+        public static string GetFriendlyModelName(string modelId)
+        {
+            if (modelId.Contains("opus", System.StringComparison.OrdinalIgnoreCase)) return "Opus";
+            if (modelId.Contains("sonnet", System.StringComparison.OrdinalIgnoreCase)) return "Sonnet";
+            if (modelId.Contains("haiku", System.StringComparison.OrdinalIgnoreCase)) return "Haiku";
+            return modelId;
+        }
+
+        /// <summary>
+        /// Determines the CLI model for a feature mode phase process.
+        /// </summary>
+        public static string GetCliModelForPhase(FeatureModePhase phase)
+        {
+            return phase switch
+            {
+                FeatureModePhase.None => CliSonnetModel,               // Team design = exploration
+                FeatureModePhase.PlanConsolidation => CliOpusModel,     // Consolidation = planning
+                FeatureModePhase.Evaluation => CliOpusModel,            // Evaluation = planning
+                _ => CliOpusModel
+            };
+        }
+
         // ── Constants ────────────────────────────────────────────────
 
         public const string DefaultSystemPrompt =
@@ -25,6 +81,10 @@ namespace HappyEngine.Managers
         public const string NoGitWriteBlock =
             "# NO GIT WRITES\n" +
             "Never modify repository state (commit, push, add, merge, rebase). Read-only git only (status, log, diff, show).\n\n";
+
+        public const string NoPushBlock =
+            "# NO GIT PUSH\n" +
+            "Never run `git push` or `git push --force` or any push variant. You may commit and use other git write operations, but pushing is strictly forbidden. Push should only be done manually by the user through the git panel.\n\n";
 
         public const string GameRulesBlock =
             "# GAME PROJECT\n" +
@@ -238,9 +298,11 @@ namespace HappyEngine.Managers
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
             var planOnlyBlock = planOnly ? PlanOnlyBlock : "";
-            // Skip NoGitWriteBlock when planOnly is active — PlanOnlyBlock already
+            // Skip git blocks when planOnly is active — PlanOnlyBlock already
             // prohibits all file operations which subsumes git-write restrictions.
-            var gitBlock = (noGitWrite && !planOnly) ? NoGitWriteBlock : "";
+            // When noGitWrite is true: fully read-only git (no commit, no push, nothing).
+            // When noGitWrite is false: allow commits but never push (push only via git panel).
+            var gitBlock = planOnly ? "" : (noGitWrite ? NoGitWriteBlock : NoPushBlock);
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;
@@ -293,11 +355,12 @@ namespace HappyEngine.Managers
 
         // ── Command & Script Building ────────────────────────────────
 
-        public string BuildClaudeCommand(bool skipPermissions, bool remoteSession)
+        public string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null)
         {
             var skipFlag = skipPermissions ? " --dangerously-skip-permissions" : "";
             var remoteFlag = remoteSession ? " --remote" : "";
-            return $"claude -p{skipFlag}{remoteFlag} --verbose --output-format stream-json";
+            var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
+            return $"claude -p{skipFlag}{remoteFlag}{modelFlag} --verbose --output-format stream-json";
         }
 
         public string BuildPowerShellScript(string projectPath, string promptFilePath,
@@ -309,17 +372,18 @@ namespace HappyEngine.Managers
         }
 
         public string BuildHeadlessPowerShellScript(string projectPath, string promptFilePath,
-            bool skipPermissions, bool remoteSession)
+            bool skipPermissions, bool remoteSession, string? modelId = null)
         {
             var skipFlag = skipPermissions ? " --dangerously-skip-permissions" : "";
             var remoteFlag = remoteSession ? " --remote" : "";
+            var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
                    $"Write-Host '[HappyEngine] Project: {projectPath}' -ForegroundColor DarkGray\n" +
                    $"Write-Host '[HappyEngine] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
                    "Write-Host '[HappyEngine] Starting Claude...' -ForegroundColor Cyan\n" +
                    "Write-Host ''\n" +
-                   $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{remoteFlag} --verbose\n" +
+                   $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{remoteFlag}{modelFlag} --verbose\n" +
                    "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[HappyEngine] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
                    "Write-Host \"`n[HappyEngine] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
                    "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n";

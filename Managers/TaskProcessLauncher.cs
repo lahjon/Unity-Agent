@@ -72,11 +72,17 @@ namespace HappyEngine.Managers
 
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
+            var stdoutLineCount = 0;
+            var stderrLineCount = 0;
+
             process.OutputDataReceived += (_, e) =>
             {
                 if (e.Data == null) return;
                 var line = FormatHelpers.StripAnsiCodes(e.Data).Trim();
                 if (string.IsNullOrEmpty(line)) return;
+                var lineNum = System.Threading.Interlocked.Increment(ref stdoutLineCount);
+                if (lineNum <= 3)
+                    AppLogger.Debug("FollowUp", $"[{taskId}] stdout line #{lineNum}: {(line.Length > 200 ? line[..200] + "..." : line)}");
                 _dispatcher.BeginInvoke(() => ParseStreamJson(taskId, line, activeTasks, historyTasks));
             };
 
@@ -85,11 +91,16 @@ namespace HappyEngine.Managers
                 if (e.Data == null) return;
                 var line = FormatHelpers.StripAnsiCodes(e.Data);
                 if (!string.IsNullOrWhiteSpace(line))
+                {
+                    System.Threading.Interlocked.Increment(ref stderrLineCount);
+                    AppLogger.Warn("FollowUp", $"[{taskId}] stderr: {line}");
                     _dispatcher.BeginInvoke(() => _outputProcessor.AppendOutput(taskId, $"[stderr] {line}\n", activeTasks, historyTasks));
+                }
             };
 
             process.Exited += (_, _) =>
             {
+                AppLogger.Info("FollowUp", $"[{taskId}] Process exited. Total stdout lines={stdoutLineCount}, stderr lines={stderrLineCount}");
                 _dispatcher.BeginInvoke(() =>
                 {
                     var exitCode = -1;

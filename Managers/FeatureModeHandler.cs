@@ -474,9 +474,11 @@ namespace HappyEngine.Managers
             var promptFile = Path.Combine(_scriptDir, $"feature_{task.Id}_{task.CurrentIteration}_{(int)task.FeatureModePhase}.txt");
             File.WriteAllText(promptFile, prompt, Encoding.UTF8);
 
-            var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
-            var remoteFlag = task.RemoteSession ? " --remote" : "";
-            var claudeCmd = $"claude -p{skipFlag}{remoteFlag} --verbose --output-format stream-json";
+            var phaseModel = PromptBuilder.GetCliModelForPhase(task.FeatureModePhase);
+            _outputProcessor.AppendOutput(task.Id,
+                $"\n[HappyEngine] Phase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
+                activeTasks, historyTasks);
+            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, phaseModel);
 
             var ps1File = Path.Combine(_scriptDir, $"feature_{task.Id}.ps1");
             File.WriteAllText(ps1File,

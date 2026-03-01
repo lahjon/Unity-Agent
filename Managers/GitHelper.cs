@@ -74,16 +74,5 @@ namespace HappyEngine.Managers
             }
             return files;
         }
-
-        public string? CaptureGitHead(string projectPath)
-        {
-            return RunGitCommandAsync(projectPath, "rev-parse HEAD").GetAwaiter().GetResult();
-        }
-
-        public List<(string name, int added, int removed)>? GetGitFileChanges(
-            string projectPath, string? gitStartHash)
-        {
-            return GetGitFileChangesAsync(projectPath, gitStartHash).GetAwaiter().GetResult();
-        }
     }
 }

@@ -22,13 +22,13 @@ namespace HappyEngine.Managers
         string BuildMessageBusBlock(string taskId,
             List<(string id, string summary)> siblings);
 
-        string BuildClaudeCommand(bool skipPermissions, bool remoteSession);
+        string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null);
 
         string BuildPowerShellScript(string projectPath, string promptFilePath,
             string claudeCmd);
 
         string BuildHeadlessPowerShellScript(string projectPath, string promptFilePath,
-            bool skipPermissions, bool remoteSession);
+            bool skipPermissions, bool remoteSession, string? modelId = null);
 
         ProcessStartInfo BuildProcessStartInfo(string ps1FilePath, bool headless);
 

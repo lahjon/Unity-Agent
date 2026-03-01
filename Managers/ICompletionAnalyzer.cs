@@ -16,11 +16,6 @@ namespace HappyEngine.Managers
             long inputTokens = 0, long outputTokens = 0,
             long cacheReadTokens = 0, long cacheCreationTokens = 0);
 
-        string GenerateCompletionSummary(string projectPath, string? gitStartHash,
-            AgentTaskStatus status, TimeSpan duration,
-            long inputTokens = 0, long outputTokens = 0,
-            long cacheReadTokens = 0, long cacheCreationTokens = 0);
-
         Task<string> GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash,
             AgentTaskStatus status, TimeSpan duration,
             long inputTokens = 0, long outputTokens = 0,

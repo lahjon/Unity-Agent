@@ -13,7 +13,8 @@ namespace HappyEngine.Managers
         public int TotalCount { get; set; }
         public int CompletedCount { get; set; }
         public int FailedCount { get; set; }
-        public List<TaskGroupEntry> Tasks { get; set; } = new();
+        internal readonly ConcurrentDictionary<string, TaskGroupEntry> TaskMap = new();
+        public List<TaskGroupEntry> Tasks => TaskMap.Values.ToList();
     }
 
     public class TaskGroupEntry
@@ -38,6 +39,7 @@ namespace HappyEngine.Managers
     public class TaskGroupTracker
     {
         private readonly ConcurrentDictionary<string, TaskGroupState> _groups = new();
+        private readonly object _sync = new();
 
         public event EventHandler<GroupCompletedEventArgs>? GroupCompleted;
 
@@ -52,19 +54,19 @@ namespace HappyEngine.Managers
                 StartTime = DateTime.Now
             });
 
-            lock (state)
+            var entry = new TaskGroupEntry
             {
-                if (state.Tasks.Any(t => t.TaskId == task.Id)) return;
+                TaskId = task.Id,
+                TaskNumber = task.TaskNumber,
+                Description = task.Description,
+                Status = task.Status,
+                StartTime = task.StartTime
+            };
 
+            lock (_sync)
+            {
+                if (!state.TaskMap.TryAdd(task.Id, entry)) return;
                 state.TotalCount++;
-                state.Tasks.Add(new TaskGroupEntry
-                {
-                    TaskId = task.Id,
-                    TaskNumber = task.TaskNumber,
-                    Description = task.Description,
-                    Status = task.Status,
-                    StartTime = task.StartTime
-                });
             }
         }
 
@@ -74,10 +76,9 @@ namespace HappyEngine.Managers
             if (!_groups.TryGetValue(task.GroupId!, out var state)) return;
 
             bool allDone;
-            lock (state)
+            lock (_sync)
             {
-                var entry = state.Tasks.FirstOrDefault(t => t.TaskId == task.Id);
-                if (entry == null) return;
+                if (!state.TaskMap.TryGetValue(task.Id, out var entry)) return;
 
                 entry.Status = task.Status;
                 entry.EndTime = task.EndTime;

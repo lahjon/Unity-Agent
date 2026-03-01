@@ -1190,7 +1190,7 @@
                                     <!-- Permanent toggles -->
                                     <TextBlock Text="PERSISTENT" Foreground="{StaticResource TextDisabled}" FontSize="9"
                                                FontFamily="Segoe UI" FontWeight="Bold" Margin="0,0,0,4"/>
-                                    <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="True"
+                                    <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="False"
                                                   Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
                                         <TextBlock Text="Ignore File Locks" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
@@ -1451,7 +1451,7 @@
         <!-- ═══ GRAPH + TASK OUTPUT (4) ═══ -->
         <Grid Grid.Row="0" Grid.Column="2">
             <Grid.RowDefinitions>
-                <RowDefinition x:Name="GraphPanelRow" Height="180" MinHeight="60"/>
+                <RowDefinition x:Name="GraphPanelRow" Height="Auto" MinHeight="0"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*" MinHeight="120"/>
             </Grid.RowDefinitions>
@@ -1484,22 +1484,22 @@
                 </Border.Triggers>
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Bottom" Margin="8,0,8,2">
-                        <Button x:Name="GraphCollapseBtn" Content="&#xE70D;"
+                        <Button x:Name="GraphCollapseBtn" Content="&#xE70E;"
                                 Style="{StaticResource IconBtn}" DockPanel.Dock="Left"
                                 VerticalAlignment="Center" Margin="0,0,4,0"
-                                Click="GraphCollapse_Click" ToolTip="Collapse graph"/>
+                                Click="GraphCollapse_Click" ToolTip="Expand graph"/>
                         <TextBlock Text="GRAPH" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                    FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"
                                    Margin="0,0,8,0" MouseLeftButtonDown="GraphHeader_MouseDown" Cursor="Hand"/>
                     </DockPanel>
-                    <controls:TaskNodeGraphPanel x:Name="NodeGraphPanel"/>
+                    <controls:TaskNodeGraphPanel x:Name="NodeGraphPanel" Visibility="Collapsed"/>
                 </DockPanel>
             </Border>
 
             <!-- Splitter between graph and output -->
             <GridSplitter x:Name="GraphSplitter" Grid.Row="1" Height="3" HorizontalAlignment="Stretch"
                           VerticalAlignment="Center" Background="Transparent"
-                          Style="{StaticResource HorizontalSplitter}"/>
+                          Style="{StaticResource HorizontalSplitter}" Visibility="Collapsed"/>
 
             <!-- Task Output -->
             <Border Grid.Row="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
@@ -1549,66 +1549,48 @@
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
                         <TextBlock Text="STATISTICS" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                    FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="FileLockBadge" Text="0" Visibility="Collapsed"
-                                   Foreground="{StaticResource WarningOrange}" FontSize="10" FontWeight="Bold"
-                                   FontFamily="Segoe UI" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </DockPanel>
                     <TabControl x:Name="StatisticsTabs" Style="{StaticResource SettingsTabControlStyle}"
                                 Background="Transparent" BorderThickness="0">
+                        <!-- Git tab -->
+                        <TabItem x:Name="GitTabItem">
+                            <TabItem.Header>
+                                <TextBlock Text="Git" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            </TabItem.Header>
+                            <ScrollViewer x:Name="GitTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
+                        </TabItem>
                         <!-- File Locks tab -->
                         <TabItem x:Name="FileLocksTabItem">
                             <TabItem.Header>
-                                <TextBlock Text="File Locks" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="File Locks" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                                    <TextBlock x:Name="FileLockBadge" Text="0" Visibility="Collapsed"
+                                               Foreground="{StaticResource WarningOrange}" FontSize="10" FontWeight="Bold"
+                                               FontFamily="Segoe UI" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
                             </TabItem.Header>
                             <DockPanel Margin="0,6,0,0">
                                 <TextBlock DockPanel.Dock="Top" Text="Active file locks across all tasks"
                                            Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,8"/>
-                                <!-- Header row -->
-                                <Grid DockPanel.Dock="Top" Margin="0,0,0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="160"/>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="90"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="70"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="FILE" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                    <TextBlock Grid.Column="1" Text="STATUS" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                    <TextBlock Grid.Column="2" Text="TOOL" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                    <TextBlock Grid.Column="3" Text="PATH" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                    <TextBlock Grid.Column="4" Text="TASK" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                    <TextBlock Grid.Column="5" Text="SINCE" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                               FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                </Grid>
-                                <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,4"/>
-                                <!-- Lock rows -->
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <ItemsControl x:Name="FileLocksListView">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Padding="8,5" Margin="0,1" CornerRadius="4"
-                                                        Background="{StaticResource BgSection}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="160"/>
-                                                            <ColumnDefinition Width="70"/>
-                                                            <ColumnDefinition Width="90"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="70"/>
-                                                            <ColumnDefinition Width="70"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="{Binding FileName}"
+                                <!-- Lock rows with resizable columns -->
+                                <ListView x:Name="FileLocksListView" Style="{StaticResource FileLockListViewStyle}">
+                                    <ListView.View>
+                                        <GridView ColumnHeaderContainerStyle="{StaticResource FileLockColumnHeaderStyle}">
+                                            <GridViewColumn Header="FILE" Width="160">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding FileName}"
                                                                    Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Consolas"
                                                                    TextTrimming="CharacterEllipsis"
                                                                    ToolTip="{Binding OriginalPath}"/>
-                                                        <TextBlock Grid.Column="1" Text="{Binding StatusText}"
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="STATUS" Width="70">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding StatusText}"
                                                                    FontSize="11" FontFamily="Consolas">
                                                             <TextBlock.Style>
                                                                 <Style TargetType="TextBlock">
@@ -1621,21 +1603,45 @@
                                                                 </Style>
                                                             </TextBlock.Style>
                                                         </TextBlock>
-                                                        <TextBlock Grid.Column="2" Text="{Binding ToolName}"
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="TOOL" Width="90">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding ToolName}"
                                                                    Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Consolas"/>
-                                                        <TextBlock Grid.Column="3" Text="{Binding OriginalPath}"
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="PATH" Width="200">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding OriginalPath}"
                                                                    Foreground="{StaticResource TextDim}" FontSize="11" FontFamily="Consolas"
-                                                                   TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
-                                                        <TextBlock Grid.Column="4" Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="TASK" Width="70">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
                                                                    Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
-                                                        <TextBlock Grid.Column="5" Text="{Binding TimeText}"
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="SINCE" Width="70">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding TimeText}"
                                                                    Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas"/>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
                             </DockPanel>
                         </TabItem>
                         <!-- Activity tab -->
@@ -1644,13 +1650,6 @@
                                 <TextBlock Text="Activity" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                             </TabItem.Header>
                             <ScrollViewer x:Name="ActivityTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
-                        </TabItem>
-                        <!-- Git tab -->
-                        <TabItem x:Name="GitTabItem">
-                            <TabItem.Header>
-                                <TextBlock Text="Git" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
-                            </TabItem.Header>
-                            <ScrollViewer x:Name="GitTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
                         </TabItem>
                     </TabControl>
                 </DockPanel>
@@ -1795,18 +1794,24 @@
 
                             <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,8"/>
 
-                            <!-- Error section -->
+                            <!-- Build Tools section -->
                             <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,0">
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,8,0,8"/>
-                                <TextBlock Text="Error" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
+                                <TextBlock Text="Build Tools" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
-                                <TextBlock Text="Investigate project crash logs and diagnose build failures."
+                                <TextBlock Text="Investigate build failures, crash logs, and verify project tests."
                                            Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
                                            Margin="0,0,0,8"/>
-                                <Button x:Name="BuildInvestigationBtn" Content="Build Investigation"
-                                        Click="BuildInvestigation_Click"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        FontSize="11" Padding="10,4" HorizontalAlignment="Left"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button x:Name="BuildInvestigationBtn" Content="Build Investigation"
+                                            Click="BuildInvestigation_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4" HorizontalAlignment="Left"/>
+                                    <Button x:Name="TestVerificationBtn" Content="Test Verification"
+                                            Click="TestVerification_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4" HorizontalAlignment="Left" Margin="8,0,0,0"/>
+                                </StackPanel>
                             </StackPanel>
 
                             <!-- Suggestions list -->
@@ -1985,7 +1990,7 @@
 
                                 <TextBlock Text="Defaults" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,12"/>
-                                <ToggleButton x:Name="DefaultNoGitWriteToggle" IsChecked="True"
+                                <ToggleButton x:Name="DefaultNoGitWriteToggle" IsChecked="False"
                                               Style="{StaticResource ToggleSwitch}" Margin="0,0,0,14">
                                     <TextBlock Text="No Git Write by default" Foreground="{StaticResource TextLight}"
                                                FontSize="11" FontFamily="Segoe UI"/>

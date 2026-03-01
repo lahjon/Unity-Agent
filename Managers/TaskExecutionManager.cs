@@ -157,7 +157,8 @@ namespace HappyEngine.Managers
             var promptFile = BuildAndWritePromptFile(task, activeTasks);
             var projectPath = task.ProjectPath;
 
-            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession);
+            var cliModel = PromptBuilder.GetCliModelForTask(task);
+            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, cliModel);
 
             var ps1File = Path.Combine(_scriptDir, $"task_{task.Id}.ps1");
             File.WriteAllText(ps1File,
@@ -168,6 +169,7 @@ namespace HappyEngine.Managers
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Summary: {task.Summary}\n", activeTasks, historyTasks);
             _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Project: {projectPath}\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Model: {PromptBuilder.GetFriendlyModelName(cliModel)} ({cliModel})\n", activeTasks, historyTasks);
             _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
             _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
             if (task.UseMessageBus)
@@ -259,13 +261,15 @@ namespace HappyEngine.Managers
                 }
                 else
                 {
+                    // Capture locked files BEFORE releasing so we can scope the auto-commit
+                    var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
                     _fileLockManager.ReleaseTaskLocks(task.Id);
                     if (task.UseMessageBus)
                         _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
                     // Set to Verifying while summary runs; final status is set afterwards
                     task.Status = AgentTaskStatus.Verifying;
                     _outputTabManager.UpdateTabHeader(task);
-                    _ = CompleteWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
+                    _ = CompleteWithVerificationAsync(task, exitCode, activeTasks, historyTasks, lockedFiles);
                     return;
                 }
             });
@@ -310,9 +314,16 @@ namespace HappyEngine.Managers
         /// Verifying and fires TaskCompleted, even if summary/verification throws.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteWithVerificationAsync(AgentTask task, int exitCode,
-            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            IReadOnlyCollection<string>? lockedFiles = null)
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+
+            // Auto-commit only the files this task locked (not all local changes)
+            if (exitCode == 0 && !task.NoGitWrite && lockedFiles is { Count: > 0 })
+            {
+                await CommitTaskLockedFilesAsync(task, lockedFiles, activeTasks, historyTasks);
+            }
 
             try
             {
@@ -386,14 +397,66 @@ namespace HappyEngine.Managers
             TaskCompleted?.Invoke(task.Id);
         }
 
+        /// <summary>
+        /// Commits only the files that were locked by this task, not all local changes.
+        /// Uses <c>git commit -- &lt;files&gt;</c> to scope the commit to exactly those paths,
+        /// preventing concurrent tasks' changes from being included.
+        /// </summary>
+        private async System.Threading.Tasks.Task CommitTaskLockedFilesAsync(AgentTask task,
+            IReadOnlyCollection<string> lockedFiles,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            if (string.IsNullOrEmpty(task.ProjectPath) || lockedFiles.Count == 0)
+                return;
+
+            try
+            {
+                // Build relative paths from the project root for the git commands
+                var projectRoot = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
+                var relativePaths = new List<string>();
+                foreach (var absPath in lockedFiles)
+                {
+                    var rel = absPath.StartsWith(projectRoot)
+                        ? absPath[projectRoot.Length..]
+                        : absPath;
+                    relativePaths.Add(rel.Replace('\\', '/'));
+                }
+
+                // Stage only the locked files (handles new/untracked files)
+                var pathArgs = string.Join(" ", relativePaths.Select(p => $"\"{p}\""));
+                await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
+
+                // Commit only these specific files — the pathspec ensures no other
+                // staged changes from concurrent tasks leak into this commit
+                var desc = task.Description?.Length > 70
+                    ? task.Description[..70] + "..."
+                    : task.Description ?? "task changes";
+                var escapedMsg = $"Task #{task.TaskNumber}: {desc}".Replace("\"", "\\\"");
+                var result = await _gitHelper.RunGitCommandAsync(task.ProjectPath,
+                    $"commit -m \"{escapedMsg}\" -- {pathArgs}");
+
+                if (result != null)
+                {
+                    _outputProcessor.AppendOutput(task.Id,
+                        $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s).\n",
+                        activeTasks, historyTasks);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("TaskExecution", $"Auto-commit failed for task {task.Id}", ex);
+            }
+        }
+
         public void LaunchHeadless(AgentTask task)
         {
             var promptFile = BuildAndWritePromptFile(task);
             var projectPath = task.ProjectPath;
+            var cliModel = PromptBuilder.GetCliModelForTask(task);
 
             var ps1File = Path.Combine(_scriptDir, $"headless_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                _promptBuilder.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, task.RemoteSession),
+                _promptBuilder.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, task.RemoteSession, cliModel),
                 Encoding.UTF8);
 
             var psi = _promptBuilder.BuildProcessStartInfo(ps1File, headless: true);
@@ -424,11 +487,14 @@ namespace HappyEngine.Managers
         {
             if (string.IsNullOrEmpty(text)) return;
 
+            AppLogger.Info("FollowUp", $"[{task.Id}] SendFollowUp called. Status={task.Status}, IsFeatureMode={task.IsFeatureMode}, Phase={task.FeatureModePhase}, ProcessAlive={task.Process is { HasExited: false }}, ConversationId={task.ConversationId ?? "(null)"}");
+
             // Block follow-up when the task is a feature mode coordinator waiting for subtasks.
             // Without this, it would start a new Claude process that has no context about the
             // coordination and asks "what do you want me to do?"
             if (task.IsFeatureMode && task.FeatureModePhase is FeatureModePhase.TeamPlanning or FeatureModePhase.Execution)
             {
+                AppLogger.Warn("FollowUp", $"[{task.Id}] Blocked: feature mode coordinator in phase {task.FeatureModePhase}");
                 _outputProcessor.AppendOutput(task.Id,
                     "\n[HappyEngine] This task is coordinating subtasks and waiting for them to complete. Follow-up input is not available during this phase.\n",
                     activeTasks, historyTasks);
@@ -439,6 +505,7 @@ namespace HappyEngine.Managers
             {
                 try
                 {
+                    AppLogger.Info("FollowUp", $"[{task.Id}] Writing to existing stdin (process alive)");
                     _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n", activeTasks, historyTasks);
                     task.Process.StandardInput.WriteLine(text);
                     return;
@@ -461,7 +528,8 @@ namespace HappyEngine.Managers
                 ? $"--resume {task.ConversationId}"
                 : "--continue";
 
-            _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n[HappyEngine] Sending follow-up with {resumeLabel}...\n\n", activeTasks, historyTasks);
+            var followUpModel = PromptBuilder.GetCliModelForTask(task);
+            _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n[HappyEngine] Sending follow-up with {resumeLabel} (Model: {PromptBuilder.GetFriendlyModelName(followUpModel)})...\n\n", activeTasks, historyTasks);
 
             // Set iteration start AFTER the echo so the echoed prompt text
             // (which contains recommendation keywords) is excluded from
@@ -469,19 +537,25 @@ namespace HappyEngine.Managers
             task.LastIterationOutputStart = task.OutputBuilder.Length;
 
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
+            var modelFlag = $" --model {followUpModel}";
             var followUpFile = Path.Combine(_scriptDir, $"followup_{task.Id}_{DateTime.Now.Ticks}.txt");
             File.WriteAllText(followUpFile, text, Encoding.UTF8);
+            AppLogger.Info("FollowUp", $"[{task.Id}] Wrote follow-up prompt to: {followUpFile}");
 
             var ps1File = Path.Combine(_scriptDir, $"followup_{task.Id}.ps1");
-            File.WriteAllText(ps1File,
+            var ps1Content =
                 "$env:CLAUDECODE = $null\n" +
                 $"Set-Location -LiteralPath '{task.ProjectPath}'\n" +
                 $"$prompt = Get-Content -Raw -LiteralPath '{followUpFile}'\n" +
-                $"claude -p{skipFlag}{resumeFlag} --verbose --output-format stream-json $prompt\n",
-                Encoding.UTF8);
+                $"claude -p{skipFlag}{resumeFlag}{modelFlag} --verbose --output-format stream-json $prompt\n";
+            File.WriteAllText(ps1File, ps1Content, Encoding.UTF8);
+            AppLogger.Info("FollowUp", $"[{task.Id}] Wrote PS1 script to: {ps1File}");
+            AppLogger.Debug("FollowUp", $"[{task.Id}] PS1 content:\n{ps1Content}");
 
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
+                AppLogger.Info("FollowUp", $"[{task.Id}] Follow-up process exited with code {exitCode}");
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Follow-up process exited (code={exitCode})\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Verifying;
                 _outputTabManager.UpdateTabHeader(task);
                 _ = CompleteFollowUpWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
@@ -490,9 +564,12 @@ namespace HappyEngine.Managers
             try
             {
                 _processLauncher.StartManagedProcess(task, process);
+                AppLogger.Info("FollowUp", $"[{task.Id}] Process started successfully. PID={task.Process?.Id}");
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Follow-up process started (PID={task.Process?.Id})\n", activeTasks, historyTasks);
             }
             catch (Exception ex)
             {
+                AppLogger.Error("FollowUp", $"[{task.Id}] Failed to start follow-up process", ex);
                 _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
             }
         }

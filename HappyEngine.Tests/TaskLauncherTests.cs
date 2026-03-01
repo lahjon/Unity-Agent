@@ -144,10 +144,12 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void BuildBasePrompt_WithoutNoGitWrite_ExcludesGitBlock()
+        public void BuildBasePrompt_WithoutNoGitWrite_IncludesNoPushBlock()
         {
             var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: false);
             Assert.DoesNotContain("NO GIT WRITES", result);
+            Assert.Contains("NO GIT PUSH", result);
+            Assert.Contains("git push", result);
         }
 
         [Fact]
@@ -217,6 +219,13 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
+        public void BuildClaudeCommand_WithModel_IncludesModelFlag()
+        {
+            var cmd = _prompt.BuildClaudeCommand(false, false, "claude-opus-4-20250514");
+            Assert.Contains("--model claude-opus-4-20250514", cmd);
+        }
+
+        [Fact]
         public void BuildClaudeCommand_SkipPermissions_IncludesFlag()
         {
             var cmd = _prompt.BuildClaudeCommand(true, false);
@@ -240,9 +249,10 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildClaudeCommand_AllFlags()
         {
-            var cmd = _prompt.BuildClaudeCommand(true, true);
+            var cmd = _prompt.BuildClaudeCommand(true, true, "claude-sonnet-4-20250514");
             Assert.Contains("--dangerously-skip-permissions", cmd);
             Assert.Contains("--remote", cmd);
+            Assert.Contains("--model claude-sonnet-4-20250514", cmd);
             Assert.DoesNotContain("--spawn-team", cmd);
             Assert.Contains("--verbose", cmd);
             Assert.Contains("--output-format stream-json", cmd);
@@ -253,6 +263,67 @@ namespace HappyEngine.Tests
         {
             var cmd = _prompt.BuildClaudeCommand(false, false);
             Assert.Contains("stream-json", cmd);
+        }
+
+        [Fact]
+        public void GetCliModelForTask_AutoDecompose_ReturnsSonnet()
+        {
+            var task = new AgentTask { AutoDecompose = true };
+            Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForTask(task));
+        }
+
+        [Fact]
+        public void GetCliModelForTask_SpawnTeam_ReturnsSonnet()
+        {
+            var task = new AgentTask { SpawnTeam = true };
+            Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForTask(task));
+        }
+
+        [Fact]
+        public void GetCliModelForTask_FeatureModeInitial_ReturnsSonnet()
+        {
+            var task = new AgentTask { IsFeatureMode = true };
+            task.Data.FeatureModePhase = FeatureModePhase.None;
+            Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForTask(task));
+        }
+
+        [Fact]
+        public void GetCliModelForTask_PlanningTeamMember_ReturnsSonnet()
+        {
+            var task = new AgentTask { NoGitWrite = true, ParentTaskId = "parent123" };
+            Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForTask(task));
+        }
+
+        [Fact]
+        public void GetCliModelForTask_RegularTask_ReturnsOpus()
+        {
+            var task = new AgentTask();
+            Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForTask(task));
+        }
+
+        [Fact]
+        public void GetCliModelForTask_ExecutionStep_ReturnsOpus()
+        {
+            var task = new AgentTask { ExtendedPlanning = true, ParentTaskId = "parent123", NoGitWrite = true };
+            Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForTask(task));
+        }
+
+        [Fact]
+        public void GetCliModelForPhase_Consolidation_ReturnsOpus()
+        {
+            Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForPhase(FeatureModePhase.PlanConsolidation));
+        }
+
+        [Fact]
+        public void GetCliModelForPhase_Evaluation_ReturnsOpus()
+        {
+            Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForPhase(FeatureModePhase.Evaluation));
+        }
+
+        [Fact]
+        public void GetCliModelForPhase_None_ReturnsSonnet()
+        {
+            Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForPhase(FeatureModePhase.None));
         }
 
         // ── PowerShell Script Building ──────────────────────────────
@@ -685,6 +756,14 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
+        public void NoPushBlock_ContainsRestrictions()
+        {
+            Assert.Contains("NO GIT PUSH", PromptBuilder.NoPushBlock);
+            Assert.Contains("git push", PromptBuilder.NoPushBlock);
+            Assert.Contains("git panel", PromptBuilder.NoPushBlock);
+        }
+
+        [Fact]
         public void FeatureModeInitialTemplate_ContainsRestrictions()
         {
             Assert.Contains("No git commands", PromptBuilder.FeatureModeInitialTemplate);
@@ -764,32 +843,32 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void CaptureGitHead_ValidRepo_ReturnsHash()
+        public async Task CaptureGitHeadAsync_ValidRepo_ReturnsHash()
         {
             // The project itself is a git repo
-            var hash = _git.CaptureGitHead(System.IO.Directory.GetCurrentDirectory());
+            var hash = await _git.CaptureGitHeadAsync(System.IO.Directory.GetCurrentDirectory());
             Assert.NotNull(hash);
             Assert.True(hash!.Length >= 7); // short hash at minimum
         }
 
         [Fact]
-        public void CaptureGitHead_InvalidPath_ReturnsNull()
+        public async Task CaptureGitHeadAsync_InvalidPath_ReturnsNull()
         {
-            var hash = _git.CaptureGitHead(@"C:\nonexistent_path_12345");
+            var hash = await _git.CaptureGitHeadAsync(@"C:\nonexistent_path_12345");
             Assert.Null(hash);
         }
 
         [Fact]
-        public void GetGitFileChanges_InvalidPath_ReturnsNull()
+        public async Task GetGitFileChangesAsync_InvalidPath_ReturnsNull()
         {
-            var changes = _git.GetGitFileChanges(@"C:\nonexistent_path_12345", null);
+            var changes = await _git.GetGitFileChangesAsync(@"C:\nonexistent_path_12345", null);
             Assert.Null(changes);
         }
 
         [Fact]
-        public void GenerateCompletionSummary_InvalidPath_StillReturnsFormatted()
+        public async Task GenerateCompletionSummaryAsync_InvalidPath_StillReturnsFormatted()
         {
-            var result = _completion.GenerateCompletionSummary(
+            var result = await _completion.GenerateCompletionSummaryAsync(
                 @"C:\nonexistent_path_12345", null, AgentTaskStatus.Completed, TimeSpan.FromMinutes(1));
             Assert.Contains("TASK COMPLETION SUMMARY", result);
             Assert.Contains("Completed", result);

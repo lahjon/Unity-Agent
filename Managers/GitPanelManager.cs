@@ -848,22 +848,34 @@ namespace HappyEngine.Managers
                 return;
             }
 
+            if (_uncommittedChanges.Count == 0)
+            {
+                MessageBox.Show("No uncommitted changes to commit.", "Commit", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             try
             {
-                AppLogger.Info("GitPanelManager", $"Committing all changes for {projectPath}");
+                // Stage only the specific files we know about — never use "add -A"
+                // because concurrent tasks may have created changes we shouldn't include
+                var filePaths = _uncommittedChanges
+                    .Select(c => $"\"{c.FilePath.Replace('\\', '/')}\"")
+                    .ToList();
+                var pathArgs = string.Join(" ", filePaths);
 
-                // Stage all changes
-                var addResult = await _gitHelper.RunGitCommandAsync(projectPath, "add -A");
+                AppLogger.Info("GitPanelManager", $"Committing {filePaths.Count} file(s) for {projectPath}");
+
+                var addResult = await _gitHelper.RunGitCommandAsync(projectPath, $"add -- {pathArgs}");
                 if (addResult == null)
                 {
                     MessageBox.Show("Failed to stage changes.", "Commit", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                // Commit with the message - escape double quotes in message
+                // Commit with pathspec to ensure only these files are committed
                 var escapedMessage = message.Replace("\"", "\\\"");
                 var commitResult = await _gitHelper.RunGitCommandAsync(projectPath,
-                    $"commit -m \"{escapedMessage}\"");
+                    $"commit -m \"{escapedMessage}\" -- {pathArgs}");
                 if (commitResult == null)
                 {
                     MessageBox.Show("Commit failed. There may be nothing to commit or a hook rejected it.",

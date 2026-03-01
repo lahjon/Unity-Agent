@@ -256,23 +256,6 @@ namespace HappyEngine.Managers
             return sb.ToString();
         }
 
-        public string GenerateCompletionSummary(string projectPath, string? gitStartHash,
-            AgentTaskStatus status, TimeSpan duration,
-            long inputTokens = 0, long outputTokens = 0,
-            long cacheReadTokens = 0, long cacheCreationTokens = 0)
-        {
-            try
-            {
-                var fileChanges = _gitHelper.GetGitFileChanges(projectPath, gitStartHash);
-                return FormatCompletionSummary(status, duration, fileChanges, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("CompletionAnalyzer", "Failed to get git file changes for completion summary", ex);
-                return FormatCompletionSummary(status, duration, null, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
-            }
-        }
-
         public async Task<string> GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash,
             AgentTaskStatus status, TimeSpan duration,
             long inputTokens = 0, long outputTokens = 0,

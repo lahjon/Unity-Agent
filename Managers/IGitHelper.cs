@@ -15,10 +15,5 @@ namespace HappyEngine.Managers
         Task<List<(string name, int added, int removed)>?> GetGitFileChangesAsync(
             string projectPath, string? gitStartHash,
             CancellationToken cancellationToken = default);
-
-        string? CaptureGitHead(string projectPath);
-
-        List<(string name, int added, int removed)>? GetGitFileChanges(
-            string projectPath, string? gitStartHash);
     }
 }

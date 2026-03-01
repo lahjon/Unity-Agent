@@ -15,6 +15,7 @@ namespace HappyEngine.Managers
 
         public static string[] AvailableModels { get; set; } =
         {
+            "claude-opus-4-20250514",
             "claude-sonnet-4-20250514",
             "claude-haiku-4-20250414",
             "claude-3-5-sonnet-20241022",

@@ -87,7 +87,7 @@ namespace HappyEngine
 
 
         // Graph collapse state
-        private bool _graphCollapsed;
+        private bool _graphCollapsed = true;
         private GridLength _graphExpandedHeight = new(180);
 
         // Terminal collapse state
@@ -208,9 +208,8 @@ namespace HappyEngine
 
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
 
-            var gitHelper = new GitHelper();
             _gitPanelManager = new GitPanelManager(
-                gitHelper,
+                _gitHelper,
                 () => _projectManager.ProjectPath,
                 () => DefaultNoGitWriteToggle.IsChecked == true,
                 _fileLockManager,
@@ -728,10 +727,8 @@ namespace HappyEngine
 
         private void UpdateMcpVisibility(bool isGame)
         {
-            var vis = isGame ? Visibility.Visible : Visibility.Collapsed;
-            UseMcpToggle.Visibility = vis;
-            if (!isGame)
-                UseMcpToggle.IsChecked = false;
+            UseMcpToggle.Visibility = isGame ? Visibility.Visible : Visibility.Collapsed;
+            UseMcpToggle.IsChecked = isGame;
         }
 
         // ── MCP Settings ────────────────────────────────────────────
@@ -780,7 +777,19 @@ namespace HappyEngine
             {
                 var address = McpAddressBox.Text?.Trim();
                 if (string.IsNullOrEmpty(address)) { McpConnectionStatus.Text = "No address"; return; }
-                var response = await SharedHttpClient.GetAsync(address, _windowCts.Token);
+
+                if (!Uri.TryCreate(address, UriKind.Absolute, out var uri)
+                    || (uri.Scheme != "http" && uri.Scheme != "https"))
+                {
+                    McpConnectionStatus.Text = "Invalid URL";
+                    McpConnectionStatus.Foreground = FindResource("Danger") as System.Windows.Media.Brush
+                        ?? System.Windows.Media.Brushes.Red;
+                    return;
+                }
+
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(_windowCts.Token);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(2));
+                var response = await SharedHttpClient.GetAsync(uri, timeoutCts.Token);
                 if (response.IsSuccessStatusCode)
                 {
                     McpConnectionStatus.Text = "Connected";
@@ -794,8 +803,9 @@ namespace HappyEngine
                         ?? System.Windows.Media.Brushes.Red;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Warn("MCP", "Connection test failed", ex);
                 McpConnectionStatus.Text = "Unreachable";
                 McpConnectionStatus.Foreground = FindResource("Danger") as System.Windows.Media.Brush
                     ?? System.Windows.Media.Brushes.Red;
@@ -2658,6 +2668,33 @@ namespace HappyEngine
             LaunchTaskFromDescription(
                 desc,
                 "Build Investigation",
+                imagePaths: _imageManager.DetachImages(),
+                planOnly: false);
+
+            ResetPerTaskToggles();
+        }
+
+        private void TestVerification_Click(object sender, RoutedEventArgs e)
+        {
+            var projectPath = _projectManager.ProjectPath;
+            if (string.IsNullOrEmpty(projectPath)) return;
+
+            var desc = "Run all tests in this project and fix any failures.\n\n" +
+                       "## Instructions\n\n" +
+                       "1. Discover the test framework used by this project (e.g. NUnit, xUnit, MSTest, Jest, pytest, etc.).\n" +
+                       "2. Run the full test suite using the appropriate command (e.g. `dotnet test`, `npm test`, `pytest`, etc.).\n" +
+                       "3. If all tests pass, report success and provide a summary of the test results.\n" +
+                       "4. If any tests fail:\n" +
+                       "   a. Analyze each failure to determine the root cause.\n" +
+                       "   b. Determine whether the issue is in the test itself or in the source code being tested.\n" +
+                       "   c. Implement fixes for the failing tests or the underlying code.\n" +
+                       "   d. Re-run the tests to verify the fixes resolve the failures.\n" +
+                       "   e. Repeat until all tests pass.\n\n" +
+                       "Provide a clear summary of which tests failed, why they failed, and what was done to fix them.";
+
+            LaunchTaskFromDescription(
+                desc,
+                "Test Verification",
                 imagePaths: _imageManager.DetachImages(),
                 planOnly: false);
 
