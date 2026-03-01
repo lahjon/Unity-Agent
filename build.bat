@@ -1,4 +1,5 @@
 @echo off
+taskkill /IM HappyEngine.exe /F >nul 2>&1
 echo Building HappyEngine...
 dotnet publish HappyEngine.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 if %ERRORLEVEL% NEQ 0 (

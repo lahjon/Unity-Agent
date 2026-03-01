@@ -1886,7 +1886,7 @@
                                             Style="{StaticResource SmallBtn}" DockPanel.Dock="Right"
                                             Margin="8,0,0,0" Width="50">
                                         <Button.Background>
-                                            <SolidColorBrush Color="{StaticResource AccentColor}"/>
+                                            <StaticResource ResourceKey="Accent"/>
                                         </Button.Background>
                                     </Button>
                                     <TextBox x:Name="TodoInputBox"
