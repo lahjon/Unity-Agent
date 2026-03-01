@@ -1162,6 +1162,11 @@
                                                   Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
                                         <TextBlock Text="Use MCP" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
+                                    <ToggleButton x:Name="AutoVerifyToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
+                                                  Checked="AutoVerifyToggle_Changed" Unchecked="AutoVerifyToggle_Changed">
+                                        <TextBlock Text="Auto-Verify" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
                                     <!-- Separator -->
                                     <Border BorderBrush="{StaticResource SeparatorDark}" BorderThickness="0,1,0,0" Margin="0,4,0,8"/>
                                     <!-- Per-task toggles -->

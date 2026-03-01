@@ -15,13 +15,15 @@ namespace HappyEngine.Managers
     public class OutputProcessor
     {
         private readonly OutputTabManager _outputTabManager;
+        private readonly Func<bool> _getAutoVerify;
 
         /// <summary>Fires when a completion summary has been generated for a task.</summary>
         public event Action<string>? CompletionSummaryGenerated;
 
-        public OutputProcessor(OutputTabManager outputTabManager)
+        public OutputProcessor(OutputTabManager outputTabManager, Func<bool>? getAutoVerify = null)
         {
             _outputTabManager = outputTabManager;
+            _getAutoVerify = getAutoVerify ?? (() => false);
         }
 
         public void AppendOutput(string taskId, string text,
@@ -37,7 +39,7 @@ namespace HappyEngine.Managers
         }
 
         /// <summary>
-        /// Generates a git-diff-based completion summary and runs result verification.
+        /// Generates a git-diff-based completion summary and optionally runs result verification.
         /// </summary>
         /// <param name="expectedStatus">The status to use for summary generation (the final status
         /// based on exit code), since the task may still be in Verifying state.</param>
@@ -70,8 +72,9 @@ namespace HappyEngine.Managers
                     AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
 
-                // Run result verification automatically
-                await RunResultVerificationAsync(task, outputText, activeTasks, historyTasks);
+                // Run result verification if auto-verify is enabled
+                if (_getAutoVerify())
+                    await RunResultVerificationAsync(task, outputText, activeTasks, historyTasks);
 
                 CompletionSummaryGenerated?.Invoke(task.Id);
             }

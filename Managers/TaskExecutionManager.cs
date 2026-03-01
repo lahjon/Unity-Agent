@@ -59,7 +59,8 @@ namespace HappyEngine.Managers
             Func<string, bool> isGameProject,
             MessageBusManager messageBusManager,
             Dispatcher dispatcher,
-            Func<int>? getTokenLimitRetryMinutes = null)
+            Func<int>? getTokenLimitRetryMinutes = null,
+            Func<bool>? getAutoVerify = null)
         {
             _scriptDir = scriptDir;
             _fileLockManager = fileLockManager;
@@ -74,7 +75,7 @@ namespace HappyEngine.Managers
             var retryMinutesFunc = getTokenLimitRetryMinutes ?? (() => 30);
 
             // Wire up sub-handlers
-            _outputProcessor = new OutputProcessor(outputTabManager);
+            _outputProcessor = new OutputProcessor(outputTabManager, getAutoVerify);
             _processLauncher = new TaskProcessLauncher(scriptDir, fileLockManager, outputTabManager, _outputProcessor, dispatcher);
             _overnightHandler = new OvernightModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, retryMinutesFunc);
             _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, retryMinutesFunc);
@@ -240,7 +241,7 @@ namespace HappyEngine.Managers
                     _fileLockManager.ReleaseTaskLocks(task.Id);
                     if (task.UseMessageBus)
                         _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
-                    // Set to Verifying while summary + verification run; final status is set afterwards
+                    // Set to Verifying while summary runs; final status is set afterwards
                     task.Status = AgentTaskStatus.Verifying;
                     _outputTabManager.UpdateTabHeader(task);
                     _ = CompleteWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
@@ -286,20 +287,19 @@ namespace HappyEngine.Managers
         }
 
         /// <summary>
-        /// Runs the completion summary and result verification, then sets the final task status.
-        /// Ensures verification completes before the task is marked as finished.
+        /// Runs the completion summary, then sets the final task status.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteWithVerificationAsync(AgentTask task, int exitCode,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            // Generate summary + run verification (awaited, not fire-and-forget)
+            // Generate summary (awaited, not fire-and-forget)
             await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
 
             _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
 
-            // Now set the final status after verification is complete
+            // Now set the final status after summary is complete
             task.Status = expectedStatus;
             task.EndTime = DateTime.Now;
             var statusColor = exitCode == 0
@@ -315,7 +315,7 @@ namespace HappyEngine.Managers
         }
 
         /// <summary>
-        /// Runs verification after a follow-up completes, then sets the final status.
+        /// Runs the completion summary after a follow-up completes, then sets the final status.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteFollowUpWithVerificationAsync(AgentTask task, int exitCode,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)

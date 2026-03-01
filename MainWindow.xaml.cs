@@ -163,7 +163,8 @@ namespace HappyEngine
                 path => _projectManager.IsGameProject(path),
                 _messageBusManager,
                 Dispatcher,
-                () => _settingsManager.TokenLimitRetryMinutes);
+                () => _settingsManager.TokenLimitRetryMinutes,
+                () => _settingsManager.AutoVerify);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
 
@@ -332,6 +333,7 @@ namespace HappyEngine
 
             MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
+            AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
 
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
@@ -735,6 +737,11 @@ namespace HappyEngine
         {
             if (ExecuteButton == null) return;
             UpdateExecuteButtonText();
+        }
+
+        private void AutoVerifyToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            _settingsManager.AutoVerify = AutoVerifyToggle.IsChecked == true;
         }
 
         private bool _advancedPanelOpen;

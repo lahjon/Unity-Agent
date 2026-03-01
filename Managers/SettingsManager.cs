@@ -16,6 +16,7 @@ namespace HappyEngine.Managers
         private bool _settingsPanelCollapsed;
         private int _maxConcurrentTasks = 10;
         private int _tokenLimitRetryMinutes = 30;
+        private bool _autoVerify;
 
         public List<TaskTemplate> TaskTemplates { get; } = new();
 
@@ -49,6 +50,12 @@ namespace HappyEngine.Managers
             set => _tokenLimitRetryMinutes = Math.Max(1, value);
         }
 
+        public bool AutoVerify
+        {
+            get => _autoVerify;
+            set => _autoVerify = value;
+        }
+
         public SettingsManager(string appDataDir)
         {
             _settingsFile = Path.Combine(appDataDir, "settings.json");
@@ -74,6 +81,8 @@ namespace HappyEngine.Managers
                     _maxConcurrentTasks = Math.Max(1, mct.GetInt32());
                 if (dict.TryGetValue("tokenLimitRetryMinutes", out var tlr))
                     _tokenLimitRetryMinutes = Math.Max(1, tlr.GetInt32());
+                if (dict.TryGetValue("autoVerify", out var av))
+                    _autoVerify = av.GetBoolean();
             }
             catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to load settings", ex); }
         }
@@ -88,7 +97,8 @@ namespace HappyEngine.Managers
                     ["selectedProject"] = projectPath ?? "",
                     ["settingsPanelCollapsed"] = _settingsPanelCollapsed,
                     ["maxConcurrentTasks"] = _maxConcurrentTasks,
-                    ["tokenLimitRetryMinutes"] = _tokenLimitRetryMinutes
+                    ["tokenLimitRetryMinutes"] = _tokenLimitRetryMinutes,
+                    ["autoVerify"] = _autoVerify
                 };
                 var json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
                 SafeFileWriter.WriteInBackground(_settingsFile, json, "SettingsManager");
