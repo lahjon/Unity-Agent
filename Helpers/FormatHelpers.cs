@@ -91,7 +91,9 @@ namespace HappyEngine.Helpers
             return toolName.Equals("Write", StringComparison.OrdinalIgnoreCase) ||
                    toolName.Equals("Edit", StringComparison.OrdinalIgnoreCase) ||
                    toolName.Equals("MultiEdit", StringComparison.OrdinalIgnoreCase) ||
-                   toolName.Equals("NotebookEdit", StringComparison.OrdinalIgnoreCase);
+                   toolName.Equals("NotebookEdit", StringComparison.OrdinalIgnoreCase) ||
+                   toolName.Equals("Bash", StringComparison.OrdinalIgnoreCase) ||
+                   toolName.Equals("TodoWrite", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string? ExtractExecutionPrompt(string output)

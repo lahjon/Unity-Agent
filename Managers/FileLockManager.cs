@@ -19,6 +19,7 @@ namespace HappyEngine.Managers
         private readonly ObservableCollection<FileLock> _fileLocksView = new();
         private readonly Dictionary<string, HashSet<string>> _taskLockedFiles = new();
         private readonly Dictionary<string, QueuedTaskInfo> _queuedTaskInfo = new();
+        private readonly Dictionary<string, FileLock> _waitingLocks = new();
         private readonly object _lockSync = new();
         private readonly TextBlock _fileLockBadge;
         private readonly Dispatcher _dispatcher;
@@ -148,7 +149,19 @@ namespace HappyEngine.Managers
 
         private void ReleaseTaskLocksInternal(string taskId)
         {
-            if (!_taskLockedFiles.TryGetValue(taskId, out var files)) return;
+            if (!_taskLockedFiles.TryGetValue(taskId, out var files))
+            {
+                // Even if no active locks, check for waiting locks
+                if (_waitingLocks.TryGetValue(taskId, out var waitingLock))
+                {
+                    _waitingLocks.Remove(taskId);
+                    _dispatcher.BeginInvoke(() =>
+                    {
+                        _fileLocksView.Remove(waitingLock);
+                    });
+                }
+                return;
+            }
 
             var removedLocks = new List<FileLock>();
             foreach (var path in files)
@@ -160,6 +173,13 @@ namespace HappyEngine.Managers
                 }
             }
             _taskLockedFiles.Remove(taskId);
+
+            // Also check for waiting locks
+            if (_waitingLocks.TryGetValue(taskId, out var waiting))
+            {
+                _waitingLocks.Remove(taskId);
+                removedLocks.Add(waiting);
+            }
 
             var count = _fileLocks.Count;
             _dispatcher.BeginInvoke(() =>
@@ -253,6 +273,32 @@ namespace HappyEngine.Managers
                 BlockingTaskId = blockingTaskId,
                 BlockedByTaskIds = blockedByIds
             };
+
+            // Create a "Waiting" file lock entry for the queued task
+            var waitingLock = new FileLock
+            {
+                NormalizedPath = normalized,
+                OriginalPath = filePath,
+                OwnerTaskId = taskId,
+                ToolName = $"{toolName} (waiting for #{blockerNum})",
+                AcquiredAt = DateTime.Now,
+                IsWaiting = true
+            };
+
+            // Track the waiting lock
+            _waitingLocks[taskId] = waitingLock;
+
+            // Add to UI view to show in file locks panel
+            bool isAgentBusFile = normalized.Contains("agent-bus", StringComparison.OrdinalIgnoreCase) ||
+                                 filePath.Contains("agent-bus", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAgentBusFile)
+            {
+                _dispatcher.BeginInvoke(() =>
+                {
+                    _fileLocksView.Add(waitingLock);
+                });
+            }
         }
 
         public void CheckQueuedTasks(ObservableCollection<AgentTask> activeTasks)
@@ -284,7 +330,19 @@ namespace HappyEngine.Managers
                 }
 
                 foreach (var (taskId, _) in toResume)
+                {
                     _queuedTaskInfo.Remove(taskId);
+
+                    // Remove the waiting lock from UI if it exists
+                    if (_waitingLocks.TryGetValue(taskId, out var waitingLock))
+                    {
+                        _waitingLocks.Remove(taskId);
+                        _dispatcher.BeginInvoke(() =>
+                        {
+                            _fileLocksView.Remove(waitingLock);
+                        });
+                    }
+                }
             }
 
             foreach (var (taskId, qi) in toResume)
@@ -305,6 +363,16 @@ namespace HappyEngine.Managers
             lock (_lockSync)
             {
                 _queuedTaskInfo.Remove(task.Id);
+
+                // Remove the waiting lock from UI if it exists
+                if (_waitingLocks.TryGetValue(task.Id, out var waitingLock))
+                {
+                    _waitingLocks.Remove(task.Id);
+                    _dispatcher.BeginInvoke(() =>
+                    {
+                        _fileLocksView.Remove(waitingLock);
+                    });
+                }
             }
             task.Status = AgentTaskStatus.Running;
             task.QueuedReason = null;
@@ -338,6 +406,7 @@ namespace HappyEngine.Managers
                 _fileLocks.Clear();
                 _taskLockedFiles.Clear();
                 _queuedTaskInfo.Clear();
+                _waitingLocks.Clear();
             }
             _dispatcher.BeginInvoke(() =>
             {
@@ -424,6 +493,31 @@ namespace HappyEngine.Managers
                 return fp.GetString();
             if (input.TryGetProperty("path", out var p))
                 return p.GetString();
+
+            // For Bash commands, try to extract file paths from common file-modifying patterns
+            if (input.TryGetProperty("command", out var cmd))
+            {
+                var command = cmd.GetString();
+                if (!string.IsNullOrEmpty(command))
+                {
+                    // Match common patterns for file output redirection
+                    // Handles: echo > file.txt, cat > file.txt, command >> file.txt
+                    var redirectMatch = Regex.Match(command, @">\s*([^\s;|&]+)");
+                    if (redirectMatch.Success)
+                        return redirectMatch.Groups[1].Value.Trim('"', '\'');
+
+                    // Match sed -i (in-place edit)
+                    var sedMatch = Regex.Match(command, @"sed\s+.*-i[^\s]*\s+.*?['""]?([^\s'""]+)['""]?\s*$");
+                    if (sedMatch.Success)
+                        return sedMatch.Groups[1].Value;
+
+                    // Match common file write patterns with explicit file paths
+                    var fileMatch = Regex.Match(command, @"(?:echo|cat|printf|tee)\s+.*?['""]?([^\s|;&>]+\.[a-zA-Z0-9]+)['""]?");
+                    if (fileMatch.Success && !fileMatch.Groups[1].Value.StartsWith("-"))
+                        return fileMatch.Groups[1].Value;
+                }
+            }
+
             return null;
         }
     }

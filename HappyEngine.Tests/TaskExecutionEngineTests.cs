@@ -779,6 +779,28 @@ namespace HappyEngine.Tests
             Assert.Null(result);
         }
 
+        [Theory]
+        [InlineData(@"{""command"": ""echo 'test' > output.txt""}", "output.txt")]
+        [InlineData(@"{""command"": ""cat input.txt > output.txt""}", "output.txt")]
+        [InlineData(@"{""command"": ""echo 'test' >> append.log""}", "append.log")]
+        [InlineData(@"{""command"": ""sed -i 's/old/new/g' config.yaml""}", "config.yaml")]
+        [InlineData(@"{""command"": ""printf 'data' > 'file with spaces.txt'""}", "file with spaces.txt")]
+        [InlineData(@"{""command"": ""echo test > ""quoted file.txt""""}", "quoted file.txt")]
+        public void FileLock_ExtractFilePath_ExtractsFromBashCommand(string json, string expected)
+        {
+            using var doc = JsonDocument.Parse(json);
+            var result = FileLockManager.ExtractFilePath(doc.RootElement);
+            Assert.Equal(expected, result);
+        }
+
+        [Fact]
+        public void FileLock_ExtractFilePath_PrefersFilePathOverCommand()
+        {
+            using var doc = JsonDocument.Parse(@"{""file_path"": ""preferred.txt"", ""command"": ""echo > other.txt""}");
+            var result = FileLockManager.ExtractFilePath(doc.RootElement);
+            Assert.Equal("preferred.txt", result);
+        }
+
         // ══════════════════════════════════════════════════════════════
         //  C. TASK LIFECYCLE STATE TRANSITIONS
         // ══════════════════════════════════════════════════════════════
@@ -1674,6 +1696,55 @@ namespace HappyEngine.Tests
 
             // Feature mode tasks are not trimmed by general cap (they have their own iteration-based trimming)
             Assert.Equal(bigLength, task.OutputBuilder.Length);
+        }
+
+        [Fact]
+        public void FileLock_ShowsWaitingStatusForQueuedTasks()
+        {
+            var flm = MakeFileLockManager();
+            var tasks = new ObservableCollection<AgentTask>();
+
+            var task1 = new AgentTask { Id = "task1", TaskNumber = 1, ProjectPath = "C:\\test" };
+            var task2 = new AgentTask { Id = "task2", TaskNumber = 2, ProjectPath = "C:\\test" };
+            tasks.Add(task1);
+            tasks.Add(task2);
+
+            // Task 1 acquires lock on file
+            var acquired = flm.TryAcquireFileLock("task1", "test.txt", "Edit", tasks);
+            Assert.True(acquired);
+            Assert.Single(flm.FileLocksView);
+            Assert.Equal("Active", flm.FileLocksView[0].StatusText);
+
+            // Task 2 tries to acquire same file, should be queued with waiting status
+            bool conflictHandled = false;
+            var result = flm.TryAcquireOrConflict("task2", "test.txt", "Write", tasks,
+                (taskId, msg) => { conflictHandled = true; });
+
+            Assert.False(result);
+            Assert.True(conflictHandled);
+
+            // Should now have 2 file locks - one active, one waiting
+            Assert.Equal(2, flm.FileLocksView.Count);
+
+            // Find the waiting lock (could be in either position)
+            var waitingLock = flm.FileLocksView.FirstOrDefault(fl => fl.IsWaiting);
+            Assert.NotNull(waitingLock);
+            Assert.Equal("Waiting", waitingLock.StatusText);
+            Assert.Equal("task2", waitingLock.OwnerTaskId);
+            Assert.Contains("waiting for", waitingLock.ToolName);
+
+            // Release task1's lock
+            flm.ReleaseTaskLocks("task1");
+
+            // Complete task1 to allow task2 to resume
+            task1.Status = AgentTaskStatus.Completed;
+
+            // Check queued tasks - task2 should be resumed
+            flm.CheckQueuedTasks(tasks);
+
+            // Waiting lock should be removed
+            Assert.Empty(flm.FileLocksView);
+            Assert.Equal(AgentTaskStatus.Running, task2.Status);
         }
     }
 }

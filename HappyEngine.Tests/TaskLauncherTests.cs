@@ -643,7 +643,8 @@ namespace HappyEngine.Tests
         [InlineData("EDIT", true)]
         [InlineData("Read", false)]
         [InlineData("Grep", false)]
-        [InlineData("Bash", false)]
+        [InlineData("Bash", true)]
+        [InlineData("TodoWrite", true)]
         [InlineData(null, false)]
         [InlineData("", false)]
         public void IsFileModifyTool_DetectsCorrectly(string? toolName, bool expected)

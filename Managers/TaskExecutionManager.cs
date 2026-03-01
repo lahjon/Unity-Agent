@@ -108,6 +108,10 @@ namespace HappyEngine.Managers
             _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, completionAnalyzer, promptBuilder, taskFactory, retryMinutesFunc);
             _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, completionAnalyzer, retryMinutesFunc);
 
+            // Set callback to process queued messages when task becomes ready
+            _processLauncher.ProcessQueuedMessagesCallback = ProcessQueuedMessages;
+
+
             // Forward token-limit handler's TaskCompleted to the coordinator's event
             _tokenLimitHandler.TaskCompleted += id => TaskCompleted?.Invoke(id);
 
@@ -305,7 +309,7 @@ namespace HappyEngine.Managers
                         try
                         {
                             var outputText = task.OutputBuilder.ToString();
-                            var summary = _completionAnalyzer.ExtractCompletionInfo(outputText);
+                            var summary = _completionAnalyzer.ExtractRecommendations(outputText);
                             if (!string.IsNullOrWhiteSpace(summary))
                             {
                                 task.CompletionSummary = summary;
@@ -651,6 +655,26 @@ namespace HappyEngine.Managers
 
         // ── Input / Follow-up ────────────────────────────────────────
 
+        /// <summary>
+        /// Processes any messages that were queued while the task was busy.
+        /// Should be called when the task becomes ready to accept new input.
+        /// </summary>
+        public void ProcessQueuedMessages(AgentTask task, ObservableCollection<AgentTask> activeTasks,
+            ObservableCollection<AgentTask> historyTasks)
+        {
+            if (task.Runtime.PendingMessageCount == 0) return;
+
+            var nextMessage = task.Runtime.DequeueMessage();
+            if (nextMessage != null)
+            {
+                AppLogger.Info("FollowUp", $"[{task.Id}] Processing queued message. Remaining: {task.Runtime.PendingMessageCount}");
+
+                // Send the dequeued message through the regular SendFollowUp flow
+                // This will handle checking if the task is still busy and re-queue if needed
+                SendFollowUp(task, nextMessage, activeTasks, historyTasks);
+            }
+        }
+
         public void SendInput(AgentTask task, TextBox inputBox,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
@@ -689,8 +713,34 @@ namespace HappyEngine.Managers
             {
                 try
                 {
+                    // Check if the task is currently processing a message or busy with tool execution
+                    if (task.Runtime.IsProcessingMessage || task.HasToolActivity)
+                    {
+                        // Queue the message for later delivery
+                        task.Runtime.EnqueueMessage(text);
+                        AppLogger.Info("FollowUp", $"[{task.Id}] Task is busy, queuing message. Queue size: {task.Runtime.PendingMessageCount}");
+                        _outputProcessor.AppendOutput(task.Id,
+                            $"\n[Message queued - will be sent when task is ready]\n> {text}\n",
+                            activeTasks, historyTasks);
+                        return;
+                    }
+
                     AppLogger.Info("FollowUp", $"[{task.Id}] Writing to existing stdin (process alive)");
                     _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n", activeTasks, historyTasks);
+
+                    // Mark that we're processing a message
+                    task.Runtime.IsProcessingMessage = true;
+
+                    // Append follow-up prompt to task description for git commit tracking
+                    if (!string.IsNullOrEmpty(task.Description))
+                    {
+                        task.Description += $" | Follow-up: {text}";
+                    }
+                    else
+                    {
+                        task.Description = text;
+                    }
+                    AppLogger.Info("FollowUp", $"[{task.Id}] Updated task description for commit tracking");
 
                     // Format the message as a proper user message in the conversation
                     // Claude CLI expects messages to be properly formatted to maintain conversation context
@@ -711,6 +761,9 @@ namespace HappyEngine.Managers
             task.Cts = new System.Threading.CancellationTokenSource();
             _outputTabManager.UpdateTabHeader(task);
 
+            // Process any queued messages before starting the follow-up
+            ProcessQueuedMessages(task, activeTasks, historyTasks);
+
             // Use --resume with session ID when available, fall back to --continue
             var hasSessionId = !string.IsNullOrEmpty(task.ConversationId);
             var resumeFlag = hasSessionId
@@ -722,6 +775,17 @@ namespace HappyEngine.Managers
 
             var followUpModel = PromptBuilder.GetCliModelForTask(task);
             _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n[HappyEngine] Sending follow-up with {resumeLabel} (Model: {PromptBuilder.GetFriendlyModelName(followUpModel)})...\n\n", activeTasks, historyTasks);
+
+            // Append follow-up prompt to task description for git commit tracking
+            if (!string.IsNullOrEmpty(task.Description))
+            {
+                task.Description += $" | Follow-up: {text}";
+            }
+            else
+            {
+                task.Description = text;
+            }
+            AppLogger.Info("FollowUp", $"[{task.Id}] Updated task description for commit tracking");
 
             // Set iteration start AFTER the echo so the echoed prompt text
             // (which contains recommendation keywords) is excluded from

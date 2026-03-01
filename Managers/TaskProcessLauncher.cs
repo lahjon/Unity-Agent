@@ -41,6 +41,9 @@ namespace HappyEngine.Managers
         /// <summary>Fires when a task's process is resumed.</summary>
         public event Action<string>? ProcessResumed;
 
+        /// <summary>Callback to process queued messages when task becomes ready.</summary>
+        public Action<AgentTask, ObservableCollection<AgentTask>, ObservableCollection<AgentTask>>? ProcessQueuedMessagesCallback { get; set; }
+
         public TaskProcessLauncher(
             string scriptDir,
             FileLockManager fileLockManager,
@@ -608,8 +611,25 @@ namespace HappyEngine.Managers
                         }
                         break;
 
+                    case "message_stop":
+                        // Claude has finished its response and is ready for more input
+                        var readyTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                        if (readyTask != null)
+                        {
+                            readyTask.Runtime.IsProcessingMessage = false;
+                            readyTask.ClearToolActivity();
+
+                            // Process any queued messages
+                            if (readyTask.Runtime.PendingMessageCount > 0 && ProcessQueuedMessagesCallback != null)
+                            {
+                                AppLogger.Info("TaskExecution", $"[{taskId}] Claude is ready, processing {readyTask.Runtime.PendingMessageCount} queued messages");
+                                ProcessQueuedMessagesCallback(readyTask, activeTasks, historyTasks);
+                            }
+                        }
+                        break;
+
                     default:
-                        if (type != null && type != "ping" && type != "message_stop" && type != "user")
+                        if (type != null && type != "ping" && type != "user")
                             _outputProcessor.AppendOutput(taskId, $"[{type}]\n", activeTasks, historyTasks);
                         break;
                 }

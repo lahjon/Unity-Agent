@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -451,6 +452,16 @@ namespace HappyEngine.Managers
                 TextWrapping = TextWrapping.Wrap
             });
 
+            // Add Initialize Git button if it's simply not a git repo (not a git installation issue)
+            if (_lastError != null && _lastError.Contains("Not a git repository"))
+            {
+                var initButton = MakeActionButton("\uE710", "Initialize Git", "Initialize a new git repository in this project");
+                initButton.Margin = new Thickness(0, 16, 0, 8);
+                initButton.HorizontalAlignment = HorizontalAlignment.Center;
+                initButton.Click += async (_, _) => await ExecuteInitializeGitAsync();
+                panel.Children.Add(initButton);
+            }
+
             return new Border
             {
                 Background = BrushCache.Theme("BgSection"),
@@ -635,10 +646,16 @@ namespace HappyEngine.Managers
             };
             panel.Children.Add(refreshBtn);
 
-            if (_unpushedCommits.Count > 0 && HasNoFileLocks())
+            // Push All button - always show it but disable when appropriate
             {
-                // Push All button
-                var pushAllBtn = MakeActionButton("\uE898", "Push All", "Push all unpushed commits to remote");
+                var tooltip = "Push all unpushed commits to remote";
+                if (_unpushedCommits.Count == 0)
+                    tooltip = "No unpushed commits to push";
+                else if (!HasNoFileLocks())
+                    tooltip = "Cannot push while files are locked by running tasks";
+
+                var pushAllBtn = MakeActionButton("\uE898", "Push All", tooltip);
+                pushAllBtn.IsEnabled = _unpushedCommits.Count > 0 && HasNoFileLocks();
                 pushAllBtn.Click += async (_, _) => await ExecutePushAsync();
                 panel.Children.Add(pushAllBtn);
             }
@@ -804,11 +821,16 @@ namespace HappyEngine.Managers
                 section.Children.Add(commitRow);
             }
 
-            // Push Selected button
-            if (HasNoFileLocks() && commitCheckboxes.Count > 0)
+            // Push Selected button - always show if there are commits
+            if (commitCheckboxes.Count > 0)
             {
-                var pushSelectedBtn = MakeActionButton("\uE898", "Push Selected", "Push only selected commits (interactive rebase)");
+                var tooltip = "Push only selected commits (interactive rebase)";
+                if (!HasNoFileLocks())
+                    tooltip = "Cannot push while files are locked by running tasks";
+
+                var pushSelectedBtn = MakeActionButton("\uE898", "Push Selected", tooltip);
                 pushSelectedBtn.Margin = new Thickness(0, 8, 0, 0);
+                pushSelectedBtn.IsEnabled = HasNoFileLocks();
                 pushSelectedBtn.Click += async (_, _) =>
                 {
                     var selected = commitCheckboxes
@@ -1175,6 +1197,108 @@ namespace HappyEngine.Managers
                 {
                     yield return childOfChild;
                 }
+            }
+        }
+
+        private async Task ExecuteInitializeGitAsync()
+        {
+            var projectPath = _getProjectPath();
+            if (string.IsNullOrEmpty(projectPath)) return;
+
+            var confirmResult = MessageBox.Show(
+                $"Initialize a new git repository in:\n\n{projectPath}\n\nThis will create a .git folder and enable version control for this project.",
+                "Initialize Git Repository",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirmResult != MessageBoxResult.Yes) return;
+
+            _lastOperationStatus = "Initializing git repository...";
+            _lastOperationTime = DateTime.Now;
+
+            var (success, errorMessage) = await _gitOperationGuard.ExecuteWhileNoLocksHeldAsync(async () =>
+            {
+                AppLogger.Info("GitPanelManager", $"Initializing git repository for {projectPath}");
+
+                var result = await _gitHelper.RunGitCommandAsync(projectPath, "init");
+                if (result == null)
+                {
+                    _lastOperationStatus = "Failed to initialize git repository";
+                    _lastOperationTime = DateTime.Now;
+                    throw new InvalidOperationException("Git init command failed");
+                }
+
+                _lastOperationStatus = "Git repository initialized successfully!";
+                _lastOperationTime = DateTime.Now;
+
+                // Also create an initial .gitignore if it doesn't exist
+                var gitignorePath = Path.Combine(projectPath, ".gitignore");
+                if (!File.Exists(gitignorePath))
+                {
+                    // Basic .gitignore for common files
+                    var gitignoreContent = @"# Build outputs
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# User-specific files
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Package files
+packages/
+node_modules/
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Sensitive files
+*.env
+appsettings.*.json
+secrets.json
+";
+                    await File.WriteAllTextAsync(gitignorePath, gitignoreContent);
+                    AppLogger.Info("GitPanelManager", "Created default .gitignore file");
+                }
+
+                // Force refresh
+                MarkDirty();
+
+                // Find the ScrollViewer to trigger immediate refresh
+                await _dispatcher.InvokeAsync(async () =>
+                {
+                    // The button that triggered this is in the git panel, find its ScrollViewer parent
+                    if (Application.Current.MainWindow is MainWindow mainWindow)
+                    {
+                        var gitTabContent = mainWindow.FindName("GitTabContent") as ScrollViewer;
+                        if (gitTabContent != null)
+                        {
+                            await RefreshAsync(gitTabContent);
+                        }
+                    }
+                });
+            }, "init");
+
+            if (!success)
+            {
+                _lastOperationStatus = errorMessage ?? "Git initialization failed";
+                _lastOperationTime = DateTime.Now;
+                MessageBox.Show($"Failed to initialize git repository: {errorMessage}\n\nPlease check if git is installed and accessible.",
+                    "Initialize Git", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

@@ -2033,7 +2033,17 @@ namespace HappyEngine
         // ── Named handlers for anonymous lambdas (needed for cleanup) ──
 
         private void OnProjectSwapStarted() => LoadingOverlay.Visibility = Visibility.Visible;
-        private void OnProjectSwapCompleted() => LoadingOverlay.Visibility = Visibility.Collapsed;
+        private void OnProjectSwapCompleted()
+        {
+            LoadingOverlay.Visibility = Visibility.Collapsed;
+
+            // Mark git panel as dirty to force refresh with new project's git status
+            _gitPanelManager.MarkDirty();
+
+            // If git tab is currently selected, refresh it immediately
+            if (StatisticsTabs.SelectedItem == GitTabItem)
+                _gitPanelManager.RefreshIfNeeded(GitTabContent);
+        }
 
         private void OnCollectionChangedUpdateTabs(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
             => UpdateTabCounts();

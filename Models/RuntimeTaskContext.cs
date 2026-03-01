@@ -91,6 +91,60 @@ namespace HappyEngine
         // Pending commit tracking
         public Task? PendingCommitTask { get; set; }
 
+        // Message queue for handling mid-task input
+        private readonly object _messageQueueLock = new();
+        private Queue<string> _pendingMessages = new();
+        private bool _isProcessingMessage = false;
+
+        /// <summary>
+        /// Queue for storing messages that arrive while the task is busy processing.
+        /// Thread-safe property that handles concurrent access.
+        /// </summary>
+        public Queue<string> PendingMessages
+        {
+            get { lock (_messageQueueLock) return new Queue<string>(_pendingMessages); }
+        }
+
+        /// <summary>
+        /// Adds a message to the pending message queue. Thread-safe.
+        /// </summary>
+        public void EnqueueMessage(string message)
+        {
+            lock (_messageQueueLock)
+            {
+                _pendingMessages.Enqueue(message);
+            }
+        }
+
+        /// <summary>
+        /// Attempts to dequeue a message from the pending message queue. Thread-safe.
+        /// Returns null if no messages are available.
+        /// </summary>
+        public string? DequeueMessage()
+        {
+            lock (_messageQueueLock)
+            {
+                return _pendingMessages.Count > 0 ? _pendingMessages.Dequeue() : null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the count of pending messages. Thread-safe.
+        /// </summary>
+        public int PendingMessageCount
+        {
+            get { lock (_messageQueueLock) return _pendingMessages.Count; }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the task is currently processing a message. Thread-safe.
+        /// </summary>
+        public bool IsProcessingMessage
+        {
+            get { lock (_messageQueueLock) return _isProcessingMessage; }
+            set { lock (_messageQueueLock) _isProcessingMessage = value; }
+        }
+
         public void Dispose()
         {
             FeatureModeRetryTimer?.Stop();

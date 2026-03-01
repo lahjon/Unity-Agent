@@ -537,10 +537,11 @@ namespace HappyEngine
         public string ToolName { get; set; } = "";
         public DateTime AcquiredAt { get; set; } = DateTime.Now;
         public bool IsIgnored { get; set; }
+        public bool IsWaiting { get; set; }
 
         public string FileName => Path.GetFileName(OriginalPath);
         public string TimeText => AcquiredAt.ToString("HH:mm:ss");
-        public string StatusText => IsIgnored ? "Ignored" : "Active";
+        public string StatusText => IsWaiting ? "Waiting" : (IsIgnored ? "Ignored" : "Active");
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public void OnPropertyChanged([CallerMemberName] string? name = null)
