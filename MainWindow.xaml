@@ -154,6 +154,21 @@
                                             <Setter Property="Foreground" Value="{StaticResource Success}"/>
                                             <Setter Property="ToolTip" Value="Uncommit task changes"/>
                                         </DataTrigger>
+                                        <!-- Pulse animation when uncommitted -->
+                                        <DataTrigger Binding="{Binding IsCompletedUncommitted}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="CommitButtonPulseStoryboard">
+                                                    <Storyboard RepeatBehavior="Forever">
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                         From="0.6" To="1" Duration="0:0:0.8"
+                                                                         AutoReverse="True"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="CommitButtonPulseStoryboard"/>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
@@ -641,6 +656,21 @@
                                             <Setter Property="Content" Value="&#xE74D;"/>
                                             <Setter Property="Foreground" Value="{StaticResource Success}"/>
                                             <Setter Property="ToolTip" Value="Uncommit task changes"/>
+                                        </DataTrigger>
+                                        <!-- Pulse animation when uncommitted -->
+                                        <DataTrigger Binding="{Binding IsCompletedUncommitted}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="CommitButtonPulseStoryboard">
+                                                    <Storyboard RepeatBehavior="Forever">
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                         From="0.6" To="1" Duration="0:0:0.8"
+                                                                         AutoReverse="True"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="CommitButtonPulseStoryboard"/>
+                                            </DataTrigger.ExitActions>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

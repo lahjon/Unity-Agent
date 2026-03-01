@@ -164,14 +164,13 @@ namespace HappyEngine
                                 RefreshActivityDashboard(); // Update UI to show committing badge
                             });
 
-                            var success = await CommitTaskAsync(task);
+                            var (success, errorMessage) = await CommitTaskAsync(task);
                             if (!success)
                             {
                                 // If commit failed, set error and release locks
                                 await Dispatcher.InvokeAsync(() =>
                                 {
-                                    if (string.IsNullOrEmpty(task.CommitError))
-                                        task.CommitError = "Failed to commit changes";
+                                    task.CommitError = errorMessage ?? "Failed to commit changes";
                                     _fileLockManager.ReleaseTaskLocks(task.Id);
                                     task.Runtime.LockedFilesForCommit = null;
                                     _fileLockManager.CheckQueuedTasks(_activeTasks);

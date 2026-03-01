@@ -607,7 +607,15 @@ namespace HappyEngine.Managers
                 {
                     AppLogger.Info("FollowUp", $"[{task.Id}] Writing to existing stdin (process alive)");
                     _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n", activeTasks, historyTasks);
-                    task.Process.StandardInput.WriteLine(text);
+
+                    // Format the message as a proper user message in the conversation
+                    // Claude CLI expects messages to be properly formatted to maintain conversation context
+                    var formattedMessage = $"\n\nHuman: {text}\n\nAssistant:";
+                    task.Process.StandardInput.WriteLine(formattedMessage);
+                    task.Process.StandardInput.Flush();
+
+                    // Store the message in conversation history for proper context tracking
+                    AppLogger.Info("FollowUp", $"[{task.Id}] Sent formatted user message to Claude process");
                     return;
                 }
                 catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to write to stdin for task {task.Id}, starting follow-up", ex); }

@@ -794,38 +794,25 @@ namespace HappyEngine.Managers
                 task.FeatureModeIterationTimer.Stop();
                 task.FeatureModeIterationTimer = null;
             }
-            task.Status = AgentTaskStatus.Verifying;
+
+            // Directly set final status without verifying step
+            task.Status = status;
+            task.EndTime = DateTime.Now;
+
             if (task.UseMessageBus)
                 _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
+
             var duration = DateTime.Now - task.StartTime;
             var finishTokenInfo = task.HasTokenData
                 ? $" | Tokens: {Helpers.FormatHelpers.FormatTokenCount(task.InputTokens + task.OutputTokens)} ({Helpers.FormatHelpers.FormatTokenCount(task.InputTokens)} in / {Helpers.FormatHelpers.FormatTokenCount(task.OutputTokens)} out)"
                 : "";
             _outputProcessor.AppendOutput(task.Id, $"[Feature Mode] Total runtime: {(int)duration.TotalHours}h {duration.Minutes}m across {task.CurrentIteration} iteration(s).{finishTokenInfo}\n", activeTasks, historyTasks);
-            _outputTabManager.UpdateTabHeader(task);
-            _ = CompleteFeatureModeWithVerificationAsync(task, status, activeTasks, historyTasks, moveToHistory);
-        }
 
-        private async System.Threading.Tasks.Task CompleteFeatureModeWithVerificationAsync(AgentTask task, AgentTaskStatus finalStatus,
-            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
-            Action<AgentTask> moveToHistory)
-        {
-            try
-            {
-                await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, finalStatus);
-                await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("FeatureMode", $"CompleteFeatureModeWithVerificationAsync failed for task {task.Id}", ex);
-            }
-
-            task.Status = finalStatus;
-            task.EndTime = DateTime.Now;
             _outputTabManager.UpdateTabHeader(task);
             moveToHistory(task);
-            FeatureModeFinished?.Invoke(task.Id, finalStatus);
+            FeatureModeFinished?.Invoke(task.Id, status);
         }
+
 
         // ── Feature mode iteration decision logic (extracted for testability) ──
 

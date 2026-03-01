@@ -1157,10 +1157,10 @@ TextureImporter:
             }
 
             // Commit the task changes
-            var success = await CommitTaskAsync(task);
+            var (success, errorMessage) = await CommitTaskAsync(task);
             if (!success)
             {
-                MessageBox.Show($"Failed to commit changes for task #{task.TaskNumber}", "Commit Error",
+                MessageBox.Show($"Failed to commit changes for task #{task.TaskNumber}\n\nError: {errorMessage}", "Commit Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -1169,11 +1169,17 @@ TextureImporter:
         /// Commits task changes to git. Can be called from UI or auto-commit.
         /// </summary>
         /// <param name="task">The task to commit</param>
-        /// <returns>True if commit was successful, false otherwise</returns>
-        public async Task<bool> CommitTaskAsync(AgentTask task)
+        /// <returns>Tuple of (success, errorMessage) - success is true if commit was successful, errorMessage contains details if failed</returns>
+        public async Task<(bool success, string? errorMessage)> CommitTaskAsync(AgentTask task)
         {
             if (task == null || !task.IsFinished || task.IsCommitted || task.NoGitWrite)
-                return false;
+            {
+                if (task == null) return (false, "Task is null");
+                if (!task.IsFinished) return (false, "Task is not finished");
+                if (task.IsCommitted) return (false, "Task is already committed");
+                if (task.NoGitWrite) return (false, "Task has NoGitWrite flag set");
+                return (false, "Unknown pre-condition failure");
+            }
 
             try
             {
@@ -1185,7 +1191,7 @@ TextureImporter:
                 if (lockedFiles == null || lockedFiles.Count == 0)
                 {
                     // No files locked by this task, nothing to commit
-                    return false;
+                    return (false, "No files were modified by this task to commit");
                 }
 
                 // Build relative paths from the project root for the git commands
@@ -1219,7 +1225,7 @@ TextureImporter:
                     if (addResult == null)
                     {
                         Debug.WriteLine($"CommitTaskAsync failed: Failed to stage files");
-                        return false;
+                        return (false, $"Failed to stage files for commit. Git add command failed for paths: {pathArgs}");
                     }
 
                     // Commit only these specific files — the pathspec ensures no other
@@ -1244,8 +1250,16 @@ TextureImporter:
                             // Release deferred file locks if any
                             ReleaseTaskLocksAfterCommit(task);
 
-                            return true;
+                            return (true, null);
                         }
+                        else
+                        {
+                            return (false, "Git commit succeeded but failed to capture commit hash");
+                        }
+                    }
+                    else
+                    {
+                        return (false, "Git commit command failed. This could be due to no changes to commit, pre-commit hooks failing, or other git issues");
                     }
                 }
                 finally
@@ -1256,9 +1270,8 @@ TextureImporter:
             catch (Exception ex)
             {
                 Debug.WriteLine($"CommitTaskAsync failed: {ex.Message}");
+                return (false, $"Unexpected error during commit: {ex.Message}");
             }
-
-            return false;
         }
 
         private async void VerifyTask_Click(object sender, RoutedEventArgs e)

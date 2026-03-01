@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using HappyEngine.Dialogs;
 using HappyEngine.Helpers;
 using HappyEngine.Models;
 using HappyEngine.Services;
@@ -37,6 +38,7 @@ namespace HappyEngine.Managers
         private string? _remoteName;
         private List<GitCommitInfo> _unpushedCommits = new();
         private List<GitFileChange> _uncommittedChanges = new();
+        private HashSet<string> _selectedFiles = new(); // Track selected files for commit
         private string? _lastError;
         private string? _lastOperationStatus;
         private DateTime? _lastOperationTime;
@@ -45,6 +47,7 @@ namespace HappyEngine.Managers
         private StackPanel? _cachedRoot;
         private TextBlock? _cachedBranchHeader;
         private WrapPanel? _cachedActionButtons;
+        private Button? _cachedCreateCommitButton;
         private TextBlock? _cachedStatusMessage;
         private Border? _cachedStatusBorder;
         private StackPanel? _cachedUnpushedSection;
@@ -217,6 +220,7 @@ namespace HappyEngine.Managers
         private async Task LoadUncommittedChangesAsync(string projectPath, CancellationToken ct)
         {
             _uncommittedChanges.Clear();
+            _selectedFiles.Clear(); // Clear selections when refreshing
 
             var statusOutput = await _gitHelper.RunGitCommandAsync(projectPath,
                 "status --porcelain", ct);
@@ -403,6 +407,16 @@ namespace HappyEngine.Managers
         private WrapPanel BuildActionButtonsInternal()
         {
             return BuildActionButtons();
+        }
+
+        private void UpdateCommitButtonState()
+        {
+            if (_cachedCreateCommitButton == null) return;
+
+            _dispatcher.InvokeAsync(() =>
+            {
+                _cachedCreateCommitButton.IsEnabled = _selectedFiles.Count > 0;
+            });
         }
 
         private Border BuildGitUnavailablePanel()
@@ -627,6 +641,15 @@ namespace HappyEngine.Managers
                 var pushAllBtn = MakeActionButton("\uE898", "Push All", "Push all unpushed commits to remote");
                 pushAllBtn.Click += async (_, _) => await ExecutePushAsync();
                 panel.Children.Add(pushAllBtn);
+            }
+
+            // Create Commit button (show when there are uncommitted changes)
+            if (_uncommittedChanges.Count > 0 && HasNoFileLocks())
+            {
+                _cachedCreateCommitButton = MakeActionButton("\uE73E", "Create Commit", "Create a commit with selected changes");
+                _cachedCreateCommitButton.Click += async (_, _) => await ExecuteCreateCommitAsync();
+                _cachedCreateCommitButton.IsEnabled = _selectedFiles.Count > 0; // Only enabled when files are selected
+                panel.Children.Add(_cachedCreateCommitButton);
             }
 
             return panel;
@@ -887,16 +910,65 @@ namespace HappyEngine.Managers
         {
             var section = new StackPanel();
 
-            section.Children.Add(new TextBlock
+            // Header with select all/none controls
+            var headerPanel = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+
+            var header = new TextBlock
             {
                 Text = $"Uncommitted Changes ({_uncommittedChanges.Count})",
                 Foreground = BrushCache.Theme("TextLight"),
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
-                FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 6)
-            });
+                FontFamily = new FontFamily("Segoe UI")
+            };
+            DockPanel.SetDock(header, Dock.Left);
+            headerPanel.Children.Add(header);
 
+            // Add select all/none links
+            var selectControls = new WrapPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var selectAll = new TextBlock
+            {
+                Text = "Select All",
+                Foreground = BrushCache.Theme("Accent"),
+                FontSize = 10,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            selectAll.MouseLeftButtonDown += (_, _) =>
+            {
+                foreach (var change in _uncommittedChanges)
+                {
+                    _selectedFiles.Add(change.FilePath);
+                }
+                UpdateUncommittedSection();
+                UpdateCommitButtonState();
+            };
+            selectControls.Children.Add(selectAll);
+
+            var selectNone = new TextBlock
+            {
+                Text = "Select None",
+                Foreground = BrushCache.Theme("Accent"),
+                FontSize = 10,
+                Cursor = System.Windows.Input.Cursors.Hand
+            };
+            selectNone.MouseLeftButtonDown += (_, _) =>
+            {
+                _selectedFiles.Clear();
+                UpdateUncommittedSection();
+                UpdateCommitButtonState();
+            };
+            selectControls.Children.Add(selectNone);
+
+            DockPanel.SetDock(selectControls, Dock.Right);
+            headerPanel.Children.Add(selectControls);
+
+            section.Children.Add(headerPanel);
             section.Children.Add(BuildUncommittedFilesList());
 
             return section;
@@ -910,6 +982,29 @@ namespace HappyEngine.Managers
             foreach (var change in _uncommittedChanges)
             {
                 var row = new DockPanel { Margin = new Thickness(0, 1, 0, 1) };
+
+                // Add checkbox for file selection
+                var checkBox = new CheckBox
+                {
+                    IsChecked = _selectedFiles.Contains(change.FilePath),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 6, 0)
+                };
+
+                // Handle checkbox state changes
+                checkBox.Checked += (_, _) =>
+                {
+                    _selectedFiles.Add(change.FilePath);
+                    UpdateCommitButtonState();
+                };
+                checkBox.Unchecked += (_, _) =>
+                {
+                    _selectedFiles.Remove(change.FilePath);
+                    UpdateCommitButtonState();
+                };
+
+                DockPanel.SetDock(checkBox, Dock.Left);
+                row.Children.Add(checkBox);
 
                 var statusBadge = new Border
                 {
@@ -1219,6 +1314,122 @@ namespace HappyEngine.Managers
                 _lastOperationTime = DateTime.Now;
                 MarkDirty();
             }
+        }
+
+        private async Task ExecuteCreateCommitAsync()
+        {
+            var projectPath = _getProjectPath();
+            if (string.IsNullOrEmpty(projectPath)) return;
+
+            if (_selectedFiles.Count == 0)
+            {
+                MessageBox.Show("Please select files to commit.", "Create Commit", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Get selected files
+            var selectedChanges = _uncommittedChanges
+                .Where(c => _selectedFiles.Contains(c.FilePath))
+                .ToList();
+
+            if (selectedChanges.Count == 0)
+            {
+                MessageBox.Show("Selected files are no longer in the uncommitted changes list.", "Create Commit",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Generate suggested commit message for selected files only
+            var suggestionText = GenerateCommitSummaryForFiles(selectedChanges);
+
+            // Show commit dialog
+            var result = CommitDialog.Show(selectedChanges, suggestionText);
+            if (result.Cancelled) return;
+
+            // Execute the commit operation atomically while ensuring no locks
+            var (success, errorMessage) = await _gitOperationGuard.ExecuteWhileNoLocksHeldAsync(async () =>
+            {
+                // Show committing status
+                _lastOperationStatus = $"Committing {selectedChanges.Count} selected file{(selectedChanges.Count != 1 ? "s" : "")}...";
+                _lastOperationTime = DateTime.Now;
+                MarkDirty();
+
+                // Stage only the selected files
+                var filePaths = selectedChanges
+                    .Select(c => GitHelper.EscapeGitPath(c.FilePath))
+                    .ToList();
+                var pathArgs = string.Join(" ", filePaths);
+
+                AppLogger.Info("GitPanelManager", $"Committing {filePaths.Count} selected file(s) for {projectPath}");
+
+                var addResult = await _gitHelper.RunGitCommandAsync(projectPath, $"add -- {pathArgs}");
+                if (addResult == null)
+                {
+                    _lastOperationStatus = "Failed to stage selected changes";
+                    _lastOperationTime = DateTime.Now;
+                    MarkDirty();
+                    throw new InvalidOperationException("Failed to stage selected changes");
+                }
+
+                // Use the secure commit method to prevent shell injection
+                var commitResult = await _gitHelper.CommitSecureAsync(projectPath, result.Message, pathArgs);
+                if (commitResult == null)
+                {
+                    _lastOperationStatus = "Commit failed. There may be nothing to commit or a hook rejected it";
+                    _lastOperationTime = DateTime.Now;
+                    throw new InvalidOperationException("Commit failed");
+                }
+                else
+                {
+                    _lastOperationStatus = $"Successfully committed {filePaths.Count} selected file{(filePaths.Count != 1 ? "s" : "")}";
+                    _lastOperationTime = DateTime.Now;
+                }
+
+                MarkDirty();
+            }, "commit");
+
+            if (!success)
+            {
+                _lastOperationStatus = errorMessage!;
+                _lastOperationTime = DateTime.Now;
+                MarkDirty();
+                MessageBox.Show($"Commit failed: {errorMessage}", "Create Commit", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            else
+            {
+                // Clear selections after successful commit
+                _selectedFiles.Clear();
+                MarkDirty();
+            }
+        }
+
+        private string GenerateCommitSummaryForFiles(List<GitFileChange> files)
+        {
+            if (files.Count == 0) return "";
+
+            var added = files.Count(c => c.Status.Contains("A") || c.Status == "??");
+            var modified = files.Count(c => c.Status.Contains("M"));
+            var deleted = files.Count(c => c.Status.Contains("D"));
+            var renamed = files.Count(c => c.Status.Contains("R"));
+
+            var parts = new List<string>();
+            if (added > 0) parts.Add($"{added} added");
+            if (modified > 0) parts.Add($"{modified} modified");
+            if (deleted > 0) parts.Add($"{deleted} deleted");
+            if (renamed > 0) parts.Add($"{renamed} renamed");
+
+            // Try to determine common directory or pattern
+            var dirs = files
+                .Select(c => System.IO.Path.GetDirectoryName(c.FilePath)?.Replace('\\', '/'))
+                .Where(d => !string.IsNullOrEmpty(d))
+                .GroupBy(d => d)
+                .OrderByDescending(g => g.Count())
+                .Take(3)
+                .Select(g => g.Key)
+                .ToList();
+
+            var scope = dirs.Count > 0 ? string.Join(", ", dirs!) : "project";
+            return $"chore: update {scope} ({string.Join(", ", parts)})";
         }
 
         // ── Helpers ────────────────────────────────────────────────────
