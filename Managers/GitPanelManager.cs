@@ -1752,9 +1752,8 @@ secrets.json
                 Margin = new Thickness(0, 0, 4, 0)
             };
 
-            // Apply accent color on hover using triggers from IconBtn style
-            button.MouseEnter += (s, e) => button.Foreground = BrushCache.Theme("Accent");
-            button.MouseLeave += (s, e) => button.Foreground = BrushCache.Get("#4A4A4A");
+            // The IconBtn style already handles hover effects through triggers
+            // No need for manual mouse events
 
             return button;
         }

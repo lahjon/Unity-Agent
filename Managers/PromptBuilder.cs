@@ -107,7 +107,8 @@ namespace HappyEngine.Managers
             "1. Analyze: Identify objectives, implicit requirements, ambiguities, and constraints.\n" +
             "2. Specify: Rewrite as a detailed spec with acceptance criteria, edge cases, and affected files.\n" +
             "3. Plan: Create a step-by-step implementation plan with verification and risks.\n" +
-            "4. Execute: Implement following your plan.\n\n---\n";
+            "4. Execute: Implement following your plan.\n" +
+            "Note: In autonomous mode, proceed through all steps without pausing for approval.\n\n---\n";
 
         public const string MessageBusBlockTemplate =
             "# MESSAGE BUS\n" +
@@ -150,6 +151,23 @@ namespace HappyEngine.Managers
             "# CONFIRM BEFORE CHANGES\n" +
             "Describe the issue and proposed solution before changing code. Ask the user to confirm before proceeding.\n\n";
 
+        public const string AutonomousExecutionBlock =
+            "# AUTONOMOUS EXECUTION MODE\n" +
+            "You are operating in FULLY AUTONOMOUS MODE as part of a larger orchestrated task. This means:\n" +
+            "- NEVER ask for user input, approval, confirmation, or review\n" +
+            "- NEVER ask questions like \"Should I proceed?\", \"Is this okay?\", \"Want me to implement this?\"\n" +
+            "- NEVER pause for feedback or wait for the user to review your plan\n" +
+            "- Make all implementation decisions independently based on the task requirements\n" +
+            "- If you encounter ambiguity, make a reasonable choice and document your reasoning\n" +
+            "- Execute the task to completion without any user interaction\n" +
+            "- Your results will be automatically evaluated by another agent\n\n" +
+            "# EXECUTION FOCUS\n" +
+            "- Read the task description carefully and implement it fully\n" +
+            "- If the task mentions specific acceptance criteria, ensure you meet them\n" +
+            "- Complete all implementation, testing, and verification steps autonomously\n" +
+            "- Fix any issues you encounter during implementation\n" +
+            "- Your completion summary is automatically collected for evaluation\n\n";
+
         public const string FailureRecoveryBlock =
             "# FAILURE RECOVERY MODE\n" +
             "A previous attempt at this task FAILED. You are a diagnostic recovery agent.\n\n" +
@@ -169,12 +187,16 @@ namespace HappyEngine.Managers
             "You are a planning team member.\n" +
             "Post all findings and recommendations to the message bus only.\n" +
             "Your output and completion summary are automatically collected — do not write them to files.\n\n" +
+            "# AUTONOMOUS EXECUTION MODE\n" +
+            "You are operating in FULLY AUTONOMOUS MODE. This means:\n" +
+            "- NEVER ask for user input, approval, or confirmation\n" +
+            "- NEVER ask questions like \"Should I proceed?\", \"Is this approach okay?\", or \"Want me to continue?\"\n" +
+            "- NEVER wait for feedback or review\n" +
+            "- Make all decisions independently based on the task requirements\n" +
+            "- If you encounter ambiguity, make a reasonable choice and document your reasoning\n\n" +
             "# AUTO-COMPLETION\n" +
             "When you have finished your exploration and posted findings to the message bus, " +
             "you MUST stop immediately. Provide a brief final summary of your findings and then exit.\n" +
-            "Do NOT ask the user for confirmation, approval, or next steps.\n" +
-            "Do NOT re-verify, re-post, or loop back to check your own work.\n" +
-            "Do NOT say things like \"Want me to apply the fix?\" or \"Shall I continue?\".\n" +
             "Your results are automatically collected by the orchestrator — just complete your analysis and stop.\n\n";
 
         public const string FeatureModeInitialTemplate =
@@ -193,9 +215,11 @@ namespace HappyEngine.Managers
             "- Each member should explore specific files, patterns, and constraints\n" +
             "- Members coordinate via the shared message bus\n" +
             "- NO member should implement anything — planning and exploration only\n" +
-            "- **CRITICAL**: Each member's description MUST include the instruction: " +
-            "\"Do NOT create or modify any files. Do NOT write ARCHITECTURE.md or any documentation files. " +
-            "Post all findings to the message bus. Your output is collected automatically.\"\n\n" +
+            "- **CRITICAL**: Each member's description MUST include ALL of these instructions:\n" +
+            "  1. \"Do NOT create or modify any files. Do NOT write ARCHITECTURE.md or any documentation files.\"\n" +
+            "  2. \"Post all findings to the message bus. Your output is collected automatically.\"\n" +
+            "  3. \"You are in FULLY AUTONOMOUS MODE - never ask for user input or approval.\"\n" +
+            "  4. \"Complete your analysis and exit without asking for confirmation or next steps.\"\n\n" +
             "## OUTPUT\n" +
             "Output a team definition as JSON in a ```TEAM``` block:\n" +
             "```TEAM\n[{\"role\": \"Architect\", \"description\": \"Explore the codebase and design...\", \"depends_on\": []}]\n```\n\n" +
@@ -217,13 +241,24 @@ namespace HappyEngine.Managers
             "```FEATURE_STEPS\n" +
             "[{{\"description\": \"Self-contained task prompt with: what to do, which files to modify, acceptance criteria\", \"depends_on\": []}}]\n" +
             "```\n\n" +
+            "## EXAMPLE OF GOOD PARALLELISM\n" +
+            "If implementing a feature with backend API, frontend UI, tests, and docs:\n" +
+            "- Step 0: Create backend API endpoints (no dependencies)\n" +
+            "- Step 1: Create frontend UI components (no dependencies - can mock API initially)\n" +
+            "- Step 2: Write unit tests for backend (no dependencies)\n" +
+            "- Step 3: Write frontend tests (no dependencies)\n" +
+            "- Step 4: Integration & verification (depends_on: [0, 1, 2, 3] - consolidates all work)\n\n" +
             "Rules:\n" +
             "- Each step must be fully self-contained with enough context for an independent agent\n" +
             "- Include specific file paths, function names, and detailed changes needed\n" +
-            "- Use depends_on (0-indexed) for steps that must wait for earlier steps\n" +
-            "- Prefer parallel steps where possible\n" +
+            "- **PARALLELISM IS CRITICAL**: Maximize parallel execution by:\n" +
+            "  - Only use depends_on when there's a TRUE technical dependency (e.g., step B needs types/interfaces created by step A)\n" +
+            "  - Do NOT create dependencies just for logical ordering if tasks can run in parallel\n" +
+            "  - Split independent features/areas into separate parallel steps\n" +
+            "  - Consider having a final consolidation step that depends on all others if needed\n" +
             "- Each step should be focused and achievable by a single agent session\n" +
-            "- Include acceptance criteria for each step\n\n" +
+            "- Include acceptance criteria for each step\n" +
+            "- Add \"Execute autonomously without user interaction\" to each step's description\n\n" +
             "# FEATURE REQUEST\n{3}\n";
 
         public const string FeatureModeEvaluationTemplate =
@@ -231,7 +266,8 @@ namespace HappyEngine.Managers
             "You are evaluating the results of a feature implementation iteration.\n\n" +
             "## RESTRICTIONS\n" +
             "- **No git commands** of any kind.\n" +
-            "- **Stay in project root** — never access files outside ./\n\n" +
+            "- **Stay in project root** — never access files outside ./\n" +
+            "- **AUTONOMOUS MODE** — Never ask for user input or approval\n\n" +
             "## FEATURE REQUEST\n{2}\n\n" +
             "## IMPLEMENTATION RESULTS\n{3}\n\n" +
             "## YOUR TASK\n" +
