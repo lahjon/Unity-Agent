@@ -525,7 +525,9 @@ namespace HappyEngine
                 ProjectTypeGameToggle.IsChecked = activeEntry?.IsGame == true;
                 UpdateMcpVisibility(activeEntry?.IsGame == true);
                 SyncMcpSettingsFields();
-                await _helperManager.SwitchProjectAsync(_projectManager.ProjectPath);
+
+                // All critical UI updates must happen synchronously (before any await)
+                // so they complete before the swap handler hides the loading overlay.
                 RefreshFilterCombos();
                 ActiveFilter_Changed(ActiveFilterCombo, null!);
                 HistoryFilter_Changed(HistoryFilterCombo, null!);
@@ -537,9 +539,15 @@ namespace HappyEngine
                 }
 
                 UpdateStatus();
-                RestoreStarRow();
+
+                // Non-critical async work: reload helper suggestions for the new project.
+                await _helperManager.SwitchProjectAsync(_projectManager.ProjectPath);
             }
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to sync settings for project", ex); }
+            finally
+            {
+                RestoreStarRow();
+            }
         }
 
         private void SelectProjectInFilterCombo(ComboBox combo, string projectPath,

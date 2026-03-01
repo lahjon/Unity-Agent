@@ -382,6 +382,17 @@ namespace HappyEngine.Managers
         {
             if (string.IsNullOrEmpty(text)) return;
 
+            // Block follow-up when the task is a feature mode coordinator waiting for subtasks.
+            // Without this, it would start a new Claude process that has no context about the
+            // coordination and asks "what do you want me to do?"
+            if (task.IsFeatureMode && task.FeatureModePhase is FeatureModePhase.TeamPlanning or FeatureModePhase.Execution)
+            {
+                _outputProcessor.AppendOutput(task.Id,
+                    "\n[HappyEngine] This task is coordinating subtasks and waiting for them to complete. Follow-up input is not available during this phase.\n",
+                    activeTasks, historyTasks);
+                return;
+            }
+
             if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning && task.Process is { HasExited: false })
             {
                 try
@@ -482,6 +493,10 @@ namespace HappyEngine.Managers
             _processLauncher.StreamingToolState.TryRemove(task.Id, out _);
             task.Cts?.Dispose();
             task.Cts = null;
+
+            // Fire TaskCompleted so the orchestrator and feature mode parent get notified.
+            // Without this, cancelling a subtask leaves the parent stuck waiting forever.
+            TaskCompleted?.Invoke(task.Id);
         }
 
         /// <summary>Backward-compatible static KillProcess forwarding to TaskProcessLauncher.</summary>
@@ -1074,17 +1089,30 @@ namespace HappyEngine.Managers
             if (featureParent.FeatureModePhase is not (FeatureModePhase.TeamPlanning or FeatureModePhase.Execution)) return;
             if (featureParent.FeaturePhaseChildIds.Count == 0) return;
 
-            var allComplete = featureParent.FeaturePhaseChildIds.All(id =>
-            {
-                var child = activeTasks.FirstOrDefault(t => t.Id == id)
-                         ?? historyTasks.FirstOrDefault(t => t.Id == id);
-                return child?.IsFinished == true;
-            });
+            var children = featureParent.FeaturePhaseChildIds
+                .Select(id => activeTasks.FirstOrDefault(t => t.Id == id)
+                           ?? historyTasks.FirstOrDefault(t => t.Id == id))
+                .ToList();
 
-            if (allComplete)
+            var allComplete = children.All(c => c?.IsFinished == true);
+            if (!allComplete) return;
+
+            // If ALL children were cancelled, abort the feature mode task gracefully
+            // instead of advancing to the next phase with empty results
+            var allCancelled = children.All(c => c?.Status == AgentTaskStatus.Cancelled);
+            if (allCancelled)
             {
-                _featureModeHandler.OnFeatureModePhaseComplete(featureParent, activeTasks, historyTasks, moveToHistory);
+                _outputProcessor.AppendOutput(featureParent.Id,
+                    "\n[Feature Mode] All subtasks were cancelled. Aborting feature mode.\n",
+                    activeTasks, historyTasks);
+                featureParent.Status = AgentTaskStatus.Cancelled;
+                featureParent.EndTime = DateTime.Now;
+                _outputTabManager.UpdateTabHeader(featureParent);
+                moveToHistory(featureParent);
+                return;
             }
+
+            _featureModeHandler.OnFeatureModePhaseComplete(featureParent, activeTasks, historyTasks, moveToHistory);
         }
     }
 }

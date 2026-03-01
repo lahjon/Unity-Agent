@@ -22,6 +22,7 @@ namespace HappyEngine.Managers
     {
         private readonly string _scriptDir;
         private readonly ConcurrentDictionary<string, StreamingToolState> _streamingToolState = new();
+        private readonly ConcurrentDictionary<string, (long Input, long Output, long CacheRead, long CacheCreate)> _preProcessTokenBaseline = new();
         private readonly FileLockManager _fileLockManager;
         private readonly OutputTabManager _outputTabManager;
         private readonly OutputProcessor _outputProcessor;
@@ -99,6 +100,10 @@ namespace HappyEngine.Managers
         /// <summary>Starts a managed process, assigns it to the task, and begins async output reading.</summary>
         public void StartManagedProcess(AgentTask task, Process process)
         {
+            // Save current token counts as baseline so the result event can accumulate
+            // across multiple Claude invocations (feature mode phases, retries, follow-ups)
+            _preProcessTokenBaseline[task.Id] = (task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens);
+
             process.Start();
             task.Process = process;
             process.BeginOutputReadLine();
@@ -512,11 +517,23 @@ namespace HappyEngine.Managers
                                 var outTok = resultUsage.TryGetProperty("output_tokens", out var rot) ? rot.GetInt64() : 0;
                                 var cacheRead = resultUsage.TryGetProperty("cache_read_input_tokens", out var rcrt) ? rcrt.GetInt64() : 0;
                                 var cacheCreate = resultUsage.TryGetProperty("cache_creation_input_tokens", out var rcct) ? rcct.GetInt64() : 0;
-                                // Result event contains cumulative totals, so set directly instead of adding
-                                task.InputTokens = inTok;
-                                task.OutputTokens = outTok;
-                                task.CacheReadTokens = cacheRead;
-                                task.CacheCreationTokens = cacheCreate;
+                                // Result event has cumulative totals for THIS invocation.
+                                // Add to the pre-process baseline to accumulate across multiple
+                                // invocations (feature mode phases, token limit retries, follow-ups).
+                                if (_preProcessTokenBaseline.TryRemove(taskId, out var baseline))
+                                {
+                                    task.InputTokens = baseline.Input + inTok;
+                                    task.OutputTokens = baseline.Output + outTok;
+                                    task.CacheReadTokens = baseline.CacheRead + cacheRead;
+                                    task.CacheCreationTokens = baseline.CacheCreate + cacheCreate;
+                                }
+                                else
+                                {
+                                    task.InputTokens = inTok;
+                                    task.OutputTokens = outTok;
+                                    task.CacheReadTokens = cacheRead;
+                                    task.CacheCreationTokens = cacheCreate;
+                                }
                             }
                         }
                         break;

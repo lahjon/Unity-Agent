@@ -10,7 +10,8 @@
       "Bash(xargs wc:*)",
       "Bash(tail:*)",
       "Bash(cat:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(tasklist:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

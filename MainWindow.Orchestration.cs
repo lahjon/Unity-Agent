@@ -287,6 +287,19 @@ namespace HappyEngine
                 _failureRecoveryManager.TrySpawnRecoveryTask(task, _activeTasks, _historyTasks);
 
             _taskOrchestrator.OnTaskCompleted(taskId);
+
+            // Check if this completed/cancelled task is a child of a feature mode coordinator.
+            // This is critical: without this check, the parent task never advances phases
+            // because FinalizeTask (which also checks this) isn't called until much later.
+            if (task?.ParentTaskId != null)
+            {
+                var featureParent = _activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
+                if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
+                {
+                    _taskExecutionManager.CheckFeatureModePhaseCompletion(
+                        featureParent, _activeTasks, _historyTasks, MoveToHistory);
+                }
+            }
         }
 
         private void OnTaskGroupCompleted(object? sender, GroupCompletedEventArgs e)

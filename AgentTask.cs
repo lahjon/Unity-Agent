@@ -214,7 +214,11 @@ namespace HappyEngine
         public List<string> ChildTaskIds { get => Data.ChildTaskIds; set => Data.ChildTaskIds = value; }
 
         // ── Feature mode multi-phase tracking ────────────────────────
-        public FeatureModePhase FeatureModePhase { get => Data.FeatureModePhase; set => Data.FeatureModePhase = value; }
+        public FeatureModePhase FeatureModePhase
+        {
+            get => Data.FeatureModePhase;
+            set { Data.FeatureModePhase = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
+        }
         public List<string> FeaturePhaseChildIds { get => Data.FeaturePhaseChildIds; set => Data.FeaturePhaseChildIds = value; }
         public string OriginalFeatureDescription { get => Data.OriginalFeatureDescription; set => Data.OriginalFeatureDescription = value; }
         public int SubTaskCounter { get => Runtime.SubTaskCounter; set => Runtime.SubTaskCounter = value; }
@@ -328,6 +332,10 @@ namespace HappyEngine
         public string StatusText => Status switch
         {
             AgentTaskStatus.Running when IsWaitingForRetry => "Retrying soon",
+            AgentTaskStatus.Running when IsFeatureMode && FeatureModePhase == FeatureModePhase.TeamPlanning =>
+                $"Coordinating ({CurrentIteration}/{MaxIterations}) — Team Planning",
+            AgentTaskStatus.Running when IsFeatureMode && FeatureModePhase == FeatureModePhase.Execution =>
+                $"Coordinating ({CurrentIteration}/{MaxIterations}) — Execution",
             AgentTaskStatus.Running => IsFeatureMode ? $"Running ({CurrentIteration}/{MaxIterations})" : "Running",
             AgentTaskStatus.Completed => "Finished",
             AgentTaskStatus.Cancelled => "Cancelled",

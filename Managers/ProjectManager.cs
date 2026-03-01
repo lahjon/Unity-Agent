@@ -1011,7 +1011,9 @@ namespace HappyEngine.Managers
                     {
                         try
                         {
-                            updateTerminalWorkingDirectory?.Invoke(projPath);
+                            try { updateTerminalWorkingDirectory?.Invoke(projPath); }
+                            catch (Exception ex) { AppLogger.Warn("ProjectManager", "Terminal update failed during project swap", ex); }
+
                             // Yield to let UI repaint after terminal update
                             await System.Threading.Tasks.Task.Yield();
                             saveSettings?.Invoke();

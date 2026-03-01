@@ -160,18 +160,44 @@ namespace HappyEngine.Managers
                 return;
             }
 
+            // Mark the parent as the Main coordinator so the UI clearly identifies it
+            if (string.IsNullOrWhiteSpace(task.Summary) || !task.Summary.StartsWith("[Main]"))
+                task.Summary = $"[Main] {(task.Summary ?? TaskLauncher.GenerateLocalSummary(task.OriginalFeatureDescription))}";
+
             // Configure team members for planning only (no file modifications)
             task.FeaturePhaseChildIds.Clear();
+            var spawnedCount = 0;
             foreach (var child in children)
             {
-                child.SpawnTeam = false;
-                child.AutoDecompose = false;
-                child.IsFeatureMode = false;
-                child.UseMessageBus = true;
-                child.NoGitWrite = true;
-                child.SkipPermissions = true;
-                task.FeaturePhaseChildIds.Add(child.Id);
-                FeatureModeChildSpawned?.Invoke(task, child);
+                try
+                {
+                    child.SpawnTeam = false;
+                    child.AutoDecompose = false;
+                    child.IsFeatureMode = false;
+                    child.UseMessageBus = true;
+                    child.NoGitWrite = true;
+                    child.SkipPermissions = true;
+                    task.FeaturePhaseChildIds.Add(child.Id);
+                    FeatureModeChildSpawned?.Invoke(task, child);
+                    spawnedCount++;
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("FeatureMode", $"Failed to spawn team member '{child.Summary}' for task {task.Id}", ex);
+                    _outputProcessor.AppendOutput(task.Id,
+                        $"\n[Feature Mode] WARNING: Failed to spawn team member: {ex.Message}\n",
+                        activeTasks, historyTasks);
+                }
+            }
+
+            if (spawnedCount == 0)
+            {
+                _outputProcessor.AppendOutput(task.Id,
+                    "\n[Feature Mode] All team member spawns failed — falling back to direct plan consolidation.\n",
+                    activeTasks, historyTasks);
+                task.FeatureModePhase = FeatureModePhase.PlanConsolidation;
+                StartPlanConsolidationProcess(task, "", activeTasks, historyTasks, moveToHistory);
+                return;
             }
 
             // Refresh dependency display info now that TaskNumbers are assigned
@@ -179,7 +205,7 @@ namespace HappyEngine.Managers
 
             task.FeatureModePhase = FeatureModePhase.TeamPlanning;
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Feature Mode] Planning team spawned with {children.Count} member(s). Waiting for team to complete...\n",
+                $"\n[Feature Mode] Planning team spawned with {spawnedCount} member(s). Waiting for team to complete...\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
         }
@@ -262,21 +288,55 @@ namespace HappyEngine.Managers
                 activeTasks, historyTasks);
 
             // Spawn execution tasks with dependencies
-            var children = SpawnExecutionTasks(task, steps, activeTasks, historyTasks);
+            List<AgentTask> children;
+            try
+            {
+                children = SpawnExecutionTasks(task, steps, activeTasks, historyTasks);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("FeatureMode", $"Failed to spawn execution tasks for task {task.Id}", ex);
+                _outputProcessor.AppendOutput(task.Id,
+                    $"\n[Feature Mode] ERROR spawning execution tasks: {ex.Message}. Finishing.\n",
+                    activeTasks, historyTasks);
+                FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
+                return;
+            }
 
             task.FeatureModePhase = FeatureModePhase.Execution;
             task.FeaturePhaseChildIds.Clear();
+            var spawnedCount = 0;
             foreach (var child in children)
             {
-                task.FeaturePhaseChildIds.Add(child.Id);
-                FeatureModeChildSpawned?.Invoke(task, child);
+                try
+                {
+                    task.FeaturePhaseChildIds.Add(child.Id);
+                    FeatureModeChildSpawned?.Invoke(task, child);
+                    spawnedCount++;
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("FeatureMode", $"Failed to spawn execution task '{child.Summary}' for task {task.Id}", ex);
+                    _outputProcessor.AppendOutput(task.Id,
+                        $"\n[Feature Mode] WARNING: Failed to spawn execution step: {ex.Message}\n",
+                        activeTasks, historyTasks);
+                }
+            }
+
+            if (spawnedCount == 0)
+            {
+                _outputProcessor.AppendOutput(task.Id,
+                    "\n[Feature Mode] All execution task spawns failed. Finishing.\n",
+                    activeTasks, historyTasks);
+                FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
+                return;
             }
 
             // Refresh dependency display info now that TaskNumbers are assigned
             TaskExecutionManager.RefreshDependencyDisplayInfo(children, "step");
 
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Feature Mode] {children.Count} execution task(s) spawned. Waiting for completion...\n",
+                $"\n[Feature Mode] {spawnedCount} execution task(s) spawned. Waiting for completion...\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
         }
