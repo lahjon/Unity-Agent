@@ -39,9 +39,13 @@ namespace HappyEngine.Managers
         /// <summary>
         /// Generates a git-diff-based completion summary and runs result verification.
         /// </summary>
+        /// <param name="expectedStatus">The status to use for summary generation (the final status
+        /// based on exit code), since the task may still be in Verifying state.</param>
         public async System.Threading.Tasks.Task AppendCompletionSummary(AgentTask task,
-            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            AgentTaskStatus? expectedStatus = null)
         {
+            var summaryStatus = expectedStatus ?? task.Status;
             try
             {
                 var fullOutput = task.OutputBuilder.ToString();
@@ -55,13 +59,13 @@ namespace HappyEngine.Managers
                 try
                 {
                     var summary = await TaskLauncher.GenerateCompletionSummaryAsync(
-                        task.ProjectPath, task.GitStartHash, task.Status, duration, ct);
+                        task.ProjectPath, task.GitStartHash, summaryStatus, duration, ct);
                     task.CompletionSummary = summary;
                     AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
                 catch (OperationCanceledException)
                 {
-                    var summary = TaskLauncher.FormatCompletionSummary(task.Status, duration, null);
+                    var summary = TaskLauncher.FormatCompletionSummary(summaryStatus, duration, null);
                     task.CompletionSummary = summary;
                     AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }

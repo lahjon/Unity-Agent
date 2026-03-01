@@ -13,11 +13,9 @@ namespace HappyEngine
 {
     public partial class App : Application
     {
-        private static readonly string LogDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "HappyEngine", "logs");
-        private static readonly string LogFile = Path.Combine(LogDir, "crash.log");
-        private static readonly string HangLogFile = Path.Combine(LogDir, "hang.log");
+        private static string LogDir => Managers.AppLogger.GetLogDir();
+        private static string LogFile => Path.Combine(LogDir, "crash.log");
+        private static string HangLogFile => Path.Combine(LogDir, "hang.log");
 
         protected override void OnStartup(StartupEventArgs e)
         {

@@ -121,6 +121,21 @@
                                 </Style>
                             </Button.Style>
                         </Button>
+                        <!-- Verify button (visible when finished) -->
+                        <Button Click="VerifyTask_Click" Margin="0,0,2,0" FontSize="11">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE721;"/>
+                                    <Setter Property="ToolTip" Value="Run result verification"/>
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                         <!-- Close/Remove button -->
                         <Button Click="Cancel_Click">
                             <Button.Style>
@@ -138,23 +153,6 @@
                             </Button.Style>
                         </Button>
                     </StackPanel>
-                    <!-- Verify icon top-left (visible when finished) -->
-                    <Button Grid.Row="0" Content="&#xE721;" Click="VerifyTask_Click"
-                            HorizontalAlignment="Left" VerticalAlignment="Top"
-                            Margin="-2,-2,0,0" FontSize="11"
-                            ToolTip="Run result verification">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
-                                <Setter Property="Foreground" Value="#5C6BC0"/>
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsFinished}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse x:Name="StatusGlow" Width="8" Height="8"
@@ -471,6 +469,7 @@
                     BorderThickness="1">
                 <Border.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Header="Resume" Click="Resume_Click"/>
                         <MenuItem Header="Re-run Task" Click="RerunTask_Click"/>
                         <MenuItem Header="Store Task" Click="StoreHistoryTask_Click"/>
                         <Separator/>
@@ -513,28 +512,30 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <!-- Verify icon top-left (visible when finished) -->
-                    <Button Grid.Row="0" Content="&#xE721;" Click="VerifyTask_Click"
-                            HorizontalAlignment="Left" VerticalAlignment="Top"
-                            Margin="-2,-2,0,0" FontSize="11"
-                            ToolTip="Run result verification">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
-                                <Setter Property="Foreground" Value="#5C6BC0"/>
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsFinished}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    <!-- Close X button top-right -->
-                    <Button Grid.Row="0" Content="&#xE8BB;" Click="RemoveHistoryTask_Click"
-                            HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Style="{StaticResource IconBtn}" Margin="0,-2,-2,0"
-                            ToolTip="Remove from history"/>
+                    <!-- Top-right buttons -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-2,-2,0">
+                        <!-- Verify button (visible when finished) -->
+                        <Button Click="VerifyTask_Click" Margin="0,0,2,0" FontSize="11">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE721;"/>
+                                    <Setter Property="ToolTip" Value="Run result verification"/>
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <!-- Close X button -->
+                        <Button Content="&#xE8BB;" Click="RemoveHistoryTask_Click"
+                                Style="{StaticResource IconBtn}"
+                                ToolTip="Remove from history"/>
+                    </StackPanel>
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="14,0,0,0">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse x:Name="HistStatusGlow" Width="8" Height="8"
@@ -1169,10 +1170,6 @@
                                     <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
                                                   Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
                                         <TextBlock Text="Remote Session" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <ToggleButton x:Name="HeadlessToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
-                                        <TextBlock Text="Headless (Terminal)" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
                                     <ToggleButton x:Name="SpawnTeamToggle" IsChecked="False"
                                                   Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
@@ -2072,9 +2069,9 @@
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
-                                <!-- Crash Log Paths -->
+                                <!-- Log Paths -->
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Crash Log Paths" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                    <TextBlock Text="Log Paths" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                                FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                     <ToggleButton x:Name="EditCrashLogPathsToggle"
                                                   Style="{StaticResource ToggleSwitch}" Margin="12,0,0,0"
@@ -2083,15 +2080,32 @@
                                         <TextBlock Text="Edit" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
                                 </DockPanel>
-                                <TextBox x:Name="CrashLogPathsBox" AcceptsReturn="True" TextWrapping="Wrap"
-                                         MinHeight="80" MaxHeight="200"
-                                         VerticalScrollBarVisibility="Auto"
-                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
-                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                         FontSize="12" FontFamily="Consolas" Padding="10"
-                                         IsReadOnly="True" Opacity="0.6"/>
+                                <StackPanel Margin="0,0,0,4">
+                                    <TextBlock Text="Crash Log" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="CrashLogPathBox"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="12" FontFamily="Consolas" Padding="10"
+                                             IsReadOnly="True" Opacity="0.6"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,4">
+                                    <TextBlock Text="App Log" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="AppLogPathBox"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="12" FontFamily="Consolas" Padding="10"
+                                             IsReadOnly="True" Opacity="0.6"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,4">
+                                    <TextBlock Text="Hang Log" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="HangLogPathBox"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="12" FontFamily="Consolas" Padding="10"
+                                             IsReadOnly="True" Opacity="0.6"/>
+                                </StackPanel>
                                 <DockPanel Margin="0,6,0,0">
-                                    <TextBlock Text="One path per line. Used by Build Investigation to locate crash and error logs."
+                                    <TextBlock Text="Used by Build Investigation to locate crash and error logs."
                                                Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
                                                VerticalAlignment="Center"/>
                                     <StackPanel x:Name="CrashLogPathsEditButtons" Orientation="Horizontal"

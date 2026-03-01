@@ -240,17 +240,11 @@ namespace HappyEngine.Managers
                     _fileLockManager.ReleaseTaskLocks(task.Id);
                     if (task.UseMessageBus)
                         _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
-                    task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
-                    task.EndTime = DateTime.Now;
-                    _ = _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
-                    _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
-                    var statusColor = exitCode == 0
-                        ? (Brush)Application.Current.FindResource("Success")
-                        : (Brush)Application.Current.FindResource("DangerBright");
-                    _outputProcessor.AppendColoredOutput(task.Id,
-                        $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
-                        statusColor, activeTasks, historyTasks);
+                    // Set to Verifying while summary + verification run; final status is set afterwards
+                    task.Status = AgentTaskStatus.Verifying;
                     _outputTabManager.UpdateTabHeader(task);
+                    _ = CompleteWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
+                    return;
                 }
 
                 _fileLockManager.CheckQueuedTasks(activeTasks);
@@ -289,6 +283,52 @@ namespace HappyEngine.Managers
                 _outputTabManager.UpdateTabHeader(task);
                 moveToHistory(task);
             }
+        }
+
+        /// <summary>
+        /// Runs the completion summary and result verification, then sets the final task status.
+        /// Ensures verification completes before the task is marked as finished.
+        /// </summary>
+        private async System.Threading.Tasks.Task CompleteWithVerificationAsync(AgentTask task, int exitCode,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+
+            // Generate summary + run verification (awaited, not fire-and-forget)
+            await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
+
+            _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+
+            // Now set the final status after verification is complete
+            task.Status = expectedStatus;
+            task.EndTime = DateTime.Now;
+            var statusColor = exitCode == 0
+                ? (Brush)Application.Current.FindResource("Success")
+                : (Brush)Application.Current.FindResource("DangerBright");
+            _outputProcessor.AppendColoredOutput(task.Id,
+                $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
+                statusColor, activeTasks, historyTasks);
+            _outputTabManager.UpdateTabHeader(task);
+
+            _fileLockManager.CheckQueuedTasks(activeTasks);
+            TaskCompleted?.Invoke(task.Id);
+        }
+
+        /// <summary>
+        /// Runs verification after a follow-up completes, then sets the final status.
+        /// </summary>
+        private async System.Threading.Tasks.Task CompleteFollowUpWithVerificationAsync(AgentTask task, int exitCode,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+
+            await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
+            _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+
+            task.Status = expectedStatus;
+            task.EndTime = DateTime.Now;
+            _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Follow-up complete.\n", activeTasks, historyTasks);
+            _outputTabManager.UpdateTabHeader(task);
         }
 
         public void LaunchHeadless(AgentTask task)
@@ -376,12 +416,9 @@ namespace HappyEngine.Managers
 
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
-                task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
-                task.EndTime = DateTime.Now;
-                _ = _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
-                _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
-                _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Follow-up complete.\n", activeTasks, historyTasks);
+                task.Status = AgentTaskStatus.Verifying;
                 _outputTabManager.UpdateTabHeader(task);
+                _ = CompleteFollowUpWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
             });
 
             try

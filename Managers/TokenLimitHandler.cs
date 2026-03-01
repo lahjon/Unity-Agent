@@ -148,19 +148,10 @@ namespace HappyEngine.Managers
                 _fileLockManager.ReleaseTaskLocks(task.Id);
                 if (task.UseMessageBus)
                     _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
-                task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
-                task.EndTime = DateTime.Now;
-                _ = _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
-                _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
-                var statusColor = exitCode == 0
-                    ? (Brush)Application.Current.FindResource("Success")
-                    : (Brush)Application.Current.FindResource("DangerBright");
-                _outputProcessor.AppendColoredOutput(task.Id,
-                    $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
-                    statusColor, activeTasks, historyTasks);
+                // Set to Verifying while summary + verification run; final status is set afterwards
+                task.Status = AgentTaskStatus.Verifying;
                 _outputTabManager.UpdateTabHeader(task);
-                _fileLockManager.CheckQueuedTasks(activeTasks);
-                TaskCompleted?.Invoke(task.Id);
+                _ = CompleteRetryWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
             });
 
             try
@@ -174,6 +165,29 @@ namespace HappyEngine.Managers
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);
             }
+        }
+        /// <summary>
+        /// Runs verification after a token-limit retry completes, then sets the final status.
+        /// </summary>
+        private async System.Threading.Tasks.Task CompleteRetryWithVerificationAsync(AgentTask task, int exitCode,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+
+            await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
+            _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+
+            task.Status = expectedStatus;
+            task.EndTime = DateTime.Now;
+            var statusColor = exitCode == 0
+                ? (Brush)Application.Current.FindResource("Success")
+                : (Brush)Application.Current.FindResource("DangerBright");
+            _outputProcessor.AppendColoredOutput(task.Id,
+                $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
+                statusColor, activeTasks, historyTasks);
+            _outputTabManager.UpdateTabHeader(task);
+            _fileLockManager.CheckQueuedTasks(activeTasks);
+            TaskCompleted?.Invoke(task.Id);
         }
     }
 }

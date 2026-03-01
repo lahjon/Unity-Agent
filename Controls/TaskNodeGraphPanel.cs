@@ -307,7 +307,8 @@ namespace HappyEngine.Controls
                     task.PropertyChanged += OnTaskPropertyChanged;
 
             _graphDirty = true;
-            Dispatcher.BeginInvoke(RebuildGraph);
+            if (_interaction.DraggingNodeId == null && _interaction.DragSourceId == null)
+                Dispatcher.BeginInvoke(RebuildGraph);
         }
 
         private void OnTaskPropertyChanged(object? sender, PropertyChangedEventArgs e)

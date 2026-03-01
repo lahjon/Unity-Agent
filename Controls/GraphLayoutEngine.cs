@@ -112,21 +112,27 @@ namespace HappyEngine.Controls
                 }
             }
 
-            // Apply computed positions — preserve positions for user-dragged nodes
+            // Apply computed positions — preserve existing positions for stability
             foreach (var kvp in computed)
             {
-                if (userDraggedNodeIds.Contains(kvp.Key) && nodePositions.ContainsKey(kvp.Key))
+                // Skip the currently-dragged node entirely; MoveNode manages its position
+                if (kvp.Key == draggingNodeId)
+                    continue;
+
+                if (nodePositions.ContainsKey(kvp.Key))
                 {
+                    // Node already placed — keep its current position
                     targetPositions[kvp.Key] = nodePositions[kvp.Key];
                 }
                 else
                 {
+                    // New node — use computed layout position
                     targetPositions[kvp.Key] = kvp.Value;
                     nodePositions[kvp.Key] = kvp.Value;
                 }
             }
 
-            // During active drag, keep dragged node at its drag position
+            // During active drag, ensure dragged node keeps its drag position
             if (draggingNodeId != null && nodePositions.ContainsKey(draggingNodeId))
             {
                 targetPositions[draggingNodeId] = nodePositions[draggingNodeId];

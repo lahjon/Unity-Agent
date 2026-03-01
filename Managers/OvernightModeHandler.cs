@@ -155,17 +155,28 @@ namespace HappyEngine.Managers
                 task.OvernightIterationTimer.Stop();
                 task.OvernightIterationTimer = null;
             }
-            task.Status = status;
-            task.EndTime = DateTime.Now;
+            // Set to Verifying while summary + verification run; final status is set afterwards
+            task.Status = AgentTaskStatus.Verifying;
             if (task.UseMessageBus)
                 _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
-            var duration = task.EndTime.Value - task.StartTime;
+            var duration = (DateTime.Now) - task.StartTime;
             _outputProcessor.AppendOutput(task.Id, $"[Overnight] Total runtime: {(int)duration.TotalHours}h {duration.Minutes}m across {task.CurrentIteration} iteration(s).\n", activeTasks, historyTasks);
-            _ = _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
+            _outputTabManager.UpdateTabHeader(task);
+            _ = CompleteOvernightWithVerificationAsync(task, status, activeTasks, historyTasks, moveToHistory);
+        }
+
+        private async System.Threading.Tasks.Task CompleteOvernightWithVerificationAsync(AgentTask task, AgentTaskStatus finalStatus,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            Action<AgentTask> moveToHistory)
+        {
+            await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, finalStatus);
             _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+
+            task.Status = finalStatus;
+            task.EndTime = DateTime.Now;
             _outputTabManager.UpdateTabHeader(task);
             moveToHistory(task);
-            OvernightFinished?.Invoke(task.Id, status);
+            OvernightFinished?.Invoke(task.Id, finalStatus);
         }
 
         private void StartOvernightContinuation(AgentTask task,

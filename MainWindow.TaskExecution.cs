@@ -18,7 +18,6 @@ namespace HappyEngine
         private void ResetPerTaskToggles()
         {
             RemoteSessionToggle.IsChecked = false;
-            HeadlessToggle.IsChecked = false;
             SpawnTeamToggle.IsChecked = false;
             OvernightToggle.IsChecked = false;
             ExtendedPlanningToggle.IsChecked = false;
@@ -30,7 +29,6 @@ namespace HappyEngine
         private void ReadUiFlagsInto(TaskConfigBase target)
         {
             target.RemoteSession = RemoteSessionToggle.IsChecked == true;
-            target.Headless = HeadlessToggle.IsChecked == true;
             target.SpawnTeam = SpawnTeamToggle.IsChecked == true;
             target.IsOvernight = OvernightToggle.IsChecked == true;
             target.ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true;
@@ -45,7 +43,6 @@ namespace HappyEngine
         private void ApplyFlagsToUi(TaskConfigBase source)
         {
             RemoteSessionToggle.IsChecked = source.RemoteSession;
-            HeadlessToggle.IsChecked = source.Headless;
             SpawnTeamToggle.IsChecked = source.SpawnTeam;
             OvernightToggle.IsChecked = source.IsOvernight;
             ExtendedPlanningToggle.IsChecked = source.ExtendedPlanning;
@@ -76,7 +73,7 @@ namespace HappyEngine
                 _projectManager.ProjectPath,
                 true,
                 RemoteSessionToggle.IsChecked == true,
-                HeadlessToggle.IsChecked == true,
+                false,
                 OvernightToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,

@@ -89,7 +89,9 @@ namespace HappyEngine
         ToggleButton IProjectPanelView.EditLongDescToggle => EditLongDescToggle;
         ToggleButton IProjectPanelView.EditRuleInstructionToggle => EditRuleInstructionToggle;
         ItemsControl IProjectPanelView.ProjectRulesList => ProjectRulesList;
-        TextBox IProjectPanelView.CrashLogPathsBox => CrashLogPathsBox;
+        TextBox IProjectPanelView.CrashLogPathBox => CrashLogPathBox;
+        TextBox IProjectPanelView.AppLogPathBox => AppLogPathBox;
+        TextBox IProjectPanelView.HangLogPathBox => HangLogPathBox;
         ToggleButton IProjectPanelView.EditCrashLogPathsToggle => EditCrashLogPathsToggle;
         Button IProjectPanelView.RegenerateDescBtn => RegenerateDescBtn;
         Dispatcher IProjectPanelView.ViewDispatcher => Dispatcher;
@@ -582,25 +584,28 @@ namespace HappyEngine
         private void EditCrashLogPathsToggle_Changed(object sender, RoutedEventArgs e)
         {
             var editing = EditCrashLogPathsToggle.IsChecked == true;
-            CrashLogPathsBox.IsReadOnly = !editing;
-            CrashLogPathsBox.Opacity = editing ? 1.0 : 0.6;
+            CrashLogPathBox.IsReadOnly = !editing;
+            CrashLogPathBox.Opacity = editing ? 1.0 : 0.6;
+            AppLogPathBox.IsReadOnly = !editing;
+            AppLogPathBox.Opacity = editing ? 1.0 : 0.6;
+            HangLogPathBox.IsReadOnly = !editing;
+            HangLogPathBox.Opacity = editing ? 1.0 : 0.6;
             CrashLogPathsEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void SaveCrashLogPaths_Click(object sender, RoutedEventArgs e)
         {
-            var paths = CrashLogPathsBox.Text
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                .Select(p => p.Trim())
-                .Where(p => !string.IsNullOrEmpty(p))
-                .ToList();
-            _projectManager.SaveCrashLogPaths(paths);
+            _projectManager.SaveCrashLogPaths(
+                CrashLogPathBox.Text.Trim(),
+                AppLogPathBox.Text.Trim(),
+                HangLogPathBox.Text.Trim());
         }
 
         private void ResetCrashLogPaths_Click(object sender, RoutedEventArgs e)
         {
-            var defaults = ProjectManager.GetDefaultCrashLogPaths();
-            CrashLogPathsBox.Text = string.Join("\n", defaults);
+            CrashLogPathBox.Text = ProjectManager.GetDefaultCrashLogPath();
+            AppLogPathBox.Text = ProjectManager.GetDefaultAppLogPath();
+            HangLogPathBox.Text = ProjectManager.GetDefaultHangLogPath();
         }
 
         private void ProjectTypeGameToggle_Changed(object sender, RoutedEventArgs e)
@@ -913,38 +918,42 @@ namespace HappyEngine
             };
             NodeGraphPanel.DependencyCreated += (source, target) =>
             {
-                if (target.ContainsDependencyTaskId(source.Id)) return;
-                if (_taskOrchestrator.ContainsTask(target.Id) && _taskOrchestrator.ContainsTask(source.Id))
-                {
-                    if (_taskOrchestrator.DetectCycle(target.Id, source.Id)) return;
-                }
-                else if (WouldCreateCircularDependency(target, source)) return;
+                // Inverted: the drag source (start node) becomes queued, target (end node) is the prerequisite
+                var dependent = source;
+                var prerequisite = target;
 
-                target.AddDependencyTaskId(source.Id);
-                target.DependencyTaskNumbers.Add(source.TaskNumber);
-                _taskOrchestrator.AddTask(target, new List<string> { source.Id });
-                target.BlockedByTaskId = source.Id;
-                target.BlockedByTaskNumber = source.TaskNumber;
-                target.QueuedReason = $"Waiting for #{source.TaskNumber} to complete";
+                if (dependent.ContainsDependencyTaskId(prerequisite.Id)) return;
+                if (_taskOrchestrator.ContainsTask(dependent.Id) && _taskOrchestrator.ContainsTask(prerequisite.Id))
+                {
+                    if (_taskOrchestrator.DetectCycle(dependent.Id, prerequisite.Id)) return;
+                }
+                else if (WouldCreateCircularDependency(dependent, prerequisite)) return;
 
-                if (target.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning)
+                dependent.AddDependencyTaskId(prerequisite.Id);
+                dependent.DependencyTaskNumbers.Add(prerequisite.TaskNumber);
+                _taskOrchestrator.AddTask(dependent, new List<string> { prerequisite.Id });
+                dependent.BlockedByTaskId = prerequisite.Id;
+                dependent.BlockedByTaskNumber = prerequisite.TaskNumber;
+                dependent.QueuedReason = $"Waiting for #{prerequisite.TaskNumber} to complete";
+
+                if (dependent.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning)
                 {
-                    _taskExecutionManager.PauseTask(target);
-                    target.Status = AgentTaskStatus.Queued;
+                    _taskExecutionManager.PauseTask(dependent);
+                    dependent.Status = AgentTaskStatus.Queued;
                 }
-                else if (target.Status is AgentTaskStatus.Paused)
+                else if (dependent.Status is AgentTaskStatus.Paused)
                 {
-                    target.Status = AgentTaskStatus.Queued;
+                    dependent.Status = AgentTaskStatus.Queued;
                 }
-                else if (target.Status is AgentTaskStatus.InitQueued)
+                else if (dependent.Status is AgentTaskStatus.InitQueued)
                 {
-                    target.Status = AgentTaskStatus.Queued;
+                    dependent.Status = AgentTaskStatus.Queued;
                 }
 
-                _outputTabManager.AppendOutput(target.Id,
-                    $"\n[HappyEngine] Task #{target.TaskNumber} queued — waiting for #{source.TaskNumber} to complete.\n",
+                _outputTabManager.AppendOutput(dependent.Id,
+                    $"\n[HappyEngine] Task #{dependent.TaskNumber} queued — waiting for #{prerequisite.TaskNumber} to complete.\n",
                     _activeTasks, _historyTasks);
-                _outputTabManager.UpdateTabHeader(target);
+                _outputTabManager.UpdateTabHeader(dependent);
                 UpdateStatus();
             };
             NodeGraphPanel.DependenciesRemoved += task =>
@@ -1172,7 +1181,6 @@ namespace HappyEngine
             var isGameArt = tag == "GeminiGameArt";
             // Disable advanced options that don't apply to Gemini
             if (RemoteSessionToggle != null) RemoteSessionToggle.IsEnabled = !isGemini;
-            if (HeadlessToggle != null) HeadlessToggle.IsEnabled = !isGemini;
             if (OvernightToggle != null) OvernightToggle.IsEnabled = !isGemini;
             if (SpawnTeamToggle != null) SpawnTeamToggle.IsEnabled = !isGemini;
             if (ExtendedPlanningToggle != null) ExtendedPlanningToggle.IsEnabled = !isGemini;
@@ -1557,7 +1565,7 @@ namespace HappyEngine
                 task.ProjectPath,
                 true,
                 RemoteSessionToggle.IsChecked == true,
-                HeadlessToggle.IsChecked == true,
+                false,
                 OvernightToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,
@@ -2360,7 +2368,7 @@ namespace HappyEngine
                 projectPath,
                 true,
                 RemoteSessionToggle.IsChecked == true,
-                HeadlessToggle.IsChecked == true,
+                false,
                 OvernightToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,
@@ -2415,6 +2423,8 @@ namespace HappyEngine
             }
 
             var guidance = SuggestionGuidanceInput.Text?.Trim();
+            if (!string.IsNullOrEmpty(guidance))
+                SuggestionGuidanceInput.Clear();
             await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance);
         }
 
@@ -2460,7 +2470,7 @@ namespace HappyEngine
                 _projectManager.ProjectPath,
                 true,
                 RemoteSessionToggle.IsChecked == true,
-                HeadlessToggle.IsChecked == true,
+                false,
                 OvernightToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,

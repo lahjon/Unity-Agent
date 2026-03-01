@@ -25,7 +25,9 @@ namespace HappyEngine.Models
         public List<string> ProjectRules { get; set; } = new();
         public string Color { get; set; } = "";
         public bool IsGame { get; set; }
-        public List<string> CrashLogPaths { get; set; } = new();
+        public string CrashLogPath { get; set; } = "";
+        public string AppLogPath { get; set; } = "";
+        public string HangLogPath { get; set; } = "";
 
         [JsonIgnore]
         public bool IsInitializing { get; set; }

@@ -25,7 +25,9 @@ namespace HappyEngine.Models
         ToggleButton EditLongDescToggle { get; }
         ToggleButton EditRuleInstructionToggle { get; }
         ItemsControl ProjectRulesList { get; }
-        TextBox CrashLogPathsBox { get; }
+        TextBox CrashLogPathBox { get; }
+        TextBox AppLogPathBox { get; }
+        TextBox HangLogPathBox { get; }
         ToggleButton EditCrashLogPathsToggle { get; }
         Button RegenerateDescBtn { get; }
         Dispatcher ViewDispatcher { get; }

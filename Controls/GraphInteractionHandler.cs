@@ -250,14 +250,16 @@ namespace HappyEngine.Controls
 
                 if (targetId != null && _activeTasks != null)
                 {
+                    var sourceTask = _activeTasks.FirstOrDefault(t => t.Id == _dragSourceId);
                     var targetTask = _activeTasks.FirstOrDefault(t => t.Id == targetId);
-                    if (targetTask != null)
+                    if (sourceTask != null && targetTask != null)
                     {
-                        if (!targetTask.ContainsDependencyTaskId(_dragSourceId))
+                        // Inverted: drag source becomes dependent, target becomes prerequisite
+                        if (!sourceTask.ContainsDependencyTaskId(targetId))
                         {
-                            if (GraphLayoutEngine.WouldCreateCycle(_activeTasks, _dragSourceId, targetId))
+                            if (GraphLayoutEngine.WouldCreateCycle(_activeTasks, targetId, _dragSourceId))
                             {
-                                if (nodeBorders.TryGetValue(targetId, out var flashBorder))
+                                if (nodeBorders.TryGetValue(_dragSourceId, out var flashBorder))
                                 {
                                     var origBg = flashBorder.Background;
                                     flashBorder.Background = BrushCache.Theme("DangerFlash");
@@ -272,12 +274,8 @@ namespace HappyEngine.Controls
                             }
                             else
                             {
-                                var sourceTask = _activeTasks.FirstOrDefault(t => t.Id == _dragSourceId);
-                                if (sourceTask != null)
-                                {
-                                    DependencyCreated?.Invoke(sourceTask, targetTask);
-                                    RequestRebuildGraph?.Invoke();
-                                }
+                                DependencyCreated?.Invoke(sourceTask, targetTask);
+                                RequestRebuildGraph?.Invoke();
                             }
                         }
                     }

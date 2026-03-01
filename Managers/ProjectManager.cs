@@ -262,8 +262,9 @@ namespace HappyEngine.Managers
             _view.ProjectRulesList.ItemsSource = null;
             _view.ProjectRulesList.ItemsSource = entry?.ProjectRules ?? new List<string>();
 
-            var crashPaths = GetCrashLogPaths(_projectPath);
-            _view.CrashLogPathsBox.Text = string.Join("\n", crashPaths);
+            _view.CrashLogPathBox.Text = !string.IsNullOrEmpty(entry?.CrashLogPath) ? entry.CrashLogPath : GetDefaultCrashLogPath();
+            _view.AppLogPathBox.Text = !string.IsNullOrEmpty(entry?.AppLogPath) ? entry.AppLogPath : GetDefaultAppLogPath();
+            _view.HangLogPathBox.Text = !string.IsNullOrEmpty(entry?.HangLogPath) ? entry.HangLogPath : GetDefaultHangLogPath();
             _view.EditCrashLogPathsToggle.IsChecked = false;
 
             _view.EditShortDescToggle.IsChecked = false;
@@ -556,34 +557,29 @@ namespace HappyEngine.Managers
             RefreshDescriptionBoxes();
         }
 
-        private static readonly string DefaultLogDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "HappyEngine", "logs");
-
-        public static List<string> GetDefaultCrashLogPaths()
-        {
-            return new List<string>
-            {
-                Path.Combine(DefaultLogDir, "crash.log"),
-                Path.Combine(DefaultLogDir, "app.log"),
-                Path.Combine(DefaultLogDir, "hang.log")
-            };
-        }
+        public static string GetDefaultCrashLogPath() => Path.Combine(AppLogger.GetLogDir(), "crash.log");
+        public static string GetDefaultAppLogPath() => Path.Combine(AppLogger.GetLogDir(), "app.log");
+        public static string GetDefaultHangLogPath() => Path.Combine(AppLogger.GetLogDir(), "hang.log");
 
         public List<string> GetCrashLogPaths(string projectPath)
         {
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            if (entry != null && entry.CrashLogPaths.Count > 0)
-                return entry.CrashLogPaths;
-            return GetDefaultCrashLogPaths();
+            return new List<string>
+            {
+                !string.IsNullOrEmpty(entry?.CrashLogPath) ? entry.CrashLogPath : GetDefaultCrashLogPath(),
+                !string.IsNullOrEmpty(entry?.AppLogPath) ? entry.AppLogPath : GetDefaultAppLogPath(),
+                !string.IsNullOrEmpty(entry?.HangLogPath) ? entry.HangLogPath : GetDefaultHangLogPath()
+            };
         }
 
-        public void SaveCrashLogPaths(List<string> paths)
+        public void SaveCrashLogPaths(string crashLogPath, string appLogPath, string hangLogPath)
         {
             var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
             if (entry != null)
             {
-                entry.CrashLogPaths = paths;
+                entry.CrashLogPath = crashLogPath;
+                entry.AppLogPath = appLogPath;
+                entry.HangLogPath = hangLogPath;
                 SaveProjects();
             }
             _view.EditCrashLogPathsToggle.IsChecked = false;
@@ -645,8 +641,10 @@ namespace HappyEngine.Managers
 
                 var typeIcon = new TextBlock
                 {
-                    Text = proj.IsGame ? "\U0001F3AE" : "\U0001F4BB",
+                    Text = proj.IsGame ? "\uE7FC" : "\uE770",
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
                     FontSize = 14,
+                    Foreground = (Brush)Application.Current.FindResource("TextTabHeader"),
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(0, 0, 6, 0),
                     ToolTip = proj.IsGame ? "Game" : "App"

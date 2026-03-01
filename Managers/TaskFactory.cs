@@ -139,15 +139,16 @@ namespace HappyEngine.Managers
                     "- Read the main entry point and key source files\n" +
                     "- Identify the architecture, patterns, and major components from the actual code\n" +
                     "- Check for README or docs if they exist\n\n" +
-                    "STEP 2 — After you have explored the codebase, respond with EXACTLY two sections separated by '---SEPARATOR---':\n\n" +
-                    "SECTION 1 - SHORT DESCRIPTION (1-2 sentences, max 150 chars):\n" +
-                    "A brief summary of what this project is and its tech stack, based on what you actually read.\n\n" +
-                    "SECTION 2 - LONG DESCRIPTION (1-2 paragraphs):\n" +
-                    "A detailed summary covering: project purpose, tech stack, architecture, " +
-                    "key directories/files, main components, and any important patterns or conventions — all based on the actual code you explored.\n\n" +
-                    "IMPORTANT: Do NOT describe the project based on assumptions or the project name alone. " +
-                    "Base your descriptions entirely on what you found by reading the actual files.\n" +
-                    "Output ONLY the two sections with the separator in your final response. No labels, no headers.");
+                    "STEP 2 — After you have explored the codebase, respond with EXACTLY this format:\n\n" +
+                    "<short>\nA 1-2 sentence summary of what this project is and its tech stack (max 150 chars). Write the description directly — no preamble.\n</short>\n\n" +
+                    "<long>\nA 1-2 paragraph detailed summary covering: project purpose, tech stack, architecture, " +
+                    "key directories/files, main components, and any important patterns or conventions. Write the description directly — no preamble.\n</long>\n\n" +
+                    "CRITICAL RULES:\n" +
+                    "- Base descriptions entirely on what you found by reading the actual files, NOT assumptions or the project name.\n" +
+                    "- Output ONLY the <short> and <long> tags with description text inside. Nothing else.\n" +
+                    "- Do NOT include any conversational text, preamble, postamble, or commentary.\n" +
+                    "- Do NOT start with phrases like 'Based on my exploration', 'Here is', 'This is', 'I found', 'After reviewing', etc.\n" +
+                    "- The description should read as a factual project summary, not an agent response.");
                 process.StandardInput.Close();
 
                 var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
@@ -159,10 +160,23 @@ namespace HappyEngine.Managers
                     text.Contains("Reached max turns", StringComparison.OrdinalIgnoreCase))
                     return ("", "");
 
-                var parts = text.Split("---SEPARATOR---", 2, StringSplitOptions.TrimEntries);
+                // Parse <short> and <long> tags
+                var shortMatch = Regex.Match(text, @"<short>\s*(.*?)\s*</short>", RegexOptions.Singleline);
+                var longMatch = Regex.Match(text, @"<long>\s*(.*?)\s*</long>", RegexOptions.Singleline);
 
-                var shortDesc = parts.Length > 0 ? CleanDescriptionSection(parts[0]) : "";
-                var longDesc = parts.Length > 1 ? CleanDescriptionSection(parts[1]) : shortDesc;
+                string shortDesc, longDesc;
+                if (shortMatch.Success)
+                {
+                    shortDesc = CleanDescriptionSection(shortMatch.Groups[1].Value);
+                    longDesc = longMatch.Success ? CleanDescriptionSection(longMatch.Groups[1].Value) : shortDesc;
+                }
+                else
+                {
+                    // Fallback: try old separator format
+                    var parts = text.Split("---SEPARATOR---", 2, StringSplitOptions.TrimEntries);
+                    shortDesc = parts.Length > 0 ? CleanDescriptionSection(parts[0]) : "";
+                    longDesc = parts.Length > 1 ? CleanDescriptionSection(parts[1]) : shortDesc;
+                }
 
                 if (shortDesc.Length > Constants.AppConstants.MaxShortDescriptionLength)
                     shortDesc = shortDesc[..Constants.AppConstants.MaxShortDescriptionLength];
@@ -185,14 +199,49 @@ namespace HappyEngine.Managers
             }
         }
 
+        private static readonly Regex[] DescriptionPreamblePatterns =
+        {
+            // Section labels: "SECTION 1 - SHORT DESCRIPTION:"
+            new(@"^(?:SECTION\s*\d+\s*[-:–]\s*)?(?:SHORT|LONG)\s+DESCRIPTION\s*[:–\-]?\s*", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            // Markdown headers
+            new(@"^#{1,3}\s+.*\n", RegexOptions.Multiline | RegexOptions.Compiled),
+            // AI preamble: "Based on my exploration,", "After reviewing the codebase,", "Here is the description:", etc.
+            new(@"^(?:based on (?:my|the) (?:exploration|review|analysis|reading)[^.]*[.,]\s*)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new(@"^(?:after (?:exploring|reviewing|analyzing|reading|examining)[^.]*[.,]\s*)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new(@"^(?:(?:here(?:'s| is| are)|I(?:'ve| have) (?:found|discovered|identified|analyzed|explored))[^:]*[:.]?\s*)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new(@"^(?:from (?:my|the) (?:exploration|review|analysis)[^:]*[:.]?\s*)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new(@"^(?:having (?:explored|reviewed|analyzed|examined)[^,]*,\s*)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new(@"^(?:upon (?:exploration|review|analysis)[^,]*,\s*)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            // "This is a..." / "The project is a..." opening filler (only when followed by description content)
+            new(@"^(?:this (?:project |codebase )?is (?:a |an )?)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        };
+
+        private static readonly Regex[] DescriptionPostamblePatterns =
+        {
+            // "Let me know if..." / "Feel free to..." trailing text
+            new(@"\s*(?:let me know|feel free|if you (?:need|want|have)|don't hesitate|please let).*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        };
+
         private static string CleanDescriptionSection(string text)
         {
             var cleaned = text.Trim();
-            cleaned = Regex.Replace(cleaned, @"^(?:SECTION\s*\d+\s*[-:–]\s*)?(?:SHORT|LONG)\s+DESCRIPTION\s*[:–\-]?\s*", "", RegexOptions.IgnoreCase);
-            cleaned = Regex.Replace(cleaned, @"^#{1,3}\s+.*\n", "", RegexOptions.Multiline);
+
+            foreach (var pattern in DescriptionPreamblePatterns)
+                cleaned = pattern.Replace(cleaned, "");
+
+            foreach (var pattern in DescriptionPostamblePatterns)
+                cleaned = pattern.Replace(cleaned, "");
+
+            // Strip surrounding quotes
             if (cleaned.Length >= 2 && cleaned[0] == '"' && cleaned[^1] == '"')
                 cleaned = cleaned[1..^1];
-            return cleaned.Trim();
+
+            // Ensure first character is capitalized after stripping
+            cleaned = cleaned.Trim();
+            if (cleaned.Length > 0 && char.IsLower(cleaned[0]))
+                cleaned = char.ToUpper(cleaned[0]) + cleaned[1..];
+
+            return cleaned;
         }
     }
 }

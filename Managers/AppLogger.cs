@@ -111,6 +111,7 @@ namespace HappyEngine.Managers
             }
         }
 
+        public static string GetLogDir() => LogDir;
         public static string GetLogFilePath() => LogFile;
 
         public static string ReadLogFile()

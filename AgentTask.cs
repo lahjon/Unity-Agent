@@ -18,7 +18,8 @@ namespace HappyEngine
         Queued,
         Paused,
         InitQueued,
-        Planning
+        Planning,
+        Verifying
     }
 
     public enum TaskPriority
@@ -308,6 +309,7 @@ namespace HappyEngine
             AgentTaskStatus.Paused => "Paused",
             AgentTaskStatus.InitQueued => "Waiting",
             AgentTaskStatus.Planning => "Planning",
+            AgentTaskStatus.Verifying => "Verifying",
             _ => "?"
         };
 
@@ -321,6 +323,7 @@ namespace HappyEngine
             AgentTaskStatus.Paused => "#CE93D8",
             AgentTaskStatus.InitQueued => "#FF9800",
             AgentTaskStatus.Planning => "#B39DDB",
+            AgentTaskStatus.Verifying => "#80CBC4",
             _ => "#555555"
         };
 
