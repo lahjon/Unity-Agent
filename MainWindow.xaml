@@ -1890,7 +1890,6 @@
                                         </Button.Background>
                                     </Button>
                                     <TextBox x:Name="TodoInputBox"
-                                             Style="{StaticResource ModernTextBox}"
                                              FontSize="12" Padding="8,6"
                                              KeyDown="TodoInput_KeyDown">
                                         <TextBox.Tag>

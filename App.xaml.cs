@@ -69,11 +69,20 @@ namespace HappyEngine
 
         private static void ShowDarkError(string message, string title)
         {
+            var bgSurface = GetBrush("BgSurface", Color.FromRgb(0x22, 0x22, 0x22));
+            var borderMedium = GetBrush("BorderMedium", Color.FromRgb(0x3A, 0x3A, 0x3A));
+            var danger = GetBrush("DangerBright", Color.FromRgb(0xE0, 0x55, 0x55));
+            var textLight = GetBrush("TextLight", Color.FromRgb(0xCC, 0xCC, 0xCC));
+            var textBright = GetBrush("TextBright", Color.FromRgb(0xE0, 0xE0, 0xE0));
+            var accent = GetBrush("Accent", Color.FromRgb(0xDA, 0x77, 0x56));
+            var accentHover = GetBrush("AccentHover", Color.FromRgb(0xE8, 0x9B, 0x7E));
+
             var dlg = new Window
             {
                 Title = title,
-                Width = 480,
-                Height = 200,
+                Width = 500,
+                SizeToContent = SizeToContent.Height,
+                MaxHeight = 450,
                 WindowStartupLocation = WindowStartupLocation.CenterScreen,
                 ResizeMode = ResizeMode.NoResize,
                 Background = Brushes.Transparent,
@@ -83,8 +92,8 @@ namespace HappyEngine
 
             var outerBorder = new Border
             {
-                Background = GetBrush("BgSurface", Color.FromRgb(0x22, 0x22, 0x22)),
-                BorderBrush = GetBrush("BorderMedium", Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                Background = bgSurface,
+                BorderBrush = borderMedium,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12)
             };
@@ -95,7 +104,7 @@ namespace HappyEngine
             stack.Children.Add(new TextBlock
             {
                 Text = title,
-                Foreground = GetBrush("Danger", Color.FromRgb(0xA1, 0x52, 0x52)),
+                Foreground = danger,
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 FontFamily = new FontFamily("Segoe UI"),
@@ -105,35 +114,36 @@ namespace HappyEngine
             stack.Children.Add(new TextBlock
             {
                 Text = message,
-                Foreground = GetBrush("TextLight", Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                Foreground = textLight,
                 FontSize = 13,
                 FontFamily = new FontFamily("Segoe UI"),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 20)
             });
 
-            var btnPanel = new StackPanel
+            // Build a rounded button with a proper template
+            var btnBorder = new Border
             {
-                Orientation = Orientation.Horizontal,
+                Background = accent,
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(28, 8, 28, 8),
+                Cursor = Cursors.Hand,
                 HorizontalAlignment = HorizontalAlignment.Right
             };
-
-            var okBtn = new Button
+            var btnText = new TextBlock
             {
-                Content = "OK",
-                Background = GetBrush("Danger", Color.FromRgb(0xA1, 0x52, 0x52)),
-                Foreground = GetBrush("TextBright", Color.FromRgb(0xE0, 0xE0, 0xE0)),
+                Text = "OK",
+                Foreground = textBright,
                 FontFamily = new FontFamily("Segoe UI"),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12,
-                Padding = new Thickness(24, 8, 24, 8),
-                BorderThickness = new Thickness(0),
-                Cursor = Cursors.Hand
+                HorizontalAlignment = HorizontalAlignment.Center
             };
-            okBtn.Click += (_, _) => dlg.Close();
-
-            btnPanel.Children.Add(okBtn);
-            stack.Children.Add(btnPanel);
+            btnBorder.Child = btnText;
+            btnBorder.MouseEnter += (s, _) => ((Border)s).Background = accentHover;
+            btnBorder.MouseLeave += (s, _) => ((Border)s).Background = accent;
+            btnBorder.MouseLeftButtonUp += (_, _) => dlg.Close();
+            stack.Children.Add(btnBorder);
 
             outerBorder.Child = stack;
             dlg.Content = outerBorder;
