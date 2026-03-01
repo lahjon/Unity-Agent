@@ -174,6 +174,9 @@ namespace HappyEngine.Managers
                 FeatureModeChildSpawned?.Invoke(task, child);
             }
 
+            // Refresh dependency display info now that TaskNumbers are assigned
+            TaskExecutionManager.RefreshDependencyDisplayInfo(children, "team member");
+
             task.FeatureModePhase = FeatureModePhase.TeamPlanning;
             _outputProcessor.AppendOutput(task.Id,
                 $"\n[Feature Mode] Planning team spawned with {children.Count} member(s). Waiting for team to complete...\n",
@@ -268,6 +271,9 @@ namespace HappyEngine.Managers
                 task.FeaturePhaseChildIds.Add(child.Id);
                 FeatureModeChildSpawned?.Invoke(task, child);
             }
+
+            // Refresh dependency display info now that TaskNumbers are assigned
+            TaskExecutionManager.RefreshDependencyDisplayInfo(children, "step");
 
             _outputProcessor.AppendOutput(task.Id,
                 $"\n[Feature Mode] {children.Count} execution task(s) spawned. Waiting for completion...\n",

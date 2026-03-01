@@ -42,6 +42,9 @@ namespace HappyEngine.Managers
 
         public void CreateTab(AgentTask task)
         {
+            // Guard against duplicate tab creation (e.g. if SubTaskSpawned fires twice)
+            if (_tabs.ContainsKey(task.Id)) return;
+
             var outputBox = new RichTextBox
             {
                 IsReadOnly = true,

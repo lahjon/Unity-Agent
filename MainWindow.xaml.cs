@@ -59,6 +59,7 @@ namespace HappyEngine
         private ActivityDashboardManager _activityDashboard = null!;
         private readonly TaskGroupTracker _taskGroupTracker;
         private readonly TaskOrchestrator _taskOrchestrator;
+        private FailureRecoveryManager _failureRecoveryManager = null!;
         private DispatcherTimer? _helperAnimTimer;
         private int _helperAnimTick;
 
@@ -171,6 +172,10 @@ namespace HappyEngine
                 () => _settingsManager.AutoVerify);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
+
+            _failureRecoveryManager = new FailureRecoveryManager(
+                _taskExecutionManager, _outputTabManager,
+                () => _settingsManager.AutoRecover);
 
             _taskOrchestrator = new TaskOrchestrator();
             _taskOrchestrator.TaskReady += OnOrchestratorTaskReady;
@@ -338,6 +343,7 @@ namespace HappyEngine
             MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
+            AutoRecoverToggle.IsChecked = _settingsManager.AutoRecover;
 
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
@@ -752,6 +758,11 @@ namespace HappyEngine
         private void AutoVerifyToggle_Changed(object sender, RoutedEventArgs e)
         {
             _settingsManager.AutoVerify = AutoVerifyToggle.IsChecked == true;
+        }
+
+        private void AutoRecoverToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            _settingsManager.AutoRecover = AutoRecoverToggle.IsChecked == true;
         }
 
         private bool _advancedPanelOpen;

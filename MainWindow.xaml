@@ -830,7 +830,8 @@
         </DataTemplate>
         <!-- ═══ SAVED PROMPT CARD ═══ -->
         <DataTemplate x:Key="SavedPromptTemplate">
-            <Border CornerRadius="4" Padding="6,5,6,5" Margin="0,0,0,4" Cursor="Hand"
+            <Border CornerRadius="10" Padding="8,3,4,3" Margin="0,0,4,4" Cursor="Hand"
+                    MaxWidth="220"
                     MouseLeftButtonDown="SavedPromptCard_MouseLeftButtonDown"
                     MouseDown="SavedPromptCard_MouseDown">
                 <Border.Style>
@@ -849,19 +850,15 @@
                         <MenuItem Header="Copy Prompt" Click="SavedPromptCopy_Click"/>
                     </ContextMenu>
                 </Border.ContextMenu>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding DisplayName}"
                                Foreground="{StaticResource TextLight}" FontSize="11"
                                FontFamily="Segoe UI" TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center"
+                               MaxWidth="180" VerticalAlignment="Center"
                                ToolTip="{Binding PromptText, Converter={StaticResource WrapTooltipText}}"/>
-                    <Button Grid.Column="1" Content="X" FontSize="9" FontWeight="Bold"
+                    <Button Content="X" FontSize="8" FontWeight="Bold"
                             Background="Transparent" BorderThickness="0" Cursor="Hand"
-                            Padding="4,1,4,1" VerticalAlignment="Center"
+                            Padding="4,0,2,0" VerticalAlignment="Center" Margin="2,0,0,0"
                             Click="DeleteSavedPrompt_Click">
                         <Button.Style>
                             <Style TargetType="Button">
@@ -874,7 +871,7 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                </Grid>
+                </StackPanel>
             </Border>
         </DataTemplate>
 
@@ -983,14 +980,39 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Border.Triggers>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition x:Name="SavedPanelCol" Width="200" MinWidth="120"/>
-                    </Grid.ColumnDefinitions>
+                <DockPanel>
+                    <!-- Top: Saved Prompts strip (above prompt so panel can collapse further) -->
+                    <Border x:Name="SavedPromptsBorder" DockPanel.Dock="Top"
+                            Background="{StaticResource BgSurface}" CornerRadius="4"
+                            BorderBrush="{StaticResource BgElevated}" BorderThickness="1"
+                            Margin="0,0,0,6" Padding="6,4">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Left" Click="SavedPromptsToggle_Click"
+                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                    Padding="0" Margin="0,0,6,0" VerticalAlignment="Top">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="SavedPromptsArrow" Text="&#x25BE;" Foreground="{StaticResource Accent}"
+                                               FontSize="11" FontWeight="Bold" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="SAVED" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                               FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <ScrollViewer x:Name="SavedPromptsScrollViewer" VerticalScrollBarVisibility="Disabled"
+                                          HorizontalScrollBarVisibility="Auto" MaxHeight="62">
+                                <ItemsControl x:Name="SavedPromptsPanel"
+                                              ItemTemplate="{StaticResource SavedPromptTemplate}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
 
-                    <!-- Left: Prompt input area + collapsible Advanced side panel -->
-                <Grid Grid.Column="0">
+                    <!-- Prompt input area + collapsible Advanced side panel -->
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -1012,6 +1034,11 @@
                                         Background="{StaticResource BgHover}" Style="{StaticResource Btn}"
                                         Foreground="#A8A8A8"
                                         FontSize="11" Padding="6,4" Margin="0,0,6,0"/>
+                                <Button Content="Compose Workflow" Click="ComposeWorkflow_Click"
+                                        Background="{StaticResource BgHover}" Style="{StaticResource Btn}"
+                                        Foreground="{StaticResource Accent}"
+                                        FontSize="11" Padding="8,4" Margin="0,0,6,0"
+                                        ToolTip="Generate a task DAG from a natural language workflow description"/>
                                 <Button x:Name="ExecuteButton" Content="Execute Task" Click="Execute_Click"
                                         Background="{StaticResource Accent}" Style="{StaticResource Btn}"
                                         FontSize="13" Padding="18,6" FontWeight="Bold"/>
@@ -1172,6 +1199,11 @@
                                                   Checked="AutoVerifyToggle_Changed" Unchecked="AutoVerifyToggle_Changed">
                                         <TextBlock Text="Auto-Verify" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
+                                    <ToggleButton x:Name="AutoRecoverToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
+                                                  Checked="AutoRecoverToggle_Changed" Unchecked="AutoRecoverToggle_Changed">
+                                        <TextBlock Text="Auto-Recover" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
                                     <!-- Separator -->
                                     <Border BorderBrush="{StaticResource SeparatorDark}" BorderThickness="0,1,0,0" Margin="0,4,0,8"/>
                                     <!-- Per-task toggles -->
@@ -1217,28 +1249,7 @@
                     </Border>
                 </Grid>
 
-                    <!-- Center-right: Saved Prompts panel (collapsible) -->
-                    <Border x:Name="SavedPromptsBorder" Grid.Column="1" Background="{StaticResource BgSurface}" CornerRadius="6"
-                            BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Margin="10,0,0,0"
-                            Padding="8">
-                        <DockPanel>
-                            <Button DockPanel.Dock="Top" Click="SavedPromptsToggle_Click"
-                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                    HorizontalAlignment="Left" Padding="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="SavedPromptsArrow" Text="&#x25BE;" Foreground="{StaticResource Accent}"
-                                               FontSize="11" FontWeight="Bold" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="SAVED" Foreground="{StaticResource Accent}" FontWeight="Bold"
-                                               FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <ScrollViewer x:Name="SavedPromptsScrollViewer" VerticalScrollBarVisibility="Auto">
-                                <ItemsControl x:Name="SavedPromptsPanel"
-                                              ItemTemplate="{StaticResource SavedPromptTemplate}"/>
-                            </ScrollViewer>
-                        </DockPanel>
-                    </Border>
-                </Grid>
+                </DockPanel>
             </Border>
 
         <!-- Horizontal Splitter: Top ↔ Middle (Thumb-based to avoid GridSplitter star-sizing jitter) -->

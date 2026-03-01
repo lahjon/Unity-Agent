@@ -63,6 +63,9 @@ namespace HappyEngine
         public string VerificationResult { get; set; } = "";
         public bool IsVerified { get; set; }
 
+        // Failure recovery
+        public bool IsRecoveryTask { get; set; }
+
         // Token usage tracking
         public long InputTokens { get; set; }
         public long OutputTokens { get; set; }

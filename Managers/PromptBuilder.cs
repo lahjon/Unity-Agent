@@ -83,6 +83,20 @@ namespace HappyEngine.Managers
             "```TEAM\n[{\"role\": \"Backend\", \"description\": \"...\", \"depends_on\": []}, {\"role\": \"Tests\", \"description\": \"...\", \"depends_on\": [0]}]\n```\n" +
             "Prefer parallel execution. Minimize dependencies. Agents should check the message bus for sibling work.\n\n---\n";
 
+        public const string FailureRecoveryBlock =
+            "# FAILURE RECOVERY MODE\n" +
+            "A previous attempt at this task FAILED. You are a diagnostic recovery agent.\n\n" +
+            "## YOUR MISSION\n" +
+            "1. Analyze the failure output and error messages from the previous attempt.\n" +
+            "2. Identify the root cause of the failure (compilation error, runtime exception, incorrect logic, missing dependency, etc.).\n" +
+            "3. Fix the issue by making the minimum necessary changes.\n" +
+            "4. Verify your fix compiles and addresses the original task requirements.\n\n" +
+            "## GUIDELINES\n" +
+            "- Focus on fixing the specific failure, not refactoring or improving unrelated code.\n" +
+            "- If the previous attempt partially succeeded, preserve that work and only fix what broke.\n" +
+            "- If the error is environmental (missing tool, permission issue), document the blocker clearly.\n" +
+            "- Check for common failure patterns: syntax errors, missing imports, wrong file paths, type mismatches.\n\n";
+
         public const string FeatureModeInitialTemplate =
             "# FEATURE MODE — PLANNING PHASE\n" +
             "You are the planning coordinator for an iterative feature implementation.\n\n" +

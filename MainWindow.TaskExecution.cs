@@ -181,6 +181,89 @@ namespace HappyEngine
             UpdateStatus();
         }
 
+        private async void ComposeWorkflow_Click(object sender, RoutedEventArgs e)
+        {
+            var result = await WorkflowComposerDialog.ShowAsync(_claudeService, _projectManager.ProjectPath);
+            if (result == null || result.Steps.Count == 0)
+                return;
+
+            // Map taskName -> AgentTask for dependency resolution
+            var tasksByName = new Dictionary<string, AgentTask>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var step in result.Steps)
+            {
+                var task = TaskLauncher.CreateTask(
+                    step.Description,
+                    _projectManager.ProjectPath,
+                    skipPermissions: true,
+                    remoteSession: false,
+                    headless: false,
+                    isFeatureMode: false,
+                    ignoreFileLocks: IgnoreFileLocksToggle.IsChecked == true,
+                    useMcp: UseMcpToggle.IsChecked == true,
+                    noGitWrite: DefaultNoGitWriteToggle.IsChecked == true);
+
+                task.Summary = step.TaskName;
+                task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
+                task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
+
+                // Resolve dependencies from name to task ID
+                var depIds = new List<string>();
+                var depNumbers = new List<int>();
+                foreach (var depName in step.DependsOn)
+                {
+                    if (tasksByName.TryGetValue(depName, out var depTask))
+                    {
+                        depIds.Add(depTask.Id);
+                        depNumbers.Add(depTask.TaskNumber);
+                    }
+                }
+
+                tasksByName[step.TaskName] = task;
+
+                // Add to UI
+                AddActiveTask(task);
+                _outputTabManager.CreateTab(task);
+
+                if (depIds.Count > 0)
+                {
+                    task.DependencyTaskIds = depIds;
+                    task.DependencyTaskNumbers = depNumbers;
+                    _taskOrchestrator.AddTask(task, depIds);
+
+                    task.IsPlanningBeforeQueue = true;
+                    task.PlanOnly = true;
+                    task.Status = AgentTaskStatus.Planning;
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"[HappyEngine] Workflow task \"{step.TaskName}\" — waiting for dependencies: {string.Join(", ", step.DependsOn)}\n",
+                        _activeTasks, _historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                }
+                else if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
+                {
+                    _taskOrchestrator.AddTask(task, depIds);
+                    task.Status = AgentTaskStatus.InitQueued;
+                    task.QueuedReason = "Max concurrent tasks reached";
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"[HappyEngine] Workflow task \"{step.TaskName}\" — queued (max concurrent tasks reached)\n",
+                        _activeTasks, _historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                }
+                else
+                {
+                    _taskOrchestrator.AddTask(task, depIds);
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"[HappyEngine] Workflow task \"{step.TaskName}\" — starting...\n",
+                        _activeTasks, _historyTasks);
+                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                }
+            }
+
+            RefreshFilterCombos();
+            UpdateStatus();
+        }
+
         private void ExecuteGeminiTask(AgentTask task)
         {
             if (!_geminiService.IsConfigured)

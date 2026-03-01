@@ -146,6 +146,8 @@ namespace HappyEngine
 
         public bool HasVerificationResult => !string.IsNullOrWhiteSpace(VerificationResult);
 
+        public bool IsRecoveryTask { get => Data.IsRecoveryTask; set => Data.IsRecoveryTask = value; }
+
         public string Summary
         {
             get => Data.Summary;

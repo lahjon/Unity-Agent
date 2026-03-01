@@ -169,8 +169,6 @@ namespace HappyEngine
             _savedPromptsPanelOpen = !_savedPromptsPanelOpen;
             SavedPromptsScrollViewer.Visibility = _savedPromptsPanelOpen ? Visibility.Visible : Visibility.Collapsed;
             SavedPromptsArrow.Text = _savedPromptsPanelOpen ? "\u25BE" : "\u25B8";
-            SavedPanelCol.Width = _savedPromptsPanelOpen ? new GridLength(200) : GridLength.Auto;
-            SavedPanelCol.MinWidth = _savedPromptsPanelOpen ? 120 : 0;
         }
     }
 }

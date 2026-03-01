@@ -196,6 +196,9 @@ namespace HappyEngine.Controls
                     _draggingNodeId = null;
                     nodeBorder.ReleaseMouseCapture();
                     e.Handled = true;
+
+                    // Trigger rebuild after drag ends to update canvas size and edges
+                    RequestRebuildGraph?.Invoke();
                 }
             };
 
@@ -420,26 +423,28 @@ namespace HappyEngine.Controls
             if (_activeTasks == null) return;
 
             // Only handle zoom when the mouse is within the graph view bounds
-            var mousePos = e.GetPosition(_scrollViewer);
-            if (mousePos.X < 0 || mousePos.Y < 0 ||
-                mousePos.X > _scrollViewer.ActualWidth || mousePos.Y > _scrollViewer.ActualHeight)
+            var viewportPos = e.GetPosition(_scrollViewer);
+            if (viewportPos.X < 0 || viewportPos.Y < 0 ||
+                viewportPos.X > _scrollViewer.ActualWidth || viewportPos.Y > _scrollViewer.ActualHeight)
                 return;
 
             e.Handled = true;
 
             double factor = e.Delta > 0 ? 1.1 : 1.0 / 1.1;
             double newZoom = Math.Clamp(_zoom * factor, 0.3, 3.0);
+            if (newZoom == _zoom) return;
 
-            // Zoom centered on the mouse pointer position
-            double canvasX = (mousePos.X - _translateTransform.X) / _zoom;
-            double canvasY = (mousePos.Y - _translateTransform.Y) / _zoom;
+            // Get the canvas-space point under the cursor (must read before changing scale)
+            var canvasPoint = e.GetPosition(_canvas);
 
+            double oldZoom = _zoom;
             _zoom = newZoom;
             _scaleTransform.ScaleX = _zoom;
             _scaleTransform.ScaleY = _zoom;
 
-            _translateTransform.X = mousePos.X - canvasX * _zoom;
-            _translateTransform.Y = mousePos.Y - canvasY * _zoom;
+            // Adjust translate so the canvas point under the cursor stays fixed on screen
+            _translateTransform.X += canvasPoint.X * (oldZoom - _zoom);
+            _translateTransform.Y += canvasPoint.Y * (oldZoom - _zoom);
         }
 
         private void OnPanStart(object sender, MouseButtonEventArgs e)

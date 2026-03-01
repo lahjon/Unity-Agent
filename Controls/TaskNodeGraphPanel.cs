@@ -307,8 +307,13 @@ namespace HappyEngine.Controls
                     task.PropertyChanged += OnTaskPropertyChanged;
 
             _graphDirty = true;
-            if (_interaction.DraggingNodeId == null && _interaction.DragSourceId == null)
-                Dispatcher.BeginInvoke(RebuildGraph);
+            // Check drag state inside the callback, not at scheduling time,
+            // to avoid race where drag starts between scheduling and execution
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (_interaction.DraggingNodeId == null && _interaction.DragSourceId == null)
+                    RebuildGraph();
+            });
         }
 
         private void OnTaskPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -330,6 +335,14 @@ namespace HappyEngine.Controls
         public void RebuildGraph()
         {
             if (_activeTasks == null || _fileLockManager == null) return;
+
+            // Never rebuild while a node is being dragged — it recreates all borders
+            // and can cause other nodes to visually shift
+            if (_interaction.DraggingNodeId != null || _interaction.DragSourceId != null)
+            {
+                _graphDirty = true; // ensure rebuild happens after drag ends
+                return;
+            }
 
             _renderer.ClearAll();
 
@@ -389,7 +402,11 @@ namespace HappyEngine.Controls
             _renderer.RemoveEdgeElements();
             _renderer.DrawAllEdges(_activeTasks.ToList(), _fileLockManager, _nodePositions,
                 _interaction.HighlightedEdgeKeys);
-            _renderer.ResizeCanvas(_nodePositions);
+
+            // Skip canvas resize during drag to avoid WPF layout invalidation
+            // that can shift the canvas position and make other nodes appear to move
+            if (_interaction.DraggingNodeId == null)
+                _renderer.ResizeCanvas(_nodePositions);
         }
 
         // ── Progress Panel ──────────────────────────────────────────

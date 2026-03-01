@@ -42,9 +42,14 @@ namespace HappyEngine
                     if (_activeTasks[i].Id == task.ParentTaskId)
                     {
                         parentIndex = i;
-                        _activeTasks[i].SubTaskCounter++;
+                        // SpawnSubtask already increments SubTaskCounter and adds to ChildTaskIds;
+                        // only do it here for children created outside SpawnSubtask (e.g. feature mode execution tasks).
+                        if (!_activeTasks[i].ChildTaskIds.Contains(task.Id))
+                        {
+                            _activeTasks[i].SubTaskCounter++;
+                            _activeTasks[i].ChildTaskIds.Add(task.Id);
+                        }
                         task.Runtime.SubTaskIndex = _activeTasks[i].SubTaskCounter;
-                        _activeTasks[i].ChildTaskIds.Add(task.Id);
                         break;
                     }
                 }
@@ -277,6 +282,10 @@ namespace HappyEngine
                     _activeTasks.Move(idx, 0);
             }
 
+            // Auto-recovery: spawn a diagnostic child task for failed tasks
+            if (task is { Status: AgentTaskStatus.Failed })
+                _failureRecoveryManager.TrySpawnRecoveryTask(task, _activeTasks, _historyTasks);
+
             _taskOrchestrator.OnTaskCompleted(taskId);
         }
 
@@ -311,10 +320,15 @@ namespace HappyEngine
 
                 _outputTabManager.UpdateTabHeader(child);
 
-                // If the child isn't queued, start it immediately
+                // If the child isn't queued, start it immediately;
+                // otherwise register with the orchestrator so it starts when dependencies resolve.
                 if (child.Status != AgentTaskStatus.Queued)
                 {
                     _ = _taskExecutionManager.StartProcess(child, _activeTasks, _historyTasks, MoveToHistory);
+                }
+                else if (child.DependencyTaskIds.Count > 0)
+                {
+                    _taskOrchestrator.AddTask(child, child.DependencyTaskIds.ToList());
                 }
 
                 RefreshFilterCombos();

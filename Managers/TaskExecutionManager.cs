@@ -643,7 +643,8 @@ namespace HappyEngine.Managers
                     $"## Recent parent output:\n{trimmed}";
             }
 
-            SubTaskSpawned?.Invoke(parent, child);
+            // NOTE: Does NOT fire SubTaskSpawned — callers are responsible for firing the event
+            // after any additional child configuration (e.g., property overrides, dependency wiring).
             return child;
         }
 
@@ -660,6 +661,7 @@ namespace HappyEngine.Managers
             child.BlockedByTaskNumber = parent.TaskNumber;
             child.DependencyTaskIds = new List<string> { parent.Id };
             child.DependencyTaskNumbers = new List<int> { parent.TaskNumber };
+            SubTaskSpawned?.Invoke(parent, child);
             return child;
         }
 
@@ -779,6 +781,9 @@ namespace HappyEngine.Managers
             // Fire SubTaskSpawned for each child so the UI picks them up
             foreach (var child in children)
                 SubTaskSpawned?.Invoke(task, child);
+
+            // Refresh dependency display info now that TaskNumbers are assigned
+            RefreshDependencyDisplayInfo(children, "subtask");
         }
 
         /// <summary>
@@ -927,6 +932,39 @@ namespace HappyEngine.Managers
             // Fire SubTaskSpawned for each child so the UI picks them up
             foreach (var child in children)
                 SubTaskSpawned?.Invoke(task, child);
+
+            // Refresh dependency display info now that TaskNumbers are assigned
+            RefreshDependencyDisplayInfo(children, "team member");
+        }
+
+        /// <summary>
+        /// Refreshes DependencyTaskNumbers, BlockedByTaskNumber, and QueuedReason with actual
+        /// TaskNumbers after children have been added to the UI (which assigns TaskNumbers).
+        /// Must be called after SubTaskSpawned events have been fired for all children.
+        /// </summary>
+        internal static void RefreshDependencyDisplayInfo(List<AgentTask> children, string waitLabel = "subtask")
+        {
+            foreach (var child in children)
+            {
+                if (child.DependencyTaskIds.Count == 0) continue;
+
+                var depNumbers = new List<int>();
+                foreach (var depId in child.DependencyTaskIds)
+                {
+                    var dep = children.FirstOrDefault(c => c.Id == depId);
+                    if (dep != null) depNumbers.Add(dep.TaskNumber);
+                }
+                child.DependencyTaskNumbers = depNumbers;
+
+                if (child.BlockedByTaskId != null)
+                {
+                    var blocker = children.FirstOrDefault(c => c.Id == child.BlockedByTaskId);
+                    if (blocker != null) child.BlockedByTaskNumber = blocker.TaskNumber;
+                }
+
+                if (depNumbers.Count > 0)
+                    child.QueuedReason = $"Waiting for {waitLabel}(s): {string.Join(", ", depNumbers.Select(n => $"#{n}"))}";
+            }
         }
 
         private class SubtaskEntry
