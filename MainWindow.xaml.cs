@@ -21,6 +21,7 @@ using HappyEngine.Dialogs;
 using HappyEngine.Helpers;
 using HappyEngine.Managers;
 using HappyEngine.Models;
+using HappyEngine.Services;
 
 namespace HappyEngine
 {
@@ -67,6 +68,7 @@ namespace HappyEngine
         private HelperManager _helperManager = null!;
         private ActivityDashboardManager _activityDashboard = null!;
         private GitPanelManager _gitPanelManager = null!;
+        private GitOperationGuard _gitOperationGuard = null!;
         private readonly TaskGroupTracker _taskGroupTracker;
         private readonly TaskOrchestrator _taskOrchestrator;
         private FailureRecoveryManager _failureRecoveryManager = null!;
@@ -209,11 +211,13 @@ namespace HappyEngine
 
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
 
+            _gitOperationGuard = new GitOperationGuard(_fileLockManager);
             _gitPanelManager = new GitPanelManager(
                 _gitHelper,
                 () => _projectManager.ProjectPath,
                 () => DefaultNoGitWriteToggle.IsChecked == true,
                 _fileLockManager,
+                _gitOperationGuard,
                 Dispatcher);
 
             _projectManager.SetTaskCollections(_activeTasks, _historyTasks);

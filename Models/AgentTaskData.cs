@@ -75,6 +75,7 @@ namespace HappyEngine
         // Commit tracking
         public bool IsCommitted { get; set; }
         public string? CommitHash { get; set; }
+        public string? CommitError { get; set; }
 
         // Failure recovery
         public bool IsRecoveryTask { get; set; }

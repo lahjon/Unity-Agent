@@ -303,12 +303,50 @@
                                                     <StopStoryboard BeginStoryboardName="PlanningGlowStoryboard"/>
                                                 </DataTrigger.ExitActions>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsCompletedUncommitted}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="UncommittedPulseStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="Effect.Radius"
+                                                                             From="0" To="10" Duration="0:0:1"
+                                                                             AutoReverse="True"/>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.7" To="1" Duration="0:0:1"
+                                                                             AutoReverse="True"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="UncommittedPulseStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Ellipse.Style>
                             </Ellipse>
                             <Ellipse x:Name="StatusDot" Width="8" Height="8"
-                                     Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}"/>
+                                     Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCompletedUncommitted}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="DotPulseStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.6" To="1" Duration="0:0:1.2"
+                                                                             AutoReverse="True"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="DotPulseStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
                         </Grid>
                         <TextBlock Text="{Binding StatusText}"
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
@@ -680,12 +718,50 @@
                                                     <StopStoryboard BeginStoryboardName="HistQueuedGlowStoryboard"/>
                                                 </DataTrigger.ExitActions>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsCompletedUncommitted}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="HistUncommittedPulseStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="Effect.Radius"
+                                                                             From="0" To="10" Duration="0:0:1"
+                                                                             AutoReverse="True"/>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.7" To="1" Duration="0:0:1"
+                                                                             AutoReverse="True"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="HistUncommittedPulseStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Ellipse.Style>
                             </Ellipse>
                             <Ellipse x:Name="HistStatusDot" Width="8" Height="8"
-                                     Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}"/>
+                                     Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCompletedUncommitted}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="HistDotPulseStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.6" To="1" Duration="0:0:1.2"
+                                                                             AutoReverse="True"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="HistDotPulseStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
                         </Grid>
                         <TextBlock Text="{Binding StatusText}"
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"

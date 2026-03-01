@@ -475,6 +475,14 @@ namespace HappyEngine.Managers
                     var rel = absPath.StartsWith(projectRoot)
                         ? absPath[projectRoot.Length..]
                         : absPath;
+
+                    // Validate against path traversal attacks
+                    if (rel.Contains("..") || Path.IsPathRooted(rel))
+                    {
+                        AppLogger.Warn("TaskExecutionManager", $"Rejected suspicious path during git operation: {rel}");
+                        continue;
+                    }
+
                     relativePaths.Add(rel.Replace('\\', '/'));
                 }
 
@@ -506,7 +514,7 @@ namespace HappyEngine.Managers
                     if (result != null)
                     {
                         // Get the commit hash after successful commit
-                        var commitHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
+                        var commitHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts?.Token ?? CancellationToken.None);
                         if (commitHash != null)
                         {
                             task.IsCommitted = true;

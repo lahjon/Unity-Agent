@@ -127,7 +127,7 @@ namespace HappyEngine
         /// queued or dependency-blocked tasks. Every code path that finishes a task
         /// should funnel through here.
         /// </summary>
-        private async void FinalizeTask(AgentTask task, bool closeTab = true)
+        private void FinalizeTask(AgentTask task, bool closeTab = true)
         {
             // If this was a plan-only task that completed successfully, create a stored task
             if (task.PlanOnly && task.Status == AgentTaskStatus.Completed)
@@ -152,32 +152,48 @@ namespace HappyEngine
                     _fileLockManager.RemoveQueuedInfo(task.Id);
                     _taskExecutionManager.RemoveStreamingState(task.Id);
 
-                    // Perform auto-commit asynchronously
-                    _ = Task.Run(async () =>
+                    // Track pending commit task instead of fire-and-forget
+                    task.Runtime.PendingCommitTask = Task.Run(async () =>
                     {
                         try
                         {
+                            // Notify UI that commit is starting
+                            await Dispatcher.InvokeAsync(() =>
+                            {
+                                task.OnPropertyChanged(nameof(task.IsPendingCommit));
+                                RefreshActivityDashboard(); // Update UI to show committing badge
+                            });
+
                             var success = await CommitTaskAsync(task);
                             if (!success)
                             {
-                                // If commit failed, release locks anyway
+                                // If commit failed, set error and release locks
                                 await Dispatcher.InvokeAsync(() =>
                                 {
+                                    if (string.IsNullOrEmpty(task.CommitError))
+                                        task.CommitError = "Failed to commit changes";
                                     _fileLockManager.ReleaseTaskLocks(task.Id);
                                     task.Runtime.LockedFilesForCommit = null;
                                     _fileLockManager.CheckQueuedTasks(_activeTasks);
+                                    task.Runtime.PendingCommitTask = null;
+                                    task.OnPropertyChanged(nameof(task.IsPendingCommit));
+                                    RefreshActivityDashboard(); // Update UI to remove committing badge
                                 });
                             }
                         }
                         catch (Exception ex)
                         {
                             Debug.WriteLine($"Auto-commit failed for task {task.Id}: {ex.Message}");
-                            // Release locks on error
+                            // Set error and release locks on exception
                             await Dispatcher.InvokeAsync(() =>
                             {
+                                task.CommitError = $"Commit error: {ex.Message}";
                                 _fileLockManager.ReleaseTaskLocks(task.Id);
                                 task.Runtime.LockedFilesForCommit = null;
                                 _fileLockManager.CheckQueuedTasks(_activeTasks);
+                                task.Runtime.PendingCommitTask = null;
+                                task.OnPropertyChanged(nameof(task.IsPendingCommit));
+                                RefreshActivityDashboard(); // Update UI to remove committing badge
                             });
                         }
                     });
@@ -226,7 +242,7 @@ namespace HappyEngine
             if (task.ParentTaskId != null)
             {
                 var parentId = task.ParentTaskId;
-                Dispatcher.BeginInvoke(() =>
+                _ = Dispatcher.BeginInvoke(() =>
                 {
                     var featureParent = _activeTasks.FirstOrDefault(t => t.Id == parentId);
                     if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
@@ -258,6 +274,11 @@ namespace HappyEngine
                 // Check if any queued tasks can now proceed
                 _fileLockManager.CheckQueuedTasks(_activeTasks);
             }
+
+            // Clear pending commit task
+            task.Runtime.PendingCommitTask = null;
+            task.OnPropertyChanged(nameof(task.IsPendingCommit));
+            RefreshActivityDashboard(); // Update UI to remove committing badge
         }
 
         /// <summary>

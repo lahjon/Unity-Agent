@@ -114,11 +114,27 @@ namespace HappyEngine.Managers
             files.Add(normalized);
 
             var count = _fileLocks.Count;
-            _dispatcher.BeginInvoke(() =>
+
+            // Skip adding agent bus files to the UI view (but they're still tracked internally)
+            bool isAgentBusFile = normalized.Contains("agent-bus", StringComparison.OrdinalIgnoreCase) ||
+                                 filePath.Contains("agent-bus", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAgentBusFile)
             {
-                _fileLocksView.Add(fileLock);
-                UpdateFileLockBadge(count);
-            });
+                _dispatcher.BeginInvoke(() =>
+                {
+                    _fileLocksView.Add(fileLock);
+                    UpdateFileLockBadge(count);
+                });
+            }
+            else
+            {
+                // Still update the badge count even if we don't show the file
+                _dispatcher.BeginInvoke(() =>
+                {
+                    UpdateFileLockBadge(count);
+                });
+            }
             return true;
         }
 
@@ -334,6 +350,18 @@ namespace HappyEngine.Managers
         {
             _fileLockBadge.Text = count.ToString();
             _fileLockBadge.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Sets the git operation in progress flag to prevent new lock acquisitions.
+        /// This method is intended to be called by GitOperationGuard.
+        /// </summary>
+        public void SetGitOperationInProgress(bool inProgress)
+        {
+            lock (_lockSync)
+            {
+                _gitOperationInProgress = inProgress;
+            }
         }
 
         /// <summary>

@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Controls;
 using System.Windows.Threading;
+using HappyEngine.Helpers;
 using HappyEngine.Managers;
 using Xunit;
 
@@ -17,7 +20,7 @@ namespace HappyEngine.Tests
     {
         private readonly string _testAppDataDir;
         private readonly string _testProjectPath;
-        private readonly Dispatcher _dispatcher;
+        private Dispatcher _dispatcher = null!;
         private readonly MessageBusManager _messageBusManager;
         private readonly FileLockManager _fileLockManager;
         private readonly SettingsManager _settingsManager;
@@ -45,7 +48,11 @@ namespace HappyEngine.Tests
 
             // Initialize managers
             _messageBusManager = new MessageBusManager(_dispatcher);
-            _fileLockManager = new FileLockManager(_dispatcher, new System.Collections.ObjectModel.ObservableCollection<FileLock>());
+            _fileLockManager = _dispatcher.Invoke(() =>
+            {
+                var badge = new TextBlock();
+                return new FileLockManager(badge, _dispatcher);
+            });
             _settingsManager = new SettingsManager(_testAppDataDir);
         }
 
@@ -105,13 +112,13 @@ namespace HappyEngine.Tests
             // Arrange
             var taskId = "test-task";
             var filePath = Path.Combine(_testProjectPath, "test.cs");
-            var normalizedPath = PathHelper.NormalizePath(filePath);
+            var normalizedPath = FormatHelpers.NormalizePath(filePath, _testProjectPath);
+            var activeTasks = new ObservableCollection<AgentTask>();
 
             // Act - Acquire lock
             _dispatcher.Invoke(() =>
             {
-                var acquired = _fileLockManager.TryAcquireLock(filePath, taskId, 1, "Write",
-                    new System.Collections.ObjectModel.ObservableCollection<AgentTask>());
+                var acquired = _fileLockManager.TryAcquireFileLock(taskId, filePath, "Write", activeTasks);
                 Assert.True(acquired, "Should acquire lock successfully");
             });
 
@@ -133,26 +140,25 @@ namespace HappyEngine.Tests
             var taskId2 = "task-2";
             var file1 = Path.Combine(_testProjectPath, "file1.cs");
             var file2 = Path.Combine(_testProjectPath, "file2.cs");
+            var activeTasks = new ObservableCollection<AgentTask>();
 
             // Act - Acquire multiple locks
             _dispatcher.Invoke(() =>
             {
-                _fileLockManager.TryAcquireLock(file1, taskId1, 1, "Edit",
-                    new System.Collections.ObjectModel.ObservableCollection<AgentTask>());
-                _fileLockManager.TryAcquireLock(file2, taskId2, 2, "Write",
-                    new System.Collections.ObjectModel.ObservableCollection<AgentTask>());
+                _fileLockManager.TryAcquireFileLock(taskId1, file1, "Edit", activeTasks);
+                _fileLockManager.TryAcquireFileLock(taskId2, file2, "Write", activeTasks);
             });
 
             // Assert - Files should be locked
-            Assert.True(_fileLockManager.IsFileLocked(PathHelper.NormalizePath(file1)));
-            Assert.True(_fileLockManager.IsFileLocked(PathHelper.NormalizePath(file2)));
+            Assert.True(_fileLockManager.IsFileLocked(FormatHelpers.NormalizePath(file1, _testProjectPath)));
+            Assert.True(_fileLockManager.IsFileLocked(FormatHelpers.NormalizePath(file2, _testProjectPath)));
 
             // Act - Clear all (simulates app shutdown)
             _fileLockManager.ClearAll();
 
             // Assert - No files should be locked
-            Assert.False(_fileLockManager.IsFileLocked(PathHelper.NormalizePath(file1)));
-            Assert.False(_fileLockManager.IsFileLocked(PathHelper.NormalizePath(file2)));
+            Assert.False(_fileLockManager.IsFileLocked(FormatHelpers.NormalizePath(file1, _testProjectPath)));
+            Assert.False(_fileLockManager.IsFileLocked(FormatHelpers.NormalizePath(file2, _testProjectPath)));
         }
 
         [Fact]

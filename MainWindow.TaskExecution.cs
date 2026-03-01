@@ -1196,6 +1196,14 @@ TextureImporter:
                     var rel = absPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
                         ? absPath.Substring(projectRoot.Length)
                         : absPath;
+
+                    // Validate against path traversal attacks
+                    if (rel.Contains("..") || Path.IsPathRooted(rel))
+                    {
+                        AppLogger.Warn("TaskExecution", $"Rejected suspicious path during git operation: {rel}");
+                        continue;
+                    }
+
                     relativePaths.Add(rel.Replace('\\', '/'));
                 }
 

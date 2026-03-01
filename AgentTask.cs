@@ -176,13 +176,19 @@ namespace HappyEngine
         public bool IsCommitted
         {
             get => Data.IsCommitted;
-            set { if (Data.IsCommitted == value) return; Data.IsCommitted = value; OnPropertyChanged(nameof(IsCommitted)); }
+            set { if (Data.IsCommitted == value) return; Data.IsCommitted = value; NotifyAll(nameof(IsCommitted), nameof(IsCompletedUncommitted)); }
         }
 
         public string? CommitHash
         {
             get => Data.CommitHash;
             set { if (Data.CommitHash == value) return; Data.CommitHash = value; OnPropertyChanged(nameof(CommitHash)); }
+        }
+
+        public string? CommitError
+        {
+            get => Data.CommitError;
+            set { if (Data.CommitError == value) return; Data.CommitError = value; NotifyAll(nameof(CommitError), nameof(HasCommitError)); }
         }
 
         public string Summary
@@ -201,7 +207,7 @@ namespace HappyEngine
                 NotifyAll(nameof(Status), nameof(StatusText), nameof(StatusColor),
                     nameof(IsRunning), nameof(IsPlanning), nameof(IsQueued), nameof(IsPaused),
                     nameof(IsInitQueued), nameof(IsFinished), nameof(IsRetryable),
-                    nameof(TimeInfo), nameof(HasPriorityBadge));
+                    nameof(TimeInfo), nameof(HasPriorityBadge), nameof(IsCompletedUncommitted));
             }
         }
 
@@ -326,6 +332,9 @@ namespace HappyEngine
         public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
         public bool HasPriorityBadge => PriorityLevel != TaskPriority.Normal || (Priority > 0 && (IsQueued || IsInitQueued));
         public bool HasActiveToggles => !string.IsNullOrEmpty(ActiveTogglesText);
+        public bool HasCommitError => !string.IsNullOrWhiteSpace(CommitError);
+        public bool IsPendingCommit => Runtime.PendingCommitTask != null;
+        public bool IsCompletedUncommitted => Status == AgentTaskStatus.Completed && !IsCommitted;
 
         public string ProjectName =>
             !string.IsNullOrEmpty(ProjectDisplayName) ? ProjectDisplayName :

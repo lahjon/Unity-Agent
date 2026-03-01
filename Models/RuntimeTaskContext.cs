@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace HappyEngine
 {
@@ -86,6 +87,9 @@ namespace HappyEngine
                     _lockedFilesForCommit = value;
             }
         }
+
+        // Pending commit tracking
+        public Task? PendingCommitTask { get; set; }
 
         public void Dispose()
         {

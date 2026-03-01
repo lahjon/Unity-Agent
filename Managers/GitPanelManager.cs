@@ -10,6 +10,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using HappyEngine.Helpers;
 using HappyEngine.Models;
+using HappyEngine.Services;
 
 namespace HappyEngine.Managers
 {
@@ -24,6 +25,7 @@ namespace HappyEngine.Managers
         private readonly Func<string> _getProjectPath;
         private readonly Func<bool> _getNoGitWrite;
         private readonly FileLockManager _fileLockManager;
+        private readonly GitOperationGuard _gitOperationGuard;
         private readonly Dispatcher _dispatcher;
         private bool _isDirty = true;
         private bool _isRefreshing;
@@ -54,12 +56,14 @@ namespace HappyEngine.Managers
             Func<string> getProjectPath,
             Func<bool> getNoGitWrite,
             FileLockManager fileLockManager,
+            GitOperationGuard gitOperationGuard,
             Dispatcher dispatcher)
         {
             _gitHelper = gitHelper;
             _getProjectPath = getProjectPath;
             _getNoGitWrite = getNoGitWrite;
             _fileLockManager = fileLockManager;
+            _gitOperationGuard = gitOperationGuard;
             _dispatcher = dispatcher;
         }
 
@@ -984,7 +988,7 @@ namespace HappyEngine.Managers
             }
 
             // Execute the fetch/pull operation atomically while ensuring no locks
-            var (success, errorMessage) = await _fileLockManager.ExecuteWhileNoLocksHeldAsync(async () =>
+            var (success, errorMessage) = await _gitOperationGuard.ExecuteWhileNoLocksHeldAsync(async () =>
             {
                 AppLogger.Info("GitPanelManager", $"Fetching latest for {projectPath}");
 
@@ -1085,7 +1089,7 @@ namespace HappyEngine.Managers
             if (string.IsNullOrEmpty(projectPath)) return;
 
             // Execute the push operation atomically while ensuring no locks
-            var (success, errorMessage) = await _fileLockManager.ExecuteWhileNoLocksHeldAsync(async () =>
+            var (success, errorMessage) = await _gitOperationGuard.ExecuteWhileNoLocksHeldAsync(async () =>
             {
                 AppLogger.Info("GitPanelManager", $"Pushing all for {projectPath}");
 
@@ -1125,7 +1129,7 @@ namespace HappyEngine.Managers
             if (string.IsNullOrEmpty(projectPath) || string.IsNullOrEmpty(_currentBranch)) return;
 
             // Execute the push operation atomically while ensuring no locks
-            var (success, errorMessage) = await _fileLockManager.ExecuteWhileNoLocksHeldAsync(async () =>
+            var (success, errorMessage) = await _gitOperationGuard.ExecuteWhileNoLocksHeldAsync(async () =>
             {
                 await ExecutePushUpToInternalAsync(projectPath, commitHash);
             }, "push selected commits");
@@ -1166,7 +1170,7 @@ namespace HappyEngine.Managers
             }
 
             // Execute the commit operation atomically while ensuring no locks
-            var (success, errorMessage) = await _fileLockManager.ExecuteWhileNoLocksHeldAsync(async () =>
+            var (success, errorMessage) = await _gitOperationGuard.ExecuteWhileNoLocksHeldAsync(async () =>
             {
                 // Show committing status
                 _lastOperationStatus = $"Committing {_uncommittedChanges.Count} file{(_uncommittedChanges.Count != 1 ? "s" : "")}...";
