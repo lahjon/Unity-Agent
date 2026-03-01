@@ -65,6 +65,28 @@ namespace HappyEngine
         public string? PendingFileLockPath { get; set; }
         public string? PendingFileLockBlocker { get; set; }
 
+        // Auto-Commit file lock management - Thread-safe
+        private readonly object _lockedFilesLock = new();
+        private HashSet<string>? _lockedFilesForCommit;
+
+        /// <summary>
+        /// Gets or sets the locked files for commit. Thread-safe property that handles
+        /// concurrent access from stream-parsing thread and process-exit callback thread.
+        /// </summary>
+        public HashSet<string>? LockedFilesForCommit
+        {
+            get
+            {
+                lock (_lockedFilesLock)
+                    return _lockedFilesForCommit != null ? new HashSet<string>(_lockedFilesForCommit) : null;
+            }
+            set
+            {
+                lock (_lockedFilesLock)
+                    _lockedFilesForCommit = value;
+            }
+        }
+
         public void Dispose()
         {
             FeatureModeRetryTimer?.Stop();

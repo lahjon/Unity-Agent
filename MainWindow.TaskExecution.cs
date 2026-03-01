@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -1138,6 +1140,108 @@ TextureImporter:
             _storedTasks.Insert(0, storedTask);
             _historyManager.SaveStoredTasks(_storedTasks);
             RefreshFilterCombos();
+        }
+
+        private async void CommitTask_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { DataContext: AgentTask task }) return;
+            if (!task.IsFinished) return;
+
+            if (task.IsCommitted)
+            {
+                // Uncommit - just mark as uncommitted
+                task.IsCommitted = false;
+                task.CommitHash = null;
+                _historyManager.SaveHistory(_historyTasks);
+                return;
+            }
+
+            // Commit the task changes
+            var success = await CommitTaskAsync(task);
+            if (!success)
+            {
+                MessageBox.Show($"Failed to commit changes for task #{task.TaskNumber}", "Commit Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Commits task changes to git. Can be called from UI or auto-commit.
+        /// </summary>
+        /// <param name="task">The task to commit</param>
+        /// <returns>True if commit was successful, false otherwise</returns>
+        public async Task<bool> CommitTaskAsync(AgentTask task)
+        {
+            if (task == null || !task.IsFinished || task.IsCommitted || task.NoGitWrite)
+                return false;
+
+            try
+            {
+                var summary = !string.IsNullOrWhiteSpace(task.Summary) ? task.Summary : task.Description;
+                var commitMessage = $"Task #{task.TaskNumber}: {summary}";
+
+                // Get the files locked by this task for scoped commit
+                var lockedFiles = task.Runtime.LockedFilesForCommit;
+                if (lockedFiles == null || lockedFiles.Count == 0)
+                {
+                    // No files locked by this task, nothing to commit
+                    return false;
+                }
+
+                // Build relative paths from the project root for the git commands
+                var projectRoot = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
+                var relativePaths = new List<string>();
+                foreach (var absPath in lockedFiles)
+                {
+                    var rel = absPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
+                        ? absPath.Substring(projectRoot.Length)
+                        : absPath;
+                    relativePaths.Add(rel.Replace('\\', '/'));
+                }
+
+                // Stage only the locked files (handles new/untracked files)
+                var pathArgs = string.Join(" ", relativePaths.Select(p => $"\"{p}\""));
+                var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
+
+                // Check if git add failed
+                if (addResult == null)
+                {
+                    Debug.WriteLine($"CommitTaskAsync failed: Failed to stage files");
+                    return false;
+                }
+
+                // Commit only these specific files — the pathspec ensures no other
+                // staged changes from concurrent tasks leak into this commit
+                var result = await _gitHelper.RunGitCommandAsync(
+                    task.ProjectPath,
+                    $"commit -F - -- {pathArgs}", commitMessage);
+
+                if (result != null)
+                {
+                    // Get the commit hash
+                    var hash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath);
+                    if (hash != null)
+                    {
+                        task.IsCommitted = true;
+                        task.CommitHash = hash;
+                        _historyManager.SaveHistory(_historyTasks);
+
+                        // Mark git panel as dirty to refresh
+                        _gitPanelManager?.MarkDirty();
+
+                        // Release deferred file locks if any
+                        ReleaseTaskLocksAfterCommit(task);
+
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"CommitTaskAsync failed: {ex.Message}");
+            }
+
+            return false;
         }
 
         private async void VerifyTask_Click(object sender, RoutedEventArgs e)

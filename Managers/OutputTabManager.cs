@@ -389,7 +389,32 @@ namespace HappyEngine.Managers
         public void AppendOutput(string taskId, string text,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
-            if (!_outputBoxes.TryGetValue(taskId, out var box)) return;
+            if (!_outputBoxes.TryGetValue(taskId, out var box))
+            {
+                AppLogger.Warn("FollowUp", $"[{taskId}] AppendOutput: No output box found, attempting to create tab");
+
+                // Try to find the task and create a tab for it
+                var missingTask = activeTasks.FirstOrDefault(t => t.Id == taskId)
+                        ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
+
+                if (missingTask != null)
+                {
+                    AppLogger.Info("FollowUp", $"[{taskId}] Creating tab for task: {missingTask.Description}");
+                    CreateTab(missingTask);
+
+                    // Try again after creating the tab
+                    if (!_outputBoxes.TryGetValue(taskId, out box))
+                    {
+                        AppLogger.Error("FollowUp", $"[{taskId}] Failed to create output box even after creating tab");
+                        return;
+                    }
+                }
+                else
+                {
+                    AppLogger.Error("FollowUp", $"[{taskId}] Task not found in active or history tasks");
+                    return;
+                }
+            }
             var run = new Run(text) { Foreground = (Brush)Application.Current.FindResource("TextBody") };
             if (box.Document.Blocks.LastBlock is Paragraph lastPara)
                 lastPara.Inlines.Add(run);
@@ -407,7 +432,31 @@ namespace HappyEngine.Managers
         public void AppendColoredOutput(string taskId, string text, Brush foreground,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
-            if (!_outputBoxes.TryGetValue(taskId, out var box)) return;
+            if (!_outputBoxes.TryGetValue(taskId, out var box))
+            {
+                AppLogger.Warn("FollowUp", $"[{taskId}] AppendColoredOutput: No output box found, attempting to create tab");
+
+                // Try to find the task and create a tab for it
+                var missingTask = activeTasks.FirstOrDefault(t => t.Id == taskId)
+                        ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
+
+                if (missingTask != null)
+                {
+                    CreateTab(missingTask);
+
+                    // Try again after creating the tab
+                    if (!_outputBoxes.TryGetValue(taskId, out box))
+                    {
+                        AppLogger.Error("FollowUp", $"[{taskId}] Failed to create output box even after creating tab");
+                        return;
+                    }
+                }
+                else
+                {
+                    AppLogger.Error("FollowUp", $"[{taskId}] Task not found in active or history tasks");
+                    return;
+                }
+            }
             var run = new Run(text) { Foreground = foreground };
             if (box.Document.Blocks.LastBlock is Paragraph lastPara)
                 lastPara.Inlines.Add(run);
@@ -425,6 +474,10 @@ namespace HappyEngine.Managers
         /// <summary>Keeps the last <see cref="OutputCapChars"/> characters when a task's buffer grows too large.</summary>
         internal static void TrimOutputIfNeeded(AgentTask task)
         {
+            // Feature mode tasks are not trimmed by general cap (they have their own iteration-based trimming)
+            if (task.IsFeatureMode)
+                return;
+
             if (task.OutputBuilder.Length <= OutputCapChars)
                 return;
 
@@ -475,6 +528,8 @@ namespace HappyEngine.Managers
         public bool HasTab(string taskId) => _tabs.ContainsKey(taskId);
 
         public TabItem? GetTab(string taskId) => _tabs.GetValueOrDefault(taskId);
+
+        public RichTextBox? GetOutputBox(string taskId) => _outputBoxes.GetValueOrDefault(taskId);
 
         public void EnsureOverflowButton()
         {

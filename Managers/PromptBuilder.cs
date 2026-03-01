@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -110,16 +111,16 @@ namespace HappyEngine.Managers
 
         public const string MessageBusBlockTemplate =
             "# MESSAGE BUS\n" +
-            "You are part of a concurrent agent team. Shared bus: `.agent-bus/`. Your task ID: **{TASK_ID}**\n\n" +
-            "**Read** `.agent-bus/_scratchpad.md` before modifying any files to see sibling tasks and claimed areas.\n\n" +
-            "**Post** JSON to `.agent-bus/inbox/` as `{unix_ms}_{TASK_ID}_{type}.json`:\n" +
+            "You are part of a concurrent agent team. Shared bus: `{BUS_PATH}`. Your task ID: **{TASK_ID}**\n\n" +
+            "**Read** `{BUS_PATH}/_scratchpad.md` before modifying any files to see sibling tasks and claimed areas.\n\n" +
+            "**Post** JSON to `{BUS_PATH}/inbox/` as `{unix_ms}_{TASK_ID}_{type}.json`:\n" +
             "```json\n{\"from\":\"{TASK_ID}\",\"type\":\"finding|request|claim|response|status\",\"topic\":\"...\",\"body\":\"...\",\"mentions\":[]}\n```\n" +
             "Post **claim** before extensively modifying files. Post **finding** for discoveries affecting others. " +
             "Do NOT modify `_scratchpad.md`.\n\n";
 
         public const string SubtaskCoordinatorBlock =
             "# SUBTASK COORDINATOR\n" +
-            "You spawned subtasks. Results arrive at `.agent-bus/inbox/*_subtask_result.json` with fields: " +
+            "You spawned subtasks. Results arrive at `{BUS_PATH}/inbox/*_subtask_result.json` with fields: " +
             "`child_task_id`, `status`, `summary`, `recommendations`, `file_changes`.\n\n" +
             "After reading results: assess success, retry or report failures, integrate successes, " +
             "and summarize what each subtask accomplished.\n\n";
@@ -336,10 +337,15 @@ namespace HappyEngine.Managers
             return sb.ToString();
         }
 
-        public string BuildMessageBusBlock(string taskId,
+        public string BuildMessageBusBlock(string taskId, string projectPath,
             List<(string id, string summary)> siblings)
         {
-            var block = MessageBusBlockTemplate.Replace("{TASK_ID}", taskId);
+            var safeProjectName = MessageBusManager.GetSafeProjectName(projectPath);
+            var busPath = Path.Combine(MessageBusManager.AppDataBusRoot, safeProjectName);
+
+            var block = MessageBusBlockTemplate
+                .Replace("{TASK_ID}", taskId)
+                .Replace("{BUS_PATH}", busPath);
 
             if (siblings.Count > 0)
             {

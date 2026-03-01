@@ -8,8 +8,25 @@ namespace HappyEngine.Managers
 {
     public class GitHelper : IGitHelper
     {
+        /// <summary>
+        /// Escapes a shell argument to prevent injection attacks.
+        /// Wraps in single quotes and escapes any internal single quotes.
+        /// </summary>
+        private static string EscapeShellArgument(string arg)
+        {
+            // For Windows, we need to handle quotes differently
+            // Double quotes with escaped internal double quotes
+            return "\"" + arg.Replace("\"", "\\\"") + "\"";
+        }
+
         public async Task<string?> RunGitCommandAsync(string workingDirectory, string arguments,
             CancellationToken cancellationToken = default)
+        {
+            return await RunGitCommandAsync(workingDirectory, arguments, null, cancellationToken);
+        }
+
+        public async Task<string?> RunGitCommandAsync(string workingDirectory, string arguments,
+            string? standardInput, CancellationToken cancellationToken = default)
         {
             Process? process = null;
             try
@@ -22,10 +39,19 @@ namespace HappyEngine.Managers
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
+                    RedirectStandardInput = standardInput != null,
                     CreateNoWindow = true
                 };
                 process = Process.Start(psi);
                 if (process == null) return null;
+
+                if (standardInput != null)
+                {
+                    await process.StandardInput.WriteAsync(standardInput).ConfigureAwait(false);
+                    await process.StandardInput.FlushAsync().ConfigureAwait(false);
+                    process.StandardInput.Close();
+                }
+
                 var output = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
                 using var timeoutCts = new CancellationTokenSource(5000);
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, cancellationToken);
@@ -55,6 +81,32 @@ namespace HappyEngine.Managers
             return await RunGitCommandAsync(projectPath, "rev-parse HEAD", cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task<string?> CommitSecureAsync(string workingDirectory, string message,
+            string? pathSpec = null, CancellationToken cancellationToken = default)
+        {
+            // Validate the commit message doesn't contain null bytes which could be used for injection
+            if (message.Contains('\0'))
+            {
+                AppLogger.Warn("GitHelper", "Commit message contains null bytes, rejecting for security");
+                return null;
+            }
+
+            // Build the git commit command
+            // Always use -F - to read message from stdin, preventing any shell interpretation
+            var arguments = "commit -F -";
+
+            // Add pathspec if provided
+            // Note: pathSpec should contain properly escaped individual file paths
+            if (!string.IsNullOrEmpty(pathSpec))
+            {
+                arguments += $" -- {pathSpec}";
+            }
+
+            // Pass the message via stdin to completely avoid shell interpretation
+            return await RunGitCommandAsync(workingDirectory, arguments, message, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         public async Task<List<(string name, int added, int removed)>?> GetGitFileChangesAsync(
             string projectPath, string? gitStartHash,
             CancellationToken cancellationToken = default)
@@ -73,6 +125,18 @@ namespace HappyEngine.Managers
                 files.Add((parts[2], added, removed));
             }
             return files;
+        }
+
+        /// <summary>
+        /// Escapes a file path for safe use in git command-line arguments.
+        /// Public static method so it can be used by other components.
+        /// </summary>
+        public static string EscapeGitPath(string path)
+        {
+            // Convert backslashes to forward slashes for git
+            path = path.Replace('\\', '/');
+            // Use the internal escape method
+            return EscapeShellArgument(path);
         }
     }
 }

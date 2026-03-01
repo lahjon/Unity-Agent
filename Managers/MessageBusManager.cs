@@ -46,11 +46,59 @@ namespace HappyEngine.Managers
         private readonly ConcurrentDictionary<string, BusContext> _buses = new();
         private readonly Dispatcher _dispatcher;
 
+        public static readonly string AppDataBusRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "HappyEngine", "agent-bus");
+
         public event Action<string, BusMessage>? MessageReceived;
 
         public MessageBusManager(Dispatcher dispatcher)
         {
             _dispatcher = dispatcher;
+        }
+
+        public static string GetSafeProjectName(string projectPath)
+        {
+            // Convert project path to a safe directory name
+            // Replace invalid path characters with underscores
+            var projectName = Path.GetFileName(projectPath);
+            if (string.IsNullOrEmpty(projectName))
+                projectName = "default";
+
+            // Include a hash of the full path to ensure uniqueness
+            var pathHash = Math.Abs(projectPath.GetHashCode()).ToString();
+            var safeName = string.Join("_", projectName.Split(Path.GetInvalidFileNameChars()))
+                           + "_" + pathHash;
+
+            return safeName;
+        }
+
+        private static void MigrateExistingBus(string projectPath, string newBusDir)
+        {
+            var oldBusDir = Path.Combine(projectPath, ".agent-bus");
+            if (!Directory.Exists(oldBusDir)) return;
+
+            try
+            {
+                // If new location already exists, just delete the old one
+                if (Directory.Exists(newBusDir))
+                {
+                    Directory.Delete(oldBusDir, true);
+                    AppLogger.Info("MessageBus", $"Deleted old bus directory at {oldBusDir}");
+                }
+                else
+                {
+                    // Move the existing bus to the new location
+                    Directory.CreateDirectory(Path.GetDirectoryName(newBusDir)!);
+                    Directory.Move(oldBusDir, newBusDir);
+                    AppLogger.Info("MessageBus", $"Migrated bus from {oldBusDir} to {newBusDir}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("MessageBus", $"Failed to migrate bus from {oldBusDir} to {newBusDir}", ex);
+                // Continue anyway - new bus will be created
+            }
         }
 
         public void JoinBus(string projectPath, string taskId, string taskSummary)
@@ -99,10 +147,13 @@ namespace HappyEngine.Managers
 
         private BusContext CreateBus(string projectPath)
         {
-            var busDir = Path.Combine(projectPath, ".agent-bus");
+            var safeProjectName = GetSafeProjectName(projectPath);
+            var busDir = Path.Combine(AppDataBusRoot, safeProjectName);
             var inboxDir = Path.Combine(busDir, "inbox");
             Directory.CreateDirectory(inboxDir);
-            EnsureGitExclude(projectPath);
+
+            // Migrate existing .agent-bus if it exists
+            MigrateExistingBus(projectPath, busDir);
 
             var ctx = new BusContext { BusDir = busDir, InboxDir = inboxDir };
 
@@ -151,6 +202,92 @@ namespace HappyEngine.Managers
             }
 
             _buses.TryRemove(projectPath, out _);
+        }
+
+        public bool ForceMigrateActiveBus(string projectPath)
+        {
+            var oldBusDir = Path.Combine(projectPath, ".agent-bus");
+            if (!Directory.Exists(oldBusDir)) return false;
+
+            var safeProjectName = GetSafeProjectName(projectPath);
+            var newBusDir = Path.Combine(AppDataBusRoot, safeProjectName);
+
+            // If the bus is already active in memory, update its context
+            if (_buses.TryGetValue(projectPath, out var ctx))
+            {
+                try
+                {
+                    // Create new directory structure
+                    var newInboxDir = Path.Combine(newBusDir, "inbox");
+                    Directory.CreateDirectory(newInboxDir);
+
+                    // Stop the old watcher
+                    ctx.Watcher?.Dispose();
+
+                    // Copy all files to new location
+                    CopyDirectory(oldBusDir, newBusDir);
+
+                    // Update context paths
+                    ctx.BusDir = newBusDir;
+                    ctx.InboxDir = newInboxDir;
+
+                    // Clear processed files to reprocess in new location
+                    ctx.ProcessedFiles.Clear();
+
+                    // Set up new watcher on the new location
+                    try
+                    {
+                        var watcher = new FileSystemWatcher(newInboxDir, "*.json")
+                        {
+                            NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime,
+                            EnableRaisingEvents = true
+                        };
+                        watcher.Created += (_, e) =>
+                            _dispatcher.BeginInvoke(async () => await OnNewMessageFileAsync(projectPath, e.FullPath));
+                        ctx.Watcher = watcher;
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("MessageBus", $"FileSystemWatcher failed for {newInboxDir}, relying on polling", ex);
+                    }
+
+                    // Delete old directory
+                    Directory.Delete(oldBusDir, true);
+
+                    AppLogger.Info("MessageBus", $"Force migrated active bus from {oldBusDir} to {newBusDir}");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Error("MessageBus", $"Failed to force migrate active bus", ex);
+                    return false;
+                }
+            }
+            else
+            {
+                // No active bus, just do regular migration
+                MigrateExistingBus(projectPath, newBusDir);
+                return true;
+            }
+        }
+
+        private static void CopyDirectory(string sourceDir, string destDir)
+        {
+            Directory.CreateDirectory(destDir);
+
+            // Copy files
+            foreach (var file in Directory.GetFiles(sourceDir))
+            {
+                var destFile = Path.Combine(destDir, Path.GetFileName(file));
+                File.Copy(file, destFile, overwrite: true);
+            }
+
+            // Copy subdirectories
+            foreach (var subDir in Directory.GetDirectories(sourceDir))
+            {
+                var destSubDir = Path.Combine(destDir, Path.GetFileName(subDir));
+                CopyDirectory(subDir, destSubDir);
+            }
         }
 
         public void Dispose()
@@ -297,27 +434,6 @@ namespace HappyEngine.Managers
             catch (Exception ex)
             {
                 AppLogger.Debug("MessageBus", "Failed to write scratchpad", ex);
-            }
-        }
-
-        private static void EnsureGitExclude(string projectPath)
-        {
-            var gitDir = Path.Combine(projectPath, ".git");
-            if (!Directory.Exists(gitDir)) return;
-
-            try
-            {
-                var excludeDir = Path.Combine(gitDir, "info");
-                Directory.CreateDirectory(excludeDir);
-                var excludeFile = Path.Combine(excludeDir, "exclude");
-
-                var content = File.Exists(excludeFile) ? File.ReadAllText(excludeFile) : "";
-                if (!content.Contains(".agent-bus"))
-                    File.AppendAllText(excludeFile, "\n.agent-bus/\n");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("MessageBus", "Failed to update .git/info/exclude", ex);
             }
         }
     }

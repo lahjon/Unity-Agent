@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
@@ -148,13 +149,14 @@ namespace HappyEngine.Managers
                 if (exitCode != 0 && task.Status == AgentTaskStatus.Running && HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory))
                     return;
 
-                _fileLockManager.ReleaseTaskLocks(task.Id);
-                if (task.UseMessageBus)
-                    _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
+                // Capture locked files BEFORE releasing so we can scope the auto-commit
+                var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
+                // NOTE: Lock release moved to CompleteRetryWithVerificationAsync to prevent race condition
+                // where another task could modify files before commit completes
                 // Set to Verifying while summary + verification run; final status is set afterwards
                 task.Status = AgentTaskStatus.Verifying;
                 _outputTabManager.UpdateTabHeader(task);
-                _ = CompleteRetryWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
+                _ = CompleteRetryWithVerificationAsync(task, exitCode, activeTasks, historyTasks, lockedFiles);
             });
 
             try
@@ -174,18 +176,33 @@ namespace HappyEngine.Managers
         /// Wrapped in try-catch to guarantee status transition and TaskCompleted firing.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteRetryWithVerificationAsync(AgentTask task, int exitCode,
-            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            IReadOnlyCollection<string>? lockedFiles = null)
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
             try
             {
+                // NOTE: TokenLimitHandler doesn't have access to CommitTaskLockedFilesAsync
+                // Auto-commit should be handled by the main TaskExecutionManager flow
+                // This method only handles retry-specific completion logic
+
                 await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
                 await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
             }
             catch (Exception ex)
             {
                 AppLogger.Error("TokenLimitHandler", $"CompleteRetryWithVerificationAsync failed for task {task.Id}", ex);
+            }
+            finally
+            {
+                // Release locks AFTER summary to prevent race condition where another task
+                // could modify files before completion
+                _fileLockManager.ReleaseTaskLocks(task.Id);
+
+                // Also handle message bus cleanup
+                if (task.UseMessageBus)
+                    _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
             }
 
             if (task.Status != AgentTaskStatus.Verifying)

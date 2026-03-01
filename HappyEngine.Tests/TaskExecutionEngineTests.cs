@@ -541,13 +541,15 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void FileLock_ConflictWithoutPlan_SetsNeedsPlanRestart()
+        public void FileLock_ConflictWithoutPlan_SetsQueued()
         {
             RunOnSta(() =>
             {
                 var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
+                taskA.TaskNumber = 1001; // Set task number for test
                 var taskB = MakeTask();
+                taskB.TaskNumber = 1002; // Set task number for test
                 taskB.StoredPrompt = null; // No plan
                 taskB.IsPlanningBeforeQueue = false;
                 var activeTasks = new ObservableCollection<AgentTask> { taskA, taskB };
@@ -557,10 +559,11 @@ namespace HappyEngine.Tests
                 flm.HandleFileLockConflict(taskB.Id, "src/file.cs", "Edit", activeTasks,
                     (_, txt) => output.Add(txt));
 
-                Assert.True(taskB.NeedsPlanRestart);
-                Assert.True(taskB.PlanOnly);
-                Assert.NotNull(taskB.PendingFileLockPath);
-                Assert.Equal(taskA.Id, taskB.PendingFileLockBlocker);
+                // Tasks now queue directly without entering planning mode
+                Assert.Equal(AgentTaskStatus.Queued, taskB.Status);
+                Assert.Equal("File locked: file.cs by #1001", taskB.QueuedReason);
+                Assert.Equal(taskA.Id, taskB.BlockedByTaskId);
+                Assert.Equal(taskA.TaskNumber, taskB.BlockedByTaskNumber);
             });
         }
 
@@ -709,16 +712,25 @@ namespace HappyEngine.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var dispatcher = Dispatcher.CurrentDispatcher;
+                var flm = new FileLockManager(new TextBlock(), dispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
 
                 Assert.Empty(flm.FileLocksView);
 
                 flm.TryAcquireFileLock(task.Id, "src/file.cs", "Edit", activeTasks);
+
+                // Process dispatcher queue to ensure the BeginInvoke operation completes
+                dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
                 Assert.Single(flm.FileLocksView);
 
                 flm.ReleaseTaskLocks(task.Id);
+
+                // Process dispatcher queue again for the release operation
+                dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
                 Assert.Empty(flm.FileLocksView);
             });
         }
@@ -1347,12 +1359,14 @@ namespace HappyEngine.Tests
         [Fact]
         public void FullLifecycle_PlanBeforeQueue_SetsCorrectFlags()
         {
-            // Test the plan-before-queue workflow setup
+            // Test the direct queue workflow
             RunOnSta(() =>
             {
                 var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
+                taskA.TaskNumber = 1001; // Set task number for test
                 var taskB = MakeTask();
+                taskB.TaskNumber = 1002; // Set task number for test
                 taskB.StoredPrompt = null;
                 taskB.IsPlanningBeforeQueue = false;
                 var activeTasks = new ObservableCollection<AgentTask> { taskA, taskB };
@@ -1360,13 +1374,10 @@ namespace HappyEngine.Tests
                 flm.TryAcquireFileLock(taskA.Id, "src/file.cs", "Edit", activeTasks);
                 flm.HandleFileLockConflict(taskB.Id, "src/file.cs", "Edit", activeTasks, (_, _) => { });
 
-                // Should enter plan-before-queue flow
-                Assert.True(taskB.NeedsPlanRestart);
-                Assert.True(taskB.PlanOnly);
-                Assert.NotNull(taskB.PendingFileLockPath);
-                Assert.Equal(taskA.Id, taskB.PendingFileLockBlocker);
-                // Status should NOT be Queued yet (process will restart in plan mode)
-                Assert.NotEqual(AgentTaskStatus.Queued, taskB.Status);
+                // Should queue directly without planning mode
+                Assert.Equal(AgentTaskStatus.Queued, taskB.Status);
+                Assert.Equal(taskA.Id, taskB.BlockedByTaskId);
+                Assert.Equal("File locked: file.cs by #1001", taskB.QueuedReason);
             });
         }
 

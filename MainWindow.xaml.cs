@@ -135,6 +135,7 @@ namespace HappyEngine
 
             _fileLockManager = new FileLockManager(FileLockBadge, Dispatcher);
             _fileLockManager.QueuedTaskResumed += OnQueuedTaskResumed;
+            _fileLockManager.TaskNeedsPause += OnTaskNeedsPause;
 
             _outputTabManager = new OutputTabManager(OutputTabs, Dispatcher);
             _outputTabManager.TabCloseRequested += OnTabCloseRequested;
@@ -381,6 +382,7 @@ namespace HappyEngine
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
             AutoRecoverToggle.IsChecked = _settingsManager.AutoRecover;
+            AutoCommitToggle.IsChecked = _settingsManager.AutoCommit;
 
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
@@ -469,6 +471,9 @@ namespace HappyEngine
                     () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
                     SyncSettingsForProject);
 
+                // Migrate .agent-bus folders from project directories to appData
+                await MigrateAllProjectBusesAsync();
+
                 _statusTimer.Start();
                 UpdateStatus();
 
@@ -485,6 +490,40 @@ namespace HappyEngine
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
             }
+        }
+
+        /// <summary>
+        /// Migrates all project .agent-bus folders from project directories to appData
+        /// </summary>
+        private async System.Threading.Tasks.Task MigrateAllProjectBusesAsync()
+        {
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    // Get all saved projects from the project manager
+                    var projects = _projectManager.SavedProjects;
+                    var migratedCount = 0;
+
+                    foreach (var project in projects)
+                    {
+                        if (_messageBusManager.ForceMigrateActiveBus(project.Path))
+                        {
+                            migratedCount++;
+                            Managers.AppLogger.Info("MainWindow", $"Migrated agent bus for project: {project.Path}");
+                        }
+                    }
+
+                    if (migratedCount > 0)
+                    {
+                        Managers.AppLogger.Info("MainWindow", $"Successfully migrated {migratedCount} project bus(es) to appData");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Managers.AppLogger.Error("MainWindow", "Failed to migrate project buses", ex);
+                }
+            });
         }
 
         /// <summary>
@@ -728,7 +767,6 @@ namespace HappyEngine
         private void UpdateMcpVisibility(bool isGame)
         {
             UseMcpToggle.Visibility = isGame ? Visibility.Visible : Visibility.Collapsed;
-            UseMcpToggle.IsChecked = isGame;
         }
 
         // ── MCP Settings ────────────────────────────────────────────
@@ -868,6 +906,11 @@ namespace HappyEngine
         private void AutoRecoverToggle_Changed(object sender, RoutedEventArgs e)
         {
             _settingsManager.AutoRecover = AutoRecoverToggle.IsChecked == true;
+        }
+
+        private void AutoCommitToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            _settingsManager.AutoCommit = AutoCommitToggle.IsChecked == true;
         }
 
         private bool _advancedPanelOpen;
@@ -2001,6 +2044,7 @@ namespace HappyEngine
         {
             // FileLockManager
             _fileLockManager.QueuedTaskResumed -= OnQueuedTaskResumed;
+            _fileLockManager.TaskNeedsPause -= OnTaskNeedsPause;
 
             // OutputTabManager
             _outputTabManager.TabCloseRequested -= OnTabCloseRequested;

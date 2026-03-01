@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using HappyEngine.Helpers;
 using HappyEngine.Models;
@@ -35,6 +36,18 @@ namespace HappyEngine.Managers
         private List<GitCommitInfo> _unpushedCommits = new();
         private List<GitFileChange> _uncommittedChanges = new();
         private string? _lastError;
+        private string? _lastOperationStatus;
+        private DateTime? _lastOperationTime;
+
+        // Cached UI elements for optimization
+        private StackPanel? _cachedRoot;
+        private TextBlock? _cachedBranchHeader;
+        private WrapPanel? _cachedActionButtons;
+        private TextBlock? _cachedStatusMessage;
+        private Border? _cachedStatusBorder;
+        private StackPanel? _cachedUnpushedSection;
+        private StackPanel? _cachedUncommittedSection;
+        private bool _uiCacheValid = false;
 
         public GitPanelManager(
             IGitHelper gitHelper,
@@ -68,11 +81,21 @@ namespace HappyEngine.Managers
             _refreshCts = new CancellationTokenSource();
             var ct = _refreshCts.Token;
 
-            // Show loading state
-            _dispatcher.Invoke(() =>
+            // Clear old status messages after 30 seconds
+            if (_lastOperationTime.HasValue && (DateTime.Now - _lastOperationTime.Value).TotalSeconds > 30)
             {
-                container.Content = BuildLoadingContent();
-            });
+                _lastOperationStatus = null;
+                _lastOperationTime = null;
+            }
+
+            // Only show loading state if we don't have cached UI
+            if (!_uiCacheValid)
+            {
+                _dispatcher.Invoke(() =>
+                {
+                    container.Content = BuildLoadingContent();
+                });
+            }
 
             try
             {
@@ -93,6 +116,7 @@ namespace HappyEngine.Managers
                 {
                     _gitAvailable = false;
                     _lastError = "Not a git repository or git is not installed.";
+                    _uiCacheValid = false; // Invalidate cache when git becomes unavailable
                     _dispatcher.Invoke(() => container.Content = BuildContent());
                     return;
                 }
@@ -100,9 +124,18 @@ namespace HappyEngine.Managers
                 _gitAvailable = true;
                 _lastError = null;
 
+                // Track previous branch to detect changes
+                var previousBranch = _currentBranch;
+
                 // Get current branch
                 _currentBranch = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse --abbrev-ref HEAD", ct);
                 if (ct.IsCancellationRequested) return;
+
+                // Invalidate cache if branch changed
+                if (previousBranch != _currentBranch)
+                {
+                    _uiCacheValid = false;
+                }
 
                 // Get remote name
                 _remoteName = await _gitHelper.RunGitCommandAsync(projectPath, "remote", ct);
@@ -117,7 +150,21 @@ namespace HappyEngine.Managers
                 await LoadUncommittedChangesAsync(projectPath, ct);
                 if (ct.IsCancellationRequested) return;
 
-                _dispatcher.Invoke(() => container.Content = BuildContent());
+                _dispatcher.Invoke(() =>
+                {
+                    if (_uiCacheValid && _cachedRoot != null)
+                    {
+                        // Update dynamic content only
+                        UpdateDynamicContent();
+                        container.Content = _cachedRoot;
+                    }
+                    else
+                    {
+                        // Build new content and cache it
+                        container.Content = BuildContent();
+                        _uiCacheValid = true;
+                    }
+                });
             }
             catch (OperationCanceledException) { /* cancelled, ignore */ }
             catch (Exception ex)
@@ -175,7 +222,7 @@ namespace HappyEngine.Managers
             {
                 if (line.Length < 3) continue;
                 var statusCode = line[..2].Trim();
-                var filePath = line[3..].Trim();
+                var filePath = line[2..].Trim();
                 _uncommittedChanges.Add(new GitFileChange
                 {
                     Status = statusCode,
@@ -203,40 +250,155 @@ namespace HappyEngine.Managers
 
         private StackPanel BuildContent()
         {
-            var root = new StackPanel { Margin = new Thickness(4, 8, 4, 12) };
+            // Create or reuse root panel
+            _cachedRoot = new StackPanel { Margin = new Thickness(4, 8, 4, 12) };
 
             if (!_gitAvailable)
             {
-                root.Children.Add(BuildGitUnavailablePanel());
-                return root;
+                _cachedRoot.Children.Add(BuildGitUnavailablePanel());
+                _uiCacheValid = false; // Don't cache when git is unavailable
+                return _cachedRoot;
             }
 
-            // Branch info header
-            root.Children.Add(BuildBranchHeader());
+            // Branch info header - cache it
+            _cachedBranchHeader = BuildBranchHeaderInternal();
+            _cachedRoot.Children.Add(_cachedBranchHeader);
 
-            // Action buttons row
-            root.Children.Add(BuildActionButtons());
+            // Action buttons row - cache it
+            _cachedActionButtons = BuildActionButtonsInternal();
+            _cachedRoot.Children.Add(_cachedActionButtons);
 
-            root.Children.Add(MakeSeparator());
+            // Status message container - create placeholder
+            _cachedStatusBorder = new Border();
+            _cachedRoot.Children.Add(_cachedStatusBorder);
+            if (!string.IsNullOrEmpty(_lastOperationStatus))
+            {
+                UpdateStatusMessage();
+            }
+
+            _cachedRoot.Children.Add(MakeSeparator());
 
             bool noGitWrite = _getNoGitWrite();
 
             if (noGitWrite && _uncommittedChanges.Count > 0)
             {
                 // NoGitWrite mode: show uncommitted changes with encouragement to commit
-                root.Children.Add(BuildCommitEncouragementPanel());
+                _cachedRoot.Children.Add(BuildCommitEncouragementPanel());
             }
 
-            // Unpushed commits section
-            root.Children.Add(BuildUnpushedCommitsSection());
+            // Unpushed commits section - cache container
+            _cachedUnpushedSection = new StackPanel();
+            _cachedRoot.Children.Add(_cachedUnpushedSection);
+            UpdateUnpushedSection();
 
             if (!noGitWrite && _uncommittedChanges.Count > 0)
             {
-                root.Children.Add(MakeSeparator());
-                root.Children.Add(BuildUncommittedChangesSection());
+                _cachedRoot.Children.Add(MakeSeparator());
+                // Uncommitted changes section - cache container
+                _cachedUncommittedSection = new StackPanel();
+                _cachedRoot.Children.Add(_cachedUncommittedSection);
+                UpdateUncommittedSection();
             }
 
-            return root;
+            return _cachedRoot;
+        }
+
+        private void UpdateDynamicContent()
+        {
+            if (_cachedRoot == null || !_uiCacheValid) return;
+
+            // Update branch header text
+            if (_cachedBranchHeader != null)
+            {
+                _cachedBranchHeader.Text = $"📍 {(_currentBranch ?? "unknown")} " +
+                    (_remoteName == null ? "(no remote)" : $"→ {_remoteName}/{_currentBranch}");
+            }
+
+            // Update status message
+            UpdateStatusMessage();
+
+            // Update sections
+            UpdateUnpushedSection();
+            if (_cachedUncommittedSection != null)
+            {
+                UpdateUncommittedSection();
+            }
+        }
+
+        private void UpdateStatusMessage()
+        {
+            if (_cachedStatusBorder == null) return;
+
+            if (!string.IsNullOrEmpty(_lastOperationStatus))
+            {
+                if (_cachedStatusMessage == null)
+                {
+                    var statusPanel = BuildStatusMessage();
+                    _cachedStatusBorder.Child = statusPanel;
+                    _cachedStatusMessage = (statusPanel.Child as DockPanel)?.Children.OfType<TextBlock>()
+                        .LastOrDefault(); // The message TextBlock is the second (last) TextBlock
+                }
+                else if (_cachedStatusMessage != null)
+                {
+                    _cachedStatusMessage.Text = _lastOperationStatus;
+                }
+                _cachedStatusBorder.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _cachedStatusBorder.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void UpdateUnpushedSection()
+        {
+            if (_cachedUnpushedSection == null) return;
+
+            _cachedUnpushedSection.Children.Clear();
+
+            if (_unpushedCommits.Count > 0)
+            {
+                // Build the unpushed commits content
+                var content = BuildUnpushedCommitsSection();
+                _cachedUnpushedSection.Children.Add(content);
+
+                // Add separator if uncommitted changes will follow
+                if (_cachedUncommittedSection != null)
+                {
+                    _cachedUnpushedSection.Children.Add(MakeSeparator());
+                }
+            }
+        }
+
+        private void UpdateUncommittedSection()
+        {
+            if (_cachedUncommittedSection == null) return;
+
+            _cachedUncommittedSection.Children.Clear();
+
+            // Build the uncommitted changes content
+            var content = BuildUncommittedChangesSection();
+            _cachedUncommittedSection.Children.Add(content);
+        }
+
+        private TextBlock BuildBranchHeaderInternal()
+        {
+            var branchHeader = new TextBlock
+            {
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new FontFamily("Segoe UI"),
+                Foreground = BrushCache.Theme("TextLight"),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            branchHeader.Text = $"📍 {(_currentBranch ?? "unknown")} " +
+                (_remoteName == null ? "(no remote)" : $"→ {_remoteName}/{_currentBranch}");
+            return branchHeader;
+        }
+
+        private WrapPanel BuildActionButtonsInternal()
+        {
+            return BuildActionButtons();
         }
 
         private Border BuildGitUnavailablePanel()
@@ -279,6 +441,88 @@ namespace HappyEngine.Managers
                 Margin = new Thickness(0, 4, 0, 0),
                 Child = panel
             };
+        }
+
+        private Border BuildStatusMessage()
+        {
+            var isRecent = _lastOperationTime.HasValue &&
+                          (DateTime.Now - _lastOperationTime.Value).TotalSeconds < 10;
+
+            var panel = new DockPanel();
+
+            // Icon based on status type
+            var icon = new TextBlock
+            {
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 14,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+
+            var message = new TextBlock
+            {
+                Text = _lastOperationStatus ?? "",
+                FontSize = 12,
+                FontFamily = new FontFamily("Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            };
+
+            // Style based on message type
+            if (_lastOperationStatus?.Contains("Successfully") == true)
+            {
+                icon.Text = "\uE73E"; // Checkmark
+                icon.Foreground = BrushCache.Get("#4EC969");
+                message.Foreground = BrushCache.Get("#4EC969");
+            }
+            else if (_lastOperationStatus?.Contains("up to date") == true ||
+                     _lastOperationStatus?.Contains("No changes") == true)
+            {
+                icon.Text = "\uE73E"; // Checkmark
+                icon.Foreground = BrushCache.Theme("TextMuted");
+                message.Foreground = BrushCache.Theme("TextMuted");
+            }
+            else if (_lastOperationStatus?.Contains("Fetching") == true)
+            {
+                icon.Text = "\uE895"; // Sync icon
+                icon.Foreground = BrushCache.Theme("Accent");
+                message.Foreground = BrushCache.Theme("Accent");
+            }
+            else
+            {
+                icon.Text = "\uE814"; // Info
+                icon.Foreground = BrushCache.Theme("TextSecondary");
+                message.Foreground = BrushCache.Theme("TextSecondary");
+            }
+
+            DockPanel.SetDock(icon, Dock.Left);
+            panel.Children.Add(icon);
+            panel.Children.Add(message);
+
+            var border = new Border
+            {
+                Background = isRecent ? BrushCache.Get("#1A1A1A") : BrushCache.Theme("BgSection"),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(10, 6, 10, 6),
+                Margin = new Thickness(0, 4, 0, 4),
+                Child = panel
+            };
+
+            // Fade out animation for recent messages
+            if (isRecent)
+            {
+                border.Opacity = 1.0;
+                var fadeAnimation = new System.Windows.Media.Animation.DoubleAnimation
+                {
+                    From = 1.0,
+                    To = 0.8,
+                    Duration = TimeSpan.FromSeconds(5),
+                    BeginTime = TimeSpan.FromSeconds(5)
+                };
+                border.BeginAnimation(UIElement.OpacityProperty, fadeAnimation);
+            }
+
+            return border;
         }
 
         private DockPanel BuildBranchHeader()
@@ -359,6 +603,9 @@ namespace HappyEngine.Managers
             var refreshBtn = MakeActionButton("\uE72C", "Refresh", "Refresh git status");
             refreshBtn.Click += (_, _) =>
             {
+                // Clear status message on manual refresh
+                _lastOperationStatus = null;
+                _lastOperationTime = null;
                 MarkDirty();
                 // Find the parent ScrollViewer to refresh
                 if (refreshBtn.Parent is WrapPanel wp &&
@@ -651,10 +898,12 @@ namespace HappyEngine.Managers
             return section;
         }
 
-        private StackPanel BuildUncommittedFilesList()
+        private UIElement BuildUncommittedFilesList()
         {
             var list = new StackPanel();
-            foreach (var change in _uncommittedChanges.Take(50)) // Cap at 50 to avoid UI lag
+
+            // Display all uncommitted changes without limit
+            foreach (var change in _uncommittedChanges)
             {
                 var row = new DockPanel { Margin = new Thickness(0, 1, 0, 1) };
 
@@ -698,20 +947,16 @@ namespace HappyEngine.Managers
                 });
             }
 
-            if (_uncommittedChanges.Count > 50)
+            // Wrap the list in a ScrollViewer
+            var scrollViewer = new ScrollViewer
             {
-                list.Children.Add(new TextBlock
-                {
-                    Text = $"... and {_uncommittedChanges.Count - 50} more files",
-                    Foreground = BrushCache.Theme("TextMuted"),
-                    FontSize = 11,
-                    FontFamily = new FontFamily("Segoe UI"),
-                    FontStyle = FontStyles.Italic,
-                    Margin = new Thickness(8, 4, 0, 0)
-                });
-            }
+                MaxHeight = 300, // Reasonable height that allows seeing multiple items
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = list
+            };
 
-            return list;
+            return scrollViewer;
         }
 
         // ── Git Operations ─────────────────────────────────────────────
@@ -721,46 +966,116 @@ namespace HappyEngine.Managers
             var projectPath = _getProjectPath();
             if (string.IsNullOrEmpty(projectPath)) return;
 
-            if (!HasNoFileLocks())
+            // Store the parent ScrollViewer to refresh UI
+            ScrollViewer? scrollViewer = null;
+            if (Application.Current.Dispatcher.CheckAccess())
             {
-                MessageBox.Show(
-                    "Cannot fetch while file locks are active. Wait for running tasks to complete first.",
-                    "Get Latest", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                // Try to find the ScrollViewer in the visual tree
+                var window = Application.Current.MainWindow;
+                if (window != null)
+                {
+                    // This is a bit hacky but works for finding the git panel's ScrollViewer
+                    var gitPanels = FindVisualChildren<ScrollViewer>(window)
+                        .Where(sv => sv.Parent is Border && sv.Content is StackPanel);
+                    scrollViewer = gitPanels.FirstOrDefault(sv =>
+                        sv.Content is StackPanel sp && sp.Children.Count > 0 &&
+                        sp.Children[0] is Border b && b.Child is StackPanel);
+                }
             }
 
-            try
+            // Execute the fetch/pull operation atomically while ensuring no locks
+            var (success, errorMessage) = await _fileLockManager.ExecuteWhileNoLocksHeldAsync(async () =>
             {
                 AppLogger.Info("GitPanelManager", $"Fetching latest for {projectPath}");
+
+                // Show fetching status
+                _lastOperationStatus = "Fetching latest changes from remote...";
+                _lastOperationTime = DateTime.Now;
+                MarkDirty();
+                if (scrollViewer != null)
+                {
+                    await _dispatcher.InvokeAsync(async () => await RefreshAsync(scrollViewer));
+                }
+
+                // Get current HEAD before fetch
+                var headBefore = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse HEAD");
 
                 // Fetch first
                 var fetchResult = await _gitHelper.RunGitCommandAsync(projectPath, "fetch --prune");
                 if (fetchResult == null)
                 {
-                    MessageBox.Show("Failed to fetch from remote. Check your network connection and credentials.",
-                        "Get Latest", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
+                    _lastOperationStatus = "Failed to fetch from remote. Check your network connection and credentials.";
+                    _lastOperationTime = DateTime.Now;
+                    MarkDirty();
+                    throw new InvalidOperationException("Failed to fetch from remote");
                 }
 
-                // Pull with rebase to keep history clean
-                var pullResult = await _gitHelper.RunGitCommandAsync(projectPath, "pull --rebase");
-                if (pullResult == null)
+                // Check if remote branch has new commits
+                var remoteBranch = $"{_remoteName}/{_currentBranch}";
+                var behindCount = await _gitHelper.RunGitCommandAsync(projectPath, $"rev-list --count HEAD..{remoteBranch}");
+                var behind = int.TryParse(behindCount?.Trim(), out var count) ? count : 0;
+
+                if (behind == 0)
                 {
-                    // Pull failed - might have conflicts
-                    MessageBox.Show(
-                        "Pull failed. There may be conflicts or uncommitted changes preventing the merge.\n\n" +
-                        "Try committing or stashing your changes first.",
-                        "Get Latest", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
+                    _lastOperationStatus = "Already up to date - no changes found";
+                    _lastOperationTime = DateTime.Now;
+                    AppLogger.Info("GitPanelManager", "Get Latest: already up to date");
+                }
+                else
+                {
+                    // Pull with rebase to keep history clean
+                    var pullResult = await _gitHelper.RunGitCommandAsync(projectPath, "pull --rebase");
+                    if (pullResult == null)
+                    {
+                        _lastOperationStatus = "Pull failed. There may be conflicts or uncommitted changes preventing the merge.";
+                        _lastOperationTime = DateTime.Now;
+                        throw new InvalidOperationException("Pull failed");
+                    }
+                    else
+                    {
+                        // Get current HEAD after pull
+                        var headAfter = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse HEAD");
+
+                        if (headBefore != headAfter)
+                        {
+                            _lastOperationStatus = $"Successfully pulled {behind} new commit{(behind != 1 ? "s" : "")}";
+                        }
+                        else
+                        {
+                            _lastOperationStatus = "Pull completed, but no new commits were applied";
+                        }
+                        _lastOperationTime = DateTime.Now;
+                        AppLogger.Info("GitPanelManager", $"Get Latest completed: {pullResult}");
+                    }
                 }
 
-                AppLogger.Info("GitPanelManager", $"Get Latest completed: {pullResult}");
+                MarkDirty();
+            }, "fetch");
+
+            if (!success)
+            {
+                _lastOperationStatus = errorMessage!;
+                _lastOperationTime = DateTime.Now;
                 MarkDirty();
             }
-            catch (Exception ex)
+        }
+
+        private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
+        {
+            if (depObj == null) yield break;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
             {
-                AppLogger.Warn("GitPanelManager", "Get Latest failed", ex);
-                MessageBox.Show($"Get Latest failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                var child = VisualTreeHelper.GetChild(depObj, i);
+                if (child is T t)
+                {
+                    yield return t;
+                }
+
+                foreach (T childOfChild in FindVisualChildren<T>(child))
+                {
+                    yield return childOfChild;
+                }
             }
         }
 
@@ -769,33 +1084,38 @@ namespace HappyEngine.Managers
             var projectPath = _getProjectPath();
             if (string.IsNullOrEmpty(projectPath)) return;
 
-            if (!HasNoFileLocks())
-            {
-                MessageBox.Show(
-                    "Cannot push while file locks are active. Wait for running tasks to complete first.",
-                    "Push", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            try
+            // Execute the push operation atomically while ensuring no locks
+            var (success, errorMessage) = await _fileLockManager.ExecuteWhileNoLocksHeldAsync(async () =>
             {
                 AppLogger.Info("GitPanelManager", $"Pushing all for {projectPath}");
+
+                // Show pushing status
+                _lastOperationStatus = $"Pushing {_unpushedCommits.Count} commit{(_unpushedCommits.Count != 1 ? "s" : "")} to remote...";
+                _lastOperationTime = DateTime.Now;
+                MarkDirty();
+
                 var result = await _gitHelper.RunGitCommandAsync(projectPath, "push");
                 if (result == null)
                 {
-                    MessageBox.Show(
-                        "Push failed. The remote may have new changes.\n\nTry 'Get Latest' first, then push again.",
-                        "Push", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
+                    _lastOperationStatus = "Push failed. The remote may have new changes. Try 'Get Latest' first.";
+                    _lastOperationTime = DateTime.Now;
+                    throw new InvalidOperationException("Push failed");
+                }
+                else
+                {
+                    _lastOperationStatus = $"Successfully pushed {_unpushedCommits.Count} commit{(_unpushedCommits.Count != 1 ? "s" : "")}";
+                    _lastOperationTime = DateTime.Now;
+                    AppLogger.Info("GitPanelManager", "Push completed successfully");
                 }
 
-                AppLogger.Info("GitPanelManager", "Push completed successfully");
                 MarkDirty();
-            }
-            catch (Exception ex)
+            }, "push");
+
+            if (!success)
             {
-                AppLogger.Warn("GitPanelManager", "Push failed", ex);
-                MessageBox.Show($"Push failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _lastOperationStatus = errorMessage!;
+                _lastOperationTime = DateTime.Now;
+                MarkDirty();
             }
         }
 
@@ -804,35 +1124,32 @@ namespace HappyEngine.Managers
             var projectPath = _getProjectPath();
             if (string.IsNullOrEmpty(projectPath) || string.IsNullOrEmpty(_currentBranch)) return;
 
-            if (!HasNoFileLocks())
+            // Execute the push operation atomically while ensuring no locks
+            var (success, errorMessage) = await _fileLockManager.ExecuteWhileNoLocksHeldAsync(async () =>
+            {
+                await ExecutePushUpToInternalAsync(projectPath, commitHash);
+            }, "push selected commits");
+
+            if (!success)
             {
                 MessageBox.Show(
-                    "Cannot push while file locks are active. Wait for running tasks to complete first.",
+                    errorMessage + ". Wait for running tasks to complete first.",
                     "Push Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+            }
+        }
+
+        private async Task ExecutePushUpToInternalAsync(string projectPath, string commitHash)
+        {
+            AppLogger.Info("GitPanelManager", $"Pushing up to {commitHash} for {projectPath}");
+            var result = await _gitHelper.RunGitCommandAsync(projectPath,
+                $"push {_remoteName} {commitHash}:{_currentBranch}");
+            if (result == null)
+            {
+                throw new InvalidOperationException("Push failed. The remote may have new changes.\n\nTry 'Get Latest' first, then push again.");
             }
 
-            try
-            {
-                AppLogger.Info("GitPanelManager", $"Pushing up to {commitHash} for {projectPath}");
-                var result = await _gitHelper.RunGitCommandAsync(projectPath,
-                    $"push {_remoteName} {commitHash}:{_currentBranch}");
-                if (result == null)
-                {
-                    MessageBox.Show(
-                        "Push failed. The remote may have new changes.\n\nTry 'Get Latest' first, then push again.",
-                        "Push Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                AppLogger.Info("GitPanelManager", "Selective push completed successfully");
-                MarkDirty();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("GitPanelManager", "Selective push failed", ex);
-                MessageBox.Show($"Push failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            AppLogger.Info("GitPanelManager", "Selective push completed successfully");
+            MarkDirty();
         }
 
         private async Task ExecuteCommitAllAsync(string message)
@@ -840,26 +1157,26 @@ namespace HappyEngine.Managers
             var projectPath = _getProjectPath();
             if (string.IsNullOrEmpty(projectPath)) return;
 
-            if (!HasNoFileLocks())
-            {
-                MessageBox.Show(
-                    "Cannot commit while file locks are active. Wait for running tasks to complete first.",
-                    "Commit", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
             if (_uncommittedChanges.Count == 0)
             {
-                MessageBox.Show("No uncommitted changes to commit.", "Commit", MessageBoxButton.OK, MessageBoxImage.Information);
+                _lastOperationStatus = "No uncommitted changes to commit";
+                _lastOperationTime = DateTime.Now;
+                MarkDirty();
                 return;
             }
 
-            try
+            // Execute the commit operation atomically while ensuring no locks
+            var (success, errorMessage) = await _fileLockManager.ExecuteWhileNoLocksHeldAsync(async () =>
             {
+                // Show committing status
+                _lastOperationStatus = $"Committing {_uncommittedChanges.Count} file{(_uncommittedChanges.Count != 1 ? "s" : "")}...";
+                _lastOperationTime = DateTime.Now;
+                MarkDirty();
+
                 // Stage only the specific files we know about — never use "add -A"
                 // because concurrent tasks may have created changes we shouldn't include
                 var filePaths = _uncommittedChanges
-                    .Select(c => $"\"{c.FilePath.Replace('\\', '/')}\"")
+                    .Select(c => GitHelper.EscapeGitPath(c.FilePath))
                     .ToList();
                 var pathArgs = string.Join(" ", filePaths);
 
@@ -868,28 +1185,35 @@ namespace HappyEngine.Managers
                 var addResult = await _gitHelper.RunGitCommandAsync(projectPath, $"add -- {pathArgs}");
                 if (addResult == null)
                 {
-                    MessageBox.Show("Failed to stage changes.", "Commit", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
+                    _lastOperationStatus = "Failed to stage changes";
+                    _lastOperationTime = DateTime.Now;
+                    MarkDirty();
+                    throw new InvalidOperationException("Failed to stage changes");
                 }
 
-                // Commit with pathspec to ensure only these files are committed
-                var escapedMessage = message.Replace("\"", "\\\"");
-                var commitResult = await _gitHelper.RunGitCommandAsync(projectPath,
-                    $"commit -m \"{escapedMessage}\" -- {pathArgs}");
+                // Use the secure commit method to prevent shell injection
+                var commitResult = await _gitHelper.CommitSecureAsync(projectPath, message, pathArgs);
                 if (commitResult == null)
                 {
-                    MessageBox.Show("Commit failed. There may be nothing to commit or a hook rejected it.",
-                        "Commit", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
+                    _lastOperationStatus = "Commit failed. There may be nothing to commit or a hook rejected it";
+                    _lastOperationTime = DateTime.Now;
+                    throw new InvalidOperationException("Commit failed");
+                }
+                else
+                {
+                    _lastOperationStatus = $"Successfully committed {filePaths.Count} file{(filePaths.Count != 1 ? "s" : "")}";
+                    _lastOperationTime = DateTime.Now;
+                    AppLogger.Info("GitPanelManager", $"Commit completed: {commitResult}");
                 }
 
-                AppLogger.Info("GitPanelManager", $"Commit completed: {commitResult}");
                 MarkDirty();
-            }
-            catch (Exception ex)
+            }, "commit");
+
+            if (!success)
             {
-                AppLogger.Warn("GitPanelManager", "Commit failed", ex);
-                MessageBox.Show($"Commit failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _lastOperationStatus = errorMessage!;
+                _lastOperationTime = DateTime.Now;
+                MarkDirty();
             }
         }
 

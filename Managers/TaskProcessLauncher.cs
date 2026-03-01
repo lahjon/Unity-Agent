@@ -68,6 +68,10 @@ namespace HappyEngine.Managers
             ObservableCollection<AgentTask> historyTasks,
             Action<int> onExited)
         {
+            AppLogger.Info("FollowUp", $"[{taskId}] CreateManagedProcess called. ActiveTasks={activeTasks.Count}, HistoryTasks={historyTasks.Count}");
+            var targetTask = activeTasks.FirstOrDefault(t => t.Id == taskId) ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
+            AppLogger.Info("FollowUp", $"[{taskId}] Found task: {(targetTask != null ? "Yes" : "No")}, Status={targetTask?.Status}");
+
             var psi = _promptBuilder.BuildProcessStartInfo(ps1File, headless: false);
 
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
@@ -377,6 +381,7 @@ namespace HappyEngine.Managers
         private void ParseStreamJson(string taskId, string line,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
+            AppLogger.Debug("FollowUp", $"[{taskId}] ParseStreamJson called with line: {(line.Length > 100 ? line[..100] + "..." : line)}");
             try
             {
                 using var doc = JsonDocument.Parse(line);

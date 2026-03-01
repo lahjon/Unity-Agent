@@ -180,7 +180,8 @@ namespace HappyEngine.Managers
         {
             try
             {
-                var busDir = Path.Combine(parent.ProjectPath, ".agent-bus");
+                var safeProjectName = MessageBusManager.GetSafeProjectName(parent.ProjectPath);
+                var busDir = Path.Combine(MessageBusManager.AppDataBusRoot, safeProjectName);
                 var inboxDir = Path.Combine(busDir, "inbox");
                 Directory.CreateDirectory(inboxDir);
 

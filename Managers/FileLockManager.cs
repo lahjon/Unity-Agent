@@ -5,9 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using HappyEngine.Helpers;
 
 namespace HappyEngine.Managers
 {
@@ -20,8 +22,10 @@ namespace HappyEngine.Managers
         private readonly object _lockSync = new();
         private readonly TextBlock _fileLockBadge;
         private readonly Dispatcher _dispatcher;
+        private bool _gitOperationInProgress = false;
 
         public event Action<string>? QueuedTaskResumed;
+        public event Action<string>? TaskNeedsPause;
 
         public Dictionary<string, QueuedTaskInfo> QueuedTaskInfos => _queuedTaskInfo;
         public int LockCount { get { lock (_lockSync) { return _fileLocks.Count; } } }
@@ -65,6 +69,13 @@ namespace HappyEngine.Managers
         private bool TryAcquireFileLockInternal(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, bool isIgnored = false)
         {
+            // Reject new lock acquisitions during git operations
+            if (_gitOperationInProgress)
+            {
+                AppLogger.Info("FileLockManager", $"Rejecting lock acquisition for {filePath} - git operation in progress");
+                return false;
+            }
+
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
             var basePath = task?.ProjectPath;
             var normalized = Helpers.FormatHelpers.NormalizePath(filePath, basePath);
@@ -186,38 +197,46 @@ namespace HappyEngine.Managers
             var blockerTask = activeTasks.FirstOrDefault(t => t.Id == blockingTaskId);
             var blockerNum = blockerTask?.TaskNumber;
 
-            KillProcess(task);
+            // Debug logging
+            AppLogger.Info("FileLockManager", $"[DEBUG] Looking for blocking task ID: {blockingTaskId}");
+            AppLogger.Info("FileLockManager", $"[DEBUG] Active tasks count: {activeTasks.Count}");
+            foreach (var t in activeTasks)
+            {
+                AppLogger.Info("FileLockManager", $"[DEBUG] Task ID: {t.Id}, TaskNumber: {t.TaskNumber}");
+            }
+            AppLogger.Info("FileLockManager", $"[DEBUG] Blocker task found: {blockerTask != null}");
+            AppLogger.Info("FileLockManager", $"[DEBUG] Blocker TaskNumber: {blockerNum}");
+
+            // Important: Do NOT kill the process - we want to preserve the conversation state
+            // The process will be paused/suspended so it can resume later
+            AppLogger.Info("FileLockManager", $"File lock conflict for task #{task.TaskNumber} - preserving process for later resume");
+
+            // Release any locks this task might have acquired before the conflict
             ReleaseTaskLocksInternal(taskId);
 
-            if (string.IsNullOrEmpty(task.StoredPrompt) && !task.IsPlanningBeforeQueue)
-            {
-                // No plan yet — restart in plan mode before queuing
-                appendOutput(taskId, $"\n[HappyEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum}. Restarting in plan mode...\n");
-                task.NeedsPlanRestart = true;
-                task.PlanOnly = true;
-                task.PendingFileLockPath = normalized;
-                task.PendingFileLockBlocker = blockingTaskId;
-            }
-            else
-            {
-                // Already has a plan — queue immediately
-                appendOutput(taskId, $"\n[HappyEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum} ({toolName})\n");
-                appendOutput(taskId, $"[HappyEngine] Queuing task #{task.TaskNumber} for auto-resume...\n");
+            // Queue immediately when file is locked
+            appendOutput(taskId, $"\n[HappyEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum} ({toolName})\n");
+            appendOutput(taskId, $"[HappyEngine] Pausing and queuing task #{task.TaskNumber} for auto-resume...\n");
 
-                task.Status = AgentTaskStatus.Queued;
-                task.QueuedReason = $"File locked: {Path.GetFileName(filePath)} by #{blockerNum}";
-                task.BlockedByTaskId = blockingTaskId;
-                task.BlockedByTaskNumber = blockerNum;
-
-                var blockedByIds = new HashSet<string> { blockingTaskId };
-                _queuedTaskInfo[taskId] = new QueuedTaskInfo
-                {
-                    Task = task,
-                    ConflictingFilePath = normalized,
-                    BlockingTaskId = blockingTaskId,
-                    BlockedByTaskIds = blockedByIds
-                };
+            // First pause the task if it has a running process
+            if (task.Process is { HasExited: false })
+            {
+                TaskNeedsPause?.Invoke(taskId);
             }
+
+            task.Status = AgentTaskStatus.Queued;
+            task.QueuedReason = $"File locked: {Path.GetFileName(filePath)} by #{blockerNum}";
+            task.BlockedByTaskId = blockingTaskId;
+            task.BlockedByTaskNumber = blockerNum;
+
+            var blockedByIds = new HashSet<string> { blockingTaskId };
+            _queuedTaskInfo[taskId] = new QueuedTaskInfo
+            {
+                Task = task,
+                ConflictingFilePath = normalized,
+                BlockingTaskId = blockingTaskId,
+                BlockedByTaskIds = blockedByIds
+            };
         }
 
         public void CheckQueuedTasks(ObservableCollection<AgentTask> activeTasks)
@@ -315,6 +334,51 @@ namespace HappyEngine.Managers
         {
             _fileLockBadge.Text = count.ToString();
             _fileLockBadge.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Executes an action while ensuring no file locks can be acquired during the operation.
+        /// Returns (success, errorMessage) where success indicates if the operation was executed.
+        /// </summary>
+        public async Task<(bool success, string? errorMessage)> ExecuteWhileNoLocksHeldAsync(Func<Task> action, string operationName)
+        {
+            // First check without locking to avoid blocking UI thread
+            if (LockCount > 0)
+            {
+                return (false, $"Cannot {operationName} while file locks are active");
+            }
+
+            lock (_lockSync)
+            {
+                // Re-check inside the lock to ensure no race condition
+                if (_fileLocks.Count > 0)
+                {
+                    AppLogger.Info("FileLockManager", $"Race condition detected: locks acquired between check and {operationName}");
+                    return (false, $"Cannot {operationName} while file locks are active (race detected)");
+                }
+
+                // Set flag to prevent new locks
+                _gitOperationInProgress = true;
+            }
+
+            try
+            {
+                // Execute the action outside the lock to avoid blocking other operations
+                await action();
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("FileLockManager", $"{operationName} failed", ex);
+                return (false, $"{operationName} failed: {ex.Message}");
+            }
+            finally
+            {
+                lock (_lockSync)
+                {
+                    _gitOperationInProgress = false;
+                }
+            }
         }
 
         private static void KillProcess(AgentTask task)

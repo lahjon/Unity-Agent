@@ -72,6 +72,10 @@ namespace HappyEngine
         public string VerificationResult { get; set; } = "";
         public bool IsVerified { get; set; }
 
+        // Commit tracking
+        public bool IsCommitted { get; set; }
+        public string? CommitHash { get; set; }
+
         // Failure recovery
         public bool IsRecoveryTask { get; set; }
 

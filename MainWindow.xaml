@@ -19,7 +19,9 @@
                     MouseMove="TaskCard_MouseMove"
                     AllowDrop="True"
                     DragOver="TaskCard_DragOver"
-                    Drop="TaskCard_Drop">
+                    Drop="TaskCard_Drop"
+                    ToolTip="{Binding Id, StringFormat='Task ID: {0}'}"
+                    ToolTipService.InitialShowDelay="500">
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
@@ -131,6 +133,26 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsFinished}" Value="True">
                                             <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <!-- Commit/Uncommit button (visible when finished) -->
+                        <Button Click="CommitTask_Click" Margin="0,0,2,0" FontSize="11">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE74B;"/>
+                                    <Setter Property="ToolTip" Value="Commit task changes"/>
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsCommitted}" Value="True">
+                                            <Setter Property="Content" Value="&#xE74D;"/>
+                                            <Setter Property="Foreground" Value="{StaticResource Success}"/>
+                                            <Setter Property="ToolTip" Value="Uncommit task changes"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -291,7 +313,38 @@
                         <TextBlock Text="{Binding StatusText}"
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
-                                   VerticalAlignment="Center"/>
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Path=IsQueued}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="ToolTip">
+                                                <Setter.Value>
+                                                    <ToolTip MaxWidth="400" Placement="Top">
+                                                        <TextBlock Text="{Binding QueuedTooltip}" TextWrapping="Wrap"/>
+                                                    </ToolTip>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </MultiDataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Path=IsInitQueued}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="ToolTip">
+                                                <Setter.Value>
+                                                    <ToolTip MaxWidth="400" Placement="Top">
+                                                        <TextBlock Text="{Binding QueuedTooltip}" TextWrapping="Wrap"/>
+                                                    </ToolTip>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                         <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="11" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding ProjectName}" Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
@@ -468,7 +521,9 @@
         <!-- ═══ HISTORY TASK ═══ -->
         <DataTemplate x:Key="HistoryTaskTemplate">
             <Border CornerRadius="8" Padding="10" Margin="0,2"
-                    BorderThickness="1">
+                    BorderThickness="1"
+                    ToolTip="{Binding Id, StringFormat='Task ID: {0}'}"
+                    ToolTipService.InitialShowDelay="500">
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Resume" Click="Resume_Click"/>
@@ -528,6 +583,26 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsFinished}" Value="True">
                                             <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <!-- Commit/Uncommit button (visible when finished) -->
+                        <Button Click="CommitTask_Click" Margin="0,0,2,0" FontSize="11">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE74B;"/>
+                                    <Setter Property="ToolTip" Value="Commit task changes"/>
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsCommitted}" Value="True">
+                                            <Setter Property="Content" Value="&#xE74D;"/>
+                                            <Setter Property="Foreground" Value="{StaticResource Success}"/>
+                                            <Setter Property="ToolTip" Value="Uncommit task changes"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -615,7 +690,38 @@
                         <TextBlock Text="{Binding StatusText}"
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
-                                   VerticalAlignment="Center"/>
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Path=IsQueued}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="ToolTip">
+                                                <Setter.Value>
+                                                    <ToolTip MaxWidth="400" Placement="Top">
+                                                        <TextBlock Text="{Binding QueuedTooltip}" TextWrapping="Wrap"/>
+                                                    </ToolTip>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </MultiDataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Path=IsInitQueued}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="ToolTip">
+                                                <Setter.Value>
+                                                    <ToolTip MaxWidth="400" Placement="Top">
+                                                        <TextBlock Text="{Binding QueuedTooltip}" TextWrapping="Wrap"/>
+                                                    </ToolTip>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                         <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="11" FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding ProjectName}" Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
@@ -742,7 +848,9 @@
         <!-- ═══ STORED TASK ═══ -->
         <DataTemplate x:Key="StoredTaskTemplate">
             <Border CornerRadius="8" Padding="10" Margin="0,2"
-                    BorderThickness="1">
+                    BorderThickness="1"
+                    ToolTip="{Binding Id, StringFormat='Task ID: {0}'}"
+                    ToolTipService.InitialShowDelay="500">
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Copy Stored Prompt" Click="CopyStoredPrompt_Click"/>
@@ -1208,6 +1316,11 @@
                                                   Checked="AutoRecoverToggle_Changed" Unchecked="AutoRecoverToggle_Changed">
                                         <TextBlock Text="Auto-Recover" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
+                                    <ToggleButton x:Name="AutoCommitToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
+                                                  Checked="AutoCommitToggle_Changed" Unchecked="AutoCommitToggle_Changed">
+                                        <TextBlock Text="Auto-Commit" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
                                     <!-- Separator -->
                                     <Border BorderBrush="{StaticResource SeparatorDark}" BorderThickness="0,1,0,0" Margin="0,4,0,8"/>
                                     <!-- Per-task toggles -->
@@ -1574,64 +1687,65 @@
                                            Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,8"/>
                                 <!-- Lock rows with resizable columns -->
-                                <ListView x:Name="FileLocksListView" Style="{StaticResource FileLockListViewStyle}">
-                                    <ListView.View>
-                                        <GridView ColumnHeaderContainerStyle="{StaticResource FileLockColumnHeaderStyle}">
-                                            <GridViewColumn Header="FILE" Width="160">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding FileName}"
-                                                                   Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Consolas"
-                                                                   TextTrimming="CharacterEllipsis"
-                                                                   ToolTip="{Binding OriginalPath}"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="STATUS" Width="70">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding StatusText}"
-                                                                   FontSize="11" FontFamily="Consolas">
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Foreground" Value="#4EC969"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsIgnored}" Value="True">
-                                                                            <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="TOOL" Width="90">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding ToolName}"
-                                                                   Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Consolas"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="PATH" Width="200">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding OriginalPath}"
-                                                                   Foreground="{StaticResource TextDim}" FontSize="11" FontFamily="Consolas"
-                                                                   TextTrimming="CharacterEllipsis"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="TASK" Width="70">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
-                                                                   Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="SINCE" Width="70">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                                    <ListView x:Name="FileLocksListView" Style="{StaticResource FileLockListViewStyle}">
+                                        <ListView.View>
+                                            <GridView ColumnHeaderContainerStyle="{StaticResource FileLockColumnHeaderStyle}">
+                                                <GridViewColumn Header="FILE" Width="160">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding FileName}"
+                                                                       Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Consolas"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       ToolTip="{Binding OriginalPath}"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="STATUS" Width="70">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding StatusText}"
+                                                                       FontSize="11" FontFamily="Consolas">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="#4EC969"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsIgnored}" Value="True">
+                                                                                <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="TOOL" Width="90">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding ToolName}"
+                                                                       Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Consolas"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="PATH" Width="200">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding OriginalPath}"
+                                                                       Foreground="{StaticResource TextDim}" FontSize="11" FontFamily="Consolas"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="TASK" Width="70">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
+                                                                       Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="SINCE" Width="70">
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <TextBlock Text="{Binding TimeText}"
@@ -1642,6 +1756,7 @@
                                         </GridView>
                                     </ListView.View>
                                 </ListView>
+                                </ScrollViewer>
                             </DockPanel>
                         </TabItem>
                         <!-- Activity tab -->
@@ -2067,15 +2182,59 @@
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
-                    <!-- Gemini tab -->
+                    <!-- Models tab (Combined Claude and Gemini) -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Gemini" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            <TextBlock Text="Models" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                             <StackPanel MaxWidth="600">
-                                <TextBlock Text="Gemini Image Generation" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <!-- Claude Section -->
+                                <TextBlock Text="CLAUDE CHAT API" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <TextBlock Text="Configure an Anthropic API key to use Claude models in the Chat tab."
+                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Margin="0,0,0,16"/>
+
+                                <TextBlock Text="API Key" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
+                                           Margin="0,0,0,6"/>
+                                <DockPanel Margin="0,0,0,4">
+                                    <Button x:Name="SaveClaudeKeyBtn" Content="Save" Click="SaveClaudeKey_Click"
+                                            Style="{StaticResource SmallBtn}" DockPanel.Dock="Right"
+                                            Background="{StaticResource Accent}" Padding="10,4" Margin="6,0,0,0"/>
+                                    <TextBox x:Name="ClaudeApiKeyBox"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="11" FontFamily="Consolas" Padding="8,6"/>
+                                </DockPanel>
+                                <TextBlock x:Name="ClaudeKeyStatus" Text="" Foreground="{StaticResource Success}" FontSize="11"
+                                           FontFamily="Segoe UI" Margin="0,4,0,0"/>
+                                <TextBlock Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI" Margin="0,8,0,0"
+                                           TextWrapping="Wrap">
+                                    Get an API key from Anthropic:
+                                </TextBlock>
+                                <TextBlock Text="https://console.anthropic.com/settings/keys" Foreground="{StaticResource Accent}"
+                                           FontSize="11" FontFamily="Consolas" Margin="0,2,0,0"
+                                           Cursor="Hand" MouseDown="ClaudeApiLink_Click"
+                                           TextDecorations="Underline"/>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,16"/>
+
+                                <TextBlock Text="Models" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
+                                           Margin="0,0,0,6"/>
+                                <Button x:Name="RefreshClaudeModelsBtn" Content="Refresh Models from API"
+                                        Click="RefreshClaudeModels_Click"
+                                        Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
+                                        FontSize="11" HorizontalAlignment="Left"/>
+                                <TextBlock x:Name="ClaudeRefreshStatus" Text="" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                           FontFamily="Segoe UI" Margin="0,4,0,0" TextWrapping="Wrap"/>
+
+                                <!-- Section Divider -->
+                                <Border Height="2" Background="{StaticResource BgElevated}" Margin="0,40,0,40"/>
+
+                                <!-- Gemini Section -->
+                                <TextBlock Text="GEMINI IMAGE GENERATION" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
                                 <TextBlock Text="Configure Google Gemini API for AI image generation. When Gemini is selected as the model, prompts generate images instead of code."
                                            Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
                                            Margin="0,0,0,16"/>
@@ -2103,7 +2262,7 @@
                                            Cursor="Hand" MouseDown="GeminiApiLink_Click"
                                            TextDecorations="Underline"/>
 
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,16"/>
 
                                 <TextBlock Text="Model" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
@@ -2120,7 +2279,7 @@
                                 <TextBlock x:Name="GeminiRefreshStatus" Text="" Foreground="{StaticResource TextMuted}" FontSize="11"
                                            FontFamily="Segoe UI" Margin="0,4,0,0" TextWrapping="Wrap"/>
 
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,16"/>
 
                                 <TextBlock Text="Image Storage" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
@@ -2130,54 +2289,6 @@
                                         Click="OpenGeminiImages_Click"
                                         Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
                                         FontSize="11" HorizontalAlignment="Left"/>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-                    <!-- Claude tab -->
-                    <TabItem>
-                        <TabItem.Header>
-                            <TextBlock Text="Claude" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
-                        </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                            <StackPanel MaxWidth="600">
-                                <TextBlock Text="Claude Chat API" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
-                                <TextBlock Text="Configure an Anthropic API key to use Claude models in the Chat tab."
-                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
-                                           Margin="0,0,0,16"/>
-
-                                <TextBlock Text="API Key" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
-                                           Margin="0,0,0,6"/>
-                                <DockPanel Margin="0,0,0,4">
-                                    <Button x:Name="SaveClaudeKeyBtn" Content="Save" Click="SaveClaudeKey_Click"
-                                            Style="{StaticResource SmallBtn}" DockPanel.Dock="Right"
-                                            Background="{StaticResource Accent}" Padding="10,4" Margin="6,0,0,0"/>
-                                    <TextBox x:Name="ClaudeApiKeyBox"
-                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
-                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                             FontSize="11" FontFamily="Consolas" Padding="8,6"/>
-                                </DockPanel>
-                                <TextBlock x:Name="ClaudeKeyStatus" Text="" Foreground="{StaticResource Success}" FontSize="11"
-                                           FontFamily="Segoe UI" Margin="0,4,0,0"/>
-                                <TextBlock Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI" Margin="0,8,0,0"
-                                           TextWrapping="Wrap">
-                                    Get an API key from Anthropic:
-                                </TextBlock>
-                                <TextBlock Text="https://console.anthropic.com/settings/keys" Foreground="{StaticResource Accent}"
-                                           FontSize="11" FontFamily="Consolas" Margin="0,2,0,0"
-                                           Cursor="Hand" MouseDown="ClaudeApiLink_Click"
-                                           TextDecorations="Underline"/>
-
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
-
-                                <TextBlock Text="Models" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
-                                           Margin="0,0,0,6"/>
-                                <Button x:Name="RefreshClaudeModelsBtn" Content="Refresh Models from API"
-                                        Click="RefreshClaudeModels_Click"
-                                        Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
-                                        FontSize="11" HorizontalAlignment="Left"/>
-                                <TextBlock x:Name="ClaudeRefreshStatus" Text="" Foreground="{StaticResource TextMuted}" FontSize="11"
-                                           FontFamily="Segoe UI" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

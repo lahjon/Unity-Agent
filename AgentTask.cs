@@ -173,6 +173,18 @@ namespace HappyEngine
             set { if (Data.IsVerified == value) return; Data.IsVerified = value; NotifyAll(nameof(IsVerified), nameof(HasVerificationResult)); }
         }
 
+        public bool IsCommitted
+        {
+            get => Data.IsCommitted;
+            set { if (Data.IsCommitted == value) return; Data.IsCommitted = value; OnPropertyChanged(nameof(IsCommitted)); }
+        }
+
+        public string? CommitHash
+        {
+            get => Data.CommitHash;
+            set { if (Data.CommitHash == value) return; Data.CommitHash = value; OnPropertyChanged(nameof(CommitHash)); }
+        }
+
         public string Summary
         {
             get => Data.Summary;
@@ -416,6 +428,49 @@ namespace HappyEngine
             }
         }
 
+        /// <summary>Gets whether this task has pending file lock information</summary>
+        public bool HasPendingFileLock => !string.IsNullOrEmpty(Runtime.PendingFileLockPath);
+
+        /// <summary>Gets a formatted tooltip for queued tasks showing file lock information</summary>
+        public string QueuedTooltip
+        {
+            get
+            {
+                if (!IsQueued && !IsInitQueued) return "";
+
+                var lines = new List<string>();
+
+                // Add queue reason if available
+                if (!string.IsNullOrEmpty(Runtime.QueuedReason))
+                {
+                    lines.Add($"Reason: {Runtime.QueuedReason}");
+                }
+
+                // Add file lock information
+                if (HasPendingFileLock)
+                {
+                    lines.Add($"Waiting for file: {Runtime.PendingFileLockPath}");
+                    if (!string.IsNullOrEmpty(Runtime.PendingFileLockBlocker))
+                    {
+                        lines.Add($"Locked by: {Runtime.PendingFileLockBlocker}");
+                    }
+                }
+
+                // Add dependency information
+                if (Runtime.DependencyTaskIdCount > 0 || Runtime.DependencyTaskNumbers.Count > 0)
+                {
+                    if (lines.Count > 0) lines.Add(""); // Add empty line as separator
+
+                    if (Runtime.DependencyTaskNumbers.Count > 0)
+                    {
+                        lines.Add($"Waiting for tasks: {string.Join(", ", Runtime.DependencyTaskNumbers.Select(n => $"#{n}"))}");
+                    }
+                }
+
+                return lines.Count > 0 ? string.Join("\n", lines) : "Task is queued";
+            }
+        }
+
         public string TimeInfo
         {
             get
@@ -445,6 +500,22 @@ namespace HappyEngine
                 if (Status == AgentTaskStatus.Planning)
                     return $"{started} | Planning {(int)running.TotalMinutes}m {running.Seconds}s";
                 return $"{started} | Running {(int)running.TotalMinutes}m {running.Seconds}s";
+            }
+        }
+
+        public string FileLockTooltip
+        {
+            get
+            {
+                if (Status != AgentTaskStatus.Queued || string.IsNullOrEmpty(PendingFileLockPath))
+                    return "";
+
+                var tooltip = $"Waiting for file: {PendingFileLockPath}";
+                if (!string.IsNullOrEmpty(PendingFileLockBlocker))
+                {
+                    tooltip += $"\nLocked by: {PendingFileLockBlocker}";
+                }
+                return tooltip;
             }
         }
     }

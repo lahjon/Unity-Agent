@@ -131,7 +131,7 @@ namespace HappyEngine.Managers
                         .Where(p => p.TaskId != task.Id)
                         .Select(p => (p.TaskId, p.Summary))
                         .ToList();
-                    fullPrompt = _promptBuilder.BuildMessageBusBlock(task.Id, siblings) + fullPrompt;
+                    fullPrompt = _promptBuilder.BuildMessageBusBlock(task.Id, task.ProjectPath, siblings) + fullPrompt;
                 }
             }
 
@@ -249,6 +249,14 @@ namespace HappyEngine.Managers
                 // Already queued or cancelled — skip normal completion
                 if (task.Status is AgentTaskStatus.Queued or AgentTaskStatus.Cancelled)
                 {
+                    // For queued tasks, ensure process reference is cleaned up
+                    // This happens when a process is killed due to file lock conflict
+                    if (task.Status == AgentTaskStatus.Queued)
+                    {
+                        task.Process = null;
+                        AppLogger.Info("TaskExecutionManager", $"Cleaned up process reference for queued task #{task.TaskNumber}");
+                    }
+
                     _fileLockManager.CheckQueuedTasks(activeTasks);
                     TaskCompleted?.Invoke(task.Id);
                     return;
@@ -263,9 +271,8 @@ namespace HappyEngine.Managers
                 {
                     // Capture locked files BEFORE releasing so we can scope the auto-commit
                     var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
-                    _fileLockManager.ReleaseTaskLocks(task.Id);
-                    if (task.UseMessageBus)
-                        _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
+                    // NOTE: Lock release moved to CompleteWithVerificationAsync to prevent race condition
+                    // where another task could modify files before commit completes
                     // Set to Verifying while summary runs; final status is set afterwards
                     task.Status = AgentTaskStatus.Verifying;
                     _outputTabManager.UpdateTabHeader(task);
@@ -319,10 +326,23 @@ namespace HappyEngine.Managers
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            // Auto-commit only the files this task locked (not all local changes)
-            if (exitCode == 0 && !task.NoGitWrite && lockedFiles is { Count: > 0 })
+            try
             {
-                await CommitTaskLockedFilesAsync(task, lockedFiles, activeTasks, historyTasks);
+                // Auto-commit only the files this task locked (not all local changes)
+                if (exitCode == 0 && !task.NoGitWrite && lockedFiles is { Count: > 0 })
+                {
+                    await CommitTaskLockedFilesAsync(task, lockedFiles, activeTasks, historyTasks);
+                }
+            }
+            finally
+            {
+                // Release locks AFTER commit to prevent race condition where another task
+                // could modify files before commit completes
+                _fileLockManager.ReleaseTaskLocks(task.Id);
+
+                // Also handle message bus cleanup
+                if (task.UseMessageBus)
+                    _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
             }
 
             try
@@ -373,6 +393,28 @@ namespace HappyEngine.Managers
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
+            // Capture locked files before releasing so we can scope the auto-commit
+            var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
+
+            try
+            {
+                // Auto-commit only the files this task locked (not all local changes)
+                if (exitCode == 0 && !task.NoGitWrite && lockedFiles.Count > 0)
+                {
+                    await CommitTaskLockedFilesAsync(task, lockedFiles, activeTasks, historyTasks);
+                }
+            }
+            finally
+            {
+                // Release locks AFTER commit to prevent race condition where another task
+                // could modify files before commit completes
+                _fileLockManager.ReleaseTaskLocks(task.Id);
+
+                // Also handle message bus cleanup
+                if (task.UseMessageBus)
+                    _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
+            }
+
             try
             {
                 await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
@@ -393,6 +435,7 @@ namespace HappyEngine.Managers
             _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Follow-up complete.\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
+            // Check queued tasks after releasing locks to unblock waiting tasks
             _fileLockManager.CheckQueuedTasks(activeTasks);
             TaskCompleted?.Invoke(task.Id);
         }
@@ -423,23 +466,44 @@ namespace HappyEngine.Managers
                 }
 
                 // Stage only the locked files (handles new/untracked files)
-                var pathArgs = string.Join(" ", relativePaths.Select(p => $"\"{p}\""));
-                await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
+                var escapedPaths = relativePaths.Select(GitHelper.EscapeGitPath).ToList();
+                var pathArgs = string.Join(" ", escapedPaths);
+                var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
 
-                // Commit only these specific files — the pathspec ensures no other
-                // staged changes from concurrent tasks leak into this commit
+                // Check if git add failed
+                if (addResult == null)
+                {
+                    _outputProcessor.AppendOutput(task.Id,
+                        "[HappyEngine] Failed to stage files for auto-commit\n",
+                        activeTasks, historyTasks);
+                    return;
+                }
+
+                // Commit only these specific files — using the secure method to prevent shell injection
                 var desc = task.Description?.Length > 70
                     ? task.Description[..70] + "..."
                     : task.Description ?? "task changes";
-                var escapedMsg = $"Task #{task.TaskNumber}: {desc}".Replace("\"", "\\\"");
-                var result = await _gitHelper.RunGitCommandAsync(task.ProjectPath,
-                    $"commit -m \"{escapedMsg}\" -- {pathArgs}");
+                var commitMsg = $"Task #{task.TaskNumber}: {desc}";
+                var result = await _gitHelper.CommitSecureAsync(task.ProjectPath, commitMsg, pathArgs);
 
                 if (result != null)
                 {
-                    _outputProcessor.AppendOutput(task.Id,
-                        $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s).\n",
-                        activeTasks, historyTasks);
+                    // Get the commit hash after successful commit
+                    var commitHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
+                    if (commitHash != null)
+                    {
+                        task.IsCommitted = true;
+                        task.CommitHash = commitHash;
+                        _outputProcessor.AppendOutput(task.Id,
+                            $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s). Commit: {commitHash[..8]}\n",
+                            activeTasks, historyTasks);
+                    }
+                    else
+                    {
+                        _outputProcessor.AppendOutput(task.Id,
+                            $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s) but failed to capture commit hash.\n",
+                            activeTasks, historyTasks);
+                    }
                 }
             }
             catch (Exception ex)
@@ -488,6 +552,12 @@ namespace HappyEngine.Managers
             if (string.IsNullOrEmpty(text)) return;
 
             AppLogger.Info("FollowUp", $"[{task.Id}] SendFollowUp called. Status={task.Status}, IsFeatureMode={task.IsFeatureMode}, Phase={task.FeatureModePhase}, ProcessAlive={task.Process is { HasExited: false }}, ConversationId={task.ConversationId ?? "(null)"}");
+            AppLogger.Info("FollowUp", $"[{task.Id}] Task details: ActiveTasksCount={activeTasks.Count}, HistoryTasksCount={historyTasks.Count}");
+
+            // Ensure task is in active tasks (not history)
+            var isInActive = activeTasks.Contains(task);
+            var isInHistory = historyTasks.Contains(task);
+            AppLogger.Info("FollowUp", $"[{task.Id}] Task location: InActive={isInActive}, InHistory={isInHistory}");
 
             // Block follow-up when the task is a feature mode coordinator waiting for subtasks.
             // Without this, it would start a new Claude process that has no context about the
@@ -552,6 +622,7 @@ namespace HappyEngine.Managers
             AppLogger.Info("FollowUp", $"[{task.Id}] Wrote PS1 script to: {ps1File}");
             AppLogger.Debug("FollowUp", $"[{task.Id}] PS1 content:\n{ps1Content}");
 
+            AppLogger.Info("FollowUp", $"[{task.Id}] Creating managed process with ps1File={ps1File}");
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
                 AppLogger.Info("FollowUp", $"[{task.Id}] Follow-up process exited with code {exitCode}");
@@ -560,6 +631,7 @@ namespace HappyEngine.Managers
                 _outputTabManager.UpdateTabHeader(task);
                 _ = CompleteFollowUpWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
             });
+            AppLogger.Info("FollowUp", $"[{task.Id}] Process created, about to start");
 
             try
             {
@@ -682,36 +754,6 @@ namespace HappyEngine.Managers
                     depSnapshot, activeTasks, historyTasks);
                 task.ClearDependencyTaskIds();
                 task.DependencyTaskNumbers.Clear();
-            }
-
-            // Check file-lock-based queue
-            if (!string.IsNullOrEmpty(task.PendingFileLockPath))
-            {
-                var filePath = task.PendingFileLockPath;
-                var blockerId = task.PendingFileLockBlocker!;
-                task.PendingFileLockPath = null;
-                task.PendingFileLockBlocker = null;
-
-                if (_fileLockManager.IsFileLocked(filePath))
-                {
-                    var blockerTask = activeTasks.FirstOrDefault(t => t.Id == blockerId);
-                    task.Status = AgentTaskStatus.Queued;
-                    task.QueuedReason = $"Plan complete, file locked by #{blockerTask?.TaskNumber}";
-                    task.BlockedByTaskId = blockerId;
-                    task.BlockedByTaskNumber = blockerTask?.TaskNumber;
-                    _fileLockManager.AddQueuedTaskInfo(task.Id, new QueuedTaskInfo
-                    {
-                        Task = task,
-                        ConflictingFilePath = filePath,
-                        BlockingTaskId = blockerId,
-                        BlockedByTaskIds = new HashSet<string> { blockerId }
-                    });
-                    _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Planning complete. Queued — waiting for file lock to clear.\n", activeTasks, historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                    _fileLockManager.CheckQueuedTasks(activeTasks);
-                    return;
-                }
-                // File lock cleared during planning
             }
 
             // No more blockers — start execution

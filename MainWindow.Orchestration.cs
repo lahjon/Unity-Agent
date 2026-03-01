@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -125,16 +127,76 @@ namespace HappyEngine
         /// queued or dependency-blocked tasks. Every code path that finishes a task
         /// should funnel through here.
         /// </summary>
-        private void FinalizeTask(AgentTask task, bool closeTab = true)
+        private async void FinalizeTask(AgentTask task, bool closeTab = true)
         {
             // If this was a plan-only task that completed successfully, create a stored task
             if (task.PlanOnly && task.Status == AgentTaskStatus.Completed)
                 CreateStoredTaskFromPlan(task);
 
-            // Release all resources associated with this task
-            _fileLockManager.ReleaseTaskLocks(task.Id);
-            _fileLockManager.RemoveQueuedInfo(task.Id);
-            _taskExecutionManager.RemoveStreamingState(task.Id);
+            // Check if we should defer file lock release for Auto-Commit
+            var shouldDeferLockRelease = _settingsManager.AutoCommit &&
+                                        task.Status == AgentTaskStatus.Completed &&
+                                        !task.IsCommitted &&
+                                        !task.NoGitWrite;
+
+            if (shouldDeferLockRelease)
+            {
+                // Capture the locked files before moving to history
+                var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
+                if (lockedFiles.Count > 0)
+                {
+                    // Store locked files in task runtime state for later release after commit
+                    task.Runtime.LockedFilesForCommit = lockedFiles;
+
+                    // Remove from queued info but keep file locks active
+                    _fileLockManager.RemoveQueuedInfo(task.Id);
+                    _taskExecutionManager.RemoveStreamingState(task.Id);
+
+                    // Perform auto-commit asynchronously
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var success = await CommitTaskAsync(task);
+                            if (!success)
+                            {
+                                // If commit failed, release locks anyway
+                                await Dispatcher.InvokeAsync(() =>
+                                {
+                                    _fileLockManager.ReleaseTaskLocks(task.Id);
+                                    task.Runtime.LockedFilesForCommit = null;
+                                    _fileLockManager.CheckQueuedTasks(_activeTasks);
+                                });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Auto-commit failed for task {task.Id}: {ex.Message}");
+                            // Release locks on error
+                            await Dispatcher.InvokeAsync(() =>
+                            {
+                                _fileLockManager.ReleaseTaskLocks(task.Id);
+                                task.Runtime.LockedFilesForCommit = null;
+                                _fileLockManager.CheckQueuedTasks(_activeTasks);
+                            });
+                        }
+                    });
+                }
+                else
+                {
+                    // No files were modified, release locks normally
+                    _fileLockManager.ReleaseTaskLocks(task.Id);
+                    _fileLockManager.RemoveQueuedInfo(task.Id);
+                    _taskExecutionManager.RemoveStreamingState(task.Id);
+                }
+            }
+            else
+            {
+                // Release all resources associated with this task normally
+                _fileLockManager.ReleaseTaskLocks(task.Id);
+                _fileLockManager.RemoveQueuedInfo(task.Id);
+                _taskExecutionManager.RemoveStreamingState(task.Id);
+            }
 
             // Move from active to history
             _activeTasks.Remove(task);
@@ -181,6 +243,22 @@ namespace HappyEngine
 
         // Keep MoveToHistory as a thin alias for callers that pass it as a delegate
         private void MoveToHistory(AgentTask task) => FinalizeTask(task);
+
+        /// <summary>
+        /// Releases file locks that were deferred for Auto-Commit.
+        /// Called after git commit is complete to finally release the locks.
+        /// </summary>
+        public void ReleaseTaskLocksAfterCommit(AgentTask task)
+        {
+            if (task.Runtime.LockedFilesForCommit != null && task.Runtime.LockedFilesForCommit.Count > 0)
+            {
+                _fileLockManager.ReleaseTaskLocks(task.Id);
+                task.Runtime.LockedFilesForCommit = null;
+
+                // Check if any queued tasks can now proceed
+                _fileLockManager.CheckQueuedTasks(_activeTasks);
+            }
+        }
 
         /// <summary>
         /// Transitions a task from a queued/waiting state to Running and starts its process.
@@ -273,10 +351,37 @@ namespace HappyEngine
         {
             var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
             if (task == null) return;
+
+            // Debug logging
+            AppLogger.Debug("OnQueuedTaskResumed", $"Task #{task.TaskNumber} - ConversationId: {task.ConversationId}, Process: {task.Process?.Id}, HasExited: {task.Process?.HasExited}");
+
             _outputTabManager.AppendOutput(taskId, $"\n[HappyEngine] Resuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(task);
-            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+
+            // Check if we have an existing process that was paused
+            if (task.Process is { HasExited: false })
+            {
+                // Resume the existing process
+                AppLogger.Info("OnQueuedTaskResumed", $"Resuming existing process for task #{task.TaskNumber}");
+                _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
+            }
+            else
+            {
+                // No existing process, start a new one
+                AppLogger.Info("OnQueuedTaskResumed", $"Starting new process for task #{task.TaskNumber} (no existing process)");
+                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+            }
+
             UpdateStatus();
+        }
+
+        private void OnTaskNeedsPause(string taskId)
+        {
+            var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
+            if (task == null) return;
+
+            AppLogger.Debug("OnTaskNeedsPause", $"Pausing task #{task.TaskNumber} due to file lock conflict");
+            _taskExecutionManager.PauseTask(task);
         }
 
         private void OnTaskProcessCompleted(string taskId)

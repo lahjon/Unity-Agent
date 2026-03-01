@@ -19,7 +19,7 @@ namespace HappyEngine.Managers
 
         string BuildPromptWithImages(string basePrompt, List<string> imagePaths);
 
-        string BuildMessageBusBlock(string taskId,
+        string BuildMessageBusBlock(string taskId, string projectPath,
             List<(string id, string summary)> siblings);
 
         string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null);
