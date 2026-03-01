@@ -96,6 +96,8 @@ namespace HappyEngine.Managers
 
         protected string? GetApiKey() { lock (_apiKeyLock) return _apiKey; }
 
+        public string? GetApiKeyForRefresh() { lock (_apiKeyLock) return _apiKey; }
+
         protected static string TryExtractErrorMessage(string responseBody)
         {
             try

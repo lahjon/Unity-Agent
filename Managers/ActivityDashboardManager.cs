@@ -169,6 +169,8 @@ namespace HappyEngine.Managers
                 LongestDuration = durations.Count > 0 ? durations.Max() : null,
                 TotalInputTokens = tasks.Sum(t => t.InputTokens),
                 TotalOutputTokens = tasks.Sum(t => t.OutputTokens),
+                TotalCacheReadTokens = tasks.Sum(t => t.CacheReadTokens),
+                TotalCacheCreationTokens = tasks.Sum(t => t.CacheCreationTokens),
                 MostRecentTaskTime = mostRecentEnd != default ? mostRecentEnd : null,
                 RecentActivity = recentCompleted
             };
@@ -214,6 +216,7 @@ namespace HappyEngine.Managers
             var totalRuntime = TimeSpan.FromTicks(allStats.Sum(s => s.TotalDuration.Ticks));
             var activeNow = allStats.Sum(s => s.RunningTasks);
             var totalTokens = allStats.Sum(s => s.TotalTokens);
+            var totalCost = allStats.Sum(s => s.EstimatedCost);
 
             var grid = new Grid();
             if (isDialog)
@@ -239,7 +242,7 @@ namespace HappyEngine.Managers
                 ("Success Rate", totalFinished > 0 ? $"{overallSuccessRate:P0}" : "N/A", successColorKey),
                 ("Total Runtime", FormatDuration(totalRuntime), "TextPrimary"),
                 ("Active Now", activeNow.ToString(), activeNow > 0 ? "PausedBlue" : "TextSubdued"),
-                ("Total Tokens", totalTokens > 0 ? FormatTokenCount(totalTokens) : "N/A", totalTokens > 0 ? "TextBlueGrey" : "TextSubdued")
+                ("Total Tokens", totalTokens > 0 ? $"{FormatTokenCount(totalTokens)} (~{Helpers.FormatHelpers.FormatCost(totalCost)})" : "N/A", totalTokens > 0 ? "TextBlueGrey" : "TextSubdued")
             };
 
             for (int i = 0; i < metrics.Length; i++)
@@ -453,9 +456,10 @@ namespace HappyEngine.Managers
                     FontFamily = new FontFamily("Segoe UI"),
                     VerticalAlignment = VerticalAlignment.Center
                 };
+                var costStr = Helpers.FormatHelpers.FormatCost(stats.EstimatedCost);
                 var tokenValue = new TextBlock
                 {
-                    Text = $"{FormatTokenCount(stats.TotalInputTokens)} in / {FormatTokenCount(stats.TotalOutputTokens)} out",
+                    Text = $"{FormatTokenCount(stats.TotalTokens)} (~{costStr}) | {FormatTokenCount(stats.TotalInputTokens)} in / {FormatTokenCount(stats.TotalOutputTokens)} out / {FormatTokenCount(stats.TotalCacheReadTokens)} cached",
                     Foreground = BrushCache.Theme("TextBlueGrey"),
                     FontSize = 11,
                     FontWeight = FontWeights.SemiBold,

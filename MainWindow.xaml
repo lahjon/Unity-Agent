@@ -1767,7 +1767,8 @@
                             <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,8"/>
 
                             <!-- Error section -->
-                            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                            <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,0">
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,8,0,8"/>
                                 <TextBlock Text="Error" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
                                 <TextBlock Text="Investigate project crash logs and diagnose build failures."
@@ -1778,8 +1779,6 @@
                                         Style="{StaticResource SecondaryBtn}"
                                         FontSize="11" Padding="10,4" HorizontalAlignment="Left"/>
                             </StackPanel>
-
-                            <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,8"/>
 
                             <!-- Suggestions list -->
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -2087,6 +2086,12 @@
                                           SelectionChanged="GeminiModelCombo_Changed"/>
                                 <TextBlock Text="Supports native image generation with text prompts. Images are saved to AppData."
                                            Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"/>
+                                <Button x:Name="RefreshGeminiModelsBtn" Content="Refresh Models from API"
+                                        Click="RefreshGeminiModels_Click"
+                                        Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
+                                        FontSize="11" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                                <TextBlock x:Name="GeminiRefreshStatus" Text="" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                           FontFamily="Segoe UI" Margin="0,4,0,0" TextWrapping="Wrap"/>
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
@@ -2135,6 +2140,17 @@
                                            FontSize="11" FontFamily="Consolas" Margin="0,2,0,0"
                                            Cursor="Hand" MouseDown="ClaudeApiLink_Click"
                                            TextDecorations="Underline"/>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
+
+                                <TextBlock Text="Models" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
+                                           Margin="0,0,0,6"/>
+                                <Button x:Name="RefreshClaudeModelsBtn" Content="Refresh Models from API"
+                                        Click="RefreshClaudeModels_Click"
+                                        Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
+                                        FontSize="11" HorizontalAlignment="Left"/>
+                                <TextBlock x:Name="ClaudeRefreshStatus" Text="" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                           FontFamily="Segoe UI" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

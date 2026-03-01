@@ -48,6 +48,17 @@ namespace HappyEngine.Managers
                 finally
                 {
                     sem.Release();
+
+                    // Clean up the semaphore if no one else is waiting, to prevent
+                    // unbounded growth of _locks over long sessions.
+                    if (sem.CurrentCount == 1 && _locks.TryRemove(filePath, out var removed))
+                    {
+                        // If another thread snuck in via GetOrAdd between our TryRemove
+                        // and here, 'removed' is the old instance and the dictionary
+                        // already has a fresh one — safe to dispose the old one.
+                        removed.Dispose();
+                    }
+
                     DecrementPending();
                 }
             });

@@ -13,7 +13,7 @@ namespace HappyEngine.Managers
     {
         private const string ApiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
 
-        public static readonly string[] AvailableModels = new[]
+        public static string[] AvailableModels { get; set; } =
         {
             "gemini-2.5-flash",
             "gemini-2.5-pro",

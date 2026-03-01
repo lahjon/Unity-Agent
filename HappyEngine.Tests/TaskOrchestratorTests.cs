@@ -649,5 +649,724 @@ namespace HappyEngine.Tests
             // After completion, no longer runnable
             Assert.Empty(orch.GetNextRunnableTasks(10));
         }
+
+        // ── Diamond dependency patterns ──────────────────────────────────
+
+        [Fact]
+        public void Diamond_ReversedCompletionOrder_DFiresAfterBothPaths()
+        {
+            //    A
+            //   / \
+            //  B   C
+            //   \ /
+            //    D
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.OnTaskCompleted("a");
+            readyTasks.Clear();
+
+            // Complete C first (reversed from the other diamond test)
+            orch.OnTaskCompleted("c");
+            Assert.Empty(readyTasks); // D not ready yet
+
+            orch.OnTaskCompleted("b");
+            Assert.Single(readyTasks);
+            Assert.Equal("d", readyTasks[0].Id);
+        }
+
+        [Fact]
+        public void Diamond_DFiresExactlyOnce_NotPerPath()
+        {
+            //    A
+            //   / \
+            //  B   C
+            //   \ /
+            //    D
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+
+            int dReadyCount = 0;
+            orch.TaskReady += t => { if (t.Id == "d") dReadyCount++; };
+
+            orch.OnTaskCompleted("a");
+            orch.OnTaskCompleted("b");
+            orch.OnTaskCompleted("c");
+
+            // D must fire exactly once, not once per parent
+            Assert.Equal(1, dReadyCount);
+        }
+
+        [Fact]
+        public void DoubleDiamond_FullPropagation()
+        {
+            // Double diamond: A→{B,C}→D→{E,F}→G
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+            orch.AddTask(MakeTask("e"), new List<string> { "d" });
+            orch.AddTask(MakeTask("f"), new List<string> { "d" });
+            orch.AddTask(MakeTask("g"), new List<string> { "e", "f" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            // Phase 1: Complete A → B,C become ready
+            orch.OnTaskCompleted("a");
+            Assert.Equal(2, readyTasks.Count);
+            Assert.Contains(readyTasks, t => t.Id == "b");
+            Assert.Contains(readyTasks, t => t.Id == "c");
+            readyTasks.Clear();
+
+            // Phase 2: Complete B,C → D becomes ready
+            orch.OnTaskCompleted("b");
+            Assert.Empty(readyTasks);
+            orch.OnTaskCompleted("c");
+            Assert.Single(readyTasks);
+            Assert.Equal("d", readyTasks[0].Id);
+            readyTasks.Clear();
+
+            // Phase 3: Complete D → E,F become ready
+            orch.OnTaskCompleted("d");
+            Assert.Equal(2, readyTasks.Count);
+            Assert.Contains(readyTasks, t => t.Id == "e");
+            Assert.Contains(readyTasks, t => t.Id == "f");
+            readyTasks.Clear();
+
+            // Phase 4: Complete E,F → G becomes ready
+            orch.OnTaskCompleted("e");
+            Assert.Empty(readyTasks);
+            orch.OnTaskCompleted("f");
+            Assert.Single(readyTasks);
+            Assert.Equal("g", readyTasks[0].Id);
+        }
+
+        [Fact]
+        public void Diamond_WithPriority_ReadyTasksSortedCorrectly()
+        {
+            //    A
+            //   / \
+            //  B   C  (B=High, C=Critical)
+            //   \ /
+            //    D
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTaskWithPriority("b", TaskPriority.High), new List<string> { "a" });
+            orch.AddTask(MakeTaskWithPriority("c", TaskPriority.Critical), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            // Complete A → Both B and C fire, C (Critical) should come first
+            orch.OnTaskCompleted("a");
+            Assert.Equal(2, readyTasks.Count);
+            Assert.Equal("c", readyTasks[0].Id); // Critical first
+            Assert.Equal("b", readyTasks[1].Id); // High second
+        }
+
+        [Fact]
+        public void WideFanIn_SingleTaskDependsOnMany()
+        {
+            // 5 independent tasks → single joiner
+            var orch = new TaskOrchestrator();
+            for (int i = 0; i < 5; i++)
+                orch.AddTask(MakeTask($"src{i}"), new List<string>());
+
+            var deps = Enumerable.Range(0, 5).Select(i => $"src{i}").ToList();
+            orch.AddTask(MakeTask("join"), deps);
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            // Complete 4 of 5 → join must NOT fire
+            for (int i = 0; i < 4; i++)
+            {
+                orch.OnTaskCompleted($"src{i}");
+                Assert.DoesNotContain(readyTasks, t => t.Id == "join");
+            }
+
+            // Complete last → join fires
+            orch.OnTaskCompleted("src4");
+            Assert.Contains(readyTasks, t => t.Id == "join");
+        }
+
+        [Fact]
+        public void Diamond_InterleavedWithUnrelated_OnlyCorrectTasksFire()
+        {
+            //    A         X (independent)
+            //   / \
+            //  B   C
+            //   \ /
+            //    D
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+            orch.AddTask(MakeTask("x"), new List<string>()); // independent
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            // Completing X should NOT affect diamond at all
+            orch.OnTaskCompleted("x");
+            Assert.Empty(readyTasks); // no tasks newly unblocked
+
+            // Now proceed with diamond
+            orch.OnTaskCompleted("a");
+            Assert.Equal(2, readyTasks.Count);
+            Assert.DoesNotContain(readyTasks, t => t.Id == "d");
+        }
+
+        // ── Cycle detection - circular chains ────────────────────────────
+
+        [Fact]
+        public void DetectCycle_LongCircularChain_ReturnsTrue()
+        {
+            // A → B → C → D → E, adding E → A would form a 5-node cycle
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "b" });
+            orch.AddTask(MakeTask("d"), new List<string> { "c" });
+            orch.AddTask(MakeTask("e"), new List<string> { "d" });
+
+            Assert.True(orch.DetectCycle("e", "a"));
+        }
+
+        [Fact]
+        public void DetectCycle_CycleInSubgraph_DetectedCorrectly()
+        {
+            // Independent subgraph: X → Y → Z
+            // Main chain: A → B
+            // Adding Z → X would create cycle in subgraph but not affect main chain
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("x"), new List<string>());
+            orch.AddTask(MakeTask("y"), new List<string> { "x" });
+            orch.AddTask(MakeTask("z"), new List<string> { "y" });
+
+            Assert.True(orch.DetectCycle("z", "x"));   // cycle in subgraph
+            Assert.False(orch.DetectCycle("b", "x"));   // no cross-subgraph cycle
+        }
+
+        [Fact]
+        public void DetectCycle_DiamondWithBackEdge_ReturnsTrue()
+        {
+            //    A
+            //   / \
+            //  B   C
+            //   \ /
+            //    D
+            // Adding D → A would create a cycle through the diamond
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+
+            Assert.True(orch.DetectCycle("d", "a"));
+            // Also verify mid-diamond back edges
+            Assert.True(orch.DetectCycle("d", "b"));
+            Assert.True(orch.DetectCycle("d", "c"));
+            Assert.True(orch.DetectCycle("b", "a"));
+        }
+
+        [Fact]
+        public void DetectCycle_MultiplePotentialPaths_ChecksAll()
+        {
+            // A → B, A → C, B → D, C → D
+            // Adding D → A creates cycle through both B and C paths
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+
+            Assert.True(orch.DetectCycle("d", "a"));
+            // Non-cycle edge: adding new task E → D is fine
+            Assert.False(orch.DetectCycle("e", "d"));
+        }
+
+        [Fact]
+        public void DetectCycle_AlreadyResolvedNode_StillDetectsCycle()
+        {
+            // Even if A is resolved, the graph structure still has the edge
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+
+            orch.OnTaskCompleted("a");
+
+            // The edge a→b still exists in the graph, so b→a would still be a cycle
+            Assert.True(orch.DetectCycle("b", "a"));
+        }
+
+        // ── Priority ordering - simultaneous readiness ───────────────────
+
+        [Fact]
+        public void Priority_AllFourLevels_BecomeReadySimultaneously()
+        {
+            // Single dependency unblocks tasks of all 4 priority levels
+            var orch = new TaskOrchestrator();
+            var dep = MakeTask("dep");
+            orch.AddTask(dep, new List<string>());
+            orch.AddTask(MakeTaskWithPriority("low", TaskPriority.Low), new List<string> { "dep" });
+            orch.AddTask(MakeTaskWithPriority("norm", TaskPriority.Normal), new List<string> { "dep" });
+            orch.AddTask(MakeTaskWithPriority("high", TaskPriority.High), new List<string> { "dep" });
+            orch.AddTask(MakeTaskWithPriority("crit", TaskPriority.Critical), new List<string> { "dep" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.OnTaskCompleted("dep");
+
+            Assert.Equal(4, readyTasks.Count);
+            Assert.Equal("crit", readyTasks[0].Id);
+            Assert.Equal("high", readyTasks[1].Id);
+            Assert.Equal("norm", readyTasks[2].Id);
+            Assert.Equal("low", readyTasks[3].Id);
+        }
+
+        [Fact]
+        public void Priority_SameLevelDifferentSecondary_OrderedBySecondary()
+        {
+            // All tasks are High priority but have different secondary priority values
+            var orch = new TaskOrchestrator();
+            var dep = MakeTask("dep");
+            orch.AddTask(dep, new List<string>());
+            orch.AddTask(MakeTaskWithPriority("p1", TaskPriority.High, 1), new List<string> { "dep" });
+            orch.AddTask(MakeTaskWithPriority("p5", TaskPriority.High, 5), new List<string> { "dep" });
+            orch.AddTask(MakeTaskWithPriority("p3", TaskPriority.High, 3), new List<string> { "dep" });
+            orch.AddTask(MakeTaskWithPriority("p10", TaskPriority.High, 10), new List<string> { "dep" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.OnTaskCompleted("dep");
+
+            Assert.Equal(4, readyTasks.Count);
+            Assert.Equal("p10", readyTasks[0].Id);
+            Assert.Equal("p5", readyTasks[1].Id);
+            Assert.Equal("p3", readyTasks[2].Id);
+            Assert.Equal("p1", readyTasks[3].Id);
+        }
+
+        [Fact]
+        public void Priority_MixedLevelsAndSecondary_LevelTakesPrecedence()
+        {
+            var orch = new TaskOrchestrator();
+            var dep = MakeTask("dep");
+            orch.AddTask(dep, new List<string>());
+
+            // Low level with high secondary should still come after High level with low secondary
+            orch.AddTask(MakeTaskWithPriority("low_p99", TaskPriority.Low, 99), new List<string> { "dep" });
+            orch.AddTask(MakeTaskWithPriority("high_p1", TaskPriority.High, 1), new List<string> { "dep" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.OnTaskCompleted("dep");
+
+            Assert.Equal(2, readyTasks.Count);
+            Assert.Equal("high_p1", readyTasks[0].Id);  // High level first despite low secondary
+            Assert.Equal("low_p99", readyTasks[1].Id);   // Low level last despite high secondary
+        }
+
+        [Fact]
+        public void GetNextRunnableTasks_ExcludesResolvedTasks()
+        {
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTaskWithPriority("a", TaskPriority.Critical), new List<string>());
+            orch.AddTask(MakeTaskWithPriority("b", TaskPriority.Normal), new List<string>());
+            orch.AddTask(MakeTaskWithPriority("c", TaskPriority.High), new List<string>());
+
+            orch.OnTaskCompleted("a"); // resolved
+
+            var runnable = orch.GetNextRunnableTasks(10);
+            Assert.Equal(2, runnable.Count);
+            Assert.DoesNotContain(runnable, t => t.Id == "a");
+            Assert.Equal("c", runnable[0].Id);  // High before Normal
+            Assert.Equal("b", runnable[1].Id);
+        }
+
+        // ── ReevaluateAll - comprehensive scenarios ──────────────────────
+
+        [Fact]
+        public void ReevaluateAll_AfterPartialCompletion_FiresCorrectSubset()
+        {
+            // A → B, C → D, E (independent)
+            // Complete A and C, then reevaluate
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string>());
+            orch.AddTask(MakeTask("d"), new List<string> { "c" });
+            orch.AddTask(MakeTask("e"), new List<string>());
+
+            orch.OnTaskCompleted("a"); // unblocks B
+            orch.OnTaskCompleted("c"); // unblocks D
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.ReevaluateAll();
+
+            // B, D, and E should all be ready (A and C are resolved)
+            Assert.Equal(3, readyTasks.Count);
+            Assert.Contains(readyTasks, t => t.Id == "b");
+            Assert.Contains(readyTasks, t => t.Id == "d");
+            Assert.Contains(readyTasks, t => t.Id == "e");
+        }
+
+        [Fact]
+        public void ReevaluateAll_CalledTwice_FiresEachTime()
+        {
+            // ReevaluateAll is not idempotent - it fires for all currently-ready tasks each call
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string>());
+
+            var readyCount = 0;
+            orch.TaskReady += _ => readyCount++;
+
+            orch.ReevaluateAll();
+            Assert.Equal(2, readyCount);
+
+            orch.ReevaluateAll();
+            Assert.Equal(4, readyCount); // fires again for same tasks
+        }
+
+        [Fact]
+        public void ReevaluateAll_MixedResolvedAndBlocked_OnlyFiresForReady()
+        {
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("resolved"), new List<string>());
+            orch.AddTask(MakeTask("ready"), new List<string>());
+            orch.AddTask(MakeTask("blocked"), new List<string> { "dep" });
+
+            orch.MarkResolved("resolved");
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.ReevaluateAll();
+
+            Assert.Single(readyTasks);
+            Assert.Equal("ready", readyTasks[0].Id);
+        }
+
+        [Fact]
+        public void ReevaluateAll_ComplexDiamond_OnlyLeafReady()
+        {
+            //    A (resolved)
+            //   / \
+            //  B   C  (B resolved, C not)
+            //   \ /
+            //    D    (blocked by C)
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+
+            orch.OnTaskCompleted("a");
+            orch.OnTaskCompleted("b");
+            // C is not completed, so D is still blocked
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.ReevaluateAll();
+
+            // Only C should be ready (not resolved, no unresolved deps since A is done)
+            Assert.Single(readyTasks);
+            Assert.Equal("c", readyTasks[0].Id);
+        }
+
+        [Fact]
+        public void ReevaluateAll_EmptyOrchestrator_DoesNotThrow()
+        {
+            var orch = new TaskOrchestrator();
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.ReevaluateAll();
+
+            Assert.Empty(readyTasks);
+        }
+
+        // ── Edge cases ───────────────────────────────────────────────────
+
+        [Fact]
+        public void OnTaskCompleted_CalledTwice_FiresAgainForUnresolvedDependents()
+        {
+            // OnTaskCompleted is NOT idempotent: if a dependent is still unresolved,
+            // it will fire TaskReady again on repeated calls because the dependent
+            // still meets the "unresolved deps == 0 && !IsResolved" criteria.
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("dep"), new List<string>());
+            orch.AddTask(MakeTask("child"), new List<string> { "dep" });
+
+            int childReadyCount = 0;
+            orch.TaskReady += t => { if (t.Id == "child") childReadyCount++; };
+
+            orch.OnTaskCompleted("dep");
+            Assert.Equal(1, childReadyCount);
+
+            orch.OnTaskCompleted("dep"); // second completion
+            // Fires again because child is still !IsResolved with 0 unresolved deps
+            Assert.Equal(2, childReadyCount);
+        }
+
+        [Fact]
+        public void OnTaskCompleted_PlaceholderDependency_UnblocksChild()
+        {
+            // Add child with dependency "phantom" that was never AddTask'd as a real task
+            // (only exists as a placeholder node). Completing "phantom" should unblock child.
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("child"), new List<string> { "phantom" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.OnTaskCompleted("phantom");
+
+            Assert.Single(readyTasks);
+            Assert.Equal("child", readyTasks[0].Id);
+        }
+
+        [Fact]
+        public void AddTask_AfterDependencyAlreadyCompleted_TaskStillBlocked()
+        {
+            // Complete dep1 first, then add a task depending on it
+            // The task should remain blocked because OnTaskCompleted already ran
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("dep1"), new List<string>());
+            orch.OnTaskCompleted("dep1");
+
+            // Now add a task depending on dep1
+            orch.AddTask(MakeTask("late"), new List<string> { "dep1" });
+
+            // "late" has dep1 in UnresolvedDependencies but dep1 is already resolved
+            // This is a known characteristic: the task won't auto-unblock
+            // ReevaluateAll or checking GetNextRunnableTasks shows it's still blocked
+            var runnable = orch.GetNextRunnableTasks(10);
+            Assert.DoesNotContain(runnable, t => t.Id == "late");
+        }
+
+        [Fact]
+        public void DeepChain_PropagatesOneStepAtATime()
+        {
+            // Chain of 10 tasks: t0 → t1 → t2 → ... → t9
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("t0"), new List<string>());
+            for (int i = 1; i < 10; i++)
+                orch.AddTask(MakeTask($"t{i}"), new List<string> { $"t{i - 1}" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            // Each completion should only unblock the immediate successor
+            for (int i = 0; i < 9; i++)
+            {
+                readyTasks.Clear();
+                orch.OnTaskCompleted($"t{i}");
+
+                Assert.Single(readyTasks);
+                Assert.Equal($"t{i + 1}", readyTasks[0].Id);
+            }
+        }
+
+        [Fact]
+        public void RemoveTask_InMiddleOfDiamond_UnblocksFinalTask()
+        {
+            //    A
+            //   / \
+            //  B   C
+            //   \ /
+            //    D
+            // Removing B should unblock D (only C remains as dependency)
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+            orch.AddTask(MakeTask("b"), new List<string> { "a" });
+            orch.AddTask(MakeTask("c"), new List<string> { "a" });
+            orch.AddTask(MakeTask("d"), new List<string> { "b", "c" });
+
+            orch.OnTaskCompleted("a");
+
+            // Remove B - this cleans up B from D's unresolved deps
+            orch.RemoveTask("b");
+
+            // D now only depends on C
+            orch.OnTaskCompleted("c");
+
+            // After C completes, D should be runnable (B dep was removed)
+            var runnable = orch.GetNextRunnableTasks(10);
+            Assert.Contains(runnable, t => t.Id == "d");
+        }
+
+        [Fact]
+        public void RemoveTask_ThenReevaluate_WorksCorrectly()
+        {
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("dep"), new List<string>());
+            orch.AddTask(MakeTask("child"), new List<string> { "dep" });
+
+            // Remove dep → child's dependency is cleaned up
+            orch.RemoveTask("dep");
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.ReevaluateAll();
+
+            // child should now be ready since its only dep was removed
+            Assert.Single(readyTasks);
+            Assert.Equal("child", readyTasks[0].Id);
+        }
+
+        [Fact]
+        public void MarkResolved_ThenOnTaskCompleted_NoDoubleResolve()
+        {
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("dep"), new List<string>());
+            orch.AddTask(MakeTask("child"), new List<string> { "dep" });
+
+            // MarkResolved doesn't unblock dependents
+            orch.MarkResolved("dep");
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            // OnTaskCompleted after MarkResolved should still work
+            // (node is already resolved but dependents haven't been unblocked)
+            orch.OnTaskCompleted("dep");
+
+            Assert.Single(readyTasks);
+            Assert.Equal("child", readyTasks[0].Id);
+        }
+
+        [Fact]
+        public void ContainsTask_AfterRemoval_ReturnsFalse()
+        {
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("task1"), new List<string>());
+
+            Assert.True(orch.ContainsTask("task1"));
+
+            orch.RemoveTask("task1");
+
+            Assert.False(orch.ContainsTask("task1"));
+        }
+
+        [Fact]
+        public void AddTask_DuplicateId_OverwritesTask()
+        {
+            var orch = new TaskOrchestrator();
+            var task1 = MakeTaskWithPriority("same", TaskPriority.Low);
+            var task2 = MakeTaskWithPriority("same", TaskPriority.Critical);
+
+            orch.AddTask(task1, new List<string>());
+            orch.AddTask(task2, new List<string>());
+
+            var runnable = orch.GetNextRunnableTasks(10);
+            // Should contain the task with updated priority
+            Assert.Contains(runnable, t => t.Id == "same" && t.PriorityLevel == TaskPriority.Critical);
+        }
+
+        [Fact]
+        public void ComplexDAG_MultipleRootsMultipleSinks()
+        {
+            // Two independent roots, merging into a shared middle, then splitting to two sinks
+            //  R1   R2
+            //   \  / \
+            //    M1   M2
+            //   / \   |
+            //  S1  S2 S3
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("r1"), new List<string>());
+            orch.AddTask(MakeTask("r2"), new List<string>());
+            orch.AddTask(MakeTask("m1"), new List<string> { "r1", "r2" });
+            orch.AddTask(MakeTask("m2"), new List<string> { "r2" });
+            orch.AddTask(MakeTask("s1"), new List<string> { "m1" });
+            orch.AddTask(MakeTask("s2"), new List<string> { "m1" });
+            orch.AddTask(MakeTask("s3"), new List<string> { "m2" });
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            // Complete R2 → M2 unblocked (M1 still waiting on R1)
+            orch.OnTaskCompleted("r2");
+            Assert.Single(readyTasks);
+            Assert.Equal("m2", readyTasks[0].Id);
+            readyTasks.Clear();
+
+            // Complete R1 → M1 unblocked (both roots done)
+            orch.OnTaskCompleted("r1");
+            Assert.Single(readyTasks);
+            Assert.Equal("m1", readyTasks[0].Id);
+            readyTasks.Clear();
+
+            // Complete M2 → S3 unblocked
+            orch.OnTaskCompleted("m2");
+            Assert.Single(readyTasks);
+            Assert.Equal("s3", readyTasks[0].Id);
+            readyTasks.Clear();
+
+            // Complete M1 → S1, S2 unblocked
+            orch.OnTaskCompleted("m1");
+            Assert.Equal(2, readyTasks.Count);
+            Assert.Contains(readyTasks, t => t.Id == "s1");
+            Assert.Contains(readyTasks, t => t.Id == "s2");
+        }
+
+        [Fact]
+        public void OnTaskCompleted_NeverRegisteredTask_DoesNotThrow()
+        {
+            // Completing a task that was never added (not even as a placeholder)
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTask("a"), new List<string>());
+
+            var exception = Record.Exception(() => orch.OnTaskCompleted("never_existed"));
+            Assert.Null(exception);
+        }
+
+        [Fact]
+        public void ReevaluateAll_WithPriority_AfterChainCompletion()
+        {
+            // Setup: chain A→B, and independent tasks with varied priorities
+            var orch = new TaskOrchestrator();
+            orch.AddTask(MakeTaskWithPriority("a", TaskPriority.Normal), new List<string>());
+            orch.AddTask(MakeTaskWithPriority("b", TaskPriority.Critical), new List<string> { "a" });
+            orch.AddTask(MakeTaskWithPriority("x", TaskPriority.Low), new List<string>());
+            orch.AddTask(MakeTaskWithPriority("y", TaskPriority.High), new List<string>());
+
+            orch.OnTaskCompleted("a"); // unblocks B
+
+            var readyTasks = new List<AgentTask>();
+            orch.TaskReady += t => readyTasks.Add(t);
+
+            orch.ReevaluateAll();
+
+            // Should fire for B (Critical), Y (High), X (Low) - in priority order
+            // A is resolved so it's excluded
+            Assert.Equal(3, readyTasks.Count);
+            Assert.Equal("b", readyTasks[0].Id);    // Critical
+            Assert.Equal("y", readyTasks[1].Id);     // High
+            Assert.Equal("x", readyTasks[2].Id);     // Low
+        }
     }
 }

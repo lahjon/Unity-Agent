@@ -11,6 +11,35 @@ namespace HappyEngine.Helpers
             return count.ToString();
         }
 
+        /// <summary>
+        /// Estimates cost in USD based on token usage and model pricing.
+        /// Prices per million tokens (as of 2025):
+        ///   Sonnet 4:   $3 input, $15 output, $0.30 cache read, $3.75 cache creation
+        ///   Haiku 3.5:  $0.80 input, $4 output, $0.08 cache read, $1.00 cache creation
+        /// Claude Code tasks default to Sonnet pricing since that's the typical model.
+        /// </summary>
+        public static decimal EstimateCost(long inputTokens, long outputTokens,
+            long cacheReadTokens = 0, long cacheCreationTokens = 0)
+        {
+            // Sonnet 4 pricing (per million tokens)
+            const decimal inputPricePerM = 3.00m;
+            const decimal outputPricePerM = 15.00m;
+            const decimal cacheReadPricePerM = 0.30m;
+            const decimal cacheCreationPricePerM = 3.75m;
+
+            return (inputTokens * inputPricePerM
+                  + outputTokens * outputPricePerM
+                  + cacheReadTokens * cacheReadPricePerM
+                  + cacheCreationTokens * cacheCreationPricePerM) / 1_000_000m;
+        }
+
+        public static string FormatCost(decimal cost)
+        {
+            if (cost >= 1.00m) return $"${cost:F2}";
+            if (cost >= 0.01m) return $"${cost:F2}";
+            return $"${cost:F3}";
+        }
+
         public static string NormalizePath(string? path)
         {
             if (string.IsNullOrWhiteSpace(path)) return "";

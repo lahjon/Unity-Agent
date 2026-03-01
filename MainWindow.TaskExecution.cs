@@ -131,61 +131,7 @@ namespace HappyEngine
             }
 
             task.Summary = TaskLauncher.GenerateLocalSummary(desc!);
-            AddActiveTask(task);
-            _outputTabManager.CreateTab(task);
-
-            // Check if any dependencies are still active (not finished)
-            var activeDeps = dependencies.Where(d => !d.IsFinished).ToList();
-            if (activeDeps.Count > 0)
-            {
-                task.DependencyTaskIds = activeDeps.Select(d => d.Id).ToList();
-                task.DependencyTaskNumbers = activeDeps.Select(d => d.TaskNumber).ToList();
-
-                // Register with orchestrator so it tracks the DAG edges
-                _taskOrchestrator.AddTask(task, task.DependencyTaskIds.ToList());
-
-                if (!task.PlanOnly)
-                {
-                    // Start in plan mode first, then queue when planning completes
-                    task.IsPlanningBeforeQueue = true;
-                    task.PlanOnly = true;
-                    task.Status = AgentTaskStatus.Planning;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"[HappyEngine] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
-                        _activeTasks, _historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-                }
-                else
-                {
-                    // User explicitly wants plan-only — queue as before
-                    task.Status = AgentTaskStatus.Queued;
-                    task.QueuedReason = "Waiting for dependencies";
-                    task.BlockedByTaskId = activeDeps[0].Id;
-                    task.BlockedByTaskNumber = activeDeps[0].TaskNumber;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"[HappyEngine] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
-                        _activeTasks, _historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                }
-            }
-            else if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
-            {
-                // Max concurrent sessions reached — init-queue (no Claude session yet)
-                task.Status = AgentTaskStatus.InitQueued;
-                task.QueuedReason = "Max concurrent tasks reached";
-                _outputTabManager.AppendOutput(task.Id,
-                    $"[HappyEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
-                    _activeTasks, _historyTasks);
-                _outputTabManager.UpdateTabHeader(task);
-            }
-            else
-            {
-                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-            }
-
-            RefreshFilterCombos();
-            UpdateStatus();
+            LaunchTask(task, dependencies);
         }
 
         private async void ComposeWorkflow_Click(object sender, RoutedEventArgs e)
@@ -997,6 +943,17 @@ TextureImporter:
                     $"Task #{task.TaskNumber} is still running.\nAre you sure you want to cancel it?",
                     "Cancel Running Task"))
                     return;
+
+                // Re-check after dialog: the modal dialog has its own message pump,
+                // so the process exit callback may have fired and changed the task state.
+                if (task.IsFinished)
+                {
+                    _outputTabManager.UpdateTabHeader(task);
+                    if (!_activeTasks.Contains(task))
+                        return;
+                    MoveToHistory(task);
+                    return;
+                }
             }
 
             if (task.FeatureModeRetryTimer != null)
@@ -1017,7 +974,13 @@ TextureImporter:
             try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
             task.Status = AgentTaskStatus.Cancelled;
             task.EndTime = DateTime.Now;
-            TaskExecutionManager.KillProcess(task);
+            // Capture the process reference before clearing state, then kill on a
+            // background thread — Process.Kill(entireProcessTree: true) can block
+            // while enumerating/terminating child processes on Windows.
+            var proc = task.Process;
+            task.Process = null;
+            if (proc is { HasExited: false })
+                System.Threading.Tasks.Task.Run(() => { try { proc.Kill(true); } catch { /* best-effort */ } });
             task.Cts?.Dispose();
             task.Cts = null;
             _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task cancelled.\n", _activeTasks, _historyTasks);

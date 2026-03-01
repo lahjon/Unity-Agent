@@ -25,7 +25,11 @@ namespace HappyEngine.Models
 
         public long TotalInputTokens { get; set; }
         public long TotalOutputTokens { get; set; }
-        public long TotalTokens => TotalInputTokens + TotalOutputTokens;
+        public long TotalCacheReadTokens { get; set; }
+        public long TotalCacheCreationTokens { get; set; }
+        public long TotalTokens => TotalInputTokens + TotalOutputTokens + TotalCacheReadTokens + TotalCacheCreationTokens;
+        public decimal EstimatedCost => Helpers.FormatHelpers.EstimateCost(
+            TotalInputTokens, TotalOutputTokens, TotalCacheReadTokens, TotalCacheCreationTokens);
         public DateTime? MostRecentTaskTime { get; set; }
 
         public List<SparklinePoint> RecentActivity { get; set; } = new();

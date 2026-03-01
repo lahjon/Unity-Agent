@@ -300,7 +300,7 @@ namespace HappyEngine.Managers
             // Generate summary (awaited, not fire-and-forget)
             await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
 
-            _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+            await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
 
             // If a follow-up was started during summary generation, the status will
             // have changed from Verifying to Running — don't overwrite it.
@@ -331,7 +331,7 @@ namespace HappyEngine.Managers
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
             await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
-            _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+            await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
 
             // If a follow-up was started during summary generation, the status will
             // have changed from Verifying to Running — don't overwrite it.

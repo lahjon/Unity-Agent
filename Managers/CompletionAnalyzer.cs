@@ -243,10 +243,13 @@ namespace HappyEngine.Managers
             sb.AppendLine($" Duration: {(int)duration.TotalMinutes}m {duration.Seconds}s");
             if (inputTokens > 0 || outputTokens > 0)
             {
-                var total = inputTokens + outputTokens;
-                sb.AppendLine($" Tokens: {Helpers.FormatHelpers.FormatTokenCount(total)} ({Helpers.FormatHelpers.FormatTokenCount(inputTokens)} in / {Helpers.FormatHelpers.FormatTokenCount(outputTokens)} out)");
+                var totalAll = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+                var cost = Helpers.FormatHelpers.EstimateCost(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
+                var costStr = Helpers.FormatHelpers.FormatCost(cost);
+                sb.AppendLine($" Tokens: {Helpers.FormatHelpers.FormatTokenCount(totalAll)} total (~{costStr})");
+                sb.AppendLine($"         {Helpers.FormatHelpers.FormatTokenCount(inputTokens)} in / {Helpers.FormatHelpers.FormatTokenCount(outputTokens)} out");
                 if (cacheReadTokens > 0 || cacheCreationTokens > 0)
-                    sb.AppendLine($" Cache: {Helpers.FormatHelpers.FormatTokenCount(cacheReadTokens)} read / {Helpers.FormatHelpers.FormatTokenCount(cacheCreationTokens)} created");
+                    sb.AppendLine($"         {Helpers.FormatHelpers.FormatTokenCount(cacheReadTokens)} cache read / {Helpers.FormatHelpers.FormatTokenCount(cacheCreationTokens)} cache created");
             }
             sb.AppendLine("═══════════════════════════════════════════");
             return sb.ToString();

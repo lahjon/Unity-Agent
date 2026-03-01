@@ -277,7 +277,19 @@ namespace HappyEngine
             catch (Exception ex) { LogCrash("OnExit.KillOrphans", ex); }
 
             Managers.AppLogger.Info("App", "OnExit: cleanup complete");
+
+            // Final drain: capture any log entries written after the initial Flush,
+            // including the "cleanup complete" message above.
+            try { Managers.AppLogger.Flush(); }
+            catch { /* must not throw during exit */ }
+
             base.OnExit(e);
+
+            // Force-terminate the process at the OS level. Without this, native
+            // resources (ConPTY handles, pipe handles) and un-finalized objects
+            // can keep the CLR alive indefinitely, leaving a zombie process in
+            // Task Manager.
+            Environment.Exit(0);
         }
 
         /// <summary>

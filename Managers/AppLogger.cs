@@ -32,6 +32,8 @@ namespace HappyEngine.Managers
         // Write-batching: ConcurrentQueue handles thread safety for the file-write path
         private static readonly ConcurrentQueue<string> _writeQueue = new();
         private static Timer? _flushTimer;
+        private static volatile bool _flushed;
+        private static readonly object _drainLock = new();
 
         public static LogLevel MinLevel
         {
@@ -88,6 +90,11 @@ namespace HappyEngine.Managers
 
             // Enqueue for batched file write (ConcurrentQueue is thread-safe)
             _writeQueue.Enqueue(entry);
+
+            // After Flush() has been called, the timer is gone — drain synchronously
+            // so post-shutdown log entries are not silently lost.
+            if (_flushed)
+                DrainQueue();
         }
 
         /// <summary>
@@ -96,9 +103,15 @@ namespace HappyEngine.Managers
         /// </summary>
         public static void Flush()
         {
-            // Stop the timer so it doesn't race with this final drain
-            _flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            // Stop and dispose the timer so it doesn't race with this final drain
+            // and so its GCHandle is released (prevents keeping the process alive)
+            _flushTimer?.Dispose();
+            _flushTimer = null;
             DrainQueue();
+
+            // Mark as flushed so any subsequent Log() calls drain synchronously
+            // instead of relying on the (now-disposed) timer.
+            _flushed = true;
         }
 
         public static string[] GetRecentEntries()
@@ -141,18 +154,23 @@ namespace HappyEngine.Managers
         /// </summary>
         private static void DrainQueue()
         {
-            try
+            // Lock prevents concurrent drains (timer callback vs Flush vs post-flush Log)
+            // from interleaving file writes.
+            lock (_drainLock)
             {
-                var batch = new List<string>();
-                while (_writeQueue.TryDequeue(out var line))
-                    batch.Add(line);
+                try
+                {
+                    var batch = new List<string>();
+                    while (_writeQueue.TryDequeue(out var line))
+                        batch.Add(line);
 
-                if (batch.Count == 0) return;
+                    if (batch.Count == 0) return;
 
-                RotateIfNeeded();
-                File.AppendAllLines(LogFile, batch);
+                    RotateIfNeeded();
+                    File.AppendAllLines(LogFile, batch);
+                }
+                catch { /* last resort: don't crash the logger */ }
             }
-            catch { /* last resort: don't crash the logger */ }
         }
 
         private static void RotateIfNeeded()

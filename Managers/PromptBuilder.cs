@@ -24,9 +24,7 @@ namespace HappyEngine.Managers
 
         public const string NoGitWriteBlock =
             "# NO GIT WRITES\n" +
-            "Never execute git commands that modify repository state (commit, push, add, merge, rebase, etc.). " +
-            "Read-only commands (status, log, diff, show) are allowed. " +
-            "Refuse any task requiring git write operations.\n\n";
+            "Never modify repository state (commit, push, add, merge, rebase). Read-only git only (status, log, diff, show).\n\n";
 
         public const string GameRulesBlock =
             "# GAME PROJECT\n" +
@@ -85,14 +83,11 @@ namespace HappyEngine.Managers
 
         public const string ApplyFixBlock =
             "# APPLY FIX\n" +
-            "When you identify a bug, issue, or needed change, apply the fix directly without asking for user confirmation. " +
-            "Do not end your response with questions like \"Want me to apply the fix?\" or \"Should I implement this?\". " +
-            "Instead, implement the solution immediately and explain what you changed.\n\n";
+            "Apply fixes directly without asking for confirmation. Never ask \"Want me to apply the fix?\" — just implement and explain.\n\n";
 
         public const string ConfirmBeforeChangesBlock =
             "# CONFIRM BEFORE CHANGES\n" +
-            "Before making any code changes, describe the issue and your proposed solution, then ask the user if they want you to proceed with the implementation. " +
-            "If no changes are needed, simply provide the information or analysis requested.\n\n";
+            "Describe the issue and proposed solution before changing code. Ask the user to confirm before proceeding.\n\n";
 
         public const string FailureRecoveryBlock =
             "# FAILURE RECOVERY MODE\n" +
@@ -346,6 +341,7 @@ namespace HappyEngine.Managers
                 FileName = "powershell.exe",
                 Arguments = $"-ExecutionPolicy Bypass -File \"{ps1FilePath}\"",
                 UseShellExecute = false,
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,

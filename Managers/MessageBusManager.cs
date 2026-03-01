@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -42,7 +43,7 @@ namespace HappyEngine.Managers
     public class MessageBusManager : IDisposable
     {
         private bool _disposed;
-        private readonly Dictionary<string, BusContext> _buses = new();
+        private readonly ConcurrentDictionary<string, BusContext> _buses = new();
         private readonly Dispatcher _dispatcher;
 
         public event Action<string, BusMessage>? MessageReceived;
@@ -149,7 +150,7 @@ namespace HappyEngine.Managers
                 AppLogger.Warn("MessageBus", $"Failed to delete bus dir for {projectPath}", ex);
             }
 
-            _buses.Remove(projectPath);
+            _buses.TryRemove(projectPath, out _);
         }
 
         public void Dispose()

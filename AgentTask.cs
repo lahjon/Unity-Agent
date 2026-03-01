@@ -266,13 +266,18 @@ namespace HappyEngine
 
         public bool HasTokenData => InputTokens > 0 || OutputTokens > 0;
 
+        public long TotalAllTokens => InputTokens + OutputTokens + CacheReadTokens + CacheCreationTokens;
+
         public string TokenDisplayText
         {
             get
             {
                 if (!HasTokenData) return "";
-                var total = InputTokens + OutputTokens;
-                return $"{FormatTokenCount(total)} tokens ({FormatTokenCount(InputTokens)} in / {FormatTokenCount(OutputTokens)} out)";
+                var cost = Helpers.FormatHelpers.EstimateCost(InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens);
+                var costStr = Helpers.FormatHelpers.FormatCost(cost);
+                if (CacheReadTokens > 0 || CacheCreationTokens > 0)
+                    return $"{FormatTokenCount(TotalAllTokens)} tokens (~{costStr}) | {FormatTokenCount(InputTokens)} in / {FormatTokenCount(OutputTokens)} out / {FormatTokenCount(CacheReadTokens)} cached";
+                return $"{FormatTokenCount(TotalAllTokens)} tokens (~{costStr}) | {FormatTokenCount(InputTokens)} in / {FormatTokenCount(OutputTokens)} out";
             }
         }
 

@@ -156,15 +156,23 @@ namespace HappyEngine
             // Notify group tracker
             _taskGroupTracker.OnTaskCompleted(task);
 
-            // Check if this task is a child of a feature mode coordinator
+            // Check if this task is a child of a feature mode coordinator.
+            // Defer via BeginInvoke to prevent deeply nested FinalizeTask calls
+            // (CheckFeatureModePhaseCompletion may call moveToHistory → FinalizeTask
+            // for the parent, which would execute heavy UI work within this same
+            // synchronous call stack and freeze the UI).
             if (task.ParentTaskId != null)
             {
-                var featureParent = _activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
-                if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
+                var parentId = task.ParentTaskId;
+                Dispatcher.BeginInvoke(() =>
                 {
-                    _taskExecutionManager.CheckFeatureModePhaseCompletion(
-                        featureParent, _activeTasks, _historyTasks, MoveToHistory);
-                }
+                    var featureParent = _activeTasks.FirstOrDefault(t => t.Id == parentId);
+                    if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
+                    {
+                        _taskExecutionManager.CheckFeatureModePhaseCompletion(
+                            featureParent, _activeTasks, _historyTasks, MoveToHistory);
+                    }
+                });
             }
 
             // Launch init-queued tasks now that a slot may be free
@@ -291,14 +299,19 @@ namespace HappyEngine
             // Check if this completed/cancelled task is a child of a feature mode coordinator.
             // This is critical: without this check, the parent task never advances phases
             // because FinalizeTask (which also checks this) isn't called until much later.
+            // Uses BeginInvoke to match FinalizeTask's deferred pattern and avoid reentrancy.
             if (task?.ParentTaskId != null)
             {
-                var featureParent = _activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
-                if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
+                var parentId = task.ParentTaskId;
+                Dispatcher.BeginInvoke(() =>
                 {
-                    _taskExecutionManager.CheckFeatureModePhaseCompletion(
-                        featureParent, _activeTasks, _historyTasks, MoveToHistory);
-                }
+                    var featureParent = _activeTasks.FirstOrDefault(t => t.Id == parentId);
+                    if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
+                    {
+                        _taskExecutionManager.CheckFeatureModePhaseCompletion(
+                            featureParent, _activeTasks, _historyTasks, MoveToHistory);
+                    }
+                });
             }
         }
 
@@ -391,6 +404,72 @@ namespace HappyEngine
                 $"[HappyEngine] Re-running task #{historicTask.TaskNumber}\n", _activeTasks, _historyTasks);
 
             _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
+            UpdateStatus();
+        }
+
+        /// <summary>
+        /// Consolidates the post-creation launch sequence shared by Execute_Click
+        /// and the suggestion execution handler.  Adds the task to the active list,
+        /// creates its output tab, handles dependency registration and concurrency
+        /// limits, and either starts the process immediately or queues it.
+        /// </summary>
+        private void LaunchTask(AgentTask task, List<AgentTask>? dependencies = null)
+        {
+            task.Summary ??= TaskLauncher.GenerateLocalSummary(task.Description);
+            AddActiveTask(task);
+            _outputTabManager.CreateTab(task);
+
+            var activeDeps = dependencies?.Where(d => !d.IsFinished).ToList();
+
+            if (activeDeps is { Count: > 0 })
+            {
+                task.DependencyTaskIds = activeDeps.Select(d => d.Id).ToList();
+                task.DependencyTaskNumbers = activeDeps.Select(d => d.TaskNumber).ToList();
+
+                // Register with orchestrator so it tracks the DAG edges
+                _taskOrchestrator.AddTask(task, task.DependencyTaskIds.ToList());
+
+                if (!task.PlanOnly)
+                {
+                    // Start in plan mode first, then queue when planning completes
+                    task.IsPlanningBeforeQueue = true;
+                    task.PlanOnly = true;
+                    task.Status = AgentTaskStatus.Planning;
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"[HappyEngine] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
+                        _activeTasks, _historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                }
+                else
+                {
+                    // User explicitly wants plan-only — queue as before
+                    task.Status = AgentTaskStatus.Queued;
+                    task.QueuedReason = "Waiting for dependencies";
+                    task.BlockedByTaskId = activeDeps[0].Id;
+                    task.BlockedByTaskNumber = activeDeps[0].TaskNumber;
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"[HappyEngine] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
+                        _activeTasks, _historyTasks);
+                    _outputTabManager.UpdateTabHeader(task);
+                }
+            }
+            else if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
+            {
+                // Max concurrent sessions reached — init-queue (no Claude session yet)
+                task.Status = AgentTaskStatus.InitQueued;
+                task.QueuedReason = "Max concurrent tasks reached";
+                _outputTabManager.AppendOutput(task.Id,
+                    $"[HappyEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
+                    _activeTasks, _historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+            }
+            else
+            {
+                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+            }
+
+            RefreshFilterCombos();
             UpdateStatus();
         }
 

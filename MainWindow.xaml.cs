@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -55,6 +56,7 @@ namespace HappyEngine
         private TerminalTabManager? _terminalManager;
         private GeminiService _geminiService = null!;
         private ClaudeService _claudeService = null!;
+        private ModelConfigManager _modelConfigManager = null!;
         private HelperManager _helperManager = null!;
         private ActivityDashboardManager _activityDashboard = null!;
         private readonly TaskGroupTracker _taskGroupTracker;
@@ -68,6 +70,9 @@ namespace HappyEngine
 
         // Disposal guard
         private bool _disposed;
+
+        // Window-level cancellation — cancelled on close to abort in-flight async work
+        private readonly CancellationTokenSource _windowCts = new();
 
         // Chat
         private ChatManager _chatManager = null!;
@@ -144,6 +149,9 @@ namespace HappyEngine
             _imageManager = new ImageAttachmentManager(appDataDir, ImageIndicator, ClearImagesBtn);
             _geminiService = new GeminiService(appDataDir);
             _claudeService = new ClaudeService(appDataDir);
+            _modelConfigManager = new ModelConfigManager(appDataDir);
+            ClaudeService.AvailableModels = _modelConfigManager.ClaudeModels;
+            GeminiService.AvailableModels = _modelConfigManager.GeminiModels;
             _chatManager = new ChatManager(
                 ChatMessagesPanel, ChatScrollViewer, ChatInput, ChatSendBtn,
                 ChatModelCombo, _claudeService, _geminiService,
@@ -278,6 +286,8 @@ namespace HappyEngine
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            var ct = _windowCts.Token;
+
             try
             {
                 var hwnd = new WindowInteropHelper(this).Handle;
@@ -286,7 +296,8 @@ namespace HappyEngine
             }
             catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", "DWM dark mode attribute failed", ex); }
 
-            await LoadSystemPromptAsync();
+            await LoadSystemPromptAsync(ct);
+            ct.ThrowIfCancellationRequested();
             SystemPromptBox.Text = SystemPrompt;
 
             // Initialize Gemini API key display
@@ -326,8 +337,10 @@ namespace HappyEngine
             _chatManager.PopulateModelCombo();
 
             // Async data loading — settings, projects, history, stored tasks, saved prompts
-            await LoadStartupDataAsync();
-            await LoadSavedPromptsAsync();
+            await LoadStartupDataAsync(ct);
+            ct.ThrowIfCancellationRequested();
+            await LoadSavedPromptsAsync(ct);
+            ct.ThrowIfCancellationRequested();
             await _settingsManager.LoadTemplatesAsync();
             RenderTemplateCombo();
 
@@ -350,10 +363,10 @@ namespace HappyEngine
 
             SetupMainTabsOverflow();
 
-            await CheckClaudeCliAsync();
+            await CheckClaudeCliAsync(ct);
         }
 
-        private async System.Threading.Tasks.Task CheckClaudeCliAsync()
+        private async System.Threading.Tasks.Task CheckClaudeCliAsync(CancellationToken ct = default)
         {
             try
             {
@@ -374,10 +387,11 @@ namespace HappyEngine
                     return;
                 }
 
-                await process.WaitForExitAsync();
+                await process.WaitForExitAsync(ct);
                 if (process.ExitCode != 0)
                     ShowClaudeNotFoundWarning();
             }
+            catch (OperationCanceledException) { /* window closing — abandon check */ }
             catch (Exception)
             {
                 ShowClaudeNotFoundWarning();
@@ -395,7 +409,7 @@ namespace HappyEngine
                 "Claude CLI Not Found");
         }
 
-        private async System.Threading.Tasks.Task LoadStartupDataAsync()
+        private async System.Threading.Tasks.Task LoadStartupDataAsync(CancellationToken ct = default)
         {
             try
             {
@@ -406,6 +420,7 @@ namespace HappyEngine
                 var storedTask = _historyManager.LoadStoredTasksAsync();
 
                 await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask);
+                ct.ThrowIfCancellationRequested();
 
                 // Populate collections on the UI thread — pin Row 0 to prevent layout jitter
                 var historyItems = historyTask.Result;
@@ -431,6 +446,7 @@ namespace HappyEngine
                 _statusTimer.Start();
                 UpdateStatus();
             }
+            catch (OperationCanceledException) { /* window closing — stop startup */ }
             catch (Exception ex)
             {
                 Managers.AppLogger.Warn("MainWindow", "Failed during async startup loading", ex);
@@ -447,13 +463,14 @@ namespace HappyEngine
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HappyEngine", "system_prompt.txt");
 
-        private async System.Threading.Tasks.Task LoadSystemPromptAsync()
+        private async System.Threading.Tasks.Task LoadSystemPromptAsync(CancellationToken ct = default)
         {
             try
             {
                 if (File.Exists(SystemPromptFile))
                 {
-                    var text = await System.Threading.Tasks.Task.Run(() => File.ReadAllText(SystemPromptFile));
+                    var text = await System.Threading.Tasks.Task.Run(() => File.ReadAllText(SystemPromptFile), ct);
+                    ct.ThrowIfCancellationRequested();
                     if (text.Contains("# MCP VERIFICATION"))
                     {
                         text = text.Replace(TaskLauncher.McpPromptBlock, "");
@@ -465,6 +482,7 @@ namespace HappyEngine
                     SystemPromptBox.Text = SystemPrompt;
                 }
             }
+            catch (OperationCanceledException) { /* window closing */ }
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to load system prompt", ex); }
         }
 
@@ -508,46 +526,54 @@ namespace HappyEngine
         {
             try
             {
-                App.TraceUi("SyncSettingsForProject");
-
-                // Pin Row 0 to prevent prompt panel resize jitter during layout changes
-                var topRow = RootGrid.RowDefinitions[0];
-                if (topRow.ActualHeight > 0)
-                    topRow.Height = new GridLength(topRow.ActualHeight);
-
-                _projectManager.RefreshProjectCombo();
-                _projectManager.RefreshProjectList(
-                    p => _terminalManager?.UpdateWorkingDirectory(p),
-                    () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
-                    SyncSettingsForProject);
-                _projectManager.UpdateMcpToggleForProject();
-                var activeEntry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
-                ProjectTypeGameToggle.IsChecked = activeEntry?.IsGame == true;
-                UpdateMcpVisibility(activeEntry?.IsGame == true);
-                SyncMcpSettingsFields();
-
-                // All critical UI updates must happen synchronously (before any await)
-                // so they complete before the swap handler hides the loading overlay.
-                RefreshFilterCombos();
-                ActiveFilter_Changed(ActiveFilterCombo, null!);
-                HistoryFilter_Changed(HistoryFilterCombo, null!);
-
-                if (EditSystemPromptToggle.IsChecked == true)
-                {
-                    EditSystemPromptToggle.IsChecked = false;
-                    SystemPromptBox.Text = SystemPrompt;
-                }
-
-                UpdateStatus();
-
-                // Non-critical async work: reload helper suggestions for the new project.
-                await _helperManager.SwitchProjectAsync(_projectManager.ProjectPath);
+                await SyncSettingsForProjectAsync(_windowCts.Token);
             }
+            catch (OperationCanceledException) { /* window closing */ }
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to sync settings for project", ex); }
             finally
             {
                 RestoreStarRow();
             }
+        }
+
+        private async System.Threading.Tasks.Task SyncSettingsForProjectAsync(CancellationToken ct)
+        {
+            App.TraceUi("SyncSettingsForProject");
+
+            // Pin Row 0 to prevent prompt panel resize jitter during layout changes
+            var topRow = RootGrid.RowDefinitions[0];
+            if (topRow.ActualHeight > 0)
+                topRow.Height = new GridLength(topRow.ActualHeight);
+
+            _projectManager.RefreshProjectCombo();
+            _projectManager.RefreshProjectList(
+                p => _terminalManager?.UpdateWorkingDirectory(p),
+                () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
+                SyncSettingsForProject);
+            _projectManager.UpdateMcpToggleForProject();
+            var activeEntry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
+            ProjectTypeGameToggle.IsChecked = activeEntry?.IsGame == true;
+            UpdateMcpVisibility(activeEntry?.IsGame == true);
+            SyncMcpSettingsFields();
+
+            // All critical UI updates must happen synchronously (before any await)
+            // so they complete before the swap handler hides the loading overlay.
+            RefreshFilterCombos();
+            ActiveFilter_Changed(ActiveFilterCombo, null!);
+            HistoryFilter_Changed(HistoryFilterCombo, null!);
+
+            if (EditSystemPromptToggle.IsChecked == true)
+            {
+                EditSystemPromptToggle.IsChecked = false;
+                SystemPromptBox.Text = SystemPrompt;
+            }
+
+            UpdateStatus();
+
+            ct.ThrowIfCancellationRequested();
+
+            // Non-critical async work: reload helper suggestions for the new project.
+            await _helperManager.SwitchProjectAsync(_projectManager.ProjectPath);
         }
 
         private void SelectProjectInFilterCombo(ComboBox combo, string projectPath,
@@ -693,7 +719,7 @@ namespace HappyEngine
             {
                 var address = McpAddressBox.Text?.Trim();
                 if (string.IsNullOrEmpty(address)) { McpConnectionStatus.Text = "No address"; return; }
-                var response = await SharedHttpClient.GetAsync(address);
+                var response = await SharedHttpClient.GetAsync(address, _windowCts.Token);
                 if (response.IsSuccessStatusCode)
                 {
                     McpConnectionStatus.Text = "Connected";
@@ -1191,6 +1217,81 @@ namespace HappyEngine
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://console.anthropic.com/settings/keys") { UseShellExecute = true });
             }
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to open Claude API link", ex); }
+        }
+
+        private async void RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
+        {
+            await RefreshModelsFromApi(geminiOnly: true);
+        }
+
+        private async void RefreshClaudeModels_Click(object sender, RoutedEventArgs e)
+        {
+            await RefreshModelsFromApi(claudeOnly: true);
+        }
+
+        private async Task RefreshModelsFromApi(bool geminiOnly = false, bool claudeOnly = false)
+        {
+            RefreshGeminiModelsBtn.IsEnabled = false;
+            RefreshClaudeModelsBtn.IsEnabled = false;
+
+            var statusBlock = claudeOnly ? ClaudeRefreshStatus : GeminiRefreshStatus;
+            statusBlock.Text = "Fetching models from API...";
+            statusBlock.Foreground = (Brush)FindResource("TextMuted");
+
+            try
+            {
+                var claudeKey = claudeOnly ? _claudeService.GetApiKeyForRefresh() : null;
+                var geminiKey = geminiOnly ? _geminiService.GetApiKeyForRefresh() : null;
+
+                var (claudeCount, geminiCount, error) = await _modelConfigManager.RefreshFromApisAsync(claudeKey, geminiKey);
+
+                // Apply updated models to services
+                Managers.ClaudeService.AvailableModels = _modelConfigManager.ClaudeModels;
+                Managers.GeminiService.AvailableModels = _modelConfigManager.GeminiModels;
+
+                // Refresh Gemini model combo
+                var prevGeminiModel = GeminiModelCombo.SelectedItem as string;
+                GeminiModelCombo.Items.Clear();
+                foreach (var model in Managers.GeminiService.AvailableModels)
+                    GeminiModelCombo.Items.Add(model);
+                if (prevGeminiModel != null && GeminiModelCombo.Items.Contains(prevGeminiModel))
+                    GeminiModelCombo.SelectedItem = prevGeminiModel;
+                else if (GeminiModelCombo.Items.Count > 0)
+                    GeminiModelCombo.SelectedIndex = 0;
+
+                // Refresh chat model combo
+                _chatManager.PopulateModelCombo();
+
+                var parts = new List<string>();
+                if (claudeCount > 0) parts.Add($"{claudeCount} Claude models");
+                if (geminiCount > 0) parts.Add($"{geminiCount} Gemini models");
+
+                if (parts.Count > 0)
+                {
+                    statusBlock.Text = $"Loaded {string.Join(" + ", parts)}";
+                    statusBlock.Foreground = (Brush)FindResource("Success");
+                }
+                else if (error != null)
+                {
+                    statusBlock.Text = $"Failed: {error}";
+                    statusBlock.Foreground = (Brush)FindResource("DangerBright");
+                }
+                else
+                {
+                    statusBlock.Text = "No API key configured";
+                    statusBlock.Foreground = (Brush)FindResource("TextMuted");
+                }
+            }
+            catch (Exception ex)
+            {
+                statusBlock.Text = $"Error: {ex.Message}";
+                statusBlock.Foreground = (Brush)FindResource("DangerBright");
+            }
+            finally
+            {
+                RefreshGeminiModelsBtn.IsEnabled = true;
+                RefreshClaudeModelsBtn.IsEnabled = true;
+            }
         }
 
         // ── Project Events ─────────────────────────────────────────
@@ -1899,6 +2000,7 @@ namespace HappyEngine
             _helperAnimTimer?.Stop();
 
             // ── 3. Cancel in-flight async work ──
+            _windowCts.Cancel();
             _chatManager.CancelAndDispose();
 
             _helperManager?.Dispose();
@@ -1925,6 +2027,8 @@ namespace HappyEngine
             _taskExecutionManager.StreamingToolState.Clear();
 
             _terminalManager?.Dispose();
+
+            _windowCts.Dispose();
         }
 
         // ── Splitter drag (Thumb-based, avoids GridSplitter star-sizing jitter) ──
@@ -2615,27 +2719,8 @@ namespace HappyEngine
                 return;
             }
 
-            AddActiveTask(task);
-            _outputTabManager.CreateTab(task);
-
-            if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
-            {
-                task.Status = AgentTaskStatus.InitQueued;
-                task.QueuedReason = "Max concurrent tasks reached";
-                _outputTabManager.AppendOutput(task.Id,
-                    $"[HappyEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
-                    _activeTasks, _historyTasks);
-                _outputTabManager.UpdateTabHeader(task);
-            }
-            else
-            {
-                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-            }
-
+            LaunchTask(task);
             _helperManager.RemoveSuggestion(suggestion);
-
-            RefreshFilterCombos();
-            UpdateStatus();
         }
 
         private void RemoveSuggestion_Click(object sender, RoutedEventArgs e)
@@ -2783,5 +2868,6 @@ namespace HappyEngine
                               $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
                               $"Locks: {locks}  |  {_projectManager.ProjectPath}";
         }
+
     }
 }

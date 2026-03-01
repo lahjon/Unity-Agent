@@ -769,7 +769,7 @@ namespace HappyEngine.Managers
             Action<AgentTask> moveToHistory)
         {
             await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, finalStatus);
-            _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+            await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
 
             task.Status = finalStatus;
             task.EndTime = DateTime.Now;

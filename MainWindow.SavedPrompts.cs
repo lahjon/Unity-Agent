@@ -21,7 +21,7 @@ namespace HappyEngine
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HappyEngine", "saved_prompts.json");
 
-        private async System.Threading.Tasks.Task LoadSavedPromptsAsync()
+        private async System.Threading.Tasks.Task LoadSavedPromptsAsync(System.Threading.CancellationToken ct = default)
         {
             SavedPromptsPanel.ItemsSource = _savedPrompts;
 
@@ -29,7 +29,8 @@ namespace HappyEngine
             {
                 if (File.Exists(SavedPromptsFile))
                 {
-                    var json = await System.Threading.Tasks.Task.Run(() => File.ReadAllText(SavedPromptsFile));
+                    var json = await System.Threading.Tasks.Task.Run(() => File.ReadAllText(SavedPromptsFile), ct);
+                    ct.ThrowIfCancellationRequested();
                     var entries = System.Text.Json.JsonSerializer.Deserialize<List<SavedPromptEntry>>(json);
                     if (entries != null)
                     {
@@ -39,6 +40,7 @@ namespace HappyEngine
                     }
                 }
             }
+            catch (OperationCanceledException) { /* window closing */ }
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to load saved prompts", ex); }
         }
 

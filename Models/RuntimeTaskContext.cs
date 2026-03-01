@@ -78,6 +78,7 @@ namespace HappyEngine
             Cts?.Dispose();
             Cts = null;
 
+            try { if (Process is { HasExited: false }) Process.Kill(entireProcessTree: true); } catch { }
             try { Process?.Dispose(); } catch (Exception ex) { Managers.AppLogger.Debug("RuntimeTaskContext", $"Failed to dispose process: {ex.Message}"); }
             Process = null;
         }

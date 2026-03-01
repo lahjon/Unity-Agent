@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Windows.Media;
 
 namespace HappyEngine.Managers
@@ -138,7 +139,7 @@ namespace HappyEngine.Managers
         /// <summary>
         /// If the completing task has a ParentTaskId, finds the parent and injects the subtask result.
         /// </summary>
-        public void TryInjectSubtaskResult(AgentTask child,
+        public async System.Threading.Tasks.Task TryInjectSubtaskResultAsync(AgentTask child,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
             if (child.ParentTaskId == null) return;
@@ -151,15 +152,25 @@ namespace HappyEngine.Managers
                 return;
             }
 
-            InjectSubtaskResult(parent, child);
+            await InjectSubtaskResultAsync(parent, child);
+        }
+
+        /// <summary>
+        /// Synchronous wrapper kept for backward compatibility (non-UI-thread callers).
+        /// </summary>
+        public void TryInjectSubtaskResult(AgentTask child,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            _ = TryInjectSubtaskResultAsync(child, activeTasks, historyTasks);
         }
 
         /// <summary>
         /// Injects a subtask's result into the parent task's message bus inbox.
         /// Writes a JSON file with type='subtask_result' containing the child's
         /// summary, status, file changes, and recommendations.
+        /// Uses async git diff to avoid blocking the UI thread.
         /// </summary>
-        public void InjectSubtaskResult(AgentTask parent, AgentTask child)
+        public async System.Threading.Tasks.Task InjectSubtaskResultAsync(AgentTask parent, AgentTask child)
         {
             try
             {
@@ -167,11 +178,12 @@ namespace HappyEngine.Managers
                 var inboxDir = Path.Combine(busDir, "inbox");
                 Directory.CreateDirectory(inboxDir);
 
-                // Gather file changes from git diff
+                // Gather file changes from git diff asynchronously to avoid blocking the UI thread
                 List<object>? fileChangesList = null;
                 try
                 {
-                    var changes = TaskLauncher.GetGitFileChanges(child.ProjectPath, child.GitStartHash);
+                    var changes = await TaskLauncher.GetGitFileChangesAsync(
+                        child.ProjectPath, child.GitStartHash, CancellationToken.None);
                     if (changes != null)
                     {
                         fileChangesList = new List<object>();
@@ -217,5 +229,11 @@ namespace HappyEngine.Managers
                 AppLogger.Warn("TaskExecution", $"Failed to inject subtask result for {child.Id} into parent {parent.Id}", ex);
             }
         }
+
+        /// <summary>
+        /// Synchronous wrapper kept for backward compatibility (non-UI-thread callers).
+        /// </summary>
+        public void InjectSubtaskResult(AgentTask parent, AgentTask child)
+            => _ = InjectSubtaskResultAsync(parent, child);
     }
 }

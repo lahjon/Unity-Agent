@@ -49,6 +49,9 @@ namespace HappyEngine.Controls
         // Dirty-flag: only rebuild graph when something changed
         private bool _graphDirty = true;
 
+        // Debounce timer for collection changes (prevents redundant rebuilds during rapid additions)
+        private DispatcherTimer? _collectionDebounce;
+
         // Decomposed subsystems
         private GraphLayoutEngine _layoutEngine = null!;
         private GraphRenderer _renderer = null!;
@@ -307,13 +310,29 @@ namespace HappyEngine.Controls
                     task.PropertyChanged += OnTaskPropertyChanged;
 
             _graphDirty = true;
-            // Check drag state inside the callback, not at scheduling time,
-            // to avoid race where drag starts between scheduling and execution
-            Dispatcher.BeginInvoke(() =>
+
+            // Debounce rapid additions: coalesce multiple CollectionChanged events
+            // into a single rebuild after a short delay. This prevents redundant
+            // rebuilds when many tasks are added in quick succession (e.g. subtask
+            // spawning, workflow composition) and ensures the layout sees the full
+            // batch at once, producing correct positions.
+            if (_collectionDebounce == null)
             {
-                if (_interaction.DraggingNodeId == null && _interaction.DragSourceId == null)
-                    RebuildGraph();
-            });
+                _collectionDebounce = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(50)
+                };
+                _collectionDebounce.Tick += (_, _) =>
+                {
+                    _collectionDebounce.Stop();
+                    if (_interaction.DraggingNodeId == null && _interaction.DragSourceId == null)
+                        RebuildGraph();
+                };
+            }
+
+            // Restart the timer on each change so rapid additions are batched
+            _collectionDebounce.Stop();
+            _collectionDebounce.Start();
         }
 
         private void OnTaskPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -439,6 +458,8 @@ namespace HappyEngine.Controls
             _interaction.Dispose();
             _refreshTimer?.Stop();
             _refreshTimer = null;
+            _collectionDebounce?.Stop();
+            _collectionDebounce = null;
             if (_activeTasks != null)
             {
                 _activeTasks.CollectionChanged -= OnTasksChanged;

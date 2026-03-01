@@ -94,7 +94,6 @@ namespace HappyEngine.Managers
                 IsIgnored = isIgnored
             };
             _fileLocks[normalized] = fileLock;
-            _fileLocksView.Add(fileLock);
 
             if (!_taskLockedFiles.TryGetValue(taskId, out var files))
             {
@@ -103,7 +102,12 @@ namespace HappyEngine.Managers
             }
             files.Add(normalized);
 
-            UpdateFileLockBadge();
+            var count = _fileLocks.Count;
+            _dispatcher.BeginInvoke(() =>
+            {
+                _fileLocksView.Add(fileLock);
+                UpdateFileLockBadge(count);
+            });
             return true;
         }
 
@@ -119,16 +123,24 @@ namespace HappyEngine.Managers
         {
             if (!_taskLockedFiles.TryGetValue(taskId, out var files)) return;
 
+            var removedLocks = new List<FileLock>();
             foreach (var path in files)
             {
                 if (_fileLocks.TryGetValue(path, out var fl))
                 {
                     _fileLocks.Remove(path);
-                    _fileLocksView.Remove(fl);
+                    removedLocks.Add(fl);
                 }
             }
             _taskLockedFiles.Remove(taskId);
-            UpdateFileLockBadge();
+
+            var count = _fileLocks.Count;
+            _dispatcher.BeginInvoke(() =>
+            {
+                foreach (var fl in removedLocks)
+                    _fileLocksView.Remove(fl);
+                UpdateFileLockBadge(count);
+            });
         }
 
         public bool IsFileLocked(string normalizedPath)
@@ -275,15 +287,18 @@ namespace HappyEngine.Managers
             lock (_lockSync)
             {
                 _fileLocks.Clear();
-                _fileLocksView.Clear();
                 _taskLockedFiles.Clear();
                 _queuedTaskInfo.Clear();
             }
+            _dispatcher.BeginInvoke(() =>
+            {
+                _fileLocksView.Clear();
+                UpdateFileLockBadge(0);
+            });
         }
 
-        private void UpdateFileLockBadge()
+        private void UpdateFileLockBadge(int count)
         {
-            var count = _fileLocks.Count;
             _fileLockBadge.Text = count.ToString();
             _fileLockBadge.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }

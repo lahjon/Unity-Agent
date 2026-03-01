@@ -72,7 +72,11 @@ namespace HappyEngine.Controls
             }
 
             // Phase 2: Topological layout for remaining (non-hierarchy) tasks
-            var orphans = tasks.Where(t => !hierarchyIds.Contains(t.Id)).ToList();
+            // Sort by TaskNumber for stable ordering — new tasks (higher numbers) always
+            // sort after existing ones, preventing position collisions with preserved nodes.
+            var orphans = tasks.Where(t => !hierarchyIds.Contains(t.Id))
+                .OrderBy(t => t.TaskNumber)
+                .ToList();
 
             if (orphans.Count > 0)
             {
@@ -117,10 +121,11 @@ namespace HappyEngine.Controls
                 }
             }
 
-            // Apply computed positions — preserve existing positions for stability
+            // Apply computed positions — preserve existing positions for stability.
+            // First pass: lock in preserved positions for existing nodes.
+            var newNodes = new List<KeyValuePair<string, Point>>();
             foreach (var kvp in computed)
             {
-                // Skip the currently-dragged node entirely; MoveNode manages its position
                 if (kvp.Key == draggingNodeId)
                     continue;
 
@@ -131,10 +136,18 @@ namespace HappyEngine.Controls
                 }
                 else
                 {
-                    // New node — use computed layout position
-                    targetPositions[kvp.Key] = kvp.Value;
-                    nodePositions[kvp.Key] = kvp.Value;
+                    newNodes.Add(kvp);
                 }
+            }
+
+            // Second pass: place new nodes, resolving collisions with preserved positions.
+            // When collection order changes (e.g. finished tasks shift insertion points),
+            // a new node's computed position can overlap an existing node's preserved position.
+            foreach (var kvp in newNodes)
+            {
+                var pos = ResolveCollision(kvp.Value, nodePositions);
+                targetPositions[kvp.Key] = pos;
+                nodePositions[kvp.Key] = pos;
             }
 
             // During active drag, ensure dragged node keeps its drag position
@@ -142,6 +155,30 @@ namespace HappyEngine.Controls
             {
                 targetPositions[draggingNodeId] = nodePositions[draggingNodeId];
             }
+        }
+
+        /// <summary>
+        /// Shifts a proposed position downward until it no longer overlaps any existing node.
+        /// </summary>
+        private static Point ResolveCollision(Point pos, Dictionary<string, Point> occupied)
+        {
+            bool moved;
+            do
+            {
+                moved = false;
+                foreach (var other in occupied.Values)
+                {
+                    if (Math.Abs(pos.X - other.X) < NodeWidth &&
+                        Math.Abs(pos.Y - other.Y) < NodeHeight)
+                    {
+                        pos = new Point(pos.X, other.Y + NodeHeight + NodePadding);
+                        moved = true;
+                        break;
+                    }
+                }
+            } while (moved);
+
+            return pos;
         }
 
         public void CleanupRemovedTasks(

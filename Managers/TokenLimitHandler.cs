@@ -175,13 +175,13 @@ namespace HappyEngine.Managers
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
             await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
-            _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+            await _outputProcessor.TryInjectSubtaskResultAsync(task, activeTasks, historyTasks);
 
             task.Status = expectedStatus;
             task.EndTime = DateTime.Now;
             var statusColor = exitCode == 0
-                ? (Brush)Application.Current.FindResource("Success")
-                : (Brush)Application.Current.FindResource("DangerBright");
+                ? Application.Current?.TryFindResource("Success") as Brush ?? Brushes.Green
+                : Application.Current?.TryFindResource("DangerBright") as Brush ?? Brushes.Red;
             _outputProcessor.AppendColoredOutput(task.Id,
                 $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
                 statusColor, activeTasks, historyTasks);

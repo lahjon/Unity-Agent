@@ -13,7 +13,7 @@ namespace HappyEngine.Managers
     {
         private const string ApiBaseUrl = "https://api.anthropic.com/v1/messages";
 
-        public static readonly string[] AvailableModels = new[]
+        public static string[] AvailableModels { get; set; } =
         {
             "claude-sonnet-4-20250514",
             "claude-haiku-4-20250414",
