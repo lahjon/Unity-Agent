@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using HappyEngine.Models;
 
 namespace HappyEngine
@@ -88,7 +89,26 @@ namespace HappyEngine
 
         // Feature mode multi-phase tracking
         public FeatureModePhase FeatureModePhase { get; set; }
-        public List<string> FeaturePhaseChildIds { get; set; } = new();
+
+        // Thread-safe feature phase child IDs
+        private readonly object _featurePhaseChildIdsLock = new();
+        private List<string> _featurePhaseChildIds = new();
+
+        /// <summary>
+        /// Gets a snapshot (copy) of the feature phase child IDs for safe iteration,
+        /// or replaces the entire list under lock.
+        /// </summary>
+        public List<string> FeaturePhaseChildIds
+        {
+            get { lock (_featurePhaseChildIdsLock) return _featurePhaseChildIds.ToList(); }
+            set { lock (_featurePhaseChildIdsLock) _featurePhaseChildIds = value ?? new List<string>(); }
+        }
+
+        public void AddFeaturePhaseChildId(string id) { lock (_featurePhaseChildIdsLock) _featurePhaseChildIds.Add(id); }
+        public void ClearFeaturePhaseChildIds() { lock (_featurePhaseChildIdsLock) _featurePhaseChildIds.Clear(); }
+        public bool ContainsFeaturePhaseChildId(string id) { lock (_featurePhaseChildIdsLock) return _featurePhaseChildIds.Contains(id); }
+        public int FeaturePhaseChildIdCount { get { lock (_featurePhaseChildIdsLock) return _featurePhaseChildIds.Count; } }
+
         public string OriginalFeatureDescription { get; set; } = "";
     }
 }

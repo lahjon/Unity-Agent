@@ -115,6 +115,10 @@ namespace HappyEngine
         public string? ParentTaskId { get => Data.ParentTaskId; set => Data.ParentTaskId = value; }
         public List<string> ChildTaskIds { get => Data.ChildTaskIds; set => Data.ChildTaskIds = value; }
         public List<string> FeaturePhaseChildIds { get => Data.FeaturePhaseChildIds; set => Data.FeaturePhaseChildIds = value; }
+        public void AddFeaturePhaseChildId(string id) => Data.AddFeaturePhaseChildId(id);
+        public void ClearFeaturePhaseChildIds() => Data.ClearFeaturePhaseChildIds();
+        public bool ContainsFeaturePhaseChildId(string id) => Data.ContainsFeaturePhaseChildId(id);
+        public int FeaturePhaseChildIdCount => Data.FeaturePhaseChildIdCount;
         public string OriginalFeatureDescription { get => Data.OriginalFeatureDescription; set => Data.OriginalFeatureDescription = value; }
 
         // ── Persistent data delegation (with notification) ───────────────
@@ -296,6 +300,7 @@ namespace HappyEngine
         public System.Windows.Threading.DispatcherTimer? FeatureModeIterationTimer { get => Runtime.FeatureModeIterationTimer; set => Runtime.FeatureModeIterationTimer = value; }
         public System.Windows.Threading.DispatcherTimer? TokenLimitRetryTimer { get => Runtime.TokenLimitRetryTimer; set => Runtime.TokenLimitRetryTimer = value; }
         public int ConsecutiveFailures { get => Runtime.ConsecutiveFailures; set => Runtime.ConsecutiveFailures = value; }
+        public int ConsecutiveTokenLimitRetries { get => Runtime.ConsecutiveTokenLimitRetries; set => Runtime.ConsecutiveTokenLimitRetries = value; }
         public int LastIterationOutputStart { get => Runtime.LastIterationOutputStart; set => Runtime.LastIterationOutputStart = value; }
         public Process? Process { get => Runtime.Process; set => Runtime.Process = value; }
         public System.Threading.CancellationTokenSource? Cts { get => Runtime.Cts; set => Runtime.Cts = value; }

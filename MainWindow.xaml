@@ -1140,9 +1140,25 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Border.Triggers>
-                <DockPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <TextBlock Grid.Row="0" Text="PROJECTS" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                               FontSize="10" FontFamily="Segoe UI" Margin="4,2,0,6"/>
+
+                    <!-- Project list with ScrollViewer -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="ProjectListPanel" Margin="0"/>
+                    </ScrollViewer>
+
                     <!-- Add / Create Project form -->
-                    <Border DockPanel.Dock="Bottom" Background="{StaticResource BgSection}" CornerRadius="6"
+                    <Border Grid.Row="2" Background="{StaticResource BgSection}" CornerRadius="6"
                             BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" Margin="0,6,0,0" Padding="8">
                         <StackPanel>
                             <Border Background="{StaticResource BgDeep}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
@@ -1159,14 +1175,7 @@
                                     HorizontalAlignment="Stretch" Margin="0,6,0,0" Padding="10,4"/>
                         </StackPanel>
                     </Border>
-                    <!-- Header -->
-                    <TextBlock DockPanel.Dock="Top" Text="PROJECTS" Foreground="{StaticResource Accent}" FontWeight="Bold"
-                               FontSize="10" FontFamily="Segoe UI" Margin="4,2,0,6"/>
-                    <!-- Project list -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel x:Name="ProjectListPanel" Margin="0"/>
-                    </ScrollViewer>
-                </DockPanel>
+                </Grid>
             </Border>
 
         <!-- Vertical Splitter: Left ↔ Center/Right -->
@@ -1761,12 +1770,12 @@
                DragDelta="ChatSplitter_DragDelta" Visibility="Collapsed"/>
 
         <Grid Grid.Column="6" Grid.Row="2" Grid.RowSpan="3">
-            <!-- Statistics panel -->
+            <!-- Project Info panel -->
             <Border x:Name="FileLocksPanel" Background="{StaticResource BgSurface}" CornerRadius="8"
                     BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Padding="8">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-                        <TextBlock Text="STATISTICS" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                        <TextBlock Text="PROJECT INFO" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                    FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                     </DockPanel>
                     <TabControl x:Name="StatisticsTabs" Style="{StaticResource SettingsTabControlStyle}"
@@ -1862,6 +1871,101 @@
                                         </GridView>
                                     </ListView.View>
                                 </ListView>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </TabItem>
+                        <!-- Todo tab -->
+                        <TabItem x:Name="TodoTabItem">
+                            <TabItem.Header>
+                                <TextBlock Text="Todo" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            </TabItem.Header>
+                            <DockPanel Margin="0,6,0,0">
+                                <!-- Input area -->
+                                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                    <Button x:Name="AddTodoBtn" Content="Add" Click="AddTodo_Click"
+                                            Style="{StaticResource SmallBtn}" DockPanel.Dock="Right"
+                                            Margin="8,0,0,0" Width="50">
+                                        <Button.Background>
+                                            <SolidColorBrush Color="{StaticResource AccentColor}"/>
+                                        </Button.Background>
+                                    </Button>
+                                    <TextBox x:Name="TodoInputBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             FontSize="12" Padding="8,6"
+                                             KeyDown="TodoInput_KeyDown">
+                                        <TextBox.Tag>
+                                            <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Add a new todo item...</sys:String>
+                                        </TextBox.Tag>
+                                    </TextBox>
+                                </DockPanel>
+
+                                <!-- Todo list -->
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl x:Name="TodoListControl">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="TodoItemBorder"
+                                                        Background="{StaticResource BgSubtle}"
+                                                        CornerRadius="6"
+                                                        Padding="12,8"
+                                                        Margin="0,0,0,4"
+                                                        Cursor="Hand"
+                                                        MouseLeftButtonUp="TodoItem_Click">
+                                                    <Border.Triggers>
+                                                        <EventTrigger RoutedEvent="MouseEnter">
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <ColorAnimation Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                                                    To="#2A2A2A" Duration="0:0:0.15"/>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </EventTrigger>
+                                                        <EventTrigger RoutedEvent="MouseLeave">
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <ColorAnimation Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                                                    To="#1F1F1F" Duration="0:0:0.15"/>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </EventTrigger>
+                                                    </Border.Triggers>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Checkbox visual -->
+                                                        <Border Grid.Column="0" Width="16" Height="16"
+                                                                BorderThickness="2" CornerRadius="3"
+                                                                BorderBrush="{StaticResource TextDim}"
+                                                                Background="Transparent"
+                                                                Margin="0,0,10,0">
+                                                            <Path x:Name="CheckMark"
+                                                                  Data="M 2,6 L 6,10 L 14,2"
+                                                                  Stroke="{StaticResource Accent}"
+                                                                  StrokeThickness="2"
+                                                                  Visibility="Collapsed"/>
+                                                        </Border>
+
+                                                        <!-- Todo text -->
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Text}"
+                                                                   Foreground="{StaticResource TextLight}"
+                                                                   FontSize="12"
+                                                                   FontFamily="Segoe UI"
+                                                                   VerticalAlignment="Center"
+                                                                   TextWrapping="Wrap"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
                                 </ScrollViewer>
                             </DockPanel>
                         </TabItem>

@@ -233,25 +233,6 @@ namespace HappyEngine
             // Notify group tracker
             _taskGroupTracker.OnTaskCompleted(task);
 
-            // Check if this task is a child of a feature mode coordinator.
-            // Defer via BeginInvoke to prevent deeply nested FinalizeTask calls
-            // (CheckFeatureModePhaseCompletion may call moveToHistory → FinalizeTask
-            // for the parent, which would execute heavy UI work within this same
-            // synchronous call stack and freeze the UI).
-            if (task.ParentTaskId != null)
-            {
-                var parentId = task.ParentTaskId;
-                _ = Dispatcher.BeginInvoke(() =>
-                {
-                    var featureParent = _activeTasks.FirstOrDefault(t => t.Id == parentId);
-                    if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
-                    {
-                        _taskExecutionManager.CheckFeatureModePhaseCompletion(
-                            featureParent, _activeTasks, _historyTasks, MoveToHistory);
-                    }
-                });
-            }
-
             // Launch init-queued tasks now that a slot may be free
             DrainInitQueue();
         }
@@ -420,24 +401,6 @@ namespace HappyEngine
                 _failureRecoveryManager.TrySpawnRecoveryTask(task, _activeTasks, _historyTasks);
 
             _taskOrchestrator.OnTaskCompleted(taskId);
-
-            // Check if this completed/cancelled task is a child of a feature mode coordinator.
-            // This is critical: without this check, the parent task never advances phases
-            // because FinalizeTask (which also checks this) isn't called until much later.
-            // Uses BeginInvoke to match FinalizeTask's deferred pattern and avoid reentrancy.
-            if (task?.ParentTaskId != null)
-            {
-                var parentId = task.ParentTaskId;
-                Dispatcher.BeginInvoke(() =>
-                {
-                    var featureParent = _activeTasks.FirstOrDefault(t => t.Id == parentId);
-                    if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
-                    {
-                        _taskExecutionManager.CheckFeatureModePhaseCompletion(
-                            featureParent, _activeTasks, _historyTasks, MoveToHistory);
-                    }
-                });
-            }
         }
 
         private void OnTaskGroupCompleted(object? sender, GroupCompletedEventArgs e)

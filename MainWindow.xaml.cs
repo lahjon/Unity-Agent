@@ -50,6 +50,7 @@ namespace HappyEngine
         private ICollectionView? _activeView;
         private ICollectionView? _historyView;
         private ICollectionView? _storedView;
+        private ICollectionView? _fileLocksView;
         private readonly DispatcherTimer _statusTimer;
 
         // Managers
@@ -65,6 +66,7 @@ namespace HappyEngine
         private GeminiService _geminiService = null!;
         private ClaudeService _claudeService = null!;
         private ModelConfigManager _modelConfigManager = null!;
+        private TodoManager _todoManager = null!;
         private HelperManager _helperManager = null!;
         private ActivityDashboardManager _activityDashboard = null!;
         private GitPanelManager _gitPanelManager = null!;
@@ -163,6 +165,7 @@ namespace HappyEngine
             _modelConfigManager = new ModelConfigManager(appDataDir);
             ClaudeService.AvailableModels = _modelConfigManager.ClaudeModels;
             GeminiService.AvailableModels = _modelConfigManager.GeminiModels;
+            _todoManager = new TodoManager(appDataDir);
             _chatManager = new ChatManager(
                 ChatMessagesPanel, ChatScrollViewer, ChatInput, ChatSendBtn,
                 ChatModelCombo, _claudeService, _geminiService,
@@ -198,6 +201,7 @@ namespace HappyEngine
                 () => _settingsManager.AutoVerify);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
+            _taskExecutionManager.TaskNeedsOrchestratorRegistration += (task, deps) => _taskOrchestrator.AddTask(task, deps);
 
             _failureRecoveryManager = new FailureRecoveryManager(
                 _taskExecutionManager, _outputTabManager, _taskFactory,
@@ -229,10 +233,11 @@ namespace HappyEngine
             _activeView = CollectionViewSource.GetDefaultView(_activeTasks);
             _historyView = CollectionViewSource.GetDefaultView(_historyTasks);
             _storedView = CollectionViewSource.GetDefaultView(_storedTasks);
+            _fileLocksView = CollectionViewSource.GetDefaultView(_fileLockManager.FileLocksView);
             ActiveTasksList.ItemsSource = _activeView;
             HistoryTasksList.ItemsSource = _historyView;
             StoredTasksList.ItemsSource = _storedView;
-            FileLocksListView.ItemsSource = _fileLockManager.FileLocksView;
+            FileLocksListView.ItemsSource = _fileLocksView;
             SuggestionsListView.ItemsSource = _helperManager.Suggestions;
 
             _activeTasks.CollectionChanged += OnCollectionChangedUpdateTabs;
@@ -240,6 +245,7 @@ namespace HappyEngine
             _storedTasks.CollectionChanged += OnCollectionChangedUpdateTabs;
             UpdateTabCounts();
             InitializeNodeGraphPanel();
+            UpdateFileLocks();
 
             _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(Constants.AppConstants.StatusTimerIntervalSeconds) };
             _statusTimer.Tick += (_, _) =>
@@ -449,8 +455,9 @@ namespace HappyEngine
                 var historyTask = _historyManager.LoadHistoryAsync(_settingsManager.HistoryRetentionHours);
                 var storedTask = _historyManager.LoadStoredTasksAsync();
                 var activeQueueTask = _historyManager.LoadActiveQueueAsync();
+                var todosTask = _todoManager.LoadTodosAsync();
 
-                await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask, activeQueueTask);
+                await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask, activeQueueTask, todosTask);
                 ct.ThrowIfCancellationRequested();
 
                 // Populate collections on the UI thread — pin Row 0 to prevent layout jitter
@@ -470,6 +477,7 @@ namespace HappyEngine
                 RestoreStarRow();
                 RefreshFilterCombos();
                 RefreshActivityDashboard();
+                InitializeTodoList();
                 _projectManager.RefreshProjectList(
                     p => _terminalManager?.UpdateWorkingDirectory(p),
                     () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
@@ -2037,16 +2045,56 @@ namespace HappyEngine
         {
             LoadingOverlay.Visibility = Visibility.Collapsed;
 
-            // Mark git panel as dirty to force refresh with new project's git status
+            // Mark all panels as dirty to force refresh with new project
             _gitPanelManager.MarkDirty();
+            _activityDashboard.MarkDirty();
 
-            // If git tab is currently selected, refresh it immediately
+            // Refresh the currently selected tab immediately
             if (StatisticsTabs.SelectedItem == GitTabItem)
                 _gitPanelManager.RefreshIfNeeded(GitTabContent);
+            else if (StatisticsTabs.SelectedItem == ActivityTabItem)
+                _activityDashboard.RefreshIfNeeded(ActivityTabContent, _projectManager.ProjectPath);
+
+            // Update file locks display
+            UpdateFileLocks();
+        }
+
+        private void UpdateFileLocks()
+        {
+            if (_fileLocksView != null)
+            {
+                var currentProjectPath = _projectManager.ProjectPath;
+                _fileLocksView.Filter = (obj) =>
+                {
+                    if (obj is FileLock fileLock)
+                    {
+                        // Find the task that owns this lock
+                        var ownerTask = _activeTasks.FirstOrDefault(t => t.Id == fileLock.OwnerTaskId);
+                        if (ownerTask != null)
+                        {
+                            // Only show file locks for tasks in the current project
+                            return NormalizePath(ownerTask.ProjectPath) == NormalizePath(currentProjectPath);
+                        }
+                    }
+                    return false;
+                };
+                _fileLocksView.Refresh();
+            }
+        }
+
+        private static string NormalizePath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            return path.Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
         }
 
         private void OnCollectionChangedUpdateTabs(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-            => UpdateTabCounts();
+        {
+            UpdateTabCounts();
+            // Also update file locks filter when active tasks change
+            if (sender == _activeTasks)
+                UpdateFileLocks();
+        }
 
         // ── Window Close ───────────────────────────────────────────
 
@@ -2527,7 +2575,7 @@ namespace HappyEngine
         {
             if (e.Source != StatisticsTabs) return;
             if (StatisticsTabs.SelectedItem == ActivityTabItem)
-                _activityDashboard.RefreshIfNeeded(ActivityTabContent);
+                _activityDashboard.RefreshIfNeeded(ActivityTabContent, _projectManager.ProjectPath);
             else if (StatisticsTabs.SelectedItem == GitTabItem)
                 _gitPanelManager.RefreshIfNeeded(GitTabContent);
         }
@@ -2638,7 +2686,7 @@ namespace HappyEngine
             _activityDashboard.MarkDirty();
             _gitPanelManager.MarkDirty();
             if (StatisticsTabs.SelectedItem == ActivityTabItem)
-                _activityDashboard.RefreshIfNeeded(ActivityTabContent);
+                _activityDashboard.RefreshIfNeeded(ActivityTabContent, _projectManager.ProjectPath);
             else if (StatisticsTabs.SelectedItem == GitTabItem)
                 _gitPanelManager.RefreshIfNeeded(GitTabContent);
         }
@@ -2949,6 +2997,104 @@ namespace HappyEngine
         private void ChatInput_DragOver(object sender, DragEventArgs e) => _chatManager.HandleDragOver(e);
         private void ChatInput_Drop(object sender, DragEventArgs e) => _chatManager.HandleDrop(e);
         private void ChatModelCombo_Changed(object sender, SelectionChangedEventArgs e) => _chatManager.HandleModelComboChanged();
+
+        // ── Todo Panel ─────────────────────────────────────────────
+
+        private void InitializeTodoList()
+        {
+            if (_todoManager?.Todos != null)
+            {
+                TodoListControl.ItemsSource = new ObservableCollection<TodoItem>(_todoManager.Todos);
+            }
+        }
+
+        private void AddTodo_Click(object sender, RoutedEventArgs e)
+        {
+            AddTodoItem();
+        }
+
+        private void TodoInput_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                e.Handled = true;
+                AddTodoItem();
+            }
+        }
+
+        private void AddTodoItem()
+        {
+            var text = TodoInputBox.Text?.Trim();
+            if (string.IsNullOrEmpty(text) || text == TodoInputBox.Tag?.ToString())
+                return;
+
+            _todoManager.AddTodo(text);
+            TodoInputBox.Clear();
+
+            // Add to UI
+            if (TodoListControl.ItemsSource is ObservableCollection<TodoItem> todos)
+            {
+                todos.Add(_todoManager.Todos.Last());
+            }
+        }
+
+        private async void TodoItem_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is Border border && border.DataContext is TodoItem todo)
+            {
+                // Find the check mark path
+                var checkMark = FindVisualChild<System.Windows.Shapes.Path>(border, "CheckMark");
+                if (checkMark != null)
+                {
+                    // Show check mark with animation
+                    checkMark.Visibility = Visibility.Visible;
+                    var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
+                    checkMark.BeginAnimation(OpacityProperty, fadeIn);
+                }
+
+                // Animate the border background to green
+                var bgAnimation = new ColorAnimation
+                {
+                    To = Color.FromRgb(78, 201, 105), // Success green
+                    Duration = TimeSpan.FromMilliseconds(300)
+                };
+
+                var brush = new SolidColorBrush((Color)FindResource("BgSubtleColor"));
+                border.Background = brush;
+                brush.BeginAnimation(SolidColorBrush.ColorProperty, bgAnimation);
+
+                // Mark as completed
+                _todoManager.CompleteTodo(todo);
+
+                // Wait for animation, then remove with fade out
+                await System.Threading.Tasks.Task.Delay(400);
+
+                var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
+                fadeOut.Completed += (s, args) =>
+                {
+                    if (TodoListControl.ItemsSource is ObservableCollection<TodoItem> todos)
+                    {
+                        todos.Remove(todo);
+                    }
+                };
+                border.BeginAnimation(OpacityProperty, fadeOut);
+            }
+        }
+
+        private static T? FindVisualChild<T>(DependencyObject parent, string name) where T : FrameworkElement
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T element && element.Name == name)
+                    return element;
+
+                var result = FindVisualChild<T>(child, name);
+                if (result != null)
+                    return result;
+            }
+            return null;
+        }
 
         // ── Status ─────────────────────────────────────────────────
 

@@ -730,12 +730,11 @@ namespace HappyEngine.Managers
                     Foreground = BrushCache.Theme("TextLight"),
                     FontSize = 11,
                     FontFamily = new FontFamily("Consolas"),
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = BrushCache.Theme("BgElevated"),
                     Padding = new Thickness(8, 6, 8, 6),
                     IsReadOnly = true,
                     TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 8)
+                    Margin = new Thickness(0, 0, 0, 8),
+                    BorderThickness = new Thickness(1)
                 };
                 panel.Children.Add(suggestionBox);
             }
@@ -1611,19 +1610,16 @@ secrets.json
                 VerticalAlignment = VerticalAlignment.Center
             });
 
-            return new Button
+            var button = new Button
             {
                 Content = stack,
                 ToolTip = tooltip,
-                Foreground = BrushCache.Theme("TextLight"),
-                Background = BrushCache.Theme("BgElevated"),
-                BorderThickness = new Thickness(1),
-                BorderBrush = BrushCache.Theme("BorderMedium"),
-                Padding = new Thickness(10, 5, 10, 5),
-                Margin = new Thickness(0, 0, 6, 4),
-                Cursor = System.Windows.Input.Cursors.Hand,
-                HorizontalAlignment = HorizontalAlignment.Left
+                Style = Application.Current.TryFindResource("SmallBtn") as Style,
+                Background = BrushCache.Theme("Accent"),
+                Margin = new Thickness(0, 0, 6, 4)
             };
+
+            return button;
         }
 
         private static Border MakeSeparator()

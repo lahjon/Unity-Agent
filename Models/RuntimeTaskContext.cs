@@ -24,6 +24,7 @@ namespace HappyEngine
         public System.Windows.Threading.DispatcherTimer? FeatureModeRetryTimer { get; set; }
         public System.Windows.Threading.DispatcherTimer? FeatureModeIterationTimer { get; set; }
         public int ConsecutiveFailures { get; set; }
+        public int ConsecutiveTokenLimitRetries { get; set; }
         public int LastIterationOutputStart { get; set; }
 
         // Token limit retry (all task types)

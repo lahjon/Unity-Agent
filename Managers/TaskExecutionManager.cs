@@ -69,6 +69,9 @@ namespace HappyEngine.Managers
         /// <summary>Fires when a subtask is spawned (parent, child). MainWindow subscribes to wire the subtask into _activeTasks and create its output tab.</summary>
         public event Action<AgentTask, AgentTask>? SubTaskSpawned;
 
+        /// <summary>Fires when a task transitions to Queued with unresolved dependencies after planning, so the orchestrator can track it.</summary>
+        public event Action<AgentTask, List<string>>? TaskNeedsOrchestratorRegistration;
+
         public TaskExecutionManager(
             string scriptDir,
             FileLockManager fileLockManager,
@@ -460,27 +463,29 @@ namespace HappyEngine.Managers
 
             // If a follow-up was started during summary generation, the status will
             // have changed from Verifying to Running — don't overwrite it.
-            if (task.Status != AgentTaskStatus.Verifying)
-                return;
-
-            // Now set the final status after summary is complete
-            task.Status = expectedStatus;
-            task.EndTime = DateTime.Now;
-            try
+            if (task.Status == AgentTaskStatus.Verifying)
             {
-                var statusColor = exitCode == 0
-                    ? (Brush)Application.Current.FindResource("Success")
-                    : (Brush)Application.Current.FindResource("DangerBright");
-                _outputProcessor.AppendColoredOutput(task.Id,
-                    $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
-                    statusColor, activeTasks, historyTasks);
+                // Now set the final status after summary is complete
+                task.Status = expectedStatus;
+                task.EndTime = DateTime.Now;
+                try
+                {
+                    var statusColor = exitCode == 0
+                        ? (Brush)Application.Current.FindResource("Success")
+                        : (Brush)Application.Current.FindResource("DangerBright");
+                    _outputProcessor.AppendColoredOutput(task.Id,
+                        $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
+                        statusColor, activeTasks, historyTasks);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Error("TaskExecution", $"Failed to append completion output for task {task.Id}", ex);
+                }
+                _outputTabManager.UpdateTabHeader(task);
             }
-            catch (Exception ex)
-            {
-                AppLogger.Error("TaskExecution", $"Failed to append completion output for task {task.Id}", ex);
-            }
-            _outputTabManager.UpdateTabHeader(task);
 
+            // Always check queued tasks and fire TaskCompleted event,
+            // even if status changed during verification
             _fileLockManager.CheckQueuedTasks(activeTasks);
             TaskCompleted?.Invoke(task.Id);
         }
@@ -528,15 +533,16 @@ namespace HappyEngine.Managers
 
             // If a follow-up was started during summary generation, the status will
             // have changed from Verifying to Running — don't overwrite it.
-            if (task.Status != AgentTaskStatus.Verifying)
-                return;
+            if (task.Status == AgentTaskStatus.Verifying)
+            {
+                task.Status = expectedStatus;
+                task.EndTime = DateTime.Now;
+                _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Follow-up complete.\n", activeTasks, historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+            }
 
-            task.Status = expectedStatus;
-            task.EndTime = DateTime.Now;
-            _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Follow-up complete.\n", activeTasks, historyTasks);
-            _outputTabManager.UpdateTabHeader(task);
-
-            // Check queued tasks after releasing locks to unblock waiting tasks
+            // Always check queued tasks and fire TaskCompleted event,
+            // even if status changed during verification
             _fileLockManager.CheckQueuedTasks(activeTasks);
             TaskCompleted?.Invoke(task.Id);
         }
@@ -932,6 +938,10 @@ namespace HappyEngine.Managers
                         $"{string.Join(", ", task.DependencyTaskNumbers.Select(n => $"#{n}"))}\n",
                         activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
+
+                    // Re-add task to orchestrator to ensure it's properly tracked
+                    // after transitioning from Planning to Queued state
+                    TaskNeedsOrchestratorRegistration?.Invoke(task, task.DependencyTaskIds.ToList());
                     return;
                 }
                 // Dependencies resolved during planning — gather context before clearing
@@ -1449,14 +1459,18 @@ namespace HappyEngine.Managers
         {
             if (!featureParent.IsFeatureMode) return;
             if (featureParent.FeatureModePhase is not (FeatureModePhase.TeamPlanning or FeatureModePhase.Execution)) return;
-            if (featureParent.FeaturePhaseChildIds.Count == 0) return;
+            if (featureParent.FeaturePhaseChildIdCount == 0) return;
 
             var children = featureParent.FeaturePhaseChildIds
                 .Select(id => activeTasks.FirstOrDefault(t => t.Id == id)
                            ?? historyTasks.FirstOrDefault(t => t.Id == id))
+                .Where(c => c != null)
                 .ToList();
 
-            var allComplete = children.All(c => c?.IsFinished == true);
+            // Guard against empty list after filtering
+            if (children.Count == 0) return;
+
+            var allComplete = children.Count > 0 && children.All(c => c != null && c.IsFinished);
             if (!allComplete) return;
 
             // If ALL children were cancelled, abort the feature mode task gracefully
@@ -1472,6 +1486,57 @@ namespace HappyEngine.Managers
                 _outputTabManager.UpdateTabHeader(featureParent);
                 moveToHistory(featureParent);
                 return;
+            }
+
+            // Handle mixed cancelled/completed children
+            var cancelledChildren = children.Where(c => c?.Status == AgentTaskStatus.Cancelled).ToList();
+            var completedChildren = children.Where(c => c?.Status == AgentTaskStatus.Completed || c?.Status == AgentTaskStatus.Failed).ToList();
+
+            if (cancelledChildren.Count > 0)
+            {
+                // Log warnings about cancelled children
+                _outputProcessor.AppendOutput(featureParent.Id,
+                    $"\n[Feature Mode] Warning: {cancelledChildren.Count} out of {children.Count} subtasks were cancelled:\n",
+                    activeTasks, historyTasks);
+
+                foreach (var cancelled in cancelledChildren)
+                {
+                    if (cancelled != null)
+                    {
+                        _outputProcessor.AppendOutput(featureParent.Id,
+                            $"  - Task #{cancelled.TaskNumber}: {cancelled.Summary ?? cancelled.Description}\n",
+                            activeTasks, historyTasks);
+                    }
+                }
+
+                // If more than half the children were cancelled, fail the phase entirely
+                if (cancelledChildren.Count > children.Count / 2)
+                {
+                    _outputProcessor.AppendOutput(featureParent.Id,
+                        $"\n[Feature Mode] Majority of subtasks ({cancelledChildren.Count}/{children.Count}) were cancelled. Aborting feature mode.\n",
+                        activeTasks, historyTasks);
+                    featureParent.Status = AgentTaskStatus.Failed;
+                    featureParent.EndTime = DateTime.Now;
+                    featureParent.CompletionSummary = $"Feature mode aborted: {cancelledChildren.Count} out of {children.Count} subtasks were cancelled";
+                    _outputTabManager.UpdateTabHeader(featureParent);
+                    moveToHistory(featureParent);
+                    return;
+                }
+
+                // Filter out cancelled children from FeaturePhaseChildIds before proceeding
+                var cancelledIds = cancelledChildren.Where(c => c != null).Select(c => c.Id).ToHashSet();
+                var validChildIds = featureParent.FeaturePhaseChildIds
+                    .Where(id => !cancelledIds.Contains(id))
+                    .ToList();
+                featureParent.ClearFeaturePhaseChildIds();
+                foreach (var id in validChildIds)
+                {
+                    featureParent.AddFeaturePhaseChildId(id);
+                }
+
+                _outputProcessor.AppendOutput(featureParent.Id,
+                    $"\n[Feature Mode] Proceeding with {completedChildren.Count} completed subtasks, ignoring {cancelledChildren.Count} cancelled ones.\n",
+                    activeTasks, historyTasks);
             }
 
             _featureModeHandler.OnFeatureModePhaseComplete(featureParent, activeTasks, historyTasks, moveToHistory);

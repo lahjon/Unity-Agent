@@ -107,8 +107,30 @@ namespace HappyEngine.Managers
                 return;
             }
 
-            // Check consecutive failures
-            if (exitCode != 0 && !_completionAnalyzer.IsTokenLimitError(iterationOutput))
+            // Check for token limit error first
+            if (_completionAnalyzer.IsTokenLimitError(iterationOutput))
+            {
+                task.ConsecutiveTokenLimitRetries++;
+                const int maxTokenLimitRetries = 5;
+
+                if (task.ConsecutiveTokenLimitRetries >= maxTokenLimitRetries)
+                {
+                    _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Max token limit retries ({maxTokenLimitRetries}) reached. Stopping.\n", activeTasks, historyTasks);
+                    FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
+                    return;
+                }
+
+                HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory);
+                return;
+            }
+            else
+            {
+                // Reset token limit retry counter on successful non-token-limit run
+                task.ConsecutiveTokenLimitRetries = 0;
+            }
+
+            // Check consecutive failures (only if not a token limit error)
+            if (exitCode != 0)
             {
                 task.ConsecutiveFailures++;
                 _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Phase process exited with code {exitCode} (failure {task.ConsecutiveFailures}/{FeatureModeMaxConsecutiveFailures})\n", activeTasks, historyTasks);
@@ -121,14 +143,8 @@ namespace HappyEngine.Managers
             }
             else
             {
+                // Only reset consecutive failures when exitCode is 0
                 task.ConsecutiveFailures = 0;
-            }
-
-            // Token limit retry
-            if (_completionAnalyzer.IsTokenLimitError(iterationOutput))
-            {
-                HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory);
-                return;
             }
 
             // Route based on current phase
@@ -184,40 +200,55 @@ namespace HappyEngine.Managers
             if (string.IsNullOrWhiteSpace(task.Summary) || !task.Summary.StartsWith("[Main]"))
                 task.Summary = $"[Main] {(task.Summary ?? _taskFactory.GenerateLocalSummary(task.OriginalFeatureDescription))}";
 
-            // Configure team members for planning only (no file modifications)
-            task.FeaturePhaseChildIds.Clear();
+            // First pass: Configure team members for planning only (no file modifications)
+            task.ClearFeaturePhaseChildIds();
+            foreach (var child in children)
+            {
+                child.SpawnTeam = false;
+                child.AutoDecompose = false;
+                child.IsFeatureMode = false;
+                child.UseMessageBus = true;
+                child.NoGitWrite = true;
+                child.SkipPermissions = true;
+                // Inject planning-only restriction so team members don't write files
+                // (e.g., ARCHITECTURE.md) that could conflict between concurrent agents
+                child.AdditionalInstructions = PromptBuilder.PlanningTeamMemberBlock +
+                    (child.AdditionalInstructions ?? "");
+            }
+
+            // Second pass: Spawn all children, tracking successes
             var spawnedCount = 0;
+            bool anySpawnFailed = false;
             foreach (var child in children)
             {
                 try
                 {
-                    child.SpawnTeam = false;
-                    child.AutoDecompose = false;
-                    child.IsFeatureMode = false;
-                    child.UseMessageBus = true;
-                    child.NoGitWrite = true;
-                    child.SkipPermissions = true;
-                    // Inject planning-only restriction so team members don't write files
-                    // (e.g., ARCHITECTURE.md) that could conflict between concurrent agents
-                    child.AdditionalInstructions = PromptBuilder.PlanningTeamMemberBlock +
-                        (child.AdditionalInstructions ?? "");
-                    task.FeaturePhaseChildIds.Add(child.Id);
+                    task.AddFeaturePhaseChildId(child.Id);
                     FeatureModeChildSpawned?.Invoke(task, child);
                     spawnedCount++;
                 }
                 catch (Exception ex)
                 {
+                    anySpawnFailed = true;
                     AppLogger.Warn("FeatureMode", $"Failed to spawn team member '{child.Summary}' for task {task.Id}", ex);
                     _outputProcessor.AppendOutput(task.Id,
                         $"\n[Feature Mode] WARNING: Failed to spawn team member: {ex.Message}\n",
                         activeTasks, historyTasks);
+                    break; // Stop spawning more children on first failure
                 }
             }
 
-            if (spawnedCount == 0)
+            // If any spawn failed or no children were spawned successfully, clean up
+            if (anySpawnFailed || spawnedCount == 0)
             {
+                // Clean up any successfully spawned children
+                if (spawnedCount > 0)
+                {
+                    CleanupSpawnedChildren(task, activeTasks, historyTasks);
+                }
+
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Feature Mode] All team member spawns failed — falling back to direct plan consolidation.\n",
+                    "\n[Feature Mode] Team member spawn failures — falling back to direct plan consolidation.\n",
                     activeTasks, historyTasks);
                 task.FeatureModePhase = FeatureModePhase.PlanConsolidation;
                 StartPlanConsolidationProcess(task, "", activeTasks, historyTasks, moveToHistory);
@@ -277,7 +308,7 @@ namespace HappyEngine.Managers
             var teamResults = CollectChildResults(task, activeTasks, historyTasks);
 
             task.FeatureModePhase = FeatureModePhase.PlanConsolidation;
-            task.FeaturePhaseChildIds.Clear();
+            task.ClearFeaturePhaseChildIds();
 
             StartPlanConsolidationProcess(task, teamResults, activeTasks, historyTasks, moveToHistory);
         }
@@ -334,29 +365,41 @@ namespace HappyEngine.Managers
             }
 
             task.FeatureModePhase = FeatureModePhase.Execution;
-            task.FeaturePhaseChildIds.Clear();
+            task.ClearFeaturePhaseChildIds();
+
+            // Spawn all children, tracking successes
             var spawnedCount = 0;
+            bool anySpawnFailed = false;
             foreach (var child in children)
             {
                 try
                 {
-                    task.FeaturePhaseChildIds.Add(child.Id);
+                    task.AddFeaturePhaseChildId(child.Id);
                     FeatureModeChildSpawned?.Invoke(task, child);
                     spawnedCount++;
                 }
                 catch (Exception ex)
                 {
+                    anySpawnFailed = true;
                     AppLogger.Warn("FeatureMode", $"Failed to spawn execution task '{child.Summary}' for task {task.Id}", ex);
                     _outputProcessor.AppendOutput(task.Id,
                         $"\n[Feature Mode] WARNING: Failed to spawn execution step: {ex.Message}\n",
                         activeTasks, historyTasks);
+                    break; // Stop spawning more children on first failure
                 }
             }
 
-            if (spawnedCount == 0)
+            // If any spawn failed or no children were spawned successfully, clean up
+            if (anySpawnFailed || spawnedCount == 0)
             {
+                // Clean up any successfully spawned children
+                if (spawnedCount > 0)
+                {
+                    CleanupSpawnedChildren(task, activeTasks, historyTasks);
+                }
+
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Feature Mode] All execution task spawns failed. Finishing.\n",
+                    "\n[Feature Mode] Execution task spawn failures. Finishing.\n",
                     activeTasks, historyTasks);
                 FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
                 return;
@@ -389,7 +432,7 @@ namespace HappyEngine.Managers
             var executionResults = CollectChildResults(task, activeTasks, historyTasks);
 
             task.FeatureModePhase = FeatureModePhase.Evaluation;
-            task.FeaturePhaseChildIds.Clear();
+            task.ClearFeaturePhaseChildIds();
 
             var prompt = _promptBuilder.BuildFeatureModeEvaluationPrompt(
                 task.CurrentIteration, task.MaxIterations, task.OriginalFeatureDescription, executionResults);
@@ -425,7 +468,7 @@ namespace HappyEngine.Managers
             // Start next iteration
             task.CurrentIteration++;
             task.FeatureModePhase = FeatureModePhase.None;
-            task.FeaturePhaseChildIds.Clear();
+            task.ClearFeaturePhaseChildIds();
             task.LastIterationOutputStart = task.OutputBuilder.Length;
 
             var iterRuntime = DateTime.Now - task.StartTime;
@@ -776,6 +819,62 @@ namespace HappyEngine.Managers
                 }
             };
             timer.Start();
+        }
+
+        // ── Cleanup helpers ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Cancels and cleans up any spawned children in the current phase.
+        /// Used when child spawning partially fails to prevent orphaned tasks.
+        /// </summary>
+        private void CleanupSpawnedChildren(AgentTask parent, ObservableCollection<AgentTask> activeTasks,
+            ObservableCollection<AgentTask> historyTasks)
+        {
+            if (parent.FeaturePhaseChildIds.Count == 0) return;
+
+            _outputProcessor.AppendOutput(parent.Id,
+                $"\n[Feature Mode] Cleaning up {parent.FeaturePhaseChildIds.Count} spawned children...\n",
+                activeTasks, historyTasks);
+
+            foreach (var childId in parent.FeaturePhaseChildIds.ToList())
+            {
+                var child = activeTasks.FirstOrDefault(t => t.Id == childId);
+                if (child != null)
+                {
+                    // Set status to cancelled
+                    child.Status = AgentTaskStatus.Cancelled;
+                    child.EndTime = DateTime.Now;
+
+                    // Kill process if running
+                    if (child.Process is { HasExited: false })
+                    {
+                        try
+                        {
+                            child.Process.Kill(true);
+                            _outputProcessor.AppendOutput(parent.Id,
+                                $"[Feature Mode] Killed child process #{child.TaskNumber}: {child.Summary}\n",
+                                activeTasks, historyTasks);
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn("FeatureMode", $"Failed to kill child process {child.Id}", ex);
+                        }
+                    }
+
+                    // Remove from message bus if applicable
+                    if (child.UseMessageBus)
+                    {
+                        _messageBusManager.LeaveBus(child.ProjectPath, child.Id);
+                    }
+
+                    _outputProcessor.AppendOutput(child.Id,
+                        "\n[Task cancelled due to sibling spawn failure]\n",
+                        activeTasks, historyTasks);
+                }
+            }
+
+            // Clear the child IDs list
+            parent.ClearFeaturePhaseChildIds();
         }
 
         // ── Finish ──────────────────────────────────────────────────────

@@ -34,21 +34,21 @@ namespace HappyEngine.Managers
 
         public void MarkDirty() => _isDirty = true;
 
-        public void RefreshIfNeeded(ScrollViewer container)
+        public void RefreshIfNeeded(ScrollViewer container, string? currentProjectPath = null)
         {
             if (!_isDirty) return;
-            RefreshContent(container);
+            RefreshContent(container, currentProjectPath);
             _isDirty = false;
         }
 
-        public void RefreshContent(ScrollViewer container)
+        public void RefreshContent(ScrollViewer container, string? currentProjectPath = null)
         {
-            container.Content = BuildDashboardContent(isDialog: false);
+            container.Content = BuildDashboardContent(isDialog: false, currentProjectPath);
         }
 
         // ── Stats computation ──────────────────────────────────────────
 
-        public List<ProjectActivityStats> ComputeStats()
+        public List<ProjectActivityStats> ComputeStats(string? currentProjectPath = null)
         {
             var allTasks = _historyTasks
                 .Concat(_activeTasks.Where(t => t.IsFinished))
@@ -96,6 +96,13 @@ namespace HappyEngine.Managers
                 if (a.TotalTasks != b.TotalTasks) return b.TotalTasks.CompareTo(a.TotalTasks);
                 return string.Compare(a.ProjectName, b.ProjectName, StringComparison.OrdinalIgnoreCase);
             });
+
+            // If a current project is specified, filter to only show that project
+            if (!string.IsNullOrEmpty(currentProjectPath))
+            {
+                var normalizedCurrentPath = NormalizePath(currentProjectPath);
+                results = results.Where(r => NormalizePath(r.ProjectPath) == normalizedCurrentPath).ToList();
+            }
 
             return results;
         }
@@ -178,9 +185,9 @@ namespace HappyEngine.Managers
 
         // ── UI Building ────────────────────────────────────────────────
 
-        public StackPanel BuildDashboardContent(bool isDialog)
+        public StackPanel BuildDashboardContent(bool isDialog, string? currentProjectPath = null)
         {
-            var stats = ComputeStats();
+            var stats = ComputeStats(currentProjectPath);
             var root = new StackPanel { Margin = new Thickness(isDialog ? 18 : 4, 0, isDialog ? 18 : 4, 12) };
 
             root.Children.Add(BuildSummaryHeader(stats, isDialog));

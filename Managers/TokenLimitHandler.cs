@@ -204,18 +204,21 @@ namespace HappyEngine.Managers
                     _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
             }
 
-            if (task.Status != AgentTaskStatus.Verifying)
-                return;
+            if (task.Status == AgentTaskStatus.Verifying)
+            {
+                task.Status = expectedStatus;
+                task.EndTime = DateTime.Now;
+                var statusColor = exitCode == 0
+                    ? Application.Current?.TryFindResource("Success") as Brush ?? Brushes.Green
+                    : Application.Current?.TryFindResource("DangerBright") as Brush ?? Brushes.Red;
+                _outputProcessor.AppendColoredOutput(task.Id,
+                    $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
+                    statusColor, activeTasks, historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+            }
 
-            task.Status = expectedStatus;
-            task.EndTime = DateTime.Now;
-            var statusColor = exitCode == 0
-                ? Application.Current?.TryFindResource("Success") as Brush ?? Brushes.Green
-                : Application.Current?.TryFindResource("DangerBright") as Brush ?? Brushes.Red;
-            _outputProcessor.AppendColoredOutput(task.Id,
-                $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
-                statusColor, activeTasks, historyTasks);
-            _outputTabManager.UpdateTabHeader(task);
+            // Always check queued tasks and fire TaskCompleted event,
+            // even if status changed during verification
             _fileLockManager.CheckQueuedTasks(activeTasks);
             TaskCompleted?.Invoke(task.Id);
         }
