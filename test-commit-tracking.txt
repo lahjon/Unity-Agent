@@ -1,2 +1,0 @@
-Test file for commit tracking
-This line was added using the Edit tool
