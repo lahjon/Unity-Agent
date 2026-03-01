@@ -282,6 +282,90 @@ namespace HappyEngine.Managers
                 }
                 else
                 {
+                    // Check if this is a feature mode child task (e.g., architect, team member)
+                    var isFeatureModeChild = false;
+                    if (!string.IsNullOrEmpty(task.ParentTaskId))
+                    {
+                        var parent = activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId)
+                                    ?? historyTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
+                        if (parent != null && parent.IsFeatureMode)
+                        {
+                            isFeatureModeChild = true;
+                        }
+                    }
+
+                    if (isFeatureModeChild)
+                    {
+                        // Feature mode child tasks complete directly without verification step
+                        var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
+                        task.Status = expectedStatus;
+                        task.EndTime = DateTime.Now;
+
+                        // Extract basic summary from output for parent to collect
+                        try
+                        {
+                            var outputText = task.OutputBuilder.ToString();
+                            var summary = _completionAnalyzer.ExtractCompletionInfo(outputText);
+                            if (!string.IsNullOrWhiteSpace(summary))
+                            {
+                                task.CompletionSummary = summary;
+                            }
+                            else
+                            {
+                                // Fallback to simple status summary
+                                task.CompletionSummary = $"Task completed with status: {expectedStatus}";
+                            }
+
+                            // Extract recommendations if any
+                            var recommendations = _completionAnalyzer.ExtractRecommendations(outputText);
+                            if (!string.IsNullOrWhiteSpace(recommendations))
+                            {
+                                task.Recommendations = recommendations;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("TaskExecution", $"Failed to extract summary for feature mode child task {task.Id}", ex);
+                            task.CompletionSummary = $"Task completed with status: {expectedStatus}";
+                        }
+
+                        // Release locks and cleanup
+                        _fileLockManager.ReleaseTaskLocks(task.Id);
+                        if (task.UseMessageBus)
+                            _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
+
+                        // Log completion
+                        try
+                        {
+                            var statusColor = exitCode == 0
+                                ? (Brush)Application.Current.FindResource("Success")
+                                : (Brush)Application.Current.FindResource("DangerBright");
+                            _outputProcessor.AppendColoredOutput(task.Id,
+                                $"\n[HappyEngine] Feature mode child task completed (exit code: {exitCode}).\n",
+                                statusColor, activeTasks, historyTasks);
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("TaskExecution", $"Failed to append completion output for feature mode child task {task.Id}", ex);
+                        }
+
+                        _outputTabManager.UpdateTabHeader(task);
+                        _fileLockManager.CheckQueuedTasks(activeTasks);
+                        TaskCompleted?.Invoke(task.Id);
+
+                        // Check if all feature mode children are complete to trigger next phase
+                        if (!string.IsNullOrEmpty(task.ParentTaskId))
+                        {
+                            var parent = activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
+                            if (parent != null)
+                            {
+                                CheckFeatureModePhaseCompletion(parent, activeTasks, historyTasks, moveToHistory);
+                            }
+                        }
+                        return;
+                    }
+
+                    // Regular tasks go through verification
                     // Capture locked files BEFORE releasing so we can scope the auto-commit
                     var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
                     // NOTE: Lock release moved to CompleteWithVerificationAsync to prevent race condition
