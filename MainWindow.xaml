@@ -1208,15 +1208,15 @@
                                                   Checked="AutoRecoverToggle_Changed" Unchecked="AutoRecoverToggle_Changed">
                                         <TextBlock Text="Auto-Recover" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
-                                    <ToggleButton x:Name="ApplyFixToggle" IsChecked="True"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
-                                        <TextBlock Text="Apply Fix" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
                                     <!-- Separator -->
                                     <Border BorderBrush="{StaticResource SeparatorDark}" BorderThickness="0,1,0,0" Margin="0,4,0,8"/>
                                     <!-- Per-task toggles -->
                                     <TextBlock Text="PER-TASK" Foreground="{StaticResource TextDisabled}" FontSize="9"
                                                FontFamily="Segoe UI" FontWeight="Bold" Margin="0,0,0,4"/>
+                                    <ToggleButton x:Name="ApplyFixToggle" IsChecked="True"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Apply Fix" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
                                     <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
                                                   Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
                                         <TextBlock Text="Remote Session" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
@@ -1458,7 +1458,7 @@
 
             <!-- Node Graph Panel -->
             <Border Grid.Row="0" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
-                    BorderThickness="1" Margin="0,0,0,3">
+                    BorderThickness="1" Margin="0,0,0,1">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="GraphPanelBorder" Color="#2C2C2C"/>
                 </Border.BorderBrush>
@@ -1497,13 +1497,13 @@
             </Border>
 
             <!-- Splitter between graph and output -->
-            <GridSplitter x:Name="GraphSplitter" Grid.Row="1" Height="6" HorizontalAlignment="Stretch"
+            <GridSplitter x:Name="GraphSplitter" Grid.Row="1" Height="3" HorizontalAlignment="Stretch"
                           VerticalAlignment="Center" Background="Transparent"
                           Style="{StaticResource HorizontalSplitter}"/>
 
             <!-- Task Output -->
             <Border Grid.Row="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
-                    BorderThickness="1" Margin="0,3,0,0">
+                    BorderThickness="1" Margin="0,1,0,0">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="MainContentBorder" Color="#2C2C2C"/>
                 </Border.BorderBrush>
@@ -1644,6 +1644,13 @@
                                 <TextBlock Text="Activity" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                             </TabItem.Header>
                             <ScrollViewer x:Name="ActivityTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
+                        </TabItem>
+                        <!-- Git tab -->
+                        <TabItem x:Name="GitTabItem">
+                            <TabItem.Header>
+                                <TextBlock Text="Git" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            </TabItem.Header>
+                            <ScrollViewer x:Name="GitTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
                         </TabItem>
                     </TabControl>
                 </DockPanel>

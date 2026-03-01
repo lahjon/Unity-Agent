@@ -6,7 +6,7 @@ namespace HappyEngine.Constants
     /// </summary>
     public static class AppConstants
     {
-        // ── TaskLauncher ────────────────────────────────────────────
+        // ── Task Services ────────────────────────────────────────────
 
         /// <summary>Number of lines from the end of output to scan for status markers.</summary>
         public const int MaxOutputTailLines = 50;

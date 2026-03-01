@@ -24,6 +24,9 @@ namespace HappyEngine.Managers
         private readonly OutputProcessor _outputProcessor;
         private readonly MessageBusManager _messageBusManager;
         private readonly OutputTabManager _outputTabManager;
+        private readonly ICompletionAnalyzer _completionAnalyzer;
+        private readonly IPromptBuilder _promptBuilder;
+        private readonly ITaskFactory _taskFactory;
         private readonly Func<int> _getTokenLimitRetryMinutes;
 
         internal const int FeatureModeMaxRuntimeHours = 12;
@@ -50,6 +53,9 @@ namespace HappyEngine.Managers
             OutputProcessor outputProcessor,
             MessageBusManager messageBusManager,
             OutputTabManager outputTabManager,
+            ICompletionAnalyzer completionAnalyzer,
+            IPromptBuilder promptBuilder,
+            ITaskFactory taskFactory,
             Func<int> getTokenLimitRetryMinutes)
         {
             _scriptDir = scriptDir;
@@ -57,6 +63,9 @@ namespace HappyEngine.Managers
             _outputProcessor = outputProcessor;
             _messageBusManager = messageBusManager;
             _outputTabManager = outputTabManager;
+            _completionAnalyzer = completionAnalyzer;
+            _promptBuilder = promptBuilder;
+            _taskFactory = taskFactory;
             _getTokenLimitRetryMinutes = getTokenLimitRetryMinutes;
         }
 
@@ -99,7 +108,7 @@ namespace HappyEngine.Managers
             }
 
             // Check consecutive failures
-            if (exitCode != 0 && !TaskLauncher.IsTokenLimitError(iterationOutput))
+            if (exitCode != 0 && !_completionAnalyzer.IsTokenLimitError(iterationOutput))
             {
                 task.ConsecutiveFailures++;
                 _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Phase process exited with code {exitCode} (failure {task.ConsecutiveFailures}/{FeatureModeMaxConsecutiveFailures})\n", activeTasks, historyTasks);
@@ -116,7 +125,7 @@ namespace HappyEngine.Managers
             }
 
             // Token limit retry
-            if (TaskLauncher.IsTokenLimitError(iterationOutput))
+            if (_completionAnalyzer.IsTokenLimitError(iterationOutput))
             {
                 HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory);
                 return;
@@ -173,7 +182,7 @@ namespace HappyEngine.Managers
 
             // Mark the parent as the Main coordinator so the UI clearly identifies it
             if (string.IsNullOrWhiteSpace(task.Summary) || !task.Summary.StartsWith("[Main]"))
-                task.Summary = $"[Main] {(task.Summary ?? TaskLauncher.GenerateLocalSummary(task.OriginalFeatureDescription))}";
+                task.Summary = $"[Main] {(task.Summary ?? _taskFactory.GenerateLocalSummary(task.OriginalFeatureDescription))}";
 
             // Configure team members for planning only (no file modifications)
             task.FeaturePhaseChildIds.Clear();
@@ -280,7 +289,7 @@ namespace HappyEngine.Managers
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            var prompt = TaskLauncher.BuildFeatureModePlanConsolidationPrompt(
+            var prompt = _promptBuilder.BuildFeatureModePlanConsolidationPrompt(
                 task.CurrentIteration, task.MaxIterations, teamResults, task.OriginalFeatureDescription);
 
             StartFeatureModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
@@ -382,7 +391,7 @@ namespace HappyEngine.Managers
             task.FeatureModePhase = FeatureModePhase.Evaluation;
             task.FeaturePhaseChildIds.Clear();
 
-            var prompt = TaskLauncher.BuildFeatureModeEvaluationPrompt(
+            var prompt = _promptBuilder.BuildFeatureModeEvaluationPrompt(
                 task.CurrentIteration, task.MaxIterations, task.OriginalFeatureDescription, executionResults);
 
             StartFeatureModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
@@ -395,7 +404,7 @@ namespace HappyEngine.Managers
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            if (TaskLauncher.CheckFeatureModeComplete(output))
+            if (_completionAnalyzer.CheckFeatureModeComplete(output))
             {
                 _outputProcessor.AppendOutput(task.Id,
                     $"\n[Feature Mode] STATUS: COMPLETE detected at iteration {task.CurrentIteration}. Feature finished.\n",
@@ -471,7 +480,7 @@ namespace HappyEngine.Managers
 
             var ps1File = Path.Combine(_scriptDir, $"feature_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                TaskLauncher.BuildPowerShellScript(task.ProjectPath, promptFile, claudeCmd),
+                _promptBuilder.BuildPowerShellScript(task.ProjectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
@@ -559,7 +568,7 @@ namespace HappyEngine.Managers
 
             foreach (var step in steps)
             {
-                var child = TaskLauncher.CreateTask(
+                var child = _taskFactory.CreateTask(
                     step.Description,
                     parent.ProjectPath,
                     skipPermissions: true,
@@ -578,7 +587,7 @@ namespace HappyEngine.Managers
 
                 child.ProjectColor = parent.ProjectColor;
                 child.ProjectDisplayName = parent.ProjectDisplayName;
-                child.Summary = TaskLauncher.GenerateLocalSummary(step.Description);
+                child.Summary = _taskFactory.GenerateLocalSummary(step.Description);
                 child.AutoDecompose = false;
                 children.Add(child);
             }
@@ -758,7 +767,7 @@ namespace HappyEngine.Managers
                         break;
                     case FeatureModePhase.Evaluation:
                         var execResults = CollectChildResults(task, activeTasks, historyTasks);
-                        var evalPrompt = TaskLauncher.BuildFeatureModeEvaluationPrompt(
+                        var evalPrompt = _promptBuilder.BuildFeatureModeEvaluationPrompt(
                             task.CurrentIteration, task.MaxIterations, task.OriginalFeatureDescription, execResults);
                         StartFeatureModeProcess(task, evalPrompt, activeTasks, historyTasks, moveToHistory);
                         break;
@@ -832,6 +841,7 @@ namespace HappyEngine.Managers
         /// Pure decision function that evaluates what the feature mode loop should do next.
         /// </summary>
         internal static FeatureModeDecision EvaluateFeatureModeIteration(
+            ICompletionAnalyzer completionAnalyzer,
             AgentTaskStatus currentStatus,
             TimeSpan totalRuntime,
             string iterationOutput,
@@ -847,14 +857,14 @@ namespace HappyEngine.Managers
             if (totalRuntime.TotalHours >= FeatureModeMaxRuntimeHours)
                 return new FeatureModeDecision { Action = FeatureModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
 
-            if (TaskLauncher.CheckFeatureModeComplete(iterationOutput))
+            if (completionAnalyzer.CheckFeatureModeComplete(iterationOutput))
                 return new FeatureModeDecision { Action = FeatureModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
 
             if (currentIteration >= maxIterations)
                 return new FeatureModeDecision { Action = FeatureModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
 
             var newFailures = consecutiveFailures;
-            if (exitCode != 0 && !TaskLauncher.IsTokenLimitError(iterationOutput))
+            if (exitCode != 0 && !completionAnalyzer.IsTokenLimitError(iterationOutput))
             {
                 newFailures++;
                 if (newFailures >= FeatureModeMaxConsecutiveFailures)
@@ -865,7 +875,7 @@ namespace HappyEngine.Managers
                 newFailures = 0;
             }
 
-            if (TaskLauncher.IsTokenLimitError(iterationOutput))
+            if (completionAnalyzer.IsTokenLimitError(iterationOutput))
                 return new FeatureModeDecision { Action = FeatureModeAction.RetryAfterDelay, ConsecutiveFailures = newFailures };
 
             return new FeatureModeDecision

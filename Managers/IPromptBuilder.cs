@@ -34,6 +34,12 @@ namespace HappyEngine.Managers
 
         string BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = "");
 
+        string BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations,
+            string teamResults, string featureDescription);
+
+        string BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations,
+            string featureDescription, string implementationResults);
+
         string BuildDependencyContext(List<string> depIds,
             IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks);
 

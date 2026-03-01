@@ -67,7 +67,7 @@ namespace HappyEngine.Managers
         {
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
             var basePath = task?.ProjectPath;
-            var normalized = TaskLauncher.NormalizePath(filePath, basePath);
+            var normalized = Helpers.FormatHelpers.NormalizePath(filePath, basePath);
 
             if (_fileLocks.TryGetValue(normalized, out var existing))
             {
@@ -166,7 +166,7 @@ namespace HappyEngine.Managers
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
             if (task == null) return;
 
-            var normalized = TaskLauncher.NormalizePath(filePath, task.ProjectPath);
+            var normalized = Helpers.FormatHelpers.NormalizePath(filePath, task.ProjectPath);
             var blockingLock = _fileLocks.GetValueOrDefault(normalized);
             var blockingTaskId = blockingLock?.OwnerTaskId ?? "unknown";
             var blockerTask = activeTasks.FirstOrDefault(t => t.Id == blockingTaskId);

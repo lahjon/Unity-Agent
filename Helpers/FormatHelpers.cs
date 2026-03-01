@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Text.RegularExpressions;
 
 namespace HappyEngine.Helpers
@@ -66,6 +68,36 @@ namespace HappyEngine.Helpers
             if (!match.Success)
                 return null;
             return match.Groups[1].Value.Trim();
+        }
+
+        public static string NormalizePath(string path, string? basePath)
+        {
+            path = path.Replace('/', '\\');
+            if (!Path.IsPathRooted(path) && !string.IsNullOrEmpty(basePath))
+                path = Path.Combine(basePath, path);
+            try { path = Path.GetFullPath(path); } catch { }
+            return path.ToLowerInvariant();
+        }
+
+        public static bool IsImageFile(string path)
+        {
+            var ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp";
+        }
+
+        public static bool IsFileModifyTool(string? toolName)
+        {
+            if (string.IsNullOrEmpty(toolName)) return false;
+            return toolName.Equals("Write", StringComparison.OrdinalIgnoreCase) ||
+                   toolName.Equals("Edit", StringComparison.OrdinalIgnoreCase) ||
+                   toolName.Equals("MultiEdit", StringComparison.OrdinalIgnoreCase) ||
+                   toolName.Equals("NotebookEdit", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static string? ExtractExecutionPrompt(string output)
+        {
+            var match = Regex.Match(output, @"```EXECUTION_PROMPT\s*\n(.*?)```", RegexOptions.Singleline);
+            return match.Success ? match.Groups[1].Value.Trim() : null;
         }
     }
 }

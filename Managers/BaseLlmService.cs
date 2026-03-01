@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace HappyEngine.Managers
 {
-    public abstract class BaseLlmService
+    public abstract class BaseLlmService : IDisposable
     {
         protected readonly string _configFile;
         protected readonly HttpClient _httpClient;
@@ -160,5 +160,10 @@ namespace HappyEngine.Managers
             Action<string> onTextChunk,
             string? systemInstruction = null,
             CancellationToken cancellationToken = default);
+
+        public void Dispose()
+        {
+            _httpClient.Dispose();
+        }
     }
 }

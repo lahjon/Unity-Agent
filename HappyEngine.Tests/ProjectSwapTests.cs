@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
+using HappyEngine.Helpers;
+using HappyEngine.Managers;
 using Xunit;
 
 namespace HappyEngine.Tests
@@ -9,23 +11,28 @@ namespace HappyEngine.Tests
     /// Tests verifying that project swapping behaves correctly when tasks are
     /// running, queued, paused, initializing, or holding file locks. These
     /// exercise the pure-logic components (AgentTask, FileLockManager,
-    /// TaskLauncher) without requiring a WPF Dispatcher or UI elements.
+    /// services) without requiring a WPF Dispatcher or UI elements.
     /// </summary>
     public class ProjectSwapTests
     {
+        private static readonly ITaskFactory _factory = new Managers.TaskFactory();
+        private static readonly IPromptBuilder _prompt = new PromptBuilder();
+        private static readonly IGitHelper _git = new GitHelper();
+        private static readonly ICompletionAnalyzer _completion = new CompletionAnalyzer(_git);
+
         // ── Helpers ──────────────────────────────────────────────────
 
         private static AgentTask MakeTask(string projectPath, AgentTaskStatus status = AgentTaskStatus.Running)
         {
-            var t = TaskLauncher.CreateTask("test task", projectPath, false, false, false, false, false, false);
+            var t = _factory.CreateTask("test task", projectPath, false, false, false, false, false, false);
             t.Status = status;
             return t;
         }
 
         private static AgentTask MakeFeatureModeTask(string projectPath)
         {
-            var t = TaskLauncher.CreateTask("feature mode task", projectPath, true, false, false, true, false, false);
-            TaskLauncher.PrepareTaskForFeatureModeStart(t);
+            var t = _factory.CreateTask("feature mode task", projectPath, true, false, false, true, false, false);
+            _factory.PrepareTaskForFeatureModeStart(t);
             return t;
         }
 
@@ -106,8 +113,8 @@ namespace HappyEngine.Tests
             var activeTasks = new ObservableCollection<AgentTask> { taskA, taskB };
 
             // Same relative file "src/file.cs" in two different projects should normalize differently
-            var pathA = TaskLauncher.NormalizePath("src/file.cs", @"C:\Projects\ProjectA");
-            var pathB = TaskLauncher.NormalizePath("src/file.cs", @"C:\Projects\ProjectB");
+            var pathA = FormatHelpers.NormalizePath("src/file.cs", @"C:\Projects\ProjectA");
+            var pathB = FormatHelpers.NormalizePath("src/file.cs", @"C:\Projects\ProjectB");
 
             Assert.NotEqual(pathA, pathB);
         }
@@ -119,8 +126,8 @@ namespace HappyEngine.Tests
             var taskA = MakeTask(@"C:\Projects\Shared");
             var taskB = MakeTask(@"C:\Projects\Shared");
 
-            var pathA = TaskLauncher.NormalizePath("src/file.cs", @"C:\Projects\Shared");
-            var pathB = TaskLauncher.NormalizePath("src/file.cs", @"C:\Projects\Shared");
+            var pathA = FormatHelpers.NormalizePath("src/file.cs", @"C:\Projects\Shared");
+            var pathB = FormatHelpers.NormalizePath("src/file.cs", @"C:\Projects\Shared");
 
             Assert.Equal(pathA, pathB);
         }
@@ -129,8 +136,8 @@ namespace HappyEngine.Tests
         public void NormalizePath_CrossProjectPaths_AreDifferent()
         {
             // Even if file names are identical, different base paths yield different normalized paths
-            var p1 = TaskLauncher.NormalizePath("Assets/Scripts/Player.cs", @"C:\Projects\GameA");
-            var p2 = TaskLauncher.NormalizePath("Assets/Scripts/Player.cs", @"C:\Projects\GameB");
+            var p1 = FormatHelpers.NormalizePath("Assets/Scripts/Player.cs", @"C:\Projects\GameA");
+            var p2 = FormatHelpers.NormalizePath("Assets/Scripts/Player.cs", @"C:\Projects\GameB");
 
             Assert.NotEqual(p1, p2);
         }
@@ -139,8 +146,8 @@ namespace HappyEngine.Tests
         public void NormalizePath_AbsolutePaths_IgnoreBasePath()
         {
             // Absolute paths are independent of project base
-            var abs = TaskLauncher.NormalizePath(@"C:\Shared\config.json", @"C:\Projects\GameA");
-            var abs2 = TaskLauncher.NormalizePath(@"C:\Shared\config.json", @"C:\Projects\GameB");
+            var abs = FormatHelpers.NormalizePath(@"C:\Shared\config.json", @"C:\Projects\GameA");
+            var abs2 = FormatHelpers.NormalizePath(@"C:\Shared\config.json", @"C:\Projects\GameB");
 
             Assert.Equal(abs, abs2); // Same absolute path regardless of project
         }
@@ -192,7 +199,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void FeatureModeTask_ContinuationPrompt_UsesCorrectIteration()
         {
-            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(7, 50);
+            var prompt = _prompt.BuildFeatureModeContinuationPrompt(7, 50);
             Assert.Contains("iteration 7/50", prompt);
         }
 
@@ -206,7 +213,7 @@ namespace HappyEngine.Tests
                 SkipPermissions = false,
                 IsFeatureMode = true
             };
-            TaskLauncher.PrepareTaskForFeatureModeStart(task);
+            _factory.PrepareTaskForFeatureModeStart(task);
 
             Assert.True(task.SkipPermissions);
             Assert.Equal(1, task.CurrentIteration);
@@ -351,7 +358,7 @@ namespace HappyEngine.Tests
                 IsFeatureMode = false
             };
 
-            var result = TaskLauncher.BuildFullPrompt("SYS:", task, "A Unity game project");
+            var result = _prompt.BuildFullPrompt("SYS:", task, "A Unity game project");
 
             Assert.Contains("SYS:", result);
             Assert.Contains("A Unity game project", result);
@@ -368,7 +375,7 @@ namespace HappyEngine.Tests
                 IsFeatureMode = false
             };
 
-            var result = TaskLauncher.BuildFullPrompt("SYS:", task, "");
+            var result = _prompt.BuildFullPrompt("SYS:", task, "");
             Assert.Contains("do work", result);
         }
 
@@ -383,7 +390,7 @@ namespace HappyEngine.Tests
             };
 
             // null description should not crash
-            var result = TaskLauncher.BuildFullPrompt("SYS:", task);
+            var result = _prompt.BuildFullPrompt("SYS:", task);
             Assert.Contains("do work", result);
         }
 
@@ -395,12 +402,12 @@ namespace HappyEngine.Tests
             // The PS1 script hardcodes the project path at build time.
             // Swapping projects after building should NOT affect the script.
             var originalPath = @"C:\Projects\OriginalProject";
-            var script = TaskLauncher.BuildPowerShellScript(originalPath, @"C:\temp\prompt.txt", "claude -p");
+            var script = _prompt.BuildPowerShellScript(originalPath, @"C:\temp\prompt.txt", "claude -p");
 
             Assert.Contains("Set-Location -LiteralPath 'C:\\Projects\\OriginalProject'", script);
 
             // If we build another script for a different project, it's independent
-            var newScript = TaskLauncher.BuildPowerShellScript(@"C:\Projects\NewProject", @"C:\temp\prompt2.txt", "claude -p");
+            var newScript = _prompt.BuildPowerShellScript(@"C:\Projects\NewProject", @"C:\temp\prompt2.txt", "claude -p");
             Assert.Contains("Set-Location -LiteralPath 'C:\\Projects\\NewProject'", newScript);
             Assert.DoesNotContain("OriginalProject", newScript);
         }
@@ -408,8 +415,8 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildPowerShellScript_DifferentPromptFiles_PerTask()
         {
-            var script1 = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt_abc.txt", "claude");
-            var script2 = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt_def.txt", "claude");
+            var script1 = _prompt.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt_abc.txt", "claude");
+            var script2 = _prompt.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt_def.txt", "claude");
 
             Assert.Contains("prompt_abc.txt", script1);
             Assert.Contains("prompt_def.txt", script2);
@@ -589,9 +596,9 @@ namespace HappyEngine.Tests
         public void TokenLimitError_DetectedRegardlessOfProject()
         {
             // Token limit errors should be detected regardless of which project the task is on
-            Assert.True(TaskLauncher.IsTokenLimitError("rate limit exceeded"));
-            Assert.True(TaskLauncher.IsTokenLimitError("token limit reached"));
-            Assert.True(TaskLauncher.IsTokenLimitError("server overloaded"));
+            Assert.True(_completion.IsTokenLimitError("rate limit exceeded"));
+            Assert.True(_completion.IsTokenLimitError("token limit reached"));
+            Assert.True(_completion.IsTokenLimitError("server overloaded"));
         }
 
         // ── PlanOnly task retains project across states ───────────────
@@ -599,7 +606,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void PlanOnlyTask_RetainsProjectPath_AcrossStatusChanges()
         {
-            var task = TaskLauncher.CreateTask("plan task", @"C:\Projects\Alpha",
+            var task = _factory.CreateTask("plan task", @"C:\Projects\Alpha",
                 false, false, false, false, false, false,
                 noGitWrite: false, planOnly: true);
             task.ProjectColor = "#D4806B";
@@ -732,7 +739,7 @@ namespace HappyEngine.Tests
             var normalTask = MakeTask(@"C:\Projects\Alpha");
             normalTask.IgnoreFileLocks = false;
 
-            var ignoreTask = TaskLauncher.CreateTask("ignore locks", @"C:\Projects\Alpha",
+            var ignoreTask = _factory.CreateTask("ignore locks", @"C:\Projects\Alpha",
                 false, false, false, false, ignoreFileLocks: true, false);
 
             Assert.False(normalTask.IgnoreFileLocks);
@@ -772,14 +779,14 @@ namespace HappyEngine.Tests
         [Fact]
         public void NoGitWrite_Task_RetainsFlag_AfterSwap()
         {
-            var task = TaskLauncher.CreateTask("no git task", @"C:\Projects\Alpha",
+            var task = _factory.CreateTask("no git task", @"C:\Projects\Alpha",
                 false, false, false, false, false, false, noGitWrite: true);
 
             Assert.True(task.NoGitWrite);
             Assert.Equal(@"C:\Projects\Alpha", task.ProjectPath);
 
             // Prompt should contain the no-git-write block
-            var prompt = TaskLauncher.BuildFullPrompt("SYS:", task);
+            var prompt = _prompt.BuildFullPrompt("SYS:", task);
             Assert.Contains("NO GIT WRITES", prompt);
         }
 
@@ -788,7 +795,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void PlanOnly_Task_RetainsFlag()
         {
-            var task = TaskLauncher.CreateTask("plan task", @"C:\Projects\Alpha",
+            var task = _factory.CreateTask("plan task", @"C:\Projects\Alpha",
                 false, false, false, false, false, false,
                 noGitWrite: false, planOnly: true);
 
@@ -801,14 +808,14 @@ namespace HappyEngine.Tests
         [Fact]
         public void SpawnTeam_Task_PromptIncludesTeamBlock()
         {
-            var prompt = TaskLauncher.BuildBasePrompt("system", "team task", false, false, spawnTeam: true);
+            var prompt = _prompt.BuildBasePrompt("system", "team task", false, false, spawnTeam: true);
             Assert.Contains("TEAM SPAWN MODE", prompt);
         }
 
         [Fact]
         public void SpawnTeam_Task_RetainsFlag()
         {
-            var task = TaskLauncher.CreateTask("team task", @"C:\Projects\Alpha",
+            var task = _factory.CreateTask("team task", @"C:\Projects\Alpha",
                 false, false, false, false, false, false, spawnTeam: true);
 
             Assert.True(task.SpawnTeam);
@@ -837,7 +844,7 @@ namespace HappyEngine.Tests
         public void ImagePaths_RetainedOnTask_AfterSwap()
         {
             var images = new List<string> { @"C:\imgs\screenshot.png" };
-            var task = TaskLauncher.CreateTask("with images", @"C:\Projects\Alpha",
+            var task = _factory.CreateTask("with images", @"C:\Projects\Alpha",
                 false, false, false, false, false, false,
                 false, false, false, false, false, images);
 
@@ -845,7 +852,7 @@ namespace HappyEngine.Tests
             Assert.Equal(@"C:\imgs\screenshot.png", task.ImagePaths[0]);
 
             // Swapping projects doesn't affect existing task's images
-            var newTask = TaskLauncher.CreateTask("no images", @"C:\Projects\Beta",
+            var newTask = _factory.CreateTask("no images", @"C:\Projects\Beta",
                 false, false, false, false, false, false);
 
             Assert.Single(task.ImagePaths); // still has images
@@ -886,7 +893,7 @@ namespace HappyEngine.Tests
         public void FormatCompletionSummary_IncludesProjectInfo_Implicitly()
         {
             // The summary format includes status and duration
-            var summary = TaskLauncher.FormatCompletionSummary(
+            var summary = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.FromMinutes(10), null);
 
             Assert.Contains("TASK COMPLETION SUMMARY", summary);
@@ -945,7 +952,7 @@ namespace HappyEngine.Tests
             var info = new QueuedTaskInfo
             {
                 Task = task,
-                ConflictingFilePath = TaskLauncher.NormalizePath("src/file.cs", @"C:\Projects\Alpha"),
+                ConflictingFilePath = FormatHelpers.NormalizePath("src/file.cs", @"C:\Projects\Alpha"),
                 BlockingTaskId = "blocker1",
                 BlockedByTaskIds = new HashSet<string> { "blocker1" }
             };

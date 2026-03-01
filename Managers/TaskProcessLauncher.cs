@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Threading;
+using HappyEngine.Helpers;
 
 namespace HappyEngine.Managers
 {
@@ -26,6 +27,7 @@ namespace HappyEngine.Managers
         private readonly FileLockManager _fileLockManager;
         private readonly OutputTabManager _outputTabManager;
         private readonly OutputProcessor _outputProcessor;
+        private readonly IPromptBuilder _promptBuilder;
         private readonly Dispatcher _dispatcher;
 
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _streamingToolState;
@@ -44,12 +46,14 @@ namespace HappyEngine.Managers
             FileLockManager fileLockManager,
             OutputTabManager outputTabManager,
             OutputProcessor outputProcessor,
+            IPromptBuilder promptBuilder,
             Dispatcher dispatcher)
         {
             _scriptDir = scriptDir;
             _fileLockManager = fileLockManager;
             _outputTabManager = outputTabManager;
             _outputProcessor = outputProcessor;
+            _promptBuilder = promptBuilder;
             _dispatcher = dispatcher;
         }
 
@@ -64,14 +68,14 @@ namespace HappyEngine.Managers
             ObservableCollection<AgentTask> historyTasks,
             Action<int> onExited)
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(ps1File, headless: false);
+            var psi = _promptBuilder.BuildProcessStartInfo(ps1File, headless: false);
 
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
             process.OutputDataReceived += (_, e) =>
             {
                 if (e.Data == null) return;
-                var line = TaskLauncher.StripAnsi(e.Data).Trim();
+                var line = FormatHelpers.StripAnsiCodes(e.Data).Trim();
                 if (string.IsNullOrEmpty(line)) return;
                 _dispatcher.BeginInvoke(() => ParseStreamJson(taskId, line, activeTasks, historyTasks));
             };
@@ -79,7 +83,7 @@ namespace HappyEngine.Managers
             process.ErrorDataReceived += (_, e) =>
             {
                 if (e.Data == null) return;
-                var line = TaskLauncher.StripAnsi(e.Data);
+                var line = FormatHelpers.StripAnsiCodes(e.Data);
                 if (!string.IsNullOrWhiteSpace(line))
                     _dispatcher.BeginInvoke(() => _outputProcessor.AppendOutput(taskId, $"[stderr] {line}\n", activeTasks, historyTasks));
             };
@@ -392,7 +396,7 @@ namespace HappyEngine.Managers
                                     var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
                                     actionTask?.AddToolActivity(actionText);
 
-                                    if (TaskLauncher.IsFileModifyTool(toolName) && toolInput != null)
+                                    if (FormatHelpers.IsFileModifyTool(toolName) && toolInput != null)
                                     {
                                         var fp = FileLockManager.ExtractFilePath(toolInput.Value);
                                         if (!string.IsNullOrEmpty(fp) && !_fileLockManager.TryAcquireOrConflict(taskId, fp, toolName!, activeTasks,
@@ -422,7 +426,7 @@ namespace HappyEngine.Managers
                                 _streamingToolState[taskId] = new StreamingToolState
                                 {
                                     CurrentToolName = toolName ?? "tool",
-                                    IsFileModifyTool = TaskLauncher.IsFileModifyTool(toolName),
+                                    IsFileModifyTool = FormatHelpers.IsFileModifyTool(toolName),
                                     JsonAccumulator = new StringBuilder()
                                 };
                             }

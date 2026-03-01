@@ -20,6 +20,7 @@ namespace HappyEngine.Managers
         private readonly FileLockManager _fileLockManager;
         private readonly MessageBusManager _messageBusManager;
         private readonly OutputTabManager _outputTabManager;
+        private readonly ICompletionAnalyzer _completionAnalyzer;
         private readonly Func<int> _getTokenLimitRetryMinutes;
 
         /// <summary>Fires when the handler finishes a task normally after a retry (taskId).</summary>
@@ -38,6 +39,7 @@ namespace HappyEngine.Managers
             FileLockManager fileLockManager,
             MessageBusManager messageBusManager,
             OutputTabManager outputTabManager,
+            ICompletionAnalyzer completionAnalyzer,
             Func<int> getTokenLimitRetryMinutes)
         {
             _scriptDir = scriptDir;
@@ -46,6 +48,7 @@ namespace HappyEngine.Managers
             _fileLockManager = fileLockManager;
             _messageBusManager = messageBusManager;
             _outputTabManager = outputTabManager;
+            _completionAnalyzer = completionAnalyzer;
             _getTokenLimitRetryMinutes = getTokenLimitRetryMinutes;
         }
 
@@ -60,7 +63,7 @@ namespace HappyEngine.Managers
         {
             var output = task.OutputBuilder.ToString();
             var tail = output.Length > 3000 ? output[^3000..] : output;
-            if (!TaskLauncher.IsTokenLimitError(tail)) return false;
+            if (!_completionAnalyzer.IsTokenLimitError(tail)) return false;
 
             var retryMinutes = _getTokenLimitRetryMinutes();
             _outputProcessor.AppendOutput(task.Id, $"\n[HappyEngine] Token/rate limit detected. Retrying in {retryMinutes} minutes...\n", activeTasks, historyTasks);

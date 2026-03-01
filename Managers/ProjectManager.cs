@@ -54,6 +54,7 @@ namespace HappyEngine.Managers
         };
 
         private readonly IProjectPanelView _view;
+        private ITaskFactory? _taskFactory;
 
         public event Action<AgentTask>? McpInvestigationRequested;
         public event Action? ProjectSwapStarted;
@@ -76,6 +77,11 @@ namespace HappyEngine.Managers
             _projectsFile = Path.Combine(appDataDir, "projects.json");
             _projectPath = initialProjectPath;
             _view = view;
+        }
+
+        public void SetTaskFactory(ITaskFactory taskFactory)
+        {
+            _taskFactory = taskFactory;
         }
 
         public void SetTaskCollections(
@@ -460,7 +466,7 @@ namespace HappyEngine.Managers
         {
             try
             {
-                var (shortDesc, longDesc) = await TaskLauncher.GenerateProjectDescriptionAsync(entry.Path);
+                var (shortDesc, longDesc) = await _taskFactory!.GenerateProjectDescriptionAsync(entry.Path);
                 _view.ViewDispatcher.Invoke(() =>
                 {
                     entry.ShortDescription = shortDesc;

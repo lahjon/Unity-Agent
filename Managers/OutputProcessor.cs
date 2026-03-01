@@ -17,13 +17,19 @@ namespace HappyEngine.Managers
     {
         private readonly OutputTabManager _outputTabManager;
         private readonly Func<bool> _getAutoVerify;
+        private readonly ICompletionAnalyzer _completionAnalyzer;
+        private readonly IGitHelper _gitHelper;
 
         /// <summary>Fires when a completion summary has been generated for a task.</summary>
         public event Action<string>? CompletionSummaryGenerated;
 
-        public OutputProcessor(OutputTabManager outputTabManager, Func<bool>? getAutoVerify = null)
+        public OutputProcessor(OutputTabManager outputTabManager,
+            ICompletionAnalyzer completionAnalyzer, IGitHelper gitHelper,
+            Func<bool>? getAutoVerify = null)
         {
             _outputTabManager = outputTabManager;
+            _completionAnalyzer = completionAnalyzer;
+            _gitHelper = gitHelper;
             _getAutoVerify = getAutoVerify ?? (() => false);
         }
 
@@ -61,7 +67,7 @@ namespace HappyEngine.Managers
                 var duration = (task.EndTime ?? DateTime.Now) - task.StartTime;
                 try
                 {
-                    var summary = await TaskLauncher.GenerateCompletionSummaryAsync(
+                    var summary = await _completionAnalyzer.GenerateCompletionSummaryAsync(
                         task.ProjectPath, task.GitStartHash, summaryStatus, duration,
                         task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens, ct);
                     task.CompletionSummary = summary;
@@ -69,7 +75,7 @@ namespace HappyEngine.Managers
                 }
                 catch (OperationCanceledException)
                 {
-                    var summary = TaskLauncher.FormatCompletionSummary(summaryStatus, duration, null,
+                    var summary = _completionAnalyzer.FormatCompletionSummary(summaryStatus, duration, null,
                         task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens);
                     task.CompletionSummary = summary;
                     AppendOutput(task.Id, summary, activeTasks, historyTasks);
@@ -107,7 +113,7 @@ namespace HappyEngine.Managers
 
             try
             {
-                var result = await TaskLauncher.VerifyResultAsync(
+                var result = await _completionAnalyzer.VerifyResultAsync(
                     outputText, task.Description, task.CompletionSummary, ct);
 
                 if (result != null)
@@ -182,7 +188,7 @@ namespace HappyEngine.Managers
                 List<object>? fileChangesList = null;
                 try
                 {
-                    var changes = await TaskLauncher.GetGitFileChangesAsync(
+                    var changes = await _gitHelper.GetGitFileChangesAsync(
                         child.ProjectPath, child.GitStartHash, CancellationToken.None);
                     if (changes != null)
                     {
@@ -198,7 +204,7 @@ namespace HappyEngine.Managers
 
                 // Extract recommendations from child output
                 var childOutput = child.OutputBuilder.ToString();
-                var recommendations = TaskLauncher.ExtractRecommendations(childOutput) ?? "";
+                var recommendations = _completionAnalyzer.ExtractRecommendations(childOutput) ?? "";
 
                 var payload = new
                 {

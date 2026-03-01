@@ -13,15 +13,18 @@ namespace HappyEngine.Managers
     {
         private readonly TaskExecutionManager _taskExecutionManager;
         private readonly OutputTabManager _outputTabManager;
+        private readonly ITaskFactory _taskFactory;
         private readonly Func<bool> _getAutoRecover;
 
         public FailureRecoveryManager(
             TaskExecutionManager taskExecutionManager,
             OutputTabManager outputTabManager,
+            ITaskFactory taskFactory,
             Func<bool> getAutoRecover)
         {
             _taskExecutionManager = taskExecutionManager;
             _outputTabManager = outputTabManager;
+            _taskFactory = taskFactory;
             _getAutoRecover = getAutoRecover;
         }
 
@@ -58,7 +61,7 @@ namespace HappyEngine.Managers
                 child.IsRecoveryTask = true;
                 child.AutoDecompose = false;
                 child.SpawnTeam = false;
-                child.Summary = $"[Recovery] Fix: {failedTask.Summary ?? TaskLauncher.GenerateLocalSummary(failedTask.Description)}";
+                child.Summary = $"[Recovery] Fix: {failedTask.Summary ?? _taskFactory.GenerateLocalSummary(failedTask.Description)}";
 
                 _outputTabManager.AppendOutput(failedTask.Id,
                     $"\n[HappyEngine] Auto-Recovery: Spawning diagnostic task #{child.TaskNumber} to fix failure.\n",

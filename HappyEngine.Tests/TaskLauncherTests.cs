@@ -1,34 +1,46 @@
 using System.Diagnostics;
+using HappyEngine.Helpers;
+using HappyEngine.Managers;
 using Xunit;
 
 namespace HappyEngine.Tests
 {
     public class TaskLauncherTests
     {
+        private readonly ITaskFactory _factory = new Managers.TaskFactory();
+        private readonly IPromptBuilder _prompt = new PromptBuilder();
+        private readonly IGitHelper _git = new GitHelper();
+        private readonly ICompletionAnalyzer _completion;
+
+        public TaskLauncherTests()
+        {
+            _completion = new CompletionAnalyzer(_git);
+        }
+
         // ── Validation ──────────────────────────────────────────────
 
         [Fact]
         public void ValidateTaskInput_Null_ReturnsFalse()
         {
-            Assert.False(TaskLauncher.ValidateTaskInput(null));
+            Assert.False(_factory.ValidateTaskInput(null));
         }
 
         [Fact]
         public void ValidateTaskInput_Empty_ReturnsFalse()
         {
-            Assert.False(TaskLauncher.ValidateTaskInput(""));
+            Assert.False(_factory.ValidateTaskInput(""));
         }
 
         [Fact]
         public void ValidateTaskInput_Whitespace_ReturnsFalse()
         {
-            Assert.False(TaskLauncher.ValidateTaskInput("   "));
+            Assert.False(_factory.ValidateTaskInput("   "));
         }
 
         [Fact]
         public void ValidateTaskInput_ValidText_ReturnsTrue()
         {
-            Assert.True(TaskLauncher.ValidateTaskInput("Fix the login bug"));
+            Assert.True(_factory.ValidateTaskInput("Fix the login bug"));
         }
 
         // ── CreateTask ──────────────────────────────────────────────
@@ -36,7 +48,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void CreateTask_SetsAllProperties()
         {
-            var task = TaskLauncher.CreateTask(
+            var task = _factory.CreateTask(
                 "Do something",
                 @"C:\Projects\Test",
                 skipPermissions: true,
@@ -63,7 +75,7 @@ namespace HappyEngine.Tests
         public void CreateTask_WithImages_CopiesImagePaths()
         {
             var images = new List<string> { "img1.png", "img2.jpg" };
-            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, false, false, false, images);
+            var task = _factory.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, false, false, false, images);
 
             Assert.Equal(2, task.ImagePaths.Count);
             Assert.Contains("img1.png", task.ImagePaths);
@@ -73,21 +85,21 @@ namespace HappyEngine.Tests
         [Fact]
         public void CreateTask_NullImages_EmptyList()
         {
-            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false);
+            var task = _factory.CreateTask("desc", @"C:\proj", false, false, false, false, false, false);
             Assert.Empty(task.ImagePaths);
         }
 
         [Fact]
         public void CreateTask_NoGitWrite_SetsProperty()
         {
-            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, noGitWrite: true);
+            var task = _factory.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, noGitWrite: true);
             Assert.True(task.NoGitWrite);
         }
 
         [Fact]
         public void CreateTask_MaxIterationsIs2()
         {
-            var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false);
+            var task = _factory.CreateTask("desc", @"C:\proj", false, false, false, false, false, false);
             Assert.Equal(2, task.MaxIterations);
         }
 
@@ -96,7 +108,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildBasePrompt_NormalMode_CombinesSystemAndDescription()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "do things", useMcp: false, isFeatureMode: false);
+            var result = _prompt.BuildBasePrompt("SYSTEM:", "do things", useMcp: false, isFeatureMode: false);
             Assert.StartsWith("SYSTEM:", result);
             Assert.EndsWith("do things", result);
             Assert.Contains("# USER PROMPT / TASK", result);
@@ -105,7 +117,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildBasePrompt_WithMcp_IncludesMcpBlock()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: false);
+            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: false);
             Assert.Contains("# MCP", result);
             Assert.Contains("mcp-for-unity-server", result);
             Assert.StartsWith("SYS:", result);
@@ -115,7 +127,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildBasePrompt_FeatureMode_UsesFeatureModeTemplate()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isFeatureMode: true);
+            var result = _prompt.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isFeatureMode: true);
             Assert.StartsWith("# FEATURE MODE", result);
             Assert.EndsWith("fix bugs", result);
             Assert.DoesNotContain("SYSTEM:", result);
@@ -124,7 +136,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildBasePrompt_WithNoGitWrite_IncludesGitBlock()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: true);
+            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: true);
             Assert.Contains("NO GIT WRITES", result);
             Assert.Contains("modify repository state", result);
             Assert.StartsWith("SYS:", result);
@@ -134,14 +146,14 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildBasePrompt_WithoutNoGitWrite_ExcludesGitBlock()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: false);
+            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: false);
             Assert.DoesNotContain("NO GIT WRITES", result);
         }
 
         [Fact]
         public void BuildBasePrompt_FeatureMode_IgnoresMcp()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: true);
+            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: true);
             Assert.DoesNotContain("# MCP\n", result);
             Assert.StartsWith("# FEATURE MODE", result);
         }
@@ -149,7 +161,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildPromptWithImages_NoImages_ReturnsBase()
         {
-            var result = TaskLauncher.BuildPromptWithImages("base prompt", new List<string>());
+            var result = _prompt.BuildPromptWithImages("base prompt", new List<string>());
             Assert.Equal("base prompt", result);
         }
 
@@ -157,7 +169,7 @@ namespace HappyEngine.Tests
         public void BuildPromptWithImages_WithImages_AppendsSection()
         {
             var images = new List<string> { @"C:\imgs\test.png", @"C:\imgs\test2.jpg" };
-            var result = TaskLauncher.BuildPromptWithImages("base", images);
+            var result = _prompt.BuildPromptWithImages("base", images);
 
             Assert.Contains("# ATTACHED IMAGES", result);
             Assert.Contains("Read tool", result);
@@ -174,7 +186,7 @@ namespace HappyEngine.Tests
                 UseMcp = false,
                 IsFeatureMode = false
             };
-            var result = TaskLauncher.BuildFullPrompt("SYS:", task);
+            var result = _prompt.BuildFullPrompt("SYS:", task);
             Assert.StartsWith("SYS:", result);
             Assert.EndsWith("do work", result);
             Assert.Contains("# USER PROMPT / TASK", result);
@@ -190,7 +202,7 @@ namespace HappyEngine.Tests
                 IsFeatureMode = false
             };
             task.ImagePaths.Add("img.png");
-            var result = TaskLauncher.BuildFullPrompt("SYS:", task);
+            var result = _prompt.BuildFullPrompt("SYS:", task);
             Assert.Contains("# ATTACHED IMAGES", result);
             Assert.Contains("img.png", result);
         }
@@ -200,35 +212,35 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildClaudeCommand_NoFlags_BasicCommand()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(false, false);
+            var cmd = _prompt.BuildClaudeCommand(false, false);
             Assert.Equal("claude -p --verbose --output-format stream-json", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_SkipPermissions_IncludesFlag()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(true, false);
+            var cmd = _prompt.BuildClaudeCommand(true, false);
             Assert.Contains("--dangerously-skip-permissions", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_Remote_IncludesFlag()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(false, true);
+            var cmd = _prompt.BuildClaudeCommand(false, true);
             Assert.Contains("--remote", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_NoSpawnTeamFlag()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(false, false);
+            var cmd = _prompt.BuildClaudeCommand(false, false);
             Assert.DoesNotContain("--spawn-team", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_AllFlags()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(true, true);
+            var cmd = _prompt.BuildClaudeCommand(true, true);
             Assert.Contains("--dangerously-skip-permissions", cmd);
             Assert.Contains("--remote", cmd);
             Assert.DoesNotContain("--spawn-team", cmd);
@@ -239,7 +251,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildClaudeCommand_AlwaysContainsStreamJson()
         {
-            var cmd = TaskLauncher.BuildClaudeCommand(false, false);
+            var cmd = _prompt.BuildClaudeCommand(false, false);
             Assert.Contains("stream-json", cmd);
         }
 
@@ -248,70 +260,70 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildPowerShellScript_ContainsSetLocation()
         {
-            var script = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "claude -p");
+            var script = _prompt.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "claude -p");
             Assert.Contains("Set-Location -LiteralPath 'C:\\proj'", script);
         }
 
         [Fact]
         public void BuildPowerShellScript_PipesPromptViaStdin()
         {
-            var script = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "claude -p");
+            var script = _prompt.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "claude -p");
             Assert.Contains("Get-Content -Raw -LiteralPath 'C:\\scripts\\prompt.txt' | claude -p", script);
         }
 
         [Fact]
         public void BuildPowerShellScript_ContainsClaudeCommand()
         {
-            var script = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "my-command");
+            var script = _prompt.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "my-command");
             Assert.Contains("my-command", script);
         }
 
         [Fact]
         public void BuildPowerShellScript_ClearsClaudeCodeEnv()
         {
-            var script = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\p.txt", "cmd");
+            var script = _prompt.BuildPowerShellScript(@"C:\proj", @"C:\p.txt", "cmd");
             Assert.Contains("$env:CLAUDECODE = $null", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsReadKey()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
             Assert.Contains("ReadKey", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_NoStreamJson()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
             Assert.DoesNotContain("stream-json", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_SkipPermissions()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", true, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", true, false);
             Assert.Contains("--dangerously-skip-permissions", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_Remote()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, true);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, true);
             Assert.Contains("--remote", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_NoSpawnTeamFlag()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
             Assert.DoesNotContain("--spawn-team", script);
         }
 
         [Fact]
         public void SpawnTeam_AddsTeamDecompositionPromptBlock()
         {
-            var prompt = TaskLauncher.BuildBasePrompt("system", "my task", false, false, spawnTeam: true);
+            var prompt = _prompt.BuildBasePrompt("system", "my task", false, false, spawnTeam: true);
             Assert.Contains("TEAM SPAWN MODE", prompt);
             Assert.Contains("```TEAM", prompt);
         }
@@ -319,21 +331,21 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsPressAnyKey()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
             Assert.Contains("Press any key to close", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsVerbose()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
             Assert.Contains("--verbose", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsDiagnosticMessages()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
             Assert.Contains("Starting Claude", script);
             Assert.Contains("Project:", script);
         }
@@ -341,14 +353,14 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsErrorHandling()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
             Assert.Contains("LASTEXITCODE", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_PipesPromptToStdin()
         {
-            var script = TaskLauncher.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
             Assert.Contains("Get-Content -Raw", script);
             Assert.Contains("| claude -p", script);
         }
@@ -358,7 +370,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildProcessStartInfo_Normal_RedirectsIO()
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
+            var psi = _prompt.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
             Assert.True(psi.RedirectStandardOutput);
             Assert.True(psi.RedirectStandardError);
             Assert.True(psi.CreateNoWindow);
@@ -368,14 +380,14 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildProcessStartInfo_Normal_ContainsScriptPath()
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\scripts\task.ps1", headless: false);
+            var psi = _prompt.BuildProcessStartInfo(@"C:\scripts\task.ps1", headless: false);
             Assert.Contains("task.ps1", psi.Arguments);
         }
 
         [Fact]
         public void BuildProcessStartInfo_Headless_UsesShellExecute()
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: true);
+            var psi = _prompt.BuildProcessStartInfo(@"C:\script.ps1", headless: true);
             Assert.True(psi.UseShellExecute);
             Assert.False(psi.RedirectStandardOutput);
         }
@@ -383,35 +395,35 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildProcessStartInfo_Headless_NoExit()
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: true);
+            var psi = _prompt.BuildProcessStartInfo(@"C:\script.ps1", headless: true);
             Assert.Contains("-NoExit", psi.Arguments);
         }
 
         [Fact]
         public void BuildProcessStartInfo_Normal_NoNoExit()
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
+            var psi = _prompt.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
             Assert.DoesNotContain("-NoExit", psi.Arguments);
         }
 
         [Fact]
         public void BuildProcessStartInfo_Headless_NoProfile()
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: true);
+            var psi = _prompt.BuildProcessStartInfo(@"C:\script.ps1", headless: true);
             Assert.Contains("-NoProfile", psi.Arguments);
         }
 
         [Fact]
         public void BuildProcessStartInfo_UsesPowerShell()
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
+            var psi = _prompt.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
             Assert.Equal("powershell.exe", psi.FileName);
         }
 
         [Fact]
         public void BuildProcessStartInfo_BypassesExecutionPolicy()
         {
-            var psi = TaskLauncher.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
+            var psi = _prompt.BuildProcessStartInfo(@"C:\script.ps1", headless: false);
             Assert.Contains("-ExecutionPolicy Bypass", psi.Arguments);
         }
 
@@ -421,7 +433,7 @@ namespace HappyEngine.Tests
         public void PrepareTaskForFeatureModeStart_ForcesSkipPermissions()
         {
             var task = new AgentTask { SkipPermissions = false };
-            TaskLauncher.PrepareTaskForFeatureModeStart(task);
+            _factory.PrepareTaskForFeatureModeStart(task);
             Assert.True(task.SkipPermissions);
         }
 
@@ -429,7 +441,7 @@ namespace HappyEngine.Tests
         public void PrepareTaskForFeatureModeStart_SetsIteration1()
         {
             var task = new AgentTask();
-            TaskLauncher.PrepareTaskForFeatureModeStart(task);
+            _factory.PrepareTaskForFeatureModeStart(task);
             Assert.Equal(1, task.CurrentIteration);
         }
 
@@ -437,7 +449,7 @@ namespace HappyEngine.Tests
         public void PrepareTaskForFeatureModeStart_ResetsFailures()
         {
             var task = new AgentTask { ConsecutiveFailures = 5 };
-            TaskLauncher.PrepareTaskForFeatureModeStart(task);
+            _factory.PrepareTaskForFeatureModeStart(task);
             Assert.Equal(0, task.ConsecutiveFailures);
         }
 
@@ -445,21 +457,21 @@ namespace HappyEngine.Tests
         public void PrepareTaskForFeatureModeStart_ResetsOutputStart()
         {
             var task = new AgentTask { LastIterationOutputStart = 999 };
-            TaskLauncher.PrepareTaskForFeatureModeStart(task);
+            _factory.PrepareTaskForFeatureModeStart(task);
             Assert.Equal(0, task.LastIterationOutputStart);
         }
 
         [Fact]
         public void BuildFeatureModeContinuationPrompt_InterpolatesValues()
         {
-            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(3, 50);
+            var prompt = _prompt.BuildFeatureModeContinuationPrompt(3, 50);
             Assert.Contains("iteration 3/50", prompt);
         }
 
         [Fact]
         public void BuildFeatureModeContinuationPrompt_ContainsRestrictions()
         {
-            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(1, 10);
+            var prompt = _prompt.BuildFeatureModeContinuationPrompt(1, 10);
             Assert.Contains("No git", prompt);
             Assert.Contains("no OS modifications", prompt);
             Assert.Contains("project root", prompt);
@@ -468,25 +480,25 @@ namespace HappyEngine.Tests
         [Fact]
         public void CheckFeatureModeComplete_Complete_ReturnsTrue()
         {
-            Assert.True(TaskLauncher.CheckFeatureModeComplete("some output\nSTATUS: COMPLETE\n"));
+            Assert.True(_completion.CheckFeatureModeComplete("some output\nSTATUS: COMPLETE\n"));
         }
 
         [Fact]
         public void CheckFeatureModeComplete_NeedsMoreWork_ReturnsFalse()
         {
-            Assert.False(TaskLauncher.CheckFeatureModeComplete("some output\nSTATUS: NEEDS_MORE_WORK\n"));
+            Assert.False(_completion.CheckFeatureModeComplete("some output\nSTATUS: NEEDS_MORE_WORK\n"));
         }
 
         [Fact]
         public void CheckFeatureModeComplete_NoMarker_ReturnsFalse()
         {
-            Assert.False(TaskLauncher.CheckFeatureModeComplete("just some output\nno markers here\n"));
+            Assert.False(_completion.CheckFeatureModeComplete("just some output\nno markers here\n"));
         }
 
         [Fact]
         public void CheckFeatureModeComplete_CompleteWithWhitespace_ReturnsTrue()
         {
-            Assert.True(TaskLauncher.CheckFeatureModeComplete("output\n  STATUS: COMPLETE  \n"));
+            Assert.True(_completion.CheckFeatureModeComplete("output\n  STATUS: COMPLETE  \n"));
         }
 
         [Fact]
@@ -494,14 +506,14 @@ namespace HappyEngine.Tests
         {
             // Last marker wins when scanning from the end
             var output = "STATUS: NEEDS_MORE_WORK\nmore work\nSTATUS: COMPLETE\n";
-            Assert.True(TaskLauncher.CheckFeatureModeComplete(output));
+            Assert.True(_completion.CheckFeatureModeComplete(output));
         }
 
         [Fact]
         public void CheckFeatureModeComplete_CompleteThenNeedsMoreWork_ReturnsFalse()
         {
             var output = "STATUS: COMPLETE\nmore work\nSTATUS: NEEDS_MORE_WORK\n";
-            Assert.False(TaskLauncher.CheckFeatureModeComplete(output));
+            Assert.False(_completion.CheckFeatureModeComplete(output));
         }
 
         // ── StripAnsi ───────────────────────────────────────────────
@@ -509,25 +521,25 @@ namespace HappyEngine.Tests
         [Fact]
         public void StripAnsi_PlainText_Unchanged()
         {
-            Assert.Equal("hello world", TaskLauncher.StripAnsi("hello world"));
+            Assert.Equal("hello world", FormatHelpers.StripAnsiCodes("hello world"));
         }
 
         [Fact]
         public void StripAnsi_RemovesColorCodes()
         {
-            Assert.Equal("hello", TaskLauncher.StripAnsi("\x1B[31mhello\x1B[0m"));
+            Assert.Equal("hello", FormatHelpers.StripAnsiCodes("\x1B[31mhello\x1B[0m"));
         }
 
         [Fact]
         public void StripAnsi_RemovesBoldCodes()
         {
-            Assert.Equal("text", TaskLauncher.StripAnsi("\x1B[1mtext\x1B[22m"));
+            Assert.Equal("text", FormatHelpers.StripAnsiCodes("\x1B[1mtext\x1B[22m"));
         }
 
         [Fact]
         public void StripAnsi_EmptyString_ReturnsEmpty()
         {
-            Assert.Equal("", TaskLauncher.StripAnsi(""));
+            Assert.Equal("", FormatHelpers.StripAnsiCodes(""));
         }
 
         // ── IsImageFile ─────────────────────────────────────────────
@@ -546,7 +558,7 @@ namespace HappyEngine.Tests
         [InlineData("test", false)]
         public void IsImageFile_DetectsCorrectly(string path, bool expected)
         {
-            Assert.Equal(expected, TaskLauncher.IsImageFile(path));
+            Assert.Equal(expected, FormatHelpers.IsImageFile(path));
         }
 
         // ── IsFileModifyTool ────────────────────────────────────────
@@ -565,7 +577,7 @@ namespace HappyEngine.Tests
         [InlineData("", false)]
         public void IsFileModifyTool_DetectsCorrectly(string? toolName, bool expected)
         {
-            Assert.Equal(expected, TaskLauncher.IsFileModifyTool(toolName));
+            Assert.Equal(expected, FormatHelpers.IsFileModifyTool(toolName));
         }
 
         // ── NormalizePath ───────────────────────────────────────────
@@ -573,21 +585,21 @@ namespace HappyEngine.Tests
         [Fact]
         public void NormalizePath_ForwardSlashes_Normalized()
         {
-            var result = TaskLauncher.NormalizePath("src/main/file.cs");
+            var result = FormatHelpers.NormalizePath("src/main/file.cs", null);
             Assert.DoesNotContain("/", result);
         }
 
         [Fact]
         public void NormalizePath_ReturnsLowercase()
         {
-            var result = TaskLauncher.NormalizePath(@"C:\Users\TEST\File.CS");
+            var result = FormatHelpers.NormalizePath(@"C:\Users\TEST\File.CS", null);
             Assert.Equal(result, result.ToLowerInvariant());
         }
 
         [Fact]
         public void NormalizePath_RelativeWithBase_Combines()
         {
-            var result = TaskLauncher.NormalizePath("src/file.cs", @"C:\Projects\MyApp");
+            var result = FormatHelpers.NormalizePath("src/file.cs", @"C:\Projects\MyApp");
             Assert.Contains("myapp", result);
             Assert.Contains("file.cs", result);
         }
@@ -595,7 +607,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void NormalizePath_AbsolutePath_IgnoresBase()
         {
-            var result = TaskLauncher.NormalizePath(@"C:\Absolute\Path.cs", @"C:\Other\Base");
+            var result = FormatHelpers.NormalizePath(@"C:\Absolute\Path.cs", @"C:\Other\Base");
             Assert.Contains("absolute", result);
             Assert.DoesNotContain("other", result);
         }
@@ -611,13 +623,13 @@ namespace HappyEngine.Tests
         [InlineData("too many requests")]
         public void IsTokenLimitError_DetectsLimitErrors(string output)
         {
-            Assert.True(TaskLauncher.IsTokenLimitError(output));
+            Assert.True(_completion.IsTokenLimitError(output));
         }
 
         [Fact]
         public void IsTokenLimitError_NormalOutput_ReturnsFalse()
         {
-            Assert.False(TaskLauncher.IsTokenLimitError("Task completed successfully."));
+            Assert.False(_completion.IsTokenLimitError("Task completed successfully."));
         }
 
         [Fact]
@@ -625,7 +637,7 @@ namespace HappyEngine.Tests
         {
             // Error at the end of a long string should still be detected
             var longOutput = new string('x', 5000) + "rate limit";
-            Assert.True(TaskLauncher.IsTokenLimitError(longOutput));
+            Assert.True(_completion.IsTokenLimitError(longOutput));
         }
 
         [Fact]
@@ -633,7 +645,7 @@ namespace HappyEngine.Tests
         {
             // Error at the start of a long string, beyond the 3000 char window
             var longOutput = "rate limit" + new string('x', 5000);
-            Assert.False(TaskLauncher.IsTokenLimitError(longOutput));
+            Assert.False(_completion.IsTokenLimitError(longOutput));
         }
 
         // ── Constants ───────────────────────────────────────────────
@@ -641,50 +653,50 @@ namespace HappyEngine.Tests
         [Fact]
         public void DefaultSystemPrompt_ContainsStrictRule()
         {
-            Assert.Contains("# RULES", TaskLauncher.DefaultSystemPrompt);
+            Assert.Contains("# RULES", PromptBuilder.DefaultSystemPrompt);
         }
 
         [Fact]
         public void DefaultSystemPrompt_EndsWithNewlines()
         {
-            Assert.EndsWith("\n\n", TaskLauncher.DefaultSystemPrompt);
+            Assert.EndsWith("\n\n", PromptBuilder.DefaultSystemPrompt);
         }
 
         [Fact]
         public void DefaultSystemPrompt_ContainsNoSecretsRule()
         {
-            Assert.Contains("secrets", TaskLauncher.DefaultSystemPrompt);
-            Assert.Contains("API keys", TaskLauncher.DefaultSystemPrompt);
-            Assert.Contains("%LOCALAPPDATA%", TaskLauncher.DefaultSystemPrompt);
+            Assert.Contains("secrets", PromptBuilder.DefaultSystemPrompt);
+            Assert.Contains("API keys", PromptBuilder.DefaultSystemPrompt);
+            Assert.Contains("%LOCALAPPDATA%", PromptBuilder.DefaultSystemPrompt);
         }
 
         [Fact]
         public void McpPromptBlock_ContainsServerUrl()
         {
-            Assert.Contains("127.0.0.1:8080", TaskLauncher.McpPromptBlock);
+            Assert.Contains("127.0.0.1:8080", PromptBuilder.McpPromptBlock);
         }
 
         [Fact]
         public void NoGitWriteBlock_ContainsRestrictions()
         {
-            Assert.Contains("NO GIT WRITES", TaskLauncher.NoGitWriteBlock);
-            Assert.Contains("commit", TaskLauncher.NoGitWriteBlock);
-            Assert.Contains("push", TaskLauncher.NoGitWriteBlock);
+            Assert.Contains("NO GIT WRITES", PromptBuilder.NoGitWriteBlock);
+            Assert.Contains("commit", PromptBuilder.NoGitWriteBlock);
+            Assert.Contains("push", PromptBuilder.NoGitWriteBlock);
         }
 
         [Fact]
         public void FeatureModeInitialTemplate_ContainsRestrictions()
         {
-            Assert.Contains("No git commands", TaskLauncher.FeatureModeInitialTemplate);
-            Assert.Contains("No file modifications", TaskLauncher.FeatureModeInitialTemplate);
-            Assert.Contains("TEAM", TaskLauncher.FeatureModeInitialTemplate);
+            Assert.Contains("No git commands", PromptBuilder.FeatureModeInitialTemplate);
+            Assert.Contains("No file modifications", PromptBuilder.FeatureModeInitialTemplate);
+            Assert.Contains("TEAM", PromptBuilder.FeatureModeInitialTemplate);
         }
 
         [Fact]
         public void FeatureModeContinuationTemplate_ContainsPlaceholders()
         {
-            Assert.Contains("{0}", TaskLauncher.FeatureModeContinuationTemplate);
-            Assert.Contains("{1}", TaskLauncher.FeatureModeContinuationTemplate);
+            Assert.Contains("{0}", PromptBuilder.FeatureModeContinuationTemplate);
+            Assert.Contains("{1}", PromptBuilder.FeatureModeContinuationTemplate);
         }
 
         // ── Completion Summary ─────────────────────────────────────────
@@ -692,7 +704,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void FormatCompletionSummary_ContainsStatus()
         {
-            var result = TaskLauncher.FormatCompletionSummary(
+            var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.FromMinutes(5), null);
             Assert.Contains("Completed", result);
         }
@@ -700,7 +712,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void FormatCompletionSummary_ContainsDuration()
         {
-            var result = TaskLauncher.FormatCompletionSummary(
+            var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.FromSeconds(323), null);
             Assert.Contains("5m 23s", result);
         }
@@ -708,7 +720,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void FormatCompletionSummary_NullFiles_NoFileSection()
         {
-            var result = TaskLauncher.FormatCompletionSummary(
+            var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.Zero, null);
             Assert.DoesNotContain("Files modified", result);
             Assert.DoesNotContain("Lines changed", result);
@@ -722,7 +734,7 @@ namespace HappyEngine.Tests
                 ("src/App.cs", 12, 5),
                 ("src/Main.cs", 25, 8)
             };
-            var result = TaskLauncher.FormatCompletionSummary(
+            var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Failed, TimeSpan.FromMinutes(2), files);
             Assert.DoesNotContain("Files modified", result);
             Assert.DoesNotContain("Lines changed", result);
@@ -733,7 +745,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void FormatCompletionSummary_ContainsSummaryHeader()
         {
-            var result = TaskLauncher.FormatCompletionSummary(
+            var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.Zero, null);
             Assert.Contains("TASK COMPLETION SUMMARY", result);
         }
@@ -745,7 +757,7 @@ namespace HappyEngine.Tests
             {
                 ("test.cs", 10, 3)
             };
-            var result = TaskLauncher.FormatCompletionSummary(
+            var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.Zero, files);
             Assert.DoesNotContain("test.cs", result);
             Assert.DoesNotContain("Modified files:", result);
@@ -755,7 +767,7 @@ namespace HappyEngine.Tests
         public void CaptureGitHead_ValidRepo_ReturnsHash()
         {
             // The project itself is a git repo
-            var hash = TaskLauncher.CaptureGitHead(System.IO.Directory.GetCurrentDirectory());
+            var hash = _git.CaptureGitHead(System.IO.Directory.GetCurrentDirectory());
             Assert.NotNull(hash);
             Assert.True(hash!.Length >= 7); // short hash at minimum
         }
@@ -763,21 +775,21 @@ namespace HappyEngine.Tests
         [Fact]
         public void CaptureGitHead_InvalidPath_ReturnsNull()
         {
-            var hash = TaskLauncher.CaptureGitHead(@"C:\nonexistent_path_12345");
+            var hash = _git.CaptureGitHead(@"C:\nonexistent_path_12345");
             Assert.Null(hash);
         }
 
         [Fact]
         public void GetGitFileChanges_InvalidPath_ReturnsNull()
         {
-            var changes = TaskLauncher.GetGitFileChanges(@"C:\nonexistent_path_12345", null);
+            var changes = _git.GetGitFileChanges(@"C:\nonexistent_path_12345", null);
             Assert.Null(changes);
         }
 
         [Fact]
         public void GenerateCompletionSummary_InvalidPath_StillReturnsFormatted()
         {
-            var result = TaskLauncher.GenerateCompletionSummary(
+            var result = _completion.GenerateCompletionSummary(
                 @"C:\nonexistent_path_12345", null, AgentTaskStatus.Completed, TimeSpan.FromMinutes(1));
             Assert.Contains("TASK COMPLETION SUMMARY", result);
             Assert.Contains("Completed", result);

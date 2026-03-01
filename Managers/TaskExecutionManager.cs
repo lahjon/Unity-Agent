@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using HappyEngine.Helpers;
 
 namespace HappyEngine.Managers
 {
@@ -34,6 +35,12 @@ namespace HappyEngine.Managers
         private readonly MessageBusManager _messageBusManager;
         private readonly Dispatcher _dispatcher;
 
+        // ── Injected services ────────────────────────────────────────
+        private readonly IGitHelper _gitHelper;
+        private readonly ICompletionAnalyzer _completionAnalyzer;
+        private readonly IPromptBuilder _promptBuilder;
+        private readonly ITaskFactory _taskFactory;
+
         // ── Focused sub-handlers ─────────────────────────────────────
         private readonly OutputProcessor _outputProcessor;
         private readonly TaskProcessLauncher _processLauncher;
@@ -53,6 +60,10 @@ namespace HappyEngine.Managers
             string scriptDir,
             FileLockManager fileLockManager,
             OutputTabManager outputTabManager,
+            IGitHelper gitHelper,
+            ICompletionAnalyzer completionAnalyzer,
+            IPromptBuilder promptBuilder,
+            ITaskFactory taskFactory,
             Func<string> getSystemPrompt,
             Func<AgentTask, string> getProjectDescription,
             Func<string, string> getProjectRulesBlock,
@@ -65,6 +76,10 @@ namespace HappyEngine.Managers
             _scriptDir = scriptDir;
             _fileLockManager = fileLockManager;
             _outputTabManager = outputTabManager;
+            _gitHelper = gitHelper;
+            _completionAnalyzer = completionAnalyzer;
+            _promptBuilder = promptBuilder;
+            _taskFactory = taskFactory;
             _getSystemPrompt = getSystemPrompt;
             _getProjectDescription = getProjectDescription;
             _getProjectRulesBlock = getProjectRulesBlock;
@@ -75,10 +90,10 @@ namespace HappyEngine.Managers
             var retryMinutesFunc = getTokenLimitRetryMinutes ?? (() => 30);
 
             // Wire up sub-handlers
-            _outputProcessor = new OutputProcessor(outputTabManager, getAutoVerify);
-            _processLauncher = new TaskProcessLauncher(scriptDir, fileLockManager, outputTabManager, _outputProcessor, dispatcher);
-            _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, retryMinutesFunc);
-            _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, retryMinutesFunc);
+            _outputProcessor = new OutputProcessor(outputTabManager, completionAnalyzer, gitHelper, getAutoVerify);
+            _processLauncher = new TaskProcessLauncher(scriptDir, fileLockManager, outputTabManager, _outputProcessor, promptBuilder, dispatcher);
+            _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, completionAnalyzer, promptBuilder, taskFactory, retryMinutesFunc);
+            _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, completionAnalyzer, retryMinutesFunc);
 
             // Forward token-limit handler's TaskCompleted to the coordinator's event
             _tokenLimitHandler.TaskCompleted += id => TaskCompleted?.Invoke(id);
@@ -97,7 +112,7 @@ namespace HappyEngine.Managers
         /// </summary>
         private string BuildAndWritePromptFile(AgentTask task, ObservableCollection<AgentTask>? activeTasks = null)
         {
-            var fullPrompt = TaskLauncher.BuildFullPrompt(
+            var fullPrompt = _promptBuilder.BuildFullPrompt(
                 _getSystemPrompt(), task,
                 _getProjectDescription(task),
                 _getProjectRulesBlock(task.ProjectPath),
@@ -116,7 +131,7 @@ namespace HappyEngine.Managers
                         .Where(p => p.TaskId != task.Id)
                         .Select(p => (p.TaskId, p.Summary))
                         .ToList();
-                    fullPrompt = TaskLauncher.BuildMessageBusBlock(task.Id, siblings) + fullPrompt;
+                    fullPrompt = _promptBuilder.BuildMessageBusBlock(task.Id, siblings) + fullPrompt;
                 }
             }
 
@@ -134,19 +149,19 @@ namespace HappyEngine.Managers
             task.Cts?.Dispose();
             task.Cts = new System.Threading.CancellationTokenSource();
 
-            task.GitStartHash = await TaskLauncher.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
+            task.GitStartHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
 
             if (task.IsFeatureMode)
-                TaskLauncher.PrepareTaskForFeatureModeStart(task);
+                _taskFactory.PrepareTaskForFeatureModeStart(task);
 
             var promptFile = BuildAndWritePromptFile(task, activeTasks);
             var projectPath = task.ProjectPath;
 
-            var claudeCmd = TaskLauncher.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession);
+            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession);
 
             var ps1File = Path.Combine(_scriptDir, $"task_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                TaskLauncher.BuildPowerShellScript(projectPath, promptFile, claudeCmd),
+                _promptBuilder.BuildPowerShellScript(projectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
             _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Task #{task.TaskNumber} starting...\n", activeTasks, historyTasks);
@@ -378,10 +393,10 @@ namespace HappyEngine.Managers
 
             var ps1File = Path.Combine(_scriptDir, $"headless_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                TaskLauncher.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, task.RemoteSession),
+                _promptBuilder.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, task.RemoteSession),
                 Encoding.UTF8);
 
-            var psi = TaskLauncher.BuildProcessStartInfo(ps1File, headless: true);
+            var psi = _promptBuilder.BuildProcessStartInfo(ps1File, headless: true);
             psi.WorkingDirectory = projectPath;
             try
             {
@@ -556,7 +571,7 @@ namespace HappyEngine.Managers
 
             // Extract execution prompt from plan output
             var output = task.OutputBuilder.ToString();
-            var executionPrompt = TaskLauncher.ExtractExecutionPrompt(output);
+            var executionPrompt = FormatHelpers.ExtractExecutionPrompt(output);
             if (!string.IsNullOrEmpty(executionPrompt))
                 task.StoredPrompt = executionPrompt;
 
@@ -586,7 +601,7 @@ namespace HappyEngine.Managers
                     return;
                 }
                 // Dependencies resolved during planning — gather context before clearing
-                task.DependencyContext = TaskLauncher.BuildDependencyContext(
+                task.DependencyContext = _promptBuilder.BuildDependencyContext(
                     depSnapshot, activeTasks, historyTasks);
                 task.ClearDependencyTaskIds();
                 task.DependencyTaskNumbers.Clear();
@@ -639,7 +654,7 @@ namespace HappyEngine.Managers
         public AgentTask SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true)
         {
             var child = inheritSettings
-                ? TaskLauncher.CreateTask(
+                ? _taskFactory.CreateTask(
                     description,
                     parent.ProjectPath,
                     parent.SkipPermissions,
@@ -654,7 +669,7 @@ namespace HappyEngine.Managers
                     planOnly: false,
                     parent.UseMessageBus,
                     model: parent.Model)
-                : TaskLauncher.CreateTask(
+                : _taskFactory.CreateTask(
                     description,
                     parent.ProjectPath,
                     skipPermissions: false,
@@ -861,6 +876,7 @@ namespace HappyEngine.Managers
         /// Delegates to <see cref="FeatureModeHandler.EvaluateFeatureModeIteration"/>.
         /// </summary>
         internal static FeatureModeHandler.FeatureModeDecision EvaluateFeatureModeIteration(
+            ICompletionAnalyzer completionAnalyzer,
             AgentTaskStatus currentStatus,
             TimeSpan totalRuntime,
             string iterationOutput,
@@ -870,7 +886,7 @@ namespace HappyEngine.Managers
             int consecutiveFailures,
             int outputLength)
             => FeatureModeHandler.EvaluateFeatureModeIteration(
-                currentStatus, totalRuntime, iterationOutput,
+                completionAnalyzer, currentStatus, totalRuntime, iterationOutput,
                 currentIteration, maxIterations, exitCode,
                 consecutiveFailures, outputLength);
 
@@ -922,7 +938,7 @@ namespace HappyEngine.Managers
                 child.SpawnTeam = false;
                 child.AutoDecompose = false;
                 child.UseMessageBus = true;
-                child.Summary = $"[{entry.Role}] {TaskLauncher.GenerateLocalSummary(entry.Description)}";
+                child.Summary = $"[{entry.Role}] {_taskFactory.GenerateLocalSummary(entry.Description)}";
                 children.Add(child);
             }
 
@@ -1083,7 +1099,7 @@ namespace HappyEngine.Managers
             foreach (var entry in entries)
             {
                 var child = SpawnSubtask(parent, entry.Description);
-                child.Summary = $"[{entry.Role}] {TaskLauncher.GenerateLocalSummary(entry.Description)}";
+                child.Summary = $"[{entry.Role}] {_taskFactory.GenerateLocalSummary(entry.Description)}";
                 children.Add(child);
             }
 

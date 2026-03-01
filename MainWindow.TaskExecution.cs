@@ -23,6 +23,7 @@ namespace HappyEngine
             ExtendedPlanningToggle.IsChecked = false;
             PlanOnlyToggle.IsChecked = false;
             AutoDecomposeToggle.IsChecked = false;
+            ApplyFixToggle.IsChecked = true;
             if (FeatureModeIterationsPanel != null)
                 FeatureModeIterationsPanel.Visibility = Visibility.Collapsed;
             if (FeatureModeIterationsBox != null)
@@ -67,57 +68,58 @@ namespace HappyEngine
 
         // ── Execute ────────────────────────────────────────────────
 
-        private void Execute_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Creates an <see cref="AgentTask"/> from a description using the current UI toggle
+        /// state, sets project metadata, then routes through the appropriate launch pipeline
+        /// (Gemini image gen, headless, or standard terminal via <see cref="LaunchTask"/>).
+        /// </summary>
+        /// <remarks>
+        /// Callers must read any UI state they need (model combo, additional instructions, etc.)
+        /// <b>before</b> calling this method, because it reads toggle values internally.
+        /// <see cref="ResetPerTaskToggles"/> should be called <b>after</b> this method returns.
+        /// </remarks>
+        private void LaunchTaskFromDescription(
+            string description,
+            string summary,
+            ModelType model = ModelType.ClaudeCode,
+            List<string>? imagePaths = null,
+            bool planOnly = false,
+            List<AgentTask>? dependencies = null,
+            string? additionalInstructions = null)
         {
-            var desc = TaskInput.Text?.Trim();
-            if (!TaskLauncher.ValidateTaskInput(desc)) return;
-
-            var selectedModel = ModelType.ClaudeCode;
-            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem)
-            {
-                var modelTag = modelItem.Tag?.ToString();
-                if (modelTag == "Gemini") selectedModel = ModelType.Gemini;
-                else if (modelTag == "GeminiGameArt") selectedModel = ModelType.GeminiGameArt;
-            }
-
-            var task = TaskLauncher.CreateTask(
-                desc!,
+            var task = _taskFactory.CreateTask(
+                description,
                 _projectManager.ProjectPath,
-                true,
-                RemoteSessionToggle.IsChecked == true,
-                false,
-                FeatureModeToggle.IsChecked == true,
-                IgnoreFileLocksToggle.IsChecked == true,
-                UseMcpToggle.IsChecked == true,
-                SpawnTeamToggle.IsChecked == true,
-                ExtendedPlanningToggle.IsChecked == true,
-                DefaultNoGitWriteToggle.IsChecked == true,
-                PlanOnlyToggle.IsChecked == true,
-                imagePaths: _imageManager.DetachImages(),
-                model: selectedModel,
+                skipPermissions: true,
+                remoteSession: RemoteSessionToggle.IsChecked == true,
+                headless: false,
+                isFeatureMode: FeatureModeToggle.IsChecked == true,
+                ignoreFileLocks: IgnoreFileLocksToggle.IsChecked == true,
+                useMcp: UseMcpToggle.IsChecked == true,
+                spawnTeam: SpawnTeamToggle.IsChecked == true,
+                extendedPlanning: ExtendedPlanningToggle.IsChecked == true,
+                noGitWrite: DefaultNoGitWriteToggle.IsChecked == true,
+                planOnly: planOnly,
+                imagePaths: imagePaths,
+                model: model,
                 autoDecompose: AutoDecomposeToggle.IsChecked == true,
                 applyFix: ApplyFixToggle.IsChecked == true);
+
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
-            task.AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "";
-            if (task.IsFeatureMode && int.TryParse(FeatureModeIterationsBox.Text, out var iterations) && iterations > 0)
+            task.Summary = summary;
+            task.AdditionalInstructions = additionalInstructions ?? "";
+
+            if (task.IsFeatureMode && int.TryParse(FeatureModeIterationsBox?.Text, out var iterations) && iterations > 0)
                 task.MaxIterations = iterations;
 
-            // Capture dependencies before clearing
-            var dependencies = _pendingDependencies.ToList();
-            ClearPendingDependencies();
-            TaskInput.Clear();
-            AdditionalInstructionsInput.Clear();
-
-            ResetPerTaskToggles();
-
-            if (selectedModel == ModelType.Gemini)
+            if (model == ModelType.Gemini)
             {
                 ExecuteGeminiTask(task);
                 return;
             }
 
-            if (selectedModel == ModelType.GeminiGameArt)
+            if (model == ModelType.GeminiGameArt)
             {
                 ExecuteGeminiGameArtTask(task);
                 return;
@@ -130,8 +132,40 @@ namespace HappyEngine
                 return;
             }
 
-            task.Summary = TaskLauncher.GenerateLocalSummary(desc!);
             LaunchTask(task, dependencies);
+        }
+
+        private void Execute_Click(object sender, RoutedEventArgs e)
+        {
+            var desc = TaskInput.Text?.Trim();
+            if (!_taskFactory.ValidateTaskInput(desc)) return;
+
+            var selectedModel = ModelType.ClaudeCode;
+            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem)
+            {
+                var modelTag = modelItem.Tag?.ToString();
+                if (modelTag == "Gemini") selectedModel = ModelType.Gemini;
+                else if (modelTag == "GeminiGameArt") selectedModel = ModelType.GeminiGameArt;
+            }
+
+            // Capture UI state before clearing
+            var additionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "";
+            var imagePaths = _imageManager.DetachImages();
+            var dependencies = _pendingDependencies.ToList();
+            ClearPendingDependencies();
+            TaskInput.Clear();
+            AdditionalInstructionsInput.Clear();
+
+            LaunchTaskFromDescription(
+                desc!,
+                _taskFactory.GenerateLocalSummary(desc!),
+                selectedModel,
+                imagePaths,
+                PlanOnlyToggle.IsChecked == true,
+                dependencies,
+                additionalInstructions);
+
+            ResetPerTaskToggles();
         }
 
         private async void ComposeWorkflow_Click(object sender, RoutedEventArgs e)
@@ -145,7 +179,7 @@ namespace HappyEngine
 
             foreach (var step in result.Steps)
             {
-                var task = TaskLauncher.CreateTask(
+                var task = _taskFactory.CreateTask(
                     step.Description,
                     _projectManager.ProjectPath,
                     skipPermissions: true,
@@ -242,7 +276,9 @@ namespace HappyEngine
 
         private async System.Threading.Tasks.Task RunGeminiImageGeneration(AgentTask task)
         {
-            var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
+            using var linkedCts = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(
+                task.Cts?.Token ?? System.Threading.CancellationToken.None, _windowCts.Token);
+            var ct = linkedCts.Token;
             var progress = new Progress<string>(msg =>
             {
                 _outputTabManager.AppendOutput(task.Id, msg, _activeTasks, _historyTasks);
@@ -347,7 +383,9 @@ namespace HappyEngine
 
         private async System.Threading.Tasks.Task RunGameAssetGeneration(AgentTask task, string assetType)
         {
-            var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
+            using var linkedCts = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(
+                task.Cts?.Token ?? System.Threading.CancellationToken.None, _windowCts.Token);
+            var ct = linkedCts.Token;
             var progress = new Progress<string>(msg =>
             {
                 _outputTabManager.AppendOutput(task.Id, msg, _activeTasks, _historyTasks);
@@ -879,7 +917,7 @@ TextureImporter:
 
             try
             {
-                var result = await TaskLauncher.RunGitCommandAsync(
+                var result = await _gitHelper.RunGitCommandAsync(
                     task.ProjectPath, $"reset --hard {task.GitStartHash}");
 
                 if (result != null)

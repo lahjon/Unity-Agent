@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using HappyEngine.Helpers;
 using HappyEngine.Managers;
 using Xunit;
 
@@ -24,20 +25,25 @@ namespace HappyEngine.Tests
     /// </summary>
     public class TaskExecutionEngineTests
     {
+        private static readonly ITaskFactory _factory = new Managers.TaskFactory();
+        private static readonly IPromptBuilder _prompt = new PromptBuilder();
+        private static readonly IGitHelper _git = new GitHelper();
+        private static readonly ICompletionAnalyzer _completion = new CompletionAnalyzer(_git);
+
         // ── Helpers ──────────────────────────────────────────────────
 
         private static AgentTask MakeTask(string projectPath = @"C:\Projects\Test",
             AgentTaskStatus status = AgentTaskStatus.Running)
         {
-            var t = TaskLauncher.CreateTask("test task", projectPath, false, false, false, false, false, false);
+            var t = _factory.CreateTask("test task", projectPath, false, false, false, false, false, false);
             t.Status = status;
             return t;
         }
 
         private static AgentTask MakeFeatureModeTask(string projectPath = @"C:\Projects\Test")
         {
-            var t = TaskLauncher.CreateTask("feature mode task", projectPath, true, false, false, true, false, false);
-            TaskLauncher.PrepareTaskForFeatureModeStart(t);
+            var t = _factory.CreateTask("feature mode task", projectPath, true, false, false, true, false, false);
+            _factory.PrepareTaskForFeatureModeStart(t);
             return t;
         }
 
@@ -79,6 +85,7 @@ namespace HappyEngine.Tests
             var mbm = new MessageBusManager(dispatcher);
             var mgr = new TaskExecutionManager(
                 tempDir, flm, otm,
+                _git, _completion, _prompt, _factory,
                 () => "test prompt",
                 _ => "test project",
                 _ => "",
@@ -97,7 +104,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_SkipsWhenTaskNotRunning()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Paused,
+                _completion, AgentTaskStatus.Paused,
                 TimeSpan.FromHours(1), "", 1, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Skip, decision.Action);
@@ -111,7 +118,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_SkipsForNonRunningStatuses(AgentTaskStatus status)
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                status, TimeSpan.FromHours(1), "", 1, 50, 0, 0, 0);
+                _completion, status, TimeSpan.FromHours(1), "", 1, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Skip, decision.Action);
         }
@@ -120,7 +127,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_FinishesOnRuntimeCap()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(12), "", 5, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Finish, decision.Action);
@@ -131,7 +138,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_FinishesOnRuntimeCapExceeded()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(13), "", 5, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Finish, decision.Action);
@@ -144,7 +151,7 @@ namespace HappyEngine.Tests
             var output = "Some work done\nSTATUS: COMPLETE\n";
 
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), output, 5, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Finish, decision.Action);
@@ -157,7 +164,7 @@ namespace HappyEngine.Tests
             var output = "Some work done\nSTATUS: NEEDS_MORE_WORK\n";
 
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), output, 5, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Continue, decision.Action);
@@ -167,7 +174,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_FinishesOnMaxIterations()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 50, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Finish, decision.Action);
@@ -178,7 +185,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_ContinuesWhenBelowMaxIterations()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 49, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Continue, decision.Action);
@@ -188,7 +195,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_FailsOnCrashLoop_ThreeConsecutiveFailures()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
@@ -201,7 +208,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_IncrementsFailureOnNonZeroExit()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 0, outputLength: 0);
 
@@ -213,7 +220,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_IncrementsFailureToTwoThenContinues()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 1, outputLength: 0);
 
@@ -225,7 +232,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_ResetsFailuresOnSuccess()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 0, consecutiveFailures: 2, outputLength: 0);
 
@@ -243,7 +250,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_RetriesOnTokenLimitError(string errorText)
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), errorText, 5, 50,
                 exitCode: 1, consecutiveFailures: 0, outputLength: 0);
 
@@ -254,7 +261,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_TokenLimitResetsFailureCount()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "rate limit exceeded", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
@@ -267,7 +274,7 @@ namespace HappyEngine.Tests
         {
             // Token limit with exitCode != 0 should NOT increment failures
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "rate limit exceeded", 5, 50,
                 exitCode: 1, consecutiveFailures: 1, outputLength: 0);
 
@@ -279,7 +286,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_SetsOutputTrimWhenOverCap()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 200_000);
 
@@ -291,7 +298,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_NoTrimWhenUnderCap()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 50_000);
 
@@ -303,7 +310,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_NoTrimAtExactCap()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 100_000);
 
@@ -315,7 +322,7 @@ namespace HappyEngine.Tests
         {
             // Both conditions true: runtime cap AND STATUS: COMPLETE
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(12), "STATUS: COMPLETE\n", 5, 50, 0, 0, 0);
 
             // Runtime cap is checked first
@@ -328,7 +335,7 @@ namespace HappyEngine.Tests
         {
             // Both: STATUS: COMPLETE and at max iterations
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "STATUS: COMPLETE\n", 50, 50, 0, 0, 0);
 
             // Both lead to Completed, just verifying it finishes
@@ -341,7 +348,7 @@ namespace HappyEngine.Tests
         {
             // Exit code 1, consecutive failures at 2 → 3rd failure → crash loop
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "normal output", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
@@ -353,7 +360,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_ExactlyAtRuntimeCap()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(12).Add(TimeSpan.FromSeconds(1)),
                 "", 5, 50, 0, 0, 0);
 
@@ -364,7 +371,7 @@ namespace HappyEngine.Tests
         public void FeatureModeDecision_JustUnderRuntimeCap()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(11).Add(TimeSpan.FromMinutes(59)),
                 "", 5, 50, 0, 0, 0);
 
@@ -508,7 +515,7 @@ namespace HappyEngine.Tests
                 var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
-                var normalized = TaskLauncher.NormalizePath("src/file.cs", task.ProjectPath);
+                var normalized = FormatHelpers.NormalizePath("src/file.cs", task.ProjectPath);
 
                 flm.TryAcquireFileLock(task.Id, "src/file.cs", "Edit", activeTasks);
 
@@ -524,7 +531,7 @@ namespace HappyEngine.Tests
                 var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
-                var normalized = TaskLauncher.NormalizePath("src/file.cs", task.ProjectPath);
+                var normalized = FormatHelpers.NormalizePath("src/file.cs", task.ProjectPath);
 
                 flm.TryAcquireFileLock(task.Id, "src/file.cs", "Edit", activeTasks);
                 flm.ReleaseTaskLocks(task.Id);
@@ -1168,8 +1175,8 @@ namespace HappyEngine.Tests
         [Fact]
         public void FeatureModeLifecycle_PrepareForStart_InitializesCorrectly()
         {
-            var task = TaskLauncher.CreateTask("feature mode", @"C:\Test", true, false, false, true, false, false);
-            TaskLauncher.PrepareTaskForFeatureModeStart(task);
+            var task = _factory.CreateTask("feature mode", @"C:\Test", true, false, false, true, false, false);
+            _factory.PrepareTaskForFeatureModeStart(task);
 
             Assert.True(task.SkipPermissions);
             Assert.Equal(1, task.CurrentIteration);
@@ -1186,21 +1193,21 @@ namespace HappyEngine.Tests
 
             // Iteration 1: success
             var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(5),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(5),
                 "Working...\nSTATUS: NEEDS_MORE_WORK\n", 1, 50, 0, failures, 1000);
             Assert.Equal(FeatureModeAction.Continue, d1.Action);
             failures = d1.ConsecutiveFailures;
 
             // Iteration 2: success
             var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(15),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(15),
                 "More work...\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
             Assert.Equal(FeatureModeAction.Continue, d2.Action);
             failures = d2.ConsecutiveFailures;
 
             // Iteration 3: complete!
             var d3 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(25),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(25),
                 "Done!\nSTATUS: COMPLETE\n", 3, 50, 0, failures, 3000);
             Assert.Equal(FeatureModeAction.Finish, d3.Action);
             Assert.Equal(AgentTaskStatus.Completed, d3.FinishStatus);
@@ -1213,7 +1220,7 @@ namespace HappyEngine.Tests
 
             // Iteration 1: failure
             var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(5),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(5),
                 "error output", 1, 50, 1, failures, 1000);
             Assert.Equal(FeatureModeAction.Continue, d1.Action);
             Assert.Equal(1, d1.ConsecutiveFailures);
@@ -1221,7 +1228,7 @@ namespace HappyEngine.Tests
 
             // Iteration 2: success (resets failures)
             var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(10),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(10),
                 "back to work\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
             Assert.Equal(FeatureModeAction.Continue, d2.Action);
             Assert.Equal(0, d2.ConsecutiveFailures);
@@ -1229,19 +1236,19 @@ namespace HappyEngine.Tests
 
             // Iterations 3, 4, 5: three consecutive failures → crash loop
             var d3 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(15),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(15),
                 "error", 3, 50, 1, failures, 3000);
             Assert.Equal(FeatureModeAction.Continue, d3.Action);
             failures = d3.ConsecutiveFailures;
 
             var d4 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(20),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(20),
                 "error", 4, 50, 1, failures, 4000);
             Assert.Equal(FeatureModeAction.Continue, d4.Action);
             failures = d4.ConsecutiveFailures;
 
             var d5 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(25),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(25),
                 "error", 5, 50, 1, failures, 5000);
             Assert.Equal(FeatureModeAction.Finish, d5.Action);
             Assert.Equal(AgentTaskStatus.Failed, d5.FinishStatus);
@@ -1255,7 +1262,7 @@ namespace HappyEngine.Tests
 
             // Iteration 1: token limit
             var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromMinutes(30),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(30),
                 "error: rate limit exceeded", 1, 50, 1, failures, 1000);
             Assert.Equal(FeatureModeAction.RetryAfterDelay, d1.Action);
             Assert.Equal(0, d1.ConsecutiveFailures); // Token limit resets failures
@@ -1263,7 +1270,7 @@ namespace HappyEngine.Tests
 
             // After retry wait, iteration 2: success
             var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running, TimeSpan.FromHours(1),
+                _completion, AgentTaskStatus.Running, TimeSpan.FromHours(1),
                 "continuing work\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
             Assert.Equal(FeatureModeAction.Continue, d2.Action);
             Assert.Equal(0, d2.ConsecutiveFailures);
@@ -1413,10 +1420,10 @@ namespace HappyEngine.Tests
         [Fact]
         public void FeatureModeInit_ForcesSkipPermissions()
         {
-            var task = TaskLauncher.CreateTask("test", @"C:\Test", false, false, false, true, false, false);
+            var task = _factory.CreateTask("test", @"C:\Test", false, false, false, true, false, false);
             Assert.False(task.SkipPermissions); // Not yet prepared
 
-            TaskLauncher.PrepareTaskForFeatureModeStart(task);
+            _factory.PrepareTaskForFeatureModeStart(task);
 
             Assert.True(task.SkipPermissions);
         }
@@ -1430,7 +1437,7 @@ namespace HappyEngine.Tests
             task.ConsecutiveFailures = 2;
             task.LastIterationOutputStart = 50000;
 
-            TaskLauncher.PrepareTaskForFeatureModeStart(task);
+            _factory.PrepareTaskForFeatureModeStart(task);
 
             Assert.Equal(1, task.CurrentIteration);
             Assert.Equal(0, task.ConsecutiveFailures);
@@ -1447,7 +1454,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void FeatureModeContinuationPrompt_IncludesIterationNumbers()
         {
-            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(1, 2);
+            var prompt = _prompt.BuildFeatureModeContinuationPrompt(1, 2);
 
             Assert.Contains("1", prompt);
             Assert.Contains("2", prompt);
@@ -1457,7 +1464,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void FeatureModeContinuationPrompt_IncludesRestrictions()
         {
-            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(1, 50);
+            var prompt = _prompt.BuildFeatureModeContinuationPrompt(1, 50);
 
             Assert.Contains("No git", prompt);
             Assert.Contains("STATUS: COMPLETE", prompt);
@@ -1471,7 +1478,7 @@ namespace HappyEngine.Tests
         public void EdgeCase_EmptyOutputDoesNotTriggerCompletion()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), "", 5, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Continue, decision.Action);
@@ -1484,7 +1491,7 @@ namespace HappyEngine.Tests
             var output = "STATUS: COMPLETE\n" + string.Join("\n", new string[60].Select(_ => "filler line"));
 
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), output, 5, 50, 0, 0, 0);
 
             // Should NOT detect completion (marker buried beyond last 50 lines)
@@ -1497,7 +1504,7 @@ namespace HappyEngine.Tests
             var output = string.Join("\n", new string[40].Select(_ => "filler")) + "\nSTATUS: COMPLETE\n";
 
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), output, 5, 50, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Finish, decision.Action);
@@ -1508,7 +1515,7 @@ namespace HappyEngine.Tests
         {
             // Even exitCode 0 with token limit text → retry
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), "too many requests", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 0);
 
@@ -1519,7 +1526,7 @@ namespace HappyEngine.Tests
         public void EdgeCase_MaxIterationsAtZero()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(5), "", 0, 0, 0, 0, 0);
 
             Assert.Equal(FeatureModeAction.Finish, decision.Action);
@@ -1530,7 +1537,7 @@ namespace HappyEngine.Tests
         public void EdgeCase_OutputLengthExactlyAtCap()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(5), "", 5, 50, 0, 0, 100_000);
 
             Assert.False(decision.TrimOutput);
@@ -1540,7 +1547,7 @@ namespace HappyEngine.Tests
         public void EdgeCase_OutputLengthOneOverCap()
         {
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
-                AgentTaskStatus.Running,
+                _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(5), "", 5, 50, 0, 0, 100_001);
 
             Assert.True(decision.TrimOutput);

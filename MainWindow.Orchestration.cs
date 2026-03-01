@@ -241,7 +241,7 @@ namespace HappyEngine
                 var depSnapshot = task.DependencyTaskIds;
                 if (depSnapshot.Count > 0)
                 {
-                    task.DependencyContext = TaskLauncher.BuildDependencyContext(
+                    task.DependencyContext = _promptBuilder.BuildDependencyContext(
                         depSnapshot, _activeTasks, _historyTasks);
                 }
 
@@ -378,7 +378,7 @@ namespace HappyEngine
         private void RetryTask(AgentTask historicTask)
         {
             var prompt = historicTask.StoredPrompt ?? historicTask.Description;
-            var newTask = TaskLauncher.CreateTask(
+            var newTask = _taskFactory.CreateTask(
                 prompt,
                 historicTask.ProjectPath,
                 historicTask.SkipPermissions,
@@ -396,7 +396,7 @@ namespace HappyEngine
             newTask.ProjectColor = historicTask.ProjectColor;
             newTask.ProjectDisplayName = historicTask.ProjectDisplayName;
             newTask.AdditionalInstructions = historicTask.AdditionalInstructions;
-            newTask.Summary = TaskLauncher.GenerateLocalSummary(prompt);
+            newTask.Summary = _taskFactory.GenerateLocalSummary(prompt);
 
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
@@ -415,7 +415,7 @@ namespace HappyEngine
         /// </summary>
         private void LaunchTask(AgentTask task, List<AgentTask>? dependencies = null)
         {
-            task.Summary ??= TaskLauncher.GenerateLocalSummary(task.Description);
+            task.Summary ??= _taskFactory.GenerateLocalSummary(task.Description);
             AddActiveTask(task);
             _outputTabManager.CreateTab(task);
 

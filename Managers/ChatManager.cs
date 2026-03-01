@@ -11,7 +11,7 @@ using System.Windows.Media.Imaging;
 
 namespace HappyEngine.Managers
 {
-    public class ChatManager
+    public class ChatManager : IDisposable
     {
         private const int MaxTokenBudget = 30_000;
         private const int CharsPerToken = 4;
@@ -140,7 +140,7 @@ namespace HappyEngine.Managers
                 var added = false;
                 foreach (string? file in files)
                 {
-                    if (file != null && TaskLauncher.IsImageFile(file))
+                    if (file != null && Helpers.FormatHelpers.IsImageFile(file))
                     {
                         AddPendingImage(file);
                         added = true;
@@ -157,7 +157,7 @@ namespace HappyEngine.Managers
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = e.Data.GetData(DataFormats.FileDrop) as string[];
-                if (files != null && files.Any(TaskLauncher.IsImageFile))
+                if (files != null && files.Any(Helpers.FormatHelpers.IsImageFile))
                 {
                     e.Effects = DragDropEffects.Copy;
                     e.Handled = true;
@@ -177,7 +177,7 @@ namespace HappyEngine.Managers
                     var added = false;
                     foreach (var file in files)
                     {
-                        if (TaskLauncher.IsImageFile(file))
+                        if (Helpers.FormatHelpers.IsImageFile(file))
                         {
                             AddPendingImage(file);
                             added = true;
@@ -201,6 +201,8 @@ namespace HappyEngine.Managers
             _chatCts?.Dispose();
             _chatCts = null;
         }
+
+        public void Dispose() => CancelAndDispose();
 
         private void AddPendingImage(string path)
         {

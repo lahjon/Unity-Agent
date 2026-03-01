@@ -107,12 +107,12 @@ namespace HappyEngine.Managers
             return Convert.ToHexString(bytes)[..12].ToLowerInvariant();
         }
 
-        public async Task GenerateSuggestionsAsync(string projectPath, SuggestionCategory category, string? guidance = null)
+        public async Task GenerateSuggestionsAsync(string projectPath, SuggestionCategory category, string? guidance = null, CancellationToken externalToken = default)
         {
             if (IsGenerating) return;
 
             _cts?.Dispose();
-            _cts = new CancellationTokenSource();
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
             var ct = _cts.Token;
             IsGenerating = true;
             Suggestions.Clear();

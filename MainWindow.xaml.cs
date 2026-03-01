@@ -18,6 +18,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using HappyEngine.Dialogs;
+using HappyEngine.Helpers;
 using HappyEngine.Managers;
 using HappyEngine.Models;
 
@@ -30,8 +31,14 @@ namespace HappyEngine
 
         private static readonly System.Net.Http.HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
 
-        private const string DefaultSystemPrompt = TaskLauncher.DefaultSystemPrompt;
+        private const string DefaultSystemPrompt = PromptBuilder.DefaultSystemPrompt;
         private string SystemPrompt;
+
+        // ── Injected services (created once, shared across managers) ──
+        private readonly IGitHelper _gitHelper;
+        private readonly ICompletionAnalyzer _completionAnalyzer;
+        private readonly IPromptBuilder _promptBuilder;
+        private readonly ITaskFactory _taskFactory;
 
         private readonly ObservableCollection<AgentTask> _activeTasks = new();
         private readonly ObservableCollection<AgentTask> _historyTasks = new();
@@ -59,6 +66,7 @@ namespace HappyEngine
         private ModelConfigManager _modelConfigManager = null!;
         private HelperManager _helperManager = null!;
         private ActivityDashboardManager _activityDashboard = null!;
+        private GitPanelManager _gitPanelManager = null!;
         private readonly TaskGroupTracker _taskGroupTracker;
         private readonly TaskOrchestrator _taskOrchestrator;
         private FailureRecoveryManager _failureRecoveryManager = null!;
@@ -168,8 +176,15 @@ namespace HappyEngine
 
             _messageBusManager = new MessageBusManager(Dispatcher);
 
+            _gitHelper = new GitHelper();
+            _completionAnalyzer = new CompletionAnalyzer(_gitHelper);
+            _promptBuilder = new Managers.PromptBuilder();
+            _taskFactory = new Managers.TaskFactory();
+            _projectManager.SetTaskFactory(_taskFactory);
+
             _taskExecutionManager = new TaskExecutionManager(
                 scriptDir, _fileLockManager, _outputTabManager,
+                _gitHelper, _completionAnalyzer, _promptBuilder, _taskFactory,
                 () => SystemPrompt,
                 task => _projectManager.GetProjectDescription(task),
                 path => _projectManager.GetProjectRulesBlock(path),
@@ -182,7 +197,7 @@ namespace HappyEngine
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
 
             _failureRecoveryManager = new FailureRecoveryManager(
-                _taskExecutionManager, _outputTabManager,
+                _taskExecutionManager, _outputTabManager, _taskFactory,
                 () => _settingsManager.AutoRecover);
 
             _taskOrchestrator = new TaskOrchestrator();
@@ -192,6 +207,15 @@ namespace HappyEngine
             _taskGroupTracker.GroupCompleted += OnTaskGroupCompleted;
 
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
+
+            var gitHelper = new GitHelper();
+            _gitPanelManager = new GitPanelManager(
+                gitHelper,
+                () => _projectManager.ProjectPath,
+                () => DefaultNoGitWriteToggle.IsChecked == true,
+                _fileLockManager,
+                Dispatcher);
+
             _projectManager.SetTaskCollections(_activeTasks, _historyTasks);
 
             // Set up collections with cross-thread synchronization
@@ -414,18 +438,20 @@ namespace HappyEngine
         {
             try
             {
-                // Load settings, projects, history, and stored tasks off the UI thread
+                // Load settings, projects, history, stored tasks, and any recoverable queue off the UI thread
                 var settingsTask = _settingsManager.LoadSettingsAsync();
                 var projectsTask = _projectManager.LoadProjectsAsync();
                 var historyTask = _historyManager.LoadHistoryAsync(_settingsManager.HistoryRetentionHours);
                 var storedTask = _historyManager.LoadStoredTasksAsync();
+                var activeQueueTask = _historyManager.LoadActiveQueueAsync();
 
-                await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask);
+                await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask, activeQueueTask);
                 ct.ThrowIfCancellationRequested();
 
                 // Populate collections on the UI thread — pin Row 0 to prevent layout jitter
                 var historyItems = historyTask.Result;
                 var storedItems = storedTask.Result;
+                var recoveredTasks = activeQueueTask.Result;
 
                 var topRow = RootGrid.RowDefinitions[0];
                 if (topRow.ActualHeight > 0)
@@ -446,6 +472,10 @@ namespace HappyEngine
 
                 _statusTimer.Start();
                 UpdateStatus();
+
+                // Offer to re-queue recovered tasks from a previous session
+                if (recoveredTasks.Count > 0)
+                    RecoverActiveQueue(recoveredTasks);
             }
             catch (OperationCanceledException) { /* window closing — stop startup */ }
             catch (Exception ex)
@@ -456,6 +486,36 @@ namespace HappyEngine
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
             }
+        }
+
+        /// <summary>
+        /// Shows a confirmation dialog listing tasks recovered from a previous session and
+        /// re-queues them as new InitQueued tasks if the user confirms.
+        /// </summary>
+        private void RecoverActiveQueue(List<AgentTask> recoveredTasks)
+        {
+            var descriptions = string.Join("\n",
+                recoveredTasks.Select((t, i) => $"  {i + 1}. {_taskFactory.GenerateLocalSummary(t.Description)}"));
+
+            var confirmed = Dialogs.DarkDialog.ShowConfirm(
+                $"{recoveredTasks.Count} task(s) were still queued when the application last closed:\n\n" +
+                $"{descriptions}\n\n" +
+                "Would you like to re-queue them?",
+                "Recover Queued Tasks");
+
+            if (confirmed)
+            {
+                foreach (var task in recoveredTasks)
+                {
+                    // Reset to a fresh state — LaunchTask will assign the correct
+                    // status (Running or InitQueued) based on concurrency limits
+                    task.StartTime = DateTime.Now;
+                    LaunchTask(task);
+                }
+            }
+
+            // Always clear the recovery file — either tasks were re-queued or the user dismissed them
+            _historyManager.ClearActiveQueue();
         }
 
         // ── System Prompt ──────────────────────────────────────────
@@ -474,7 +534,7 @@ namespace HappyEngine
                     ct.ThrowIfCancellationRequested();
                     if (text.Contains("# MCP VERIFICATION"))
                     {
-                        text = text.Replace(TaskLauncher.McpPromptBlock, "");
+                        text = text.Replace(PromptBuilder.McpPromptBlock, "");
                         var cleanedText = text;
                         var path = SystemPromptFile;
                         Managers.SafeFileWriter.WriteInBackground(path, cleanedText, "MainWindow");
@@ -1740,7 +1800,7 @@ namespace HappyEngine
                 selectedModel = ModelType.Gemini;
 
             // Create a new task using the stored prompt as the description
-            var newTask = TaskLauncher.CreateTask(
+            var newTask = _taskFactory.CreateTask(
                 task.StoredPrompt,
                 task.ProjectPath,
                 true,
@@ -2003,7 +2063,7 @@ namespace HappyEngine
 
             // ── 3. Cancel in-flight async work ──
             _windowCts.Cancel();
-            _chatManager.CancelAndDispose();
+            _chatManager.Dispose();
 
             _helperManager?.Dispose();
 
@@ -2011,6 +2071,7 @@ namespace HappyEngine
             _projectManager.SaveProjects();
             _settingsManager.SaveSettings(_projectManager.ProjectPath);
             _historyManager.SaveHistory(_historyTasks);
+            _historyManager.SaveActiveQueue(_activeTasks, _activeTasksLock);
             PersistSavedPrompts();
 
             // ── 5. Wait for all background file writes to complete ──
@@ -2029,6 +2090,9 @@ namespace HappyEngine
             _taskExecutionManager.StreamingToolState.Clear();
 
             _terminalManager?.Dispose();
+
+            _claudeService.Dispose();
+            _geminiService.Dispose();
 
             _windowCts.Dispose();
         }
@@ -2396,6 +2460,8 @@ namespace HappyEngine
             if (e.Source != StatisticsTabs) return;
             if (StatisticsTabs.SelectedItem == ActivityTabItem)
                 _activityDashboard.RefreshIfNeeded(ActivityTabContent);
+            else if (StatisticsTabs.SelectedItem == GitTabItem)
+                _gitPanelManager.RefreshIfNeeded(GitTabContent);
         }
 
         private void SetupMainTabsOverflow()
@@ -2502,8 +2568,11 @@ namespace HappyEngine
         private void RefreshActivityDashboard()
         {
             _activityDashboard.MarkDirty();
+            _gitPanelManager.MarkDirty();
             if (StatisticsTabs.SelectedItem == ActivityTabItem)
                 _activityDashboard.RefreshIfNeeded(ActivityTabContent);
+            else if (StatisticsTabs.SelectedItem == GitTabItem)
+                _gitPanelManager.RefreshIfNeeded(GitTabContent);
         }
 
         private void RefreshInlineProjectStats()
@@ -2586,52 +2655,13 @@ namespace HappyEngine
                        "4. If a log file does not exist or is empty, note it and continue with the others.\n\n" +
                        "Focus on the most recent entries first. Provide a clear summary of what went wrong and what was fixed.";
 
-            var task = TaskLauncher.CreateTask(
+            LaunchTaskFromDescription(
                 desc,
-                projectPath,
-                true,
-                RemoteSessionToggle.IsChecked == true,
-                false,
-                FeatureModeToggle.IsChecked == true,
-                IgnoreFileLocksToggle.IsChecked == true,
-                UseMcpToggle.IsChecked == true,
-                SpawnTeamToggle.IsChecked == true,
-                ExtendedPlanningToggle.IsChecked == true,
-                DefaultNoGitWriteToggle.IsChecked == true,
-                planOnly: false,
-                imagePaths: _imageManager.DetachImages());
-            task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
-            task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
-            task.Summary = "Build Investigation";
+                "Build Investigation",
+                imagePaths: _imageManager.DetachImages(),
+                planOnly: false);
 
             ResetPerTaskToggles();
-
-            if (task.Headless)
-            {
-                _taskExecutionManager.LaunchHeadless(task);
-                UpdateStatus();
-                return;
-            }
-
-            AddActiveTask(task);
-            _outputTabManager.CreateTab(task);
-
-            if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
-            {
-                task.Status = AgentTaskStatus.InitQueued;
-                task.QueuedReason = "Max concurrent tasks reached";
-                _outputTabManager.AppendOutput(task.Id,
-                    $"[HappyEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
-                    _activeTasks, _historyTasks);
-                _outputTabManager.UpdateTabHeader(task);
-            }
-            else
-            {
-                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-            }
-
-            RefreshFilterCombos();
-            UpdateStatus();
         }
 
         private async void GenerateSuggestions_Click(object sender, RoutedEventArgs e)
@@ -2648,7 +2678,7 @@ namespace HappyEngine
             var guidance = SuggestionGuidanceInput.Text?.Trim();
             if (!string.IsNullOrEmpty(guidance))
                 SuggestionGuidanceInput.Clear();
-            await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance);
+            await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance, _windowCts.Token);
         }
 
         private void SuggestionGuidanceInput_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -2688,45 +2718,14 @@ namespace HappyEngine
                 selectedModel = ModelType.Gemini;
 
             // Helper suggestions must always implement — never plan-only
-            var task = TaskLauncher.CreateTask(
+            LaunchTaskFromDescription(
                 desc,
-                _projectManager.ProjectPath,
-                true,
-                RemoteSessionToggle.IsChecked == true,
-                false,
-                FeatureModeToggle.IsChecked == true,
-                IgnoreFileLocksToggle.IsChecked == true,
-                UseMcpToggle.IsChecked == true,
-                SpawnTeamToggle.IsChecked == true,
-                ExtendedPlanningToggle.IsChecked == true,
-                DefaultNoGitWriteToggle.IsChecked == true,
-                planOnly: false,
+                suggestion.Title,
+                selectedModel,
                 imagePaths: _imageManager.DetachImages(),
-                model: selectedModel);
-            task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
-            task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
-            task.Summary = suggestion.Title;
+                planOnly: false);
 
             ResetPerTaskToggles();
-
-            if (selectedModel == ModelType.Gemini)
-            {
-                ExecuteGeminiTask(task);
-                _helperManager.RemoveSuggestion(suggestion);
-                RefreshFilterCombos();
-                UpdateStatus();
-                return;
-            }
-
-            if (task.Headless)
-            {
-                _taskExecutionManager.LaunchHeadless(task);
-                _helperManager.RemoveSuggestion(suggestion);
-                UpdateStatus();
-                return;
-            }
-
-            LaunchTask(task);
             _helperManager.RemoveSuggestion(suggestion);
         }
 

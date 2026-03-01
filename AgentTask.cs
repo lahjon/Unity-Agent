@@ -54,7 +54,32 @@ namespace HappyEngine
         /// <summary>Transient runtime state (process, timers, output buffer). Not persisted.</summary>
         public RuntimeTaskContext Runtime { get; } = new();
 
-        // ── Persistent data delegation ────────────────────────────────
+        // ── INotifyPropertyChanged + helpers ─────────────────────────────
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        /// <summary>Sets a backing field, raises PropertyChanged if the value changed, and returns whether it changed.</summary>
+        private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+            field = value;
+            OnPropertyChanged(name);
+            return true;
+        }
+
+        /// <summary>Raises PropertyChanged for each of the specified property names.</summary>
+        private void NotifyAll(params string[] names)
+        {
+            var handler = PropertyChanged;
+            if (handler == null) return;
+            foreach (var n in names)
+                handler(this, new PropertyChangedEventArgs(n));
+        }
+
+        // ── Persistent data delegation (no notification) ─────────────────
 
         public string Id => Data.Id;
         public int TaskNumber { get => Data.TaskNumber; set => Data.TaskNumber = value; }
@@ -64,33 +89,11 @@ namespace HappyEngine
         public bool RemoteSession { get => Data.RemoteSession; set => Data.RemoteSession = value; }
         public bool Headless { get => Data.Headless; set => Data.Headless = value; }
         public bool IsFeatureMode { get => Data.IsFeatureMode; set => Data.IsFeatureMode = value; }
-        public bool IgnoreFileLocks
-        {
-            get => Data.IgnoreFileLocks;
-            set { Data.IgnoreFileLocks = value; OnPropertyChanged(); }
-        }
         public bool UseMcp { get => Data.UseMcp; set => Data.UseMcp = value; }
         public bool SpawnTeam { get => Data.SpawnTeam; set => Data.SpawnTeam = value; }
         public bool ExtendedPlanning { get => Data.ExtendedPlanning; set => Data.ExtendedPlanning = value; }
         public bool NoGitWrite { get => Data.NoGitWrite; set => Data.NoGitWrite = value; }
         public bool PlanOnly { get => Data.PlanOnly; set => Data.PlanOnly = value; }
-        public int Priority
-        {
-            get => Data.Priority;
-            set { Data.Priority = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasPriorityBadge)); OnPropertyChanged(nameof(PriorityBadgeText)); }
-        }
-        public TaskPriority PriorityLevel
-        {
-            get => Data.PriorityLevel;
-            set
-            {
-                Data.PriorityLevel = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasPriorityBadge));
-                OnPropertyChanged(nameof(PriorityBadgeText));
-                OnPropertyChanged(nameof(PriorityBadgeColor));
-            }
-        }
         public bool UseMessageBus { get => Data.UseMessageBus; set => Data.UseMessageBus = value; }
         public bool AutoDecompose { get => Data.AutoDecompose; set => Data.AutoDecompose = value; }
         public bool ApplyFix { get => Data.ApplyFix; set => Data.ApplyFix = value; }
@@ -106,53 +109,74 @@ namespace HappyEngine
         public List<string> GeneratedImagePaths { get => Data.GeneratedImagePaths; set => Data.GeneratedImagePaths = value; }
         public string ProjectPath { get => Data.ProjectPath; set => Data.ProjectPath = value; }
         public string ProjectColor { get => Data.ProjectColor; set => Data.ProjectColor = value; }
+        public string? GitStartHash { get => Data.GitStartHash; set => Data.GitStartHash = value; }
+        public bool IsRecoveryTask { get => Data.IsRecoveryTask; set => Data.IsRecoveryTask = value; }
+        public string? DependencyContext { get => Data.DependencyContext; set => Data.DependencyContext = value; }
+        public string? ParentTaskId { get => Data.ParentTaskId; set => Data.ParentTaskId = value; }
+        public List<string> ChildTaskIds { get => Data.ChildTaskIds; set => Data.ChildTaskIds = value; }
+        public List<string> FeaturePhaseChildIds { get => Data.FeaturePhaseChildIds; set => Data.FeaturePhaseChildIds = value; }
+        public string OriginalFeatureDescription { get => Data.OriginalFeatureDescription; set => Data.OriginalFeatureDescription = value; }
+
+        // ── Persistent data delegation (with notification) ───────────────
+
+        public bool IgnoreFileLocks
+        {
+            get => Data.IgnoreFileLocks;
+            set { if (Data.IgnoreFileLocks == value) return; Data.IgnoreFileLocks = value; OnPropertyChanged(); }
+        }
+
+        public int Priority
+        {
+            get => Data.Priority;
+            set { if (Data.Priority == value) return; Data.Priority = value; NotifyAll(nameof(Priority), nameof(HasPriorityBadge), nameof(PriorityBadgeText)); }
+        }
+
+        public TaskPriority PriorityLevel
+        {
+            get => Data.PriorityLevel;
+            set { if (Data.PriorityLevel == value) return; Data.PriorityLevel = value; NotifyAll(nameof(PriorityLevel), nameof(HasPriorityBadge), nameof(PriorityBadgeText), nameof(PriorityBadgeColor)); }
+        }
 
         public string ProjectDisplayName
         {
             get => Data.ProjectDisplayName;
-            set { Data.ProjectDisplayName = value; OnPropertyChanged(); OnPropertyChanged(nameof(ProjectName)); }
+            set { if (Data.ProjectDisplayName == value) return; Data.ProjectDisplayName = value; NotifyAll(nameof(ProjectDisplayName), nameof(ProjectName)); }
         }
 
         public int CurrentIteration
         {
             get => Data.CurrentIteration;
-            set { Data.CurrentIteration = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
+            set { if (Data.CurrentIteration == value) return; Data.CurrentIteration = value; NotifyAll(nameof(CurrentIteration), nameof(StatusText)); }
         }
 
         public string CompletionSummary
         {
             get => Data.CompletionSummary;
-            set { Data.CompletionSummary = value; OnPropertyChanged(); }
+            set { if (Data.CompletionSummary == value) return; Data.CompletionSummary = value; OnPropertyChanged(); }
         }
 
         public string Recommendations
         {
             get => Data.Recommendations;
-            set { Data.Recommendations = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasRecommendations)); }
+            set { if (Data.Recommendations == value) return; Data.Recommendations = value; NotifyAll(nameof(Recommendations), nameof(HasRecommendations)); }
         }
-
-        public bool HasRecommendations => !string.IsNullOrWhiteSpace(Recommendations);
 
         public string VerificationResult
         {
             get => Data.VerificationResult;
-            set { Data.VerificationResult = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasVerificationResult)); }
+            set { if (Data.VerificationResult == value) return; Data.VerificationResult = value; NotifyAll(nameof(VerificationResult), nameof(HasVerificationResult)); }
         }
 
         public bool IsVerified
         {
             get => Data.IsVerified;
-            set { Data.IsVerified = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasVerificationResult)); }
+            set { if (Data.IsVerified == value) return; Data.IsVerified = value; NotifyAll(nameof(IsVerified), nameof(HasVerificationResult)); }
         }
-
-        public bool HasVerificationResult => !string.IsNullOrWhiteSpace(VerificationResult);
-
-        public bool IsRecoveryTask { get => Data.IsRecoveryTask; set => Data.IsRecoveryTask = value; }
 
         public string Summary
         {
             get => Data.Summary;
-            set { Data.Summary = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShortDescription)); }
+            set { if (Data.Summary == value) return; Data.Summary = value; NotifyAll(nameof(Summary), nameof(ShortDescription)); }
         }
 
         public AgentTaskStatus Status
@@ -160,112 +184,54 @@ namespace HappyEngine
             get => Data.Status;
             set
             {
+                if (Data.Status == value) return;
                 Data.Status = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(StatusText));
-                OnPropertyChanged(nameof(StatusColor));
-                OnPropertyChanged(nameof(IsRunning));
-                OnPropertyChanged(nameof(IsPlanning));
-                OnPropertyChanged(nameof(IsQueued));
-                OnPropertyChanged(nameof(IsPaused));
-                OnPropertyChanged(nameof(IsInitQueued));
-                OnPropertyChanged(nameof(IsFinished));
-                OnPropertyChanged(nameof(IsRetryable));
-                OnPropertyChanged(nameof(TimeInfo));
-                OnPropertyChanged(nameof(HasPriorityBadge));
+                NotifyAll(nameof(Status), nameof(StatusText), nameof(StatusColor),
+                    nameof(IsRunning), nameof(IsPlanning), nameof(IsQueued), nameof(IsPaused),
+                    nameof(IsInitQueued), nameof(IsFinished), nameof(IsRetryable),
+                    nameof(TimeInfo), nameof(HasPriorityBadge));
             }
         }
 
         public DateTime? EndTime
         {
             get => Data.EndTime;
-            set { Data.EndTime = value; OnPropertyChanged(); OnPropertyChanged(nameof(TimeInfo)); }
+            set { if (Data.EndTime == value) return; Data.EndTime = value; NotifyAll(nameof(EndTime), nameof(TimeInfo)); }
         }
 
-        // ── Runtime state delegation ──────────────────────────────────
-
-        public StringBuilder OutputBuilder => Runtime.OutputBuilder;
-        public string? GitStartHash { get => Data.GitStartHash; set => Data.GitStartHash = value; }
-        public System.Windows.Threading.DispatcherTimer? FeatureModeRetryTimer { get => Runtime.FeatureModeRetryTimer; set => Runtime.FeatureModeRetryTimer = value; }
-        public System.Windows.Threading.DispatcherTimer? FeatureModeIterationTimer { get => Runtime.FeatureModeIterationTimer; set => Runtime.FeatureModeIterationTimer = value; }
-        public System.Windows.Threading.DispatcherTimer? TokenLimitRetryTimer { get => Runtime.TokenLimitRetryTimer; set => Runtime.TokenLimitRetryTimer = value; }
-        public int ConsecutiveFailures { get => Runtime.ConsecutiveFailures; set => Runtime.ConsecutiveFailures = value; }
-        public int LastIterationOutputStart { get => Runtime.LastIterationOutputStart; set => Runtime.LastIterationOutputStart = value; }
-        public Process? Process { get => Runtime.Process; set => Runtime.Process = value; }
-        public System.Threading.CancellationTokenSource? Cts { get => Runtime.Cts; set => Runtime.Cts = value; }
-        public string? QueuedReason { get => Runtime.QueuedReason; set => Runtime.QueuedReason = value; }
-        public string? BlockedByTaskId { get => Runtime.BlockedByTaskId; set => Runtime.BlockedByTaskId = value; }
-        public int? BlockedByTaskNumber { get => Runtime.BlockedByTaskNumber; set => Runtime.BlockedByTaskNumber = value; }
-        public List<string> DependencyTaskIds { get => Runtime.DependencyTaskIds; set => Runtime.DependencyTaskIds = value; }
-        public void AddDependencyTaskId(string id) => Runtime.AddDependencyTaskId(id);
-        public bool RemoveDependencyTaskId(string id) => Runtime.RemoveDependencyTaskId(id);
-        public bool ContainsDependencyTaskId(string id) => Runtime.ContainsDependencyTaskId(id);
-        public int DependencyTaskIdCount => Runtime.DependencyTaskIdCount;
-        public void ClearDependencyTaskIds() => Runtime.ClearDependencyTaskIds();
-        public List<int> DependencyTaskNumbers { get => Runtime.DependencyTaskNumbers; set => Runtime.DependencyTaskNumbers = value; }
-        public bool IsPlanningBeforeQueue { get => Runtime.IsPlanningBeforeQueue; set => Runtime.IsPlanningBeforeQueue = value; }
-        public bool NeedsPlanRestart { get => Runtime.NeedsPlanRestart; set => Runtime.NeedsPlanRestart = value; }
-        public string? DependencyContext { get => Data.DependencyContext; set => Data.DependencyContext = value; }
-        public string? PendingFileLockPath { get => Runtime.PendingFileLockPath; set => Runtime.PendingFileLockPath = value; }
-        public string? PendingFileLockBlocker { get => Runtime.PendingFileLockBlocker; set => Runtime.PendingFileLockBlocker = value; }
-
-        // ── Parent-child hierarchy ────────────────────────────────────
-
-        public string? ParentTaskId { get => Data.ParentTaskId; set => Data.ParentTaskId = value; }
-        public List<string> ChildTaskIds { get => Data.ChildTaskIds; set => Data.ChildTaskIds = value; }
-
-        // ── Feature mode multi-phase tracking ────────────────────────
         public FeatureModePhase FeatureModePhase
         {
             get => Data.FeatureModePhase;
-            set { Data.FeatureModePhase = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
+            set { if (Data.FeatureModePhase == value) return; Data.FeatureModePhase = value; NotifyAll(nameof(FeatureModePhase), nameof(StatusText)); }
         }
-        public List<string> FeaturePhaseChildIds { get => Data.FeaturePhaseChildIds; set => Data.FeaturePhaseChildIds = value; }
-        public string OriginalFeatureDescription { get => Data.OriginalFeatureDescription; set => Data.OriginalFeatureDescription = value; }
-        public int SubTaskCounter { get => Runtime.SubTaskCounter; set => Runtime.SubTaskCounter = value; }
-
-        public bool IsSubTask => ParentTaskId != null;
-        public bool HasChildren => ChildTaskIds.Count > 0;
-
-        public string HierarchyLabel
-        {
-            get
-            {
-                if (!IsSubTask) return $"#{TaskNumber:D4}";
-                return $"#{TaskNumber:D4}.{Runtime.SubTaskIndex}";
-            }
-        }
-
-        public int NestingDepth => IsSubTask ? 1 : 0;
 
         // ── Token tracking ─────────────────────────────────────────────
 
         public long InputTokens
         {
             get => Data.InputTokens;
-            set { Data.InputTokens = value; OnPropertyChanged(); OnPropertyChanged(nameof(TokenDisplayText)); OnPropertyChanged(nameof(HasTokenData)); }
+            set { Data.InputTokens = value; NotifyAll(nameof(InputTokens), nameof(TokenDisplayText), nameof(HasTokenData)); }
         }
 
         public long OutputTokens
         {
             get => Data.OutputTokens;
-            set { Data.OutputTokens = value; OnPropertyChanged(); OnPropertyChanged(nameof(TokenDisplayText)); OnPropertyChanged(nameof(HasTokenData)); }
+            set { Data.OutputTokens = value; NotifyAll(nameof(OutputTokens), nameof(TokenDisplayText), nameof(HasTokenData)); }
         }
 
         public long CacheReadTokens
         {
             get => Data.CacheReadTokens;
-            set { Data.CacheReadTokens = value; OnPropertyChanged(); OnPropertyChanged(nameof(TokenDisplayText)); }
+            set { Data.CacheReadTokens = value; NotifyAll(nameof(CacheReadTokens), nameof(TokenDisplayText)); }
         }
 
         public long CacheCreationTokens
         {
             get => Data.CacheCreationTokens;
-            set { Data.CacheCreationTokens = value; OnPropertyChanged(); OnPropertyChanged(nameof(TokenDisplayText)); }
+            set { Data.CacheCreationTokens = value; NotifyAll(nameof(CacheCreationTokens), nameof(TokenDisplayText)); }
         }
 
         public bool HasTokenData => InputTokens > 0 || OutputTokens > 0;
-
         public long TotalAllTokens => InputTokens + OutputTokens + CacheReadTokens + CacheCreationTokens;
 
         public string TokenDisplayText
@@ -298,26 +264,62 @@ namespace HappyEngine
         public string ToolActivityText
         {
             get => _toolActivityText;
-            private set { _toolActivityText = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasToolActivity)); }
+            private set { if (SetField(ref _toolActivityText, value)) OnPropertyChanged(nameof(HasToolActivity)); }
         }
 
         public bool HasToolActivity => !string.IsNullOrEmpty(_toolActivityText);
+        public void AddToolActivity(string action) => ToolActivityText = action;
+        public void ClearToolActivity() => ToolActivityText = "";
 
-        public void AddToolActivity(string action)
-        {
-            ToolActivityText = action;
-        }
+        // ── Runtime state delegation ──────────────────────────────────
 
-        public void ClearToolActivity()
-        {
-            ToolActivityText = "";
-        }
+        public StringBuilder OutputBuilder => Runtime.OutputBuilder;
+        public System.Windows.Threading.DispatcherTimer? FeatureModeRetryTimer { get => Runtime.FeatureModeRetryTimer; set => Runtime.FeatureModeRetryTimer = value; }
+        public System.Windows.Threading.DispatcherTimer? FeatureModeIterationTimer { get => Runtime.FeatureModeIterationTimer; set => Runtime.FeatureModeIterationTimer = value; }
+        public System.Windows.Threading.DispatcherTimer? TokenLimitRetryTimer { get => Runtime.TokenLimitRetryTimer; set => Runtime.TokenLimitRetryTimer = value; }
+        public int ConsecutiveFailures { get => Runtime.ConsecutiveFailures; set => Runtime.ConsecutiveFailures = value; }
+        public int LastIterationOutputStart { get => Runtime.LastIterationOutputStart; set => Runtime.LastIterationOutputStart = value; }
+        public Process? Process { get => Runtime.Process; set => Runtime.Process = value; }
+        public System.Threading.CancellationTokenSource? Cts { get => Runtime.Cts; set => Runtime.Cts = value; }
+        public string? QueuedReason { get => Runtime.QueuedReason; set => Runtime.QueuedReason = value; }
+        public string? BlockedByTaskId { get => Runtime.BlockedByTaskId; set => Runtime.BlockedByTaskId = value; }
+        public int? BlockedByTaskNumber { get => Runtime.BlockedByTaskNumber; set => Runtime.BlockedByTaskNumber = value; }
+        public List<string> DependencyTaskIds { get => Runtime.DependencyTaskIds; set => Runtime.DependencyTaskIds = value; }
+        public void AddDependencyTaskId(string id) => Runtime.AddDependencyTaskId(id);
+        public bool RemoveDependencyTaskId(string id) => Runtime.RemoveDependencyTaskId(id);
+        public bool ContainsDependencyTaskId(string id) => Runtime.ContainsDependencyTaskId(id);
+        public int DependencyTaskIdCount => Runtime.DependencyTaskIdCount;
+        public void ClearDependencyTaskIds() => Runtime.ClearDependencyTaskIds();
+        public List<int> DependencyTaskNumbers { get => Runtime.DependencyTaskNumbers; set => Runtime.DependencyTaskNumbers = value; }
+        public bool IsPlanningBeforeQueue { get => Runtime.IsPlanningBeforeQueue; set => Runtime.IsPlanningBeforeQueue = value; }
+        public bool NeedsPlanRestart { get => Runtime.NeedsPlanRestart; set => Runtime.NeedsPlanRestart = value; }
+        public string? PendingFileLockPath { get => Runtime.PendingFileLockPath; set => Runtime.PendingFileLockPath = value; }
+        public string? PendingFileLockBlocker { get => Runtime.PendingFileLockBlocker; set => Runtime.PendingFileLockBlocker = value; }
+        public int SubTaskCounter { get => Runtime.SubTaskCounter; set => Runtime.SubTaskCounter = value; }
 
         // ── Computed properties ───────────────────────────────────────
+
+        public bool HasRecommendations => !string.IsNullOrWhiteSpace(Recommendations);
+        public bool HasVerificationResult => !string.IsNullOrWhiteSpace(VerificationResult);
+        public bool IsSubTask => ParentTaskId != null;
+        public bool HasChildren => ChildTaskIds.Count > 0;
+        public int NestingDepth => IsSubTask ? 1 : 0;
+        public bool IsWaitingForRetry => TokenLimitRetryTimer != null || FeatureModeRetryTimer != null;
+        public bool IsRunning => Status == AgentTaskStatus.Running;
+        public bool IsPlanning => Status == AgentTaskStatus.Planning;
+        public bool IsQueued => Status == AgentTaskStatus.Queued;
+        public bool IsPaused => Status == AgentTaskStatus.Paused;
+        public bool IsInitQueued => Status == AgentTaskStatus.InitQueued;
+        public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed;
+        public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
+        public bool HasPriorityBadge => PriorityLevel != TaskPriority.Normal || (Priority > 0 && (IsQueued || IsInitQueued));
+        public bool HasActiveToggles => !string.IsNullOrEmpty(ActiveTogglesText);
 
         public string ProjectName =>
             !string.IsNullOrEmpty(ProjectDisplayName) ? ProjectDisplayName :
             string.IsNullOrEmpty(ProjectPath) ? "" : Path.GetFileName(ProjectPath);
+
+        public string HierarchyLabel => !IsSubTask ? $"#{TaskNumber:D4}" : $"#{TaskNumber:D4}.{Runtime.SubTaskIndex}";
 
         public string ShortDescription
         {
@@ -332,8 +334,6 @@ namespace HappyEngine
                 return desc.Length > 45 ? desc[..45] + "..." : desc;
             }
         }
-
-        public bool IsWaitingForRetry => TokenLimitRetryTimer != null || FeatureModeRetryTimer != null;
 
         public string StatusText => Status switch
         {
@@ -368,22 +368,6 @@ namespace HappyEngine
             _ => "#555555"
         };
 
-        public bool IsRunning => Status == AgentTaskStatus.Running;
-
-        public bool IsPlanning => Status == AgentTaskStatus.Planning;
-
-        public bool IsQueued => Status == AgentTaskStatus.Queued;
-
-        public bool IsPaused => Status == AgentTaskStatus.Paused;
-
-        public bool IsInitQueued => Status == AgentTaskStatus.InitQueued;
-
-        public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed;
-
-        public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
-
-        public bool HasPriorityBadge => PriorityLevel != TaskPriority.Normal || (Priority > 0 && (IsQueued || IsInitQueued));
-
         public string PriorityBadgeText => PriorityLevel switch
         {
             TaskPriority.Critical => "CRIT",
@@ -399,8 +383,6 @@ namespace HappyEngine
             TaskPriority.Low => "#78909C",
             _ => "#FFD600"
         };
-
-        public bool HasActiveToggles => !string.IsNullOrEmpty(ActiveTogglesText);
 
         public string ActiveTogglesText
         {
@@ -465,12 +447,6 @@ namespace HappyEngine
                 return $"{started} | Running {(int)running.TotalMinutes}m {running.Seconds}s";
             }
         }
-
-        // ── INotifyPropertyChanged ────────────────────────────────────
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        public void OnPropertyChanged([CallerMemberName] string? name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
     public class FileLock : INotifyPropertyChanged
