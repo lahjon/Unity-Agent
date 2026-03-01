@@ -6,7 +6,7 @@ namespace HappyEngine.Managers
     public interface IPromptBuilder
     {
         string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
-            bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false,
+            bool isFeatureMode, bool extendedPlanning = false, bool noGitWrite = false,
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
@@ -31,7 +31,7 @@ namespace HappyEngine.Managers
 
         ProcessStartInfo BuildProcessStartInfo(string ps1FilePath, bool headless);
 
-        string BuildOvernightContinuationPrompt(int iteration, int maxIterations, string taskId = "");
+        string BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = "");
 
         string BuildDependencyContext(List<string> depIds,
             IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks);

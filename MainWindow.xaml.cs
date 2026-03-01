@@ -72,6 +72,10 @@ namespace HappyEngine
         private ChatManager _chatManager = null!;
 
 
+        // Graph collapse state
+        private bool _graphCollapsed;
+        private GridLength _graphExpandedHeight = new(180);
+
         // Terminal collapse state
         private bool _terminalCollapsed = true;
         private GridLength _terminalExpandedHeight = new(120);
@@ -733,10 +737,17 @@ namespace HappyEngine
         {
         }
 
-        private void OvernightToggle_Changed(object sender, RoutedEventArgs e)
+        private void FeatureModeToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (ExecuteButton == null) return;
             UpdateExecuteButtonText();
+            if (FeatureModeIterationsPanel != null)
+                FeatureModeIterationsPanel.Visibility = FeatureModeToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void IterationsBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+        {
+            e.Handled = !int.TryParse(e.Text, out _);
         }
 
         private void AutoVerifyToggle_Changed(object sender, RoutedEventArgs e)
@@ -756,8 +767,8 @@ namespace HappyEngine
         {
             if (PlanOnlyToggle.IsChecked == true)
                 ExecuteButton.Content = "Plan Task";
-            else if (OvernightToggle.IsChecked == true)
-                ExecuteButton.Content = "Start Overnight Task";
+            else if (FeatureModeToggle.IsChecked == true)
+                ExecuteButton.Content = "Start Feature Mode";
             else
                 ExecuteButton.Content = "Execute Task";
         }
@@ -1188,7 +1199,7 @@ namespace HappyEngine
             var isGameArt = tag == "GeminiGameArt";
             // Disable advanced options that don't apply to Gemini
             if (RemoteSessionToggle != null) RemoteSessionToggle.IsEnabled = !isGemini;
-            if (OvernightToggle != null) OvernightToggle.IsEnabled = !isGemini;
+            if (FeatureModeToggle != null) FeatureModeToggle.IsEnabled = !isGemini;
             if (SpawnTeamToggle != null) SpawnTeamToggle.IsEnabled = !isGemini;
             if (ExtendedPlanningToggle != null) ExtendedPlanningToggle.IsEnabled = !isGemini;
             if (AutoDecomposeToggle != null) AutoDecomposeToggle.IsEnabled = !isGemini;
@@ -1573,7 +1584,7 @@ namespace HappyEngine
                 true,
                 RemoteSessionToggle.IsChecked == true,
                 false,
-                OvernightToggle.IsChecked == true,
+                FeatureModeToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,
                 SpawnTeamToggle.IsChecked == true,
@@ -1841,7 +1852,7 @@ namespace HappyEngine
             // ── 5. Wait for all background file writes to complete ──
             Managers.SafeFileWriter.FlushAll(timeoutMs: 5000);
 
-            // ── 6. Cancel CTS, stop overnight timers, kill & dispose processes ──
+            // ── 6. Cancel CTS, stop feature mode timers, kill & dispose processes ──
             foreach (var task in _activeTasks)
             {
                 TaskExecutionManager.KillProcess(task);
@@ -1911,6 +1922,40 @@ namespace HappyEngine
         private void TerminalInput_PreviewKeyDown(object sender, KeyEventArgs e) => _terminalManager?.HandleKeyDown(e);
 
         private void TerminalInterrupt_Click(object sender, RoutedEventArgs e) => _terminalManager?.SendInterrupt();
+
+        // ── Graph Collapse ────────────────────────────────────────────
+
+        private void GraphCollapse_Click(object sender, RoutedEventArgs e) => ToggleGraphCollapse();
+
+        private void GraphHeader_MouseDown(object sender, MouseButtonEventArgs e) => ToggleGraphCollapse();
+
+        private void ToggleGraphCollapse()
+        {
+            _graphCollapsed = !_graphCollapsed;
+
+            if (_graphCollapsed)
+            {
+                _graphExpandedHeight = GraphPanelRow.Height;
+
+                GraphPanelRow.MinHeight = 0;
+                GraphPanelRow.Height = GridLength.Auto;
+                GraphSplitter.Visibility = Visibility.Collapsed;
+                NodeGraphPanel.Visibility = Visibility.Collapsed;
+
+                GraphCollapseBtn.Content = "\uE70E"; // ChevronUp
+                GraphCollapseBtn.ToolTip = "Expand graph";
+            }
+            else
+            {
+                GraphPanelRow.MinHeight = 60;
+                GraphPanelRow.Height = _graphExpandedHeight;
+                GraphSplitter.Visibility = Visibility.Visible;
+                NodeGraphPanel.Visibility = Visibility.Visible;
+
+                GraphCollapseBtn.Content = "\uE70D"; // ChevronDown
+                GraphCollapseBtn.ToolTip = "Collapse graph";
+            }
+        }
 
         private void TerminalCollapse_Click(object sender, RoutedEventArgs e) => ToggleTerminalCollapse();
 
@@ -2376,7 +2421,7 @@ namespace HappyEngine
                 true,
                 RemoteSessionToggle.IsChecked == true,
                 false,
-                OvernightToggle.IsChecked == true,
+                FeatureModeToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,
                 SpawnTeamToggle.IsChecked == true,
@@ -2478,7 +2523,7 @@ namespace HappyEngine
                 true,
                 RemoteSessionToggle.IsChecked == true,
                 false,
-                OvernightToggle.IsChecked == true,
+                FeatureModeToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,
                 SpawnTeamToggle.IsChecked == true,

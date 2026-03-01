@@ -9,7 +9,7 @@ namespace HappyEngine
 {
     /// <summary>
     /// Transient runtime state for an active agent task. Holds the OS process,
-    /// overnight-mode timers, output buffer, and queue/planning bookkeeping.
+    /// feature-mode timers, output buffer, and queue/planning bookkeeping.
     /// None of this state is persisted.
     /// </summary>
     public class RuntimeTaskContext : IDisposable
@@ -19,9 +19,9 @@ namespace HappyEngine
         public CancellationTokenSource? Cts { get; set; }
         public StringBuilder OutputBuilder { get; } = new();
 
-        // Overnight mode
-        public System.Windows.Threading.DispatcherTimer? OvernightRetryTimer { get; set; }
-        public System.Windows.Threading.DispatcherTimer? OvernightIterationTimer { get; set; }
+        // Feature mode
+        public System.Windows.Threading.DispatcherTimer? FeatureModeRetryTimer { get; set; }
+        public System.Windows.Threading.DispatcherTimer? FeatureModeIterationTimer { get; set; }
         public int ConsecutiveFailures { get; set; }
         public int LastIterationOutputStart { get; set; }
 
@@ -67,10 +67,10 @@ namespace HappyEngine
 
         public void Dispose()
         {
-            OvernightRetryTimer?.Stop();
-            OvernightRetryTimer = null;
-            OvernightIterationTimer?.Stop();
-            OvernightIterationTimer = null;
+            FeatureModeRetryTimer?.Stop();
+            FeatureModeRetryTimer = null;
+            FeatureModeIterationTimer?.Stop();
+            FeatureModeIterationTimer = null;
             TokenLimitRetryTimer?.Stop();
             TokenLimitRetryTimer = null;
 

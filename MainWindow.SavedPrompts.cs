@@ -15,6 +15,7 @@ namespace HappyEngine
         // ── Saved Prompts ─────────────────────────────────────────
 
         private readonly ObservableCollection<SavedPromptEntry> _savedPrompts = new();
+        private bool _savedPromptsPanelOpen = true;
 
         private string SavedPromptsFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -133,6 +134,15 @@ namespace HappyEngine
             if (sender is not FrameworkElement el || el.DataContext is not SavedPromptEntry entry) return;
             _savedPrompts.Remove(entry);
             PersistSavedPrompts();
+        }
+
+        private void SavedPromptsToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _savedPromptsPanelOpen = !_savedPromptsPanelOpen;
+            SavedPromptsScrollViewer.Visibility = _savedPromptsPanelOpen ? Visibility.Visible : Visibility.Collapsed;
+            SavedPromptsArrow.Text = _savedPromptsPanelOpen ? "\u25BE" : "\u25B8";
+            SavedPanelCol.Width = _savedPromptsPanelOpen ? new GridLength(200) : GridLength.Auto;
+            SavedPanelCol.MinWidth = _savedPromptsPanelOpen ? 120 : 0;
         }
     }
 }

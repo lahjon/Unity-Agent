@@ -10,14 +10,14 @@ using System.Windows.Threading;
 using HappyEngine.Managers;
 using Xunit;
 
-using OvernightAction = HappyEngine.Managers.OvernightModeHandler.OvernightAction;
-using OvernightDecision = HappyEngine.Managers.OvernightModeHandler.OvernightDecision;
+using FeatureModeAction = HappyEngine.Managers.FeatureModeHandler.FeatureModeAction;
+using FeatureModeDecision = HappyEngine.Managers.FeatureModeHandler.FeatureModeDecision;
 
 namespace HappyEngine.Tests
 {
     /// <summary>
     /// Integration tests for the task execution engine covering:
-    /// - Overnight iteration decision logic (state machine)
+    /// - Feature mode iteration decision logic (state machine)
     /// - FileLockManager conflict detection and queueing
     /// - Full task lifecycle state transitions (queued → running → finished)
     /// - Cancellation flows and retry logic
@@ -34,10 +34,10 @@ namespace HappyEngine.Tests
             return t;
         }
 
-        private static AgentTask MakeOvernightTask(string projectPath = @"C:\Projects\Test")
+        private static AgentTask MakeFeatureModeTask(string projectPath = @"C:\Projects\Test")
         {
-            var t = TaskLauncher.CreateTask("overnight task", projectPath, true, false, false, true, false, false);
-            TaskLauncher.PrepareTaskForOvernightStart(t);
+            var t = TaskLauncher.CreateTask("feature mode task", projectPath, true, false, false, true, false, false);
+            TaskLauncher.PrepareTaskForFeatureModeStart(t);
             return t;
         }
 
@@ -90,17 +90,17 @@ namespace HappyEngine.Tests
         }
 
         // ══════════════════════════════════════════════════════════════
-        //  A. OVERNIGHT ITERATION DECISION LOGIC
+        //  A. FEATURE MODE ITERATION DECISION LOGIC
         // ══════════════════════════════════════════════════════════════
 
         [Fact]
-        public void OvernightDecision_SkipsWhenTaskNotRunning()
+        public void FeatureModeDecision_SkipsWhenTaskNotRunning()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Paused,
                 TimeSpan.FromHours(1), "", 1, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Skip, decision.Action);
+            Assert.Equal(FeatureModeAction.Skip, decision.Action);
         }
 
         [Theory]
@@ -108,128 +108,128 @@ namespace HappyEngine.Tests
         [InlineData(AgentTaskStatus.Completed)]
         [InlineData(AgentTaskStatus.Failed)]
         [InlineData(AgentTaskStatus.Queued)]
-        public void OvernightDecision_SkipsForNonRunningStatuses(AgentTaskStatus status)
+        public void FeatureModeDecision_SkipsForNonRunningStatuses(AgentTaskStatus status)
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 status, TimeSpan.FromHours(1), "", 1, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Skip, decision.Action);
+            Assert.Equal(FeatureModeAction.Skip, decision.Action);
         }
 
         [Fact]
-        public void OvernightDecision_FinishesOnRuntimeCap()
+        public void FeatureModeDecision_FinishesOnRuntimeCap()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(12), "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
         [Fact]
-        public void OvernightDecision_FinishesOnRuntimeCapExceeded()
+        public void FeatureModeDecision_FinishesOnRuntimeCapExceeded()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(13), "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
         [Fact]
-        public void OvernightDecision_FinishesOnStatusComplete()
+        public void FeatureModeDecision_FinishesOnStatusComplete()
         {
             var output = "Some work done\nSTATUS: COMPLETE\n";
 
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), output, 5, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
         [Fact]
-        public void OvernightDecision_DoesNotFinishOnNeedsMoreWork()
+        public void FeatureModeDecision_DoesNotFinishOnNeedsMoreWork()
         {
             var output = "Some work done\nSTATUS: NEEDS_MORE_WORK\n";
 
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), output, 5, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
         }
 
         [Fact]
-        public void OvernightDecision_FinishesOnMaxIterations()
+        public void FeatureModeDecision_FinishesOnMaxIterations()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 50, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
         [Fact]
-        public void OvernightDecision_ContinuesWhenBelowMaxIterations()
+        public void FeatureModeDecision_ContinuesWhenBelowMaxIterations()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 49, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
         }
 
         [Fact]
-        public void OvernightDecision_FailsOnCrashLoop_ThreeConsecutiveFailures()
+        public void FeatureModeDecision_FailsOnCrashLoop_ThreeConsecutiveFailures()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Failed, decision.FinishStatus);
             Assert.Equal(3, decision.ConsecutiveFailures);
         }
 
         [Fact]
-        public void OvernightDecision_IncrementsFailureOnNonZeroExit()
+        public void FeatureModeDecision_IncrementsFailureOnNonZeroExit()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 0, outputLength: 0);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
             Assert.Equal(1, decision.ConsecutiveFailures);
         }
 
         [Fact]
-        public void OvernightDecision_IncrementsFailureToTwoThenContinues()
+        public void FeatureModeDecision_IncrementsFailureToTwoThenContinues()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 1, outputLength: 0);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
             Assert.Equal(2, decision.ConsecutiveFailures);
         }
 
         [Fact]
-        public void OvernightDecision_ResetsFailuresOnSuccess()
+        public void FeatureModeDecision_ResetsFailuresOnSuccess()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 0, consecutiveFailures: 2, outputLength: 0);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
             Assert.Equal(0, decision.ConsecutiveFailures);
         }
 
@@ -240,69 +240,69 @@ namespace HappyEngine.Tests
         [InlineData("error 529")]
         [InlineData("at capacity")]
         [InlineData("too many requests")]
-        public void OvernightDecision_RetriesOnTokenLimitError(string errorText)
+        public void FeatureModeDecision_RetriesOnTokenLimitError(string errorText)
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), errorText, 5, 50,
                 exitCode: 1, consecutiveFailures: 0, outputLength: 0);
 
-            Assert.Equal(OvernightAction.RetryAfterDelay, decision.Action);
+            Assert.Equal(FeatureModeAction.RetryAfterDelay, decision.Action);
         }
 
         [Fact]
-        public void OvernightDecision_TokenLimitResetsFailureCount()
+        public void FeatureModeDecision_TokenLimitResetsFailureCount()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "rate limit exceeded", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
-            Assert.Equal(OvernightAction.RetryAfterDelay, decision.Action);
+            Assert.Equal(FeatureModeAction.RetryAfterDelay, decision.Action);
             Assert.Equal(0, decision.ConsecutiveFailures);
         }
 
         [Fact]
-        public void OvernightDecision_TokenLimitDoesNotCountAsFailure()
+        public void FeatureModeDecision_TokenLimitDoesNotCountAsFailure()
         {
             // Token limit with exitCode != 0 should NOT increment failures
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "rate limit exceeded", 5, 50,
                 exitCode: 1, consecutiveFailures: 1, outputLength: 0);
 
-            Assert.Equal(OvernightAction.RetryAfterDelay, decision.Action);
+            Assert.Equal(FeatureModeAction.RetryAfterDelay, decision.Action);
             Assert.Equal(0, decision.ConsecutiveFailures);
         }
 
         [Fact]
-        public void OvernightDecision_SetsOutputTrimWhenOverCap()
+        public void FeatureModeDecision_SetsOutputTrimWhenOverCap()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 200_000);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
             Assert.True(decision.TrimOutput);
         }
 
         [Fact]
-        public void OvernightDecision_NoTrimWhenUnderCap()
+        public void FeatureModeDecision_NoTrimWhenUnderCap()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 50_000);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
             Assert.False(decision.TrimOutput);
         }
 
         [Fact]
-        public void OvernightDecision_NoTrimAtExactCap()
+        public void FeatureModeDecision_NoTrimAtExactCap()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 100_000);
@@ -311,64 +311,64 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void OvernightDecision_RuntimeCapTakesPriorityOverCompletion()
+        public void FeatureModeDecision_RuntimeCapTakesPriorityOverCompletion()
         {
             // Both conditions true: runtime cap AND STATUS: COMPLETE
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(12), "STATUS: COMPLETE\n", 5, 50, 0, 0, 0);
 
             // Runtime cap is checked first
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
         [Fact]
-        public void OvernightDecision_CompletionTakesPriorityOverMaxIterations()
+        public void FeatureModeDecision_CompletionTakesPriorityOverMaxIterations()
         {
             // Both: STATUS: COMPLETE and at max iterations
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "STATUS: COMPLETE\n", 50, 50, 0, 0, 0);
 
             // Both lead to Completed, just verifying it finishes
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
         [Fact]
-        public void OvernightDecision_CrashLoopTakesPriorityOverContinue()
+        public void FeatureModeDecision_CrashLoopTakesPriorityOverContinue()
         {
             // Exit code 1, consecutive failures at 2 → 3rd failure → crash loop
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "normal output", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Failed, decision.FinishStatus);
         }
 
         [Fact]
-        public void OvernightDecision_ExactlyAtRuntimeCap()
+        public void FeatureModeDecision_ExactlyAtRuntimeCap()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(12).Add(TimeSpan.FromSeconds(1)),
                 "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
         }
 
         [Fact]
-        public void OvernightDecision_JustUnderRuntimeCap()
+        public void FeatureModeDecision_JustUnderRuntimeCap()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromHours(11).Add(TimeSpan.FromMinutes(59)),
                 "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -898,9 +898,9 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void Lifecycle_OvernightStatusText_ShowsIteration()
+        public void Lifecycle_FeatureModeStatusText_ShowsIteration()
         {
-            var task = MakeOvernightTask();
+            var task = MakeFeatureModeTask();
             task.Status = AgentTaskStatus.Running;
 
             Assert.Contains("1/50", task.StatusText);
@@ -1070,24 +1070,24 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void Cancel_StopsOvernightTimers()
+        public void Cancel_StopsFeatureModeTimers()
         {
             RunOnSta(() =>
             {
                 var (mgr, _, tempDir) = CreateManagers();
                 try
                 {
-                    var task = MakeOvernightTask();
+                    var task = MakeFeatureModeTask();
                     task.Cts = new CancellationTokenSource();
-                    task.OvernightRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-                    task.OvernightIterationTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-                    task.OvernightRetryTimer.Start();
-                    task.OvernightIterationTimer.Start();
+                    task.FeatureModeRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
+                    task.FeatureModeIterationTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
+                    task.FeatureModeRetryTimer.Start();
+                    task.FeatureModeIterationTimer.Start();
 
                     mgr.CancelTaskImmediate(task);
 
-                    Assert.Null(task.OvernightRetryTimer);
-                    Assert.Null(task.OvernightIterationTimer);
+                    Assert.Null(task.FeatureModeRetryTimer);
+                    Assert.Null(task.FeatureModeIterationTimer);
                     Assert.Equal(AgentTaskStatus.Cancelled, task.Status);
                 }
                 finally { try { Directory.Delete(tempDir, true); } catch { } }
@@ -1162,14 +1162,14 @@ namespace HappyEngine.Tests
         }
 
         // ══════════════════════════════════════════════════════════════
-        //  E. OVERNIGHT TASK LIFECYCLE (END-TO-END)
+        //  E. FEATURE MODE TASK LIFECYCLE (END-TO-END)
         // ══════════════════════════════════════════════════════════════
 
         [Fact]
-        public void OvernightLifecycle_PrepareForStart_InitializesCorrectly()
+        public void FeatureModeLifecycle_PrepareForStart_InitializesCorrectly()
         {
-            var task = TaskLauncher.CreateTask("overnight", @"C:\Test", true, false, false, true, false, false);
-            TaskLauncher.PrepareTaskForOvernightStart(task);
+            var task = TaskLauncher.CreateTask("feature mode", @"C:\Test", true, false, false, true, false, false);
+            TaskLauncher.PrepareTaskForFeatureModeStart(task);
 
             Assert.True(task.SkipPermissions);
             Assert.Equal(1, task.CurrentIteration);
@@ -1178,94 +1178,94 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void OvernightLifecycle_IterationContinuesThenFinishesOnComplete()
+        public void FeatureModeLifecycle_IterationContinuesThenFinishesOnComplete()
         {
-            // Simulate a multi-iteration overnight run
-            var task = MakeOvernightTask();
+            // Simulate a multi-iteration feature mode run
+            var task = MakeFeatureModeTask();
             var failures = 0;
 
             // Iteration 1: success
-            var d1 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(5),
                 "Working...\nSTATUS: NEEDS_MORE_WORK\n", 1, 50, 0, failures, 1000);
-            Assert.Equal(OvernightAction.Continue, d1.Action);
+            Assert.Equal(FeatureModeAction.Continue, d1.Action);
             failures = d1.ConsecutiveFailures;
 
             // Iteration 2: success
-            var d2 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(15),
                 "More work...\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
-            Assert.Equal(OvernightAction.Continue, d2.Action);
+            Assert.Equal(FeatureModeAction.Continue, d2.Action);
             failures = d2.ConsecutiveFailures;
 
             // Iteration 3: complete!
-            var d3 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d3 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(25),
                 "Done!\nSTATUS: COMPLETE\n", 3, 50, 0, failures, 3000);
-            Assert.Equal(OvernightAction.Finish, d3.Action);
+            Assert.Equal(FeatureModeAction.Finish, d3.Action);
             Assert.Equal(AgentTaskStatus.Completed, d3.FinishStatus);
         }
 
         [Fact]
-        public void OvernightLifecycle_FailureRecoveryThenCrashLoop()
+        public void FeatureModeLifecycle_FailureRecoveryThenCrashLoop()
         {
             var failures = 0;
 
             // Iteration 1: failure
-            var d1 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(5),
                 "error output", 1, 50, 1, failures, 1000);
-            Assert.Equal(OvernightAction.Continue, d1.Action);
+            Assert.Equal(FeatureModeAction.Continue, d1.Action);
             Assert.Equal(1, d1.ConsecutiveFailures);
             failures = d1.ConsecutiveFailures;
 
             // Iteration 2: success (resets failures)
-            var d2 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(10),
                 "back to work\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
-            Assert.Equal(OvernightAction.Continue, d2.Action);
+            Assert.Equal(FeatureModeAction.Continue, d2.Action);
             Assert.Equal(0, d2.ConsecutiveFailures);
             failures = d2.ConsecutiveFailures;
 
             // Iterations 3, 4, 5: three consecutive failures → crash loop
-            var d3 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d3 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(15),
                 "error", 3, 50, 1, failures, 3000);
-            Assert.Equal(OvernightAction.Continue, d3.Action);
+            Assert.Equal(FeatureModeAction.Continue, d3.Action);
             failures = d3.ConsecutiveFailures;
 
-            var d4 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d4 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(20),
                 "error", 4, 50, 1, failures, 4000);
-            Assert.Equal(OvernightAction.Continue, d4.Action);
+            Assert.Equal(FeatureModeAction.Continue, d4.Action);
             failures = d4.ConsecutiveFailures;
 
-            var d5 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d5 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(25),
                 "error", 5, 50, 1, failures, 5000);
-            Assert.Equal(OvernightAction.Finish, d5.Action);
+            Assert.Equal(FeatureModeAction.Finish, d5.Action);
             Assert.Equal(AgentTaskStatus.Failed, d5.FinishStatus);
             Assert.Equal(3, d5.ConsecutiveFailures);
         }
 
         [Fact]
-        public void OvernightLifecycle_TokenLimitRetryThenContinue()
+        public void FeatureModeLifecycle_TokenLimitRetryThenContinue()
         {
             var failures = 0;
 
             // Iteration 1: token limit
-            var d1 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromMinutes(30),
                 "error: rate limit exceeded", 1, 50, 1, failures, 1000);
-            Assert.Equal(OvernightAction.RetryAfterDelay, d1.Action);
+            Assert.Equal(FeatureModeAction.RetryAfterDelay, d1.Action);
             Assert.Equal(0, d1.ConsecutiveFailures); // Token limit resets failures
             failures = d1.ConsecutiveFailures;
 
             // After retry wait, iteration 2: success
-            var d2 = TaskExecutionManager.EvaluateOvernightIteration(
+            var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running, TimeSpan.FromHours(1),
                 "continuing work\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
-            Assert.Equal(OvernightAction.Continue, d2.Action);
+            Assert.Equal(FeatureModeAction.Continue, d2.Action);
             Assert.Equal(0, d2.ConsecutiveFailures);
         }
 
@@ -1407,30 +1407,30 @@ namespace HappyEngine.Tests
         }
 
         // ══════════════════════════════════════════════════════════════
-        //  H. OVERNIGHT TASK INITIALIZATION
+        //  H. FEATURE MODE TASK INITIALIZATION
         // ══════════════════════════════════════════════════════════════
 
         [Fact]
-        public void OvernightInit_ForcesSkipPermissions()
+        public void FeatureModeInit_ForcesSkipPermissions()
         {
             var task = TaskLauncher.CreateTask("test", @"C:\Test", false, false, false, true, false, false);
             Assert.False(task.SkipPermissions); // Not yet prepared
 
-            TaskLauncher.PrepareTaskForOvernightStart(task);
+            TaskLauncher.PrepareTaskForFeatureModeStart(task);
 
             Assert.True(task.SkipPermissions);
         }
 
         [Fact]
-        public void OvernightInit_ResetsIterationState()
+        public void FeatureModeInit_ResetsIterationState()
         {
-            var task = MakeOvernightTask();
+            var task = MakeFeatureModeTask();
             // Simulate previous run state
             task.CurrentIteration = 25;
             task.ConsecutiveFailures = 2;
             task.LastIterationOutputStart = 50000;
 
-            TaskLauncher.PrepareTaskForOvernightStart(task);
+            TaskLauncher.PrepareTaskForFeatureModeStart(task);
 
             Assert.Equal(1, task.CurrentIteration);
             Assert.Equal(0, task.ConsecutiveFailures);
@@ -1438,16 +1438,16 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void OvernightInit_DefaultMaxIterationsIs50()
+        public void FeatureModeInit_DefaultMaxIterationsIs50()
         {
-            var task = MakeOvernightTask();
+            var task = MakeFeatureModeTask();
             Assert.Equal(50, task.MaxIterations);
         }
 
         [Fact]
-        public void OvernightContinuationPrompt_IncludesIterationNumbers()
+        public void FeatureModeContinuationPrompt_IncludesIterationNumbers()
         {
-            var prompt = TaskLauncher.BuildOvernightContinuationPrompt(5, 50);
+            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(5, 50);
 
             Assert.Contains("5", prompt);
             Assert.Contains("50", prompt);
@@ -1455,9 +1455,9 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void OvernightContinuationPrompt_IncludesRestrictions()
+        public void FeatureModeContinuationPrompt_IncludesRestrictions()
         {
-            var prompt = TaskLauncher.BuildOvernightContinuationPrompt(1, 50);
+            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(1, 50);
 
             Assert.Contains("No git", prompt);
             Assert.Contains("STATUS: COMPLETE", prompt);
@@ -1470,11 +1470,11 @@ namespace HappyEngine.Tests
         [Fact]
         public void EdgeCase_EmptyOutputDoesNotTriggerCompletion()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
         }
 
         [Fact]
@@ -1483,12 +1483,12 @@ namespace HappyEngine.Tests
             // STATUS: COMPLETE only checked in last 50 lines
             var output = "STATUS: COMPLETE\n" + string.Join("\n", new string[60].Select(_ => "filler line"));
 
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), output, 5, 50, 0, 0, 0);
 
             // Should NOT detect completion (marker buried beyond last 50 lines)
-            Assert.Equal(OvernightAction.Continue, decision.Action);
+            Assert.Equal(FeatureModeAction.Continue, decision.Action);
         }
 
         [Fact]
@@ -1496,40 +1496,40 @@ namespace HappyEngine.Tests
         {
             var output = string.Join("\n", new string[40].Select(_ => "filler")) + "\nSTATUS: COMPLETE\n";
 
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), output, 5, 50, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
         }
 
         [Fact]
         public void EdgeCase_ExitCode0WithTokenLimit_IsRetry()
         {
             // Even exitCode 0 with token limit text → retry
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), "too many requests", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 0);
 
-            Assert.Equal(OvernightAction.RetryAfterDelay, decision.Action);
+            Assert.Equal(FeatureModeAction.RetryAfterDelay, decision.Action);
         }
 
         [Fact]
         public void EdgeCase_MaxIterationsAtZero()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(5), "", 0, 0, 0, 0, 0);
 
-            Assert.Equal(OvernightAction.Finish, decision.Action);
+            Assert.Equal(FeatureModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
         [Fact]
         public void EdgeCase_OutputLengthExactlyAtCap()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(5), "", 5, 50, 0, 0, 100_000);
 
@@ -1539,7 +1539,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void EdgeCase_OutputLengthOneOverCap()
         {
-            var decision = TaskExecutionManager.EvaluateOvernightIteration(
+            var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(5), "", 5, 50, 0, 0, 100_001);
 
@@ -1595,10 +1595,10 @@ namespace HappyEngine.Tests
             // Static method should not throw
             TaskExecutionManager.KillProcess(task);
         }
-        // ── General output cap (non-overnight) ──
+        // ── General output cap (non-feature-mode) ──
 
         [Fact]
-        public void TrimOutput_TrimsNonOvernightTaskOverCap()
+        public void TrimOutput_TrimsNonFeatureModeTaskOverCap()
         {
             var task = MakeTask();
             task.OutputBuilder.Append(new string('x', OutputTabManager.OutputCapChars + 100_000));
@@ -1646,15 +1646,15 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void TrimOutput_SkipsOvernightTasks()
+        public void TrimOutput_SkipsFeatureModeTasks()
         {
-            var task = MakeOvernightTask();
+            var task = MakeFeatureModeTask();
             var bigLength = OutputTabManager.OutputCapChars + 100_000;
             task.OutputBuilder.Append(new string('x', bigLength));
 
             OutputTabManager.TrimOutputIfNeeded(task);
 
-            // Overnight tasks are not trimmed by general cap (they have their own iteration-based trimming)
+            // Feature mode tasks are not trimmed by general cap (they have their own iteration-based trimming)
             Assert.Equal(bigLength, task.OutputBuilder.Length);
         }
     }

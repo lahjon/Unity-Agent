@@ -14,7 +14,7 @@ namespace HappyEngine.Managers
             bool skipPermissions,
             bool remoteSession,
             bool headless,
-            bool isOvernight,
+            bool isFeatureMode,
             bool ignoreFileLocks,
             bool useMcp,
             bool spawnTeam = false,
@@ -27,7 +27,7 @@ namespace HappyEngine.Managers
             string? parentTaskId = null,
             bool autoDecompose = false);
 
-        void PrepareTaskForOvernightStart(AgentTask task);
+        void PrepareTaskForFeatureModeStart(AgentTask task);
 
         string GenerateLocalSummary(string description);
 

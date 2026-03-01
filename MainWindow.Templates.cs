@@ -68,7 +68,7 @@ namespace HappyEngine
             if (t.RemoteSession) flags.Add("Remote");
             if (t.Headless) flags.Add("Headless");
             if (t.SpawnTeam) flags.Add("Team");
-            if (t.IsOvernight) flags.Add("Overnight");
+            if (t.IsFeatureMode) flags.Add("FeatureMode");
             if (t.ExtendedPlanning) flags.Add("ExtPlanning");
             if (t.PlanOnly) flags.Add("PlanOnly");
             if (t.AutoDecompose) flags.Add("AutoDecompose");
@@ -318,7 +318,7 @@ namespace HappyEngine
             var remoteChk = MakeTemplateCheckBox("Remote", t.RemoteSession);
             var headlessChk = MakeTemplateCheckBox("Headless", t.Headless);
             var teamChk = MakeTemplateCheckBox("Team", t.SpawnTeam);
-            var overnightChk = MakeTemplateCheckBox("Overnight", t.IsOvernight);
+            var featureModeChk = MakeTemplateCheckBox("Feature Mode", t.IsFeatureMode);
             var extPlanChk = MakeTemplateCheckBox("ExtPlanning", t.ExtendedPlanning);
             var planOnlyChk = MakeTemplateCheckBox("PlanOnly", t.PlanOnly);
             var ignoreLockChk = MakeTemplateCheckBox("IgnoreLocks", t.IgnoreFileLocks);
@@ -330,7 +330,7 @@ namespace HappyEngine
             togglePanel.Children.Add(remoteChk);
             togglePanel.Children.Add(headlessChk);
             togglePanel.Children.Add(teamChk);
-            togglePanel.Children.Add(overnightChk);
+            togglePanel.Children.Add(featureModeChk);
             togglePanel.Children.Add(extPlanChk);
             togglePanel.Children.Add(planOnlyChk);
             togglePanel.Children.Add(ignoreLockChk);
@@ -411,7 +411,7 @@ namespace HappyEngine
                 t.RemoteSession = remoteChk.IsChecked == true;
                 t.Headless = headlessChk.IsChecked == true;
                 t.SpawnTeam = teamChk.IsChecked == true;
-                t.IsOvernight = overnightChk.IsChecked == true;
+                t.IsFeatureMode = featureModeChk.IsChecked == true;
                 t.ExtendedPlanning = extPlanChk.IsChecked == true;
                 t.PlanOnly = planOnlyChk.IsChecked == true;
                 t.IgnoreFileLocks = ignoreLockChk.IsChecked == true;

@@ -329,7 +329,7 @@ namespace HappyEngine
                 historicTask.SkipPermissions,
                 historicTask.RemoteSession,
                 historicTask.Headless,
-                historicTask.IsOvernight,
+                historicTask.IsFeatureMode,
                 historicTask.IgnoreFileLocks,
                 historicTask.UseMcp,
                 historicTask.SpawnTeam,

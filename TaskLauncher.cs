@@ -35,8 +35,8 @@ namespace HappyEngine
         public const string SubtaskCoordinatorBlock = Managers.PromptBuilder.SubtaskCoordinatorBlock;
         public const string DecompositionPromptBlock = Managers.PromptBuilder.DecompositionPromptBlock;
         public const string TeamDecompositionPromptBlock = Managers.PromptBuilder.TeamDecompositionPromptBlock;
-        public const string OvernightInitialTemplate = Managers.PromptBuilder.OvernightInitialTemplate;
-        public const string OvernightContinuationTemplate = Managers.PromptBuilder.OvernightContinuationTemplate;
+        public const string FeatureModeInitialTemplate = Managers.PromptBuilder.FeatureModeInitialTemplate;
+        public const string FeatureModeContinuationTemplate = Managers.PromptBuilder.FeatureModeContinuationTemplate;
 
         // ── TaskFactory Delegates ───────────────────────────────────
 
@@ -49,7 +49,7 @@ namespace HappyEngine
             bool skipPermissions,
             bool remoteSession,
             bool headless,
-            bool isOvernight,
+            bool isFeatureMode,
             bool ignoreFileLocks,
             bool useMcp,
             bool spawnTeam = false,
@@ -62,11 +62,11 @@ namespace HappyEngine
             string? parentTaskId = null,
             bool autoDecompose = false)
             => _factory.CreateTask(description, projectPath, skipPermissions, remoteSession,
-                headless, isOvernight, ignoreFileLocks, useMcp, spawnTeam, extendedPlanning,
+                headless, isFeatureMode, ignoreFileLocks, useMcp, spawnTeam, extendedPlanning,
                 noGitWrite, planOnly, useMessageBus, imagePaths, model, parentTaskId, autoDecompose);
 
-        public static void PrepareTaskForOvernightStart(AgentTask task)
-            => _factory.PrepareTaskForOvernightStart(task);
+        public static void PrepareTaskForFeatureModeStart(AgentTask task)
+            => _factory.PrepareTaskForFeatureModeStart(task);
 
         public static string GenerateLocalSummary(string description)
             => _factory.GenerateLocalSummary(description);
@@ -78,14 +78,14 @@ namespace HappyEngine
         // ── PromptBuilder Delegates ─────────────────────────────────
 
         public static string BuildBasePrompt(string systemPrompt, string description,
-            bool useMcp, bool isOvernight, bool extendedPlanning = false,
+            bool useMcp, bool isFeatureMode, bool extendedPlanning = false,
             bool noGitWrite = false, bool planOnly = false,
             string projectDescription = "", string projectRulesBlock = "",
             bool autoDecompose = false,
             bool spawnTeam = false,
             bool isGameProject = false,
             string taskId = "")
-            => _prompt.BuildBasePrompt(systemPrompt, description, useMcp, isOvernight,
+            => _prompt.BuildBasePrompt(systemPrompt, description, useMcp, isFeatureMode,
                 extendedPlanning, noGitWrite, planOnly, projectDescription,
                 projectRulesBlock, autoDecompose, spawnTeam, isGameProject, taskId);
 
@@ -117,8 +117,8 @@ namespace HappyEngine
         public static ProcessStartInfo BuildProcessStartInfo(string ps1FilePath, bool headless)
             => _prompt.BuildProcessStartInfo(ps1FilePath, headless);
 
-        public static string BuildOvernightContinuationPrompt(int iteration, int maxIterations, string taskId = "")
-            => _prompt.BuildOvernightContinuationPrompt(iteration, maxIterations, taskId);
+        public static string BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = "")
+            => _prompt.BuildFeatureModeContinuationPrompt(iteration, maxIterations, taskId);
 
         public static string BuildDependencyContext(List<string> depIds,
             IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks)
@@ -138,21 +138,30 @@ namespace HappyEngine
             => _completion.VerifyResultAsync(outputTail, taskDescription, completionSummary, ct);
 
         public static string FormatCompletionSummary(AgentTaskStatus status,
-            TimeSpan duration, List<(string name, int added, int removed)>? fileChanges)
-            => _completion.FormatCompletionSummary(status, duration, fileChanges);
+            TimeSpan duration, List<(string name, int added, int removed)>? fileChanges,
+            long inputTokens = 0, long outputTokens = 0,
+            long cacheReadTokens = 0, long cacheCreationTokens = 0)
+            => _completion.FormatCompletionSummary(status, duration, fileChanges,
+                inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
 
         public static string GenerateCompletionSummary(string projectPath,
-            string? gitStartHash, AgentTaskStatus status, TimeSpan duration)
-            => _completion.GenerateCompletionSummary(projectPath, gitStartHash, status, duration);
+            string? gitStartHash, AgentTaskStatus status, TimeSpan duration,
+            long inputTokens = 0, long outputTokens = 0,
+            long cacheReadTokens = 0, long cacheCreationTokens = 0)
+            => _completion.GenerateCompletionSummary(projectPath, gitStartHash, status, duration,
+                inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
 
         public static Task<string> GenerateCompletionSummaryAsync(string projectPath,
             string? gitStartHash, AgentTaskStatus status, TimeSpan duration,
+            long inputTokens = 0, long outputTokens = 0,
+            long cacheReadTokens = 0, long cacheCreationTokens = 0,
             CancellationToken cancellationToken = default)
             => _completion.GenerateCompletionSummaryAsync(projectPath, gitStartHash,
-                status, duration, cancellationToken);
+                status, duration, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens,
+                cancellationToken);
 
-        public static bool CheckOvernightComplete(string output)
-            => _completion.CheckOvernightComplete(output);
+        public static bool CheckFeatureModeComplete(string output)
+            => _completion.CheckFeatureModeComplete(output);
 
         public static bool IsTokenLimitError(string output)
             => _completion.IsTokenLimitError(output);

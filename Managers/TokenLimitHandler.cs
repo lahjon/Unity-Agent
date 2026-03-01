@@ -9,7 +9,7 @@ using System.Windows.Threading;
 namespace HappyEngine.Managers
 {
     /// <summary>
-    /// Handles token/rate limit detection and automatic retry scheduling for non-overnight tasks.
+    /// Handles token/rate limit detection and automatic retry scheduling for non-feature-mode tasks.
     /// Accepts its dependencies via constructor injection and exposes events for status changes.
     /// </summary>
     public class TokenLimitHandler
@@ -50,7 +50,7 @@ namespace HappyEngine.Managers
         }
 
         /// <summary>
-        /// Checks if a non-overnight task failed due to a token/rate limit error.
+        /// Checks if a non-feature-mode task failed due to a token/rate limit error.
         /// If so, schedules an automatic retry after the configured interval.
         /// Returns true if a retry was scheduled (caller should skip normal completion).
         /// </summary>

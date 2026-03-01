@@ -27,16 +27,16 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void StatusText_Running_NonOvernight()
+        public void StatusText_Running_NonFeatureMode()
         {
-            var task = new AgentTask { IsOvernight = false };
+            var task = new AgentTask { IsFeatureMode = false };
             Assert.Equal("Running", task.StatusText);
         }
 
         [Fact]
-        public void StatusText_Running_Overnight_ShowsIteration()
+        public void StatusText_Running_FeatureMode_ShowsIteration()
         {
-            var task = new AgentTask { IsOvernight = true, MaxIterations = 50 };
+            var task = new AgentTask { IsFeatureMode = true, MaxIterations = 50 };
             task.CurrentIteration = 3;
             Assert.Equal("Running (3/50)", task.StatusText);
         }

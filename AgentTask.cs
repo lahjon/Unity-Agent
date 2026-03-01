@@ -54,7 +54,7 @@ namespace HappyEngine
         public bool SkipPermissions { get => Data.SkipPermissions; set => Data.SkipPermissions = value; }
         public bool RemoteSession { get => Data.RemoteSession; set => Data.RemoteSession = value; }
         public bool Headless { get => Data.Headless; set => Data.Headless = value; }
-        public bool IsOvernight { get => Data.IsOvernight; set => Data.IsOvernight = value; }
+        public bool IsFeatureMode { get => Data.IsFeatureMode; set => Data.IsFeatureMode = value; }
         public bool IgnoreFileLocks
         {
             get => Data.IgnoreFileLocks;
@@ -174,8 +174,8 @@ namespace HappyEngine
 
         public StringBuilder OutputBuilder => Runtime.OutputBuilder;
         public string? GitStartHash { get => Data.GitStartHash; set => Data.GitStartHash = value; }
-        public System.Windows.Threading.DispatcherTimer? OvernightRetryTimer { get => Runtime.OvernightRetryTimer; set => Runtime.OvernightRetryTimer = value; }
-        public System.Windows.Threading.DispatcherTimer? OvernightIterationTimer { get => Runtime.OvernightIterationTimer; set => Runtime.OvernightIterationTimer = value; }
+        public System.Windows.Threading.DispatcherTimer? FeatureModeRetryTimer { get => Runtime.FeatureModeRetryTimer; set => Runtime.FeatureModeRetryTimer = value; }
+        public System.Windows.Threading.DispatcherTimer? FeatureModeIterationTimer { get => Runtime.FeatureModeIterationTimer; set => Runtime.FeatureModeIterationTimer = value; }
         public System.Windows.Threading.DispatcherTimer? TokenLimitRetryTimer { get => Runtime.TokenLimitRetryTimer; set => Runtime.TokenLimitRetryTimer = value; }
         public int ConsecutiveFailures { get => Runtime.ConsecutiveFailures; set => Runtime.ConsecutiveFailures = value; }
         public int LastIterationOutputStart { get => Runtime.LastIterationOutputStart; set => Runtime.LastIterationOutputStart = value; }
@@ -297,12 +297,12 @@ namespace HappyEngine
             !string.IsNullOrWhiteSpace(Summary) ? Summary :
             Description.Length > 45 ? Description[..45] + "..." : Description;
 
-        public bool IsWaitingForRetry => TokenLimitRetryTimer != null || OvernightRetryTimer != null;
+        public bool IsWaitingForRetry => TokenLimitRetryTimer != null || FeatureModeRetryTimer != null;
 
         public string StatusText => Status switch
         {
             AgentTaskStatus.Running when IsWaitingForRetry => "Retrying soon",
-            AgentTaskStatus.Running => IsOvernight ? $"Running ({CurrentIteration}/{MaxIterations})" : "Running",
+            AgentTaskStatus.Running => IsFeatureMode ? $"Running ({CurrentIteration}/{MaxIterations})" : "Running",
             AgentTaskStatus.Completed => "Finished",
             AgentTaskStatus.Cancelled => "Cancelled",
             AgentTaskStatus.Failed => "Failed",
@@ -367,7 +367,7 @@ namespace HappyEngine
             get
             {
                 var tags = new List<string>(4);
-                if (IsOvernight) tags.Add("OVN");
+                if (IsFeatureMode) tags.Add("FEAT");
                 if (ExtendedPlanning) tags.Add("EXT");
                 if (RemoteSession) tags.Add("REM");
                 if (Headless) tags.Add("HDL");
@@ -375,6 +375,22 @@ namespace HappyEngine
                 if (AutoDecompose) tags.Add("DEC");
                 if (UseMcp) tags.Add("MCP");
                 return string.Join(" ", tags);
+            }
+        }
+
+        public string ActiveTogglesTooltip
+        {
+            get
+            {
+                var lines = new List<string>(4);
+                if (IsFeatureMode) lines.Add("FEAT = Feature Mode");
+                if (ExtendedPlanning) lines.Add("EXT = Extended Planning");
+                if (RemoteSession) lines.Add("REM = Remote Session");
+                if (Headless) lines.Add("HDL = Headless");
+                if (SpawnTeam) lines.Add("TEAM = Spawn Team");
+                if (AutoDecompose) lines.Add("DEC = Auto Decompose");
+                if (UseMcp) lines.Add("MCP = MCP Tools");
+                return string.Join("\n", lines);
             }
         }
 

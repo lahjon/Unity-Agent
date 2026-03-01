@@ -16,7 +16,7 @@ namespace HappyEngine
         public bool SkipPermissions { get; set; }
         public bool RemoteSession { get; set; }
         public bool Headless { get; set; }
-        public bool IsOvernight { get; set; }
+        public bool IsFeatureMode { get; set; }
         public bool IgnoreFileLocks { get; set; }
         public bool UseMcp { get; set; }
         public bool SpawnTeam { get; set; }

@@ -958,6 +958,36 @@ namespace HappyEngine.Managers
                 };
                 btnPanel.Children.Add(closeBtn);
 
+                var gearBtn = new Button
+                {
+                    Content = "\uE713",
+                    Background = Brushes.Transparent,
+                    Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    FontSize = 12,
+                    Padding = new Thickness(4, 2, 4, 2),
+                    BorderThickness = new Thickness(0),
+                    Cursor = Cursors.Hand,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    ToolTip = "Project settings",
+                    Margin = new Thickness(0, 4, 0, 0)
+                };
+                var gearEntry = proj;
+                gearBtn.Click += (s, ev) =>
+                {
+                    ev.Handled = true;
+                    ProjectSettingsDialog.Show(gearEntry, SaveProjects, () =>
+                    {
+                        // Refresh UI after MCP/game toggle changes
+                        RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
+                        syncSettings?.Invoke();
+                    });
+                    // Refresh after dialog closes in case settings changed
+                    RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
+                    syncSettings?.Invoke();
+                };
+                btnPanel.Children.Add(gearBtn);
+
                 Grid.SetColumn(btnPanel, 1);
                 grid.Children.Add(btnPanel);
 

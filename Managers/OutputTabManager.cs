@@ -15,8 +15,8 @@ namespace HappyEngine.Managers
 {
     public class OutputTabManager
     {
-        /// <summary>Rolling-window cap for non-overnight task output (500 KB of text).
-        /// Overnight tasks already trim at iteration boundaries via OvernightOutputCapChars.</summary>
+        /// <summary>Rolling-window cap for non-feature-mode task output (500 KB of text).
+        /// Feature mode tasks already trim at iteration boundaries via FeatureModeOutputCapChars.</summary>
         internal const int OutputCapChars = 500_000;
 
         private readonly Dictionary<string, TabItem> _tabs = new();
@@ -420,10 +420,10 @@ namespace HappyEngine.Managers
             TrimOutputIfNeeded(task);
         }
 
-        /// <summary>Keeps the last <see cref="OutputCapChars"/> characters when a non-overnight task's buffer grows too large.</summary>
+        /// <summary>Keeps the last <see cref="OutputCapChars"/> characters when a non-feature-mode task's buffer grows too large.</summary>
         internal static void TrimOutputIfNeeded(AgentTask task)
         {
-            if (task.IsOvernight || task.OutputBuilder.Length <= OutputCapChars)
+            if (task.IsFeatureMode || task.OutputBuilder.Length <= OutputCapChars)
                 return;
 
             var trimmed = task.OutputBuilder.ToString(

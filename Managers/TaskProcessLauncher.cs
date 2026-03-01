@@ -282,9 +282,9 @@ namespace HappyEngine.Managers
             SuspendProcessTree(task.Process);
             task.Status = AgentTaskStatus.Paused;
 
-            // Pause overnight timers if active
-            task.OvernightIterationTimer?.Stop();
-            task.OvernightRetryTimer?.Stop();
+            // Pause feature mode timers if active
+            task.FeatureModeIterationTimer?.Stop();
+            task.FeatureModeRetryTimer?.Stop();
 
             _outputTabManager.UpdateTabHeader(task);
             ProcessPaused?.Invoke(task.Id);
@@ -299,11 +299,11 @@ namespace HappyEngine.Managers
             ResumeProcessTree(task.Process);
             task.Status = task.IsPlanningBeforeQueue ? AgentTaskStatus.Planning : AgentTaskStatus.Running;
 
-            // Restart overnight timers if applicable
-            if (task.IsOvernight)
+            // Restart feature mode timers if applicable
+            if (task.IsFeatureMode)
             {
-                task.OvernightIterationTimer?.Start();
-                task.OvernightRetryTimer?.Start();
+                task.FeatureModeIterationTimer?.Start();
+                task.FeatureModeRetryTimer?.Start();
             }
 
             _outputTabManager.UpdateTabHeader(task);

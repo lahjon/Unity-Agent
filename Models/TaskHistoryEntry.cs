@@ -8,7 +8,7 @@ namespace HappyEngine.Models
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
         public bool RemoteSession { get; set; }
-        public bool IsOvernight { get; set; }
+        public bool IsFeatureMode { get; set; }
         public int MaxIterations { get; set; }
         public int CurrentIteration { get; set; }
         public string CompletionSummary { get; set; } = "";

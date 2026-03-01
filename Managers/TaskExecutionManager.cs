@@ -18,7 +18,7 @@ namespace HappyEngine.Managers
     /// <summary>
     /// Thin coordinator that delegates to focused single-responsibility classes:
     /// <see cref="TaskProcessLauncher"/> for subprocess creation and process lifecycle,
-    /// <see cref="OvernightModeHandler"/> for overnight retry timers and iteration tracking,
+    /// <see cref="FeatureModeHandler"/> for feature mode retry timers and iteration tracking,
     /// <see cref="OutputProcessor"/> for output trimming, completion summaries, and recommendation parsing,
     /// <see cref="TokenLimitHandler"/> for token limit detection and retry scheduling.
     /// </summary>
@@ -37,7 +37,7 @@ namespace HappyEngine.Managers
         // ── Focused sub-handlers ─────────────────────────────────────
         private readonly OutputProcessor _outputProcessor;
         private readonly TaskProcessLauncher _processLauncher;
-        private readonly OvernightModeHandler _overnightHandler;
+        private readonly FeatureModeHandler _featureModeHandler;
         private readonly TokenLimitHandler _tokenLimitHandler;
 
         /// <summary>Exposes the streaming tool state dictionary for external consumers.</summary>
@@ -77,7 +77,7 @@ namespace HappyEngine.Managers
             // Wire up sub-handlers
             _outputProcessor = new OutputProcessor(outputTabManager, getAutoVerify);
             _processLauncher = new TaskProcessLauncher(scriptDir, fileLockManager, outputTabManager, _outputProcessor, dispatcher);
-            _overnightHandler = new OvernightModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, retryMinutesFunc);
+            _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, retryMinutesFunc);
             _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, retryMinutesFunc);
 
             // Forward token-limit handler's TaskCompleted to the coordinator's event
@@ -132,8 +132,8 @@ namespace HappyEngine.Managers
 
             task.GitStartHash = await TaskLauncher.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
 
-            if (task.IsOvernight)
-                TaskLauncher.PrepareTaskForOvernightStart(task);
+            if (task.IsFeatureMode)
+                TaskLauncher.PrepareTaskForFeatureModeStart(task);
 
             var promptFile = BuildAndWritePromptFile(task, activeTasks);
             var projectPath = task.ProjectPath;
@@ -159,9 +159,9 @@ namespace HappyEngine.Managers
                 _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Auto-decompose: ON (will spawn subtasks)\n", activeTasks, historyTasks);
             if (task.SpawnTeam)
                 _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Spawn Team: ON (will decompose into team roles with message bus)\n", activeTasks, historyTasks);
-            if (task.IsOvernight)
+            if (task.IsFeatureMode)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Overnight mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Feature mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
                 _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Safety: skip-permissions forced, git blocked, 30min iteration timeout\n", activeTasks, historyTasks);
             }
             // Show the full prompt that Claude will receive
@@ -224,16 +224,16 @@ namespace HappyEngine.Managers
                     return;
                 }
 
-                if (task.IsOvernight && task.Status == AgentTaskStatus.Running)
+                if (task.IsFeatureMode && task.Status == AgentTaskStatus.Running)
                 {
-                    // Don't release locks between overnight iterations — the task
+                    // Don't release locks between feature mode iterations — the task
                     // will continue working on the same files.  Locks are released
-                    // when the overnight task finishes via FinishOvernightTask → moveToHistory.
-                    _overnightHandler.HandleOvernightIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
+                    // when the feature mode task finishes via FinishFeatureModeTask → moveToHistory.
+                    _featureModeHandler.HandleFeatureModeIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
                 }
                 else if (exitCode != 0 && task.Status == AgentTaskStatus.Running && _tokenLimitHandler.HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory))
                 {
-                    // Token limit detected on non-overnight task — retry scheduled, don't complete yet
+                    // Token limit detected on non-feature-mode task — retry scheduled, don't complete yet
                     return;
                 }
                 else
@@ -256,20 +256,20 @@ namespace HappyEngine.Managers
             {
                 _processLauncher.StartManagedProcess(task, process);
 
-                if (task.IsOvernight)
+                if (task.IsFeatureMode)
                 {
                     var iterationTimer = new DispatcherTimer
                     {
-                        Interval = TimeSpan.FromMinutes(OvernightModeHandler.OvernightIterationTimeoutMinutes)
+                        Interval = TimeSpan.FromMinutes(FeatureModeHandler.FeatureModeIterationTimeoutMinutes)
                     };
-                    task.OvernightIterationTimer = iterationTimer;
+                    task.FeatureModeIterationTimer = iterationTimer;
                     iterationTimer.Tick += (_, _) =>
                     {
                         iterationTimer.Stop();
-                        task.OvernightIterationTimer = null;
+                        task.FeatureModeIterationTimer = null;
                         if (task.Process is { HasExited: false })
                         {
-                            _outputProcessor.AppendOutput(task.Id, $"\n[Overnight] Iteration timeout ({OvernightModeHandler.OvernightIterationTimeoutMinutes}min). Killing stuck process.\n", activeTasks, historyTasks);
+                            _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Iteration timeout ({FeatureModeHandler.FeatureModeIterationTimeoutMinutes}min). Killing stuck process.\n", activeTasks, historyTasks);
                             try { task.Process.Kill(true); } catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill stuck process for task {task.Id}", ex); }
                         }
                     };
@@ -446,15 +446,15 @@ namespace HappyEngine.Managers
             // Cancel cooperative async operations before killing the process
             try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
 
-            if (task.OvernightRetryTimer != null)
+            if (task.FeatureModeRetryTimer != null)
             {
-                task.OvernightRetryTimer.Stop();
-                task.OvernightRetryTimer = null;
+                task.FeatureModeRetryTimer.Stop();
+                task.FeatureModeRetryTimer = null;
             }
-            if (task.OvernightIterationTimer != null)
+            if (task.FeatureModeIterationTimer != null)
             {
-                task.OvernightIterationTimer.Stop();
-                task.OvernightIterationTimer = null;
+                task.FeatureModeIterationTimer.Stop();
+                task.FeatureModeIterationTimer = null;
             }
             if (task.TokenLimitRetryTimer != null)
             {
@@ -590,7 +590,7 @@ namespace HappyEngine.Managers
                     parent.SkipPermissions,
                     parent.RemoteSession,
                     parent.Headless,
-                    parent.IsOvernight,
+                    parent.IsFeatureMode,
                     parent.IgnoreFileLocks,
                     parent.UseMcp,
                     parent.SpawnTeam,
@@ -605,7 +605,7 @@ namespace HappyEngine.Managers
                     skipPermissions: false,
                     remoteSession: false,
                     headless: false,
-                    isOvernight: false,
+                    isFeatureMode: false,
                     ignoreFileLocks: false,
                     useMcp: false);
 
@@ -775,13 +775,13 @@ namespace HappyEngine.Managers
         public void InjectSubtaskResult(AgentTask parent, AgentTask child)
             => _outputProcessor.InjectSubtaskResult(parent, child);
 
-        // ── Backward-compatible forwarding for EvaluateOvernightIteration ─
+        // ── Backward-compatible forwarding for EvaluateFeatureModeIteration ─
 
         /// <summary>
-        /// Pure decision function for overnight iteration logic.
-        /// Delegates to <see cref="OvernightModeHandler.EvaluateOvernightIteration"/>.
+        /// Pure decision function for feature mode iteration logic.
+        /// Delegates to <see cref="FeatureModeHandler.EvaluateFeatureModeIteration"/>.
         /// </summary>
-        internal static OvernightModeHandler.OvernightDecision EvaluateOvernightIteration(
+        internal static FeatureModeHandler.FeatureModeDecision EvaluateFeatureModeIteration(
             AgentTaskStatus currentStatus,
             TimeSpan totalRuntime,
             string iterationOutput,
@@ -790,7 +790,7 @@ namespace HappyEngine.Managers
             int exitCode,
             int consecutiveFailures,
             int outputLength)
-            => OvernightModeHandler.EvaluateOvernightIteration(
+            => FeatureModeHandler.EvaluateFeatureModeIteration(
                 currentStatus, totalRuntime, iterationOutput,
                 currentIteration, maxIterations, exitCode,
                 consecutiveFailures, outputLength);

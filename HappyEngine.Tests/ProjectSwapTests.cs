@@ -22,10 +22,10 @@ namespace HappyEngine.Tests
             return t;
         }
 
-        private static AgentTask MakeOvernightTask(string projectPath)
+        private static AgentTask MakeFeatureModeTask(string projectPath)
         {
-            var t = TaskLauncher.CreateTask("overnight task", projectPath, true, false, false, true, false, false);
-            TaskLauncher.PrepareTaskForOvernightStart(t);
+            var t = TaskLauncher.CreateTask("feature mode task", projectPath, true, false, false, true, false, false);
+            TaskLauncher.PrepareTaskForFeatureModeStart(t);
             return t;
         }
 
@@ -174,39 +174,39 @@ namespace HappyEngine.Tests
             Assert.True(queued.IsQueued);
         }
 
-        // ── Overnight task during swap ───────────────────────────────
+        // ── Feature mode task during swap ────────────────────────────
 
         [Fact]
-        public void OvernightTask_RetainsState_AfterSwap()
+        public void FeatureModeTask_RetainsState_AfterSwap()
         {
-            var overnight = MakeOvernightTask(@"C:\Projects\Alpha");
-            overnight.CurrentIteration = 5;
+            var featureMode = MakeFeatureModeTask(@"C:\Projects\Alpha");
+            featureMode.CurrentIteration = 5;
 
-            Assert.Equal(@"C:\Projects\Alpha", overnight.ProjectPath);
-            Assert.True(overnight.IsOvernight);
-            Assert.True(overnight.SkipPermissions);
-            Assert.Equal(5, overnight.CurrentIteration);
-            Assert.True(overnight.IsRunning);
+            Assert.Equal(@"C:\Projects\Alpha", featureMode.ProjectPath);
+            Assert.True(featureMode.IsFeatureMode);
+            Assert.True(featureMode.SkipPermissions);
+            Assert.Equal(5, featureMode.CurrentIteration);
+            Assert.True(featureMode.IsRunning);
         }
 
         [Fact]
-        public void OvernightTask_ContinuationPrompt_UsesCorrectIteration()
+        public void FeatureModeTask_ContinuationPrompt_UsesCorrectIteration()
         {
-            var prompt = TaskLauncher.BuildOvernightContinuationPrompt(7, 50);
+            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(7, 50);
             Assert.Contains("iteration 7/50", prompt);
         }
 
         [Fact]
-        public void OvernightTask_PrepareStart_ForcesSkipPermissions()
+        public void FeatureModeTask_PrepareStart_ForcesSkipPermissions()
         {
             var task = new AgentTask
             {
-                Description = "Overnight fix",
+                Description = "Feature mode fix",
                 ProjectPath = @"C:\Projects\Alpha",
                 SkipPermissions = false,
-                IsOvernight = true
+                IsFeatureMode = true
             };
-            TaskLauncher.PrepareTaskForOvernightStart(task);
+            TaskLauncher.PrepareTaskForFeatureModeStart(task);
 
             Assert.True(task.SkipPermissions);
             Assert.Equal(1, task.CurrentIteration);
@@ -348,7 +348,7 @@ namespace HappyEngine.Tests
             {
                 Description = "fix bug",
                 UseMcp = false,
-                IsOvernight = false
+                IsFeatureMode = false
             };
 
             var result = TaskLauncher.BuildFullPrompt("SYS:", task, "A Unity game project");
@@ -365,7 +365,7 @@ namespace HappyEngine.Tests
             {
                 Description = "do work",
                 UseMcp = false,
-                IsOvernight = false
+                IsFeatureMode = false
             };
 
             var result = TaskLauncher.BuildFullPrompt("SYS:", task, "");
@@ -379,7 +379,7 @@ namespace HappyEngine.Tests
             {
                 Description = "do work",
                 UseMcp = false,
-                IsOvernight = false
+                IsFeatureMode = false
             };
 
             // null description should not crash

@@ -25,7 +25,7 @@ namespace HappyEngine.Managers
             bool skipPermissions,
             bool remoteSession,
             bool headless,
-            bool isOvernight,
+            bool isFeatureMode,
             bool ignoreFileLocks,
             bool useMcp,
             bool spawnTeam = false,
@@ -44,7 +44,7 @@ namespace HappyEngine.Managers
                 SkipPermissions = skipPermissions,
                 RemoteSession = remoteSession,
                 Headless = headless,
-                IsOvernight = isOvernight,
+                IsFeatureMode = isFeatureMode,
                 IgnoreFileLocks = ignoreFileLocks,
                 UseMcp = useMcp,
                 SpawnTeam = spawnTeam,
@@ -63,9 +63,9 @@ namespace HappyEngine.Managers
             return task;
         }
 
-        // ── Overnight Preparation ────────────────────────────────────
+        // ── Feature Mode Preparation ────────────────────────────────────
 
-        public void PrepareTaskForOvernightStart(AgentTask task)
+        public void PrepareTaskForFeatureModeStart(AgentTask task)
         {
             task.SkipPermissions = true;
             task.CurrentIteration = 1;

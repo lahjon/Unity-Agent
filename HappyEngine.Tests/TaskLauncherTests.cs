@@ -42,7 +42,7 @@ namespace HappyEngine.Tests
                 skipPermissions: true,
                 remoteSession: true,
                 headless: false,
-                isOvernight: true,
+                isFeatureMode: true,
                 ignoreFileLocks: true,
                 useMcp: true,
                 spawnTeam: true);
@@ -52,7 +52,7 @@ namespace HappyEngine.Tests
             Assert.True(task.SkipPermissions);
             Assert.True(task.RemoteSession);
             Assert.False(task.Headless);
-            Assert.True(task.IsOvernight);
+            Assert.True(task.IsFeatureMode);
             Assert.True(task.IgnoreFileLocks);
             Assert.True(task.UseMcp);
             Assert.True(task.SpawnTeam);
@@ -96,16 +96,16 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildBasePrompt_NormalMode_CombinesSystemAndDescription()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "do things", useMcp: false, isOvernight: false);
+            var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "do things", useMcp: false, isFeatureMode: false);
             Assert.StartsWith("SYSTEM:", result);
             Assert.EndsWith("do things", result);
-            Assert.Contains("# USER PROMPT", result);
+            Assert.Contains("# USER PROMPT / TASK", result);
         }
 
         [Fact]
         public void BuildBasePrompt_WithMcp_IncludesMcpBlock()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isOvernight: false);
+            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: false);
             Assert.Contains("# MCP", result);
             Assert.Contains("mcp-for-unity-server", result);
             Assert.StartsWith("SYS:", result);
@@ -113,10 +113,10 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void BuildBasePrompt_Overnight_UsesOvernightTemplate()
+        public void BuildBasePrompt_FeatureMode_UsesFeatureModeTemplate()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isOvernight: true);
-            Assert.StartsWith("# OVERNIGHT AUTONOMOUS TASK", result);
+            var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isFeatureMode: true);
+            Assert.StartsWith("# FEATURE MODE AUTONOMOUS TASK", result);
             Assert.EndsWith("fix bugs", result);
             Assert.DoesNotContain("SYSTEM:", result);
         }
@@ -124,7 +124,7 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildBasePrompt_WithNoGitWrite_IncludesGitBlock()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isOvernight: false, noGitWrite: true);
+            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: true);
             Assert.Contains("NO GIT WRITES", result);
             Assert.Contains("modify repository state", result);
             Assert.StartsWith("SYS:", result);
@@ -134,16 +134,16 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildBasePrompt_WithoutNoGitWrite_ExcludesGitBlock()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isOvernight: false, noGitWrite: false);
+            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: false);
             Assert.DoesNotContain("NO GIT WRITES", result);
         }
 
         [Fact]
-        public void BuildBasePrompt_Overnight_IgnoresMcp()
+        public void BuildBasePrompt_FeatureMode_IgnoresMcp()
         {
-            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isOvernight: true);
+            var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: true);
             Assert.DoesNotContain("# MCP\n", result);
-            Assert.StartsWith("# OVERNIGHT AUTONOMOUS TASK", result);
+            Assert.StartsWith("# FEATURE MODE AUTONOMOUS TASK", result);
         }
 
         [Fact]
@@ -172,12 +172,12 @@ namespace HappyEngine.Tests
             {
                 Description = "do work",
                 UseMcp = false,
-                IsOvernight = false
+                IsFeatureMode = false
             };
             var result = TaskLauncher.BuildFullPrompt("SYS:", task);
             Assert.StartsWith("SYS:", result);
             Assert.EndsWith("do work", result);
-            Assert.Contains("# USER PROMPT", result);
+            Assert.Contains("# USER PROMPT / TASK", result);
         }
 
         [Fact]
@@ -187,7 +187,7 @@ namespace HappyEngine.Tests
             {
                 Description = "do work",
                 UseMcp = false,
-                IsOvernight = false
+                IsFeatureMode = false
             };
             task.ImagePaths.Add("img.png");
             var result = TaskLauncher.BuildFullPrompt("SYS:", task);
@@ -415,93 +415,93 @@ namespace HappyEngine.Tests
             Assert.Contains("-ExecutionPolicy Bypass", psi.Arguments);
         }
 
-        // ── Overnight Helpers ───────────────────────────────────────
+        // ── Feature Mode Helpers ────────────────────────────────────
 
         [Fact]
-        public void PrepareTaskForOvernightStart_ForcesSkipPermissions()
+        public void PrepareTaskForFeatureModeStart_ForcesSkipPermissions()
         {
             var task = new AgentTask { SkipPermissions = false };
-            TaskLauncher.PrepareTaskForOvernightStart(task);
+            TaskLauncher.PrepareTaskForFeatureModeStart(task);
             Assert.True(task.SkipPermissions);
         }
 
         [Fact]
-        public void PrepareTaskForOvernightStart_SetsIteration1()
+        public void PrepareTaskForFeatureModeStart_SetsIteration1()
         {
             var task = new AgentTask();
-            TaskLauncher.PrepareTaskForOvernightStart(task);
+            TaskLauncher.PrepareTaskForFeatureModeStart(task);
             Assert.Equal(1, task.CurrentIteration);
         }
 
         [Fact]
-        public void PrepareTaskForOvernightStart_ResetsFailures()
+        public void PrepareTaskForFeatureModeStart_ResetsFailures()
         {
             var task = new AgentTask { ConsecutiveFailures = 5 };
-            TaskLauncher.PrepareTaskForOvernightStart(task);
+            TaskLauncher.PrepareTaskForFeatureModeStart(task);
             Assert.Equal(0, task.ConsecutiveFailures);
         }
 
         [Fact]
-        public void PrepareTaskForOvernightStart_ResetsOutputStart()
+        public void PrepareTaskForFeatureModeStart_ResetsOutputStart()
         {
             var task = new AgentTask { LastIterationOutputStart = 999 };
-            TaskLauncher.PrepareTaskForOvernightStart(task);
+            TaskLauncher.PrepareTaskForFeatureModeStart(task);
             Assert.Equal(0, task.LastIterationOutputStart);
         }
 
         [Fact]
-        public void BuildOvernightContinuationPrompt_InterpolatesValues()
+        public void BuildFeatureModeContinuationPrompt_InterpolatesValues()
         {
-            var prompt = TaskLauncher.BuildOvernightContinuationPrompt(3, 50);
+            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(3, 50);
             Assert.Contains("iteration 3/50", prompt);
         }
 
         [Fact]
-        public void BuildOvernightContinuationPrompt_ContainsRestrictions()
+        public void BuildFeatureModeContinuationPrompt_ContainsRestrictions()
         {
-            var prompt = TaskLauncher.BuildOvernightContinuationPrompt(1, 10);
+            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(1, 10);
             Assert.Contains("No git", prompt);
             Assert.Contains("no OS modifications", prompt);
             Assert.Contains("project root", prompt);
         }
 
         [Fact]
-        public void CheckOvernightComplete_Complete_ReturnsTrue()
+        public void CheckFeatureModeComplete_Complete_ReturnsTrue()
         {
-            Assert.True(TaskLauncher.CheckOvernightComplete("some output\nSTATUS: COMPLETE\n"));
+            Assert.True(TaskLauncher.CheckFeatureModeComplete("some output\nSTATUS: COMPLETE\n"));
         }
 
         [Fact]
-        public void CheckOvernightComplete_NeedsMoreWork_ReturnsFalse()
+        public void CheckFeatureModeComplete_NeedsMoreWork_ReturnsFalse()
         {
-            Assert.False(TaskLauncher.CheckOvernightComplete("some output\nSTATUS: NEEDS_MORE_WORK\n"));
+            Assert.False(TaskLauncher.CheckFeatureModeComplete("some output\nSTATUS: NEEDS_MORE_WORK\n"));
         }
 
         [Fact]
-        public void CheckOvernightComplete_NoMarker_ReturnsFalse()
+        public void CheckFeatureModeComplete_NoMarker_ReturnsFalse()
         {
-            Assert.False(TaskLauncher.CheckOvernightComplete("just some output\nno markers here\n"));
+            Assert.False(TaskLauncher.CheckFeatureModeComplete("just some output\nno markers here\n"));
         }
 
         [Fact]
-        public void CheckOvernightComplete_CompleteWithWhitespace_ReturnsTrue()
+        public void CheckFeatureModeComplete_CompleteWithWhitespace_ReturnsTrue()
         {
-            Assert.True(TaskLauncher.CheckOvernightComplete("output\n  STATUS: COMPLETE  \n"));
+            Assert.True(TaskLauncher.CheckFeatureModeComplete("output\n  STATUS: COMPLETE  \n"));
         }
 
         [Fact]
-        public void CheckOvernightComplete_NeedsMoreWorkThenComplete_ReturnsTrue()
+        public void CheckFeatureModeComplete_NeedsMoreWorkThenComplete_ReturnsTrue()
         {
             // Last marker wins when scanning from the end
             var output = "STATUS: NEEDS_MORE_WORK\nmore work\nSTATUS: COMPLETE\n";
-            Assert.True(TaskLauncher.CheckOvernightComplete(output));
+            Assert.True(TaskLauncher.CheckFeatureModeComplete(output));
         }
 
         [Fact]
-        public void CheckOvernightComplete_CompleteThenNeedsMoreWork_ReturnsFalse()
+        public void CheckFeatureModeComplete_CompleteThenNeedsMoreWork_ReturnsFalse()
         {
             var output = "STATUS: COMPLETE\nmore work\nSTATUS: NEEDS_MORE_WORK\n";
-            Assert.False(TaskLauncher.CheckOvernightComplete(output));
+            Assert.False(TaskLauncher.CheckFeatureModeComplete(output));
         }
 
         // ── StripAnsi ───────────────────────────────────────────────
@@ -673,18 +673,18 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void OvernightInitialTemplate_ContainsRestrictions()
+        public void FeatureModeInitialTemplate_ContainsRestrictions()
         {
-            Assert.Contains("No git commands", TaskLauncher.OvernightInitialTemplate);
-            Assert.Contains("No OS modifications", TaskLauncher.OvernightInitialTemplate);
-            Assert.Contains("STATUS: COMPLETE", TaskLauncher.OvernightInitialTemplate);
+            Assert.Contains("No git commands", TaskLauncher.FeatureModeInitialTemplate);
+            Assert.Contains("No OS modifications", TaskLauncher.FeatureModeInitialTemplate);
+            Assert.Contains("STATUS: COMPLETE", TaskLauncher.FeatureModeInitialTemplate);
         }
 
         [Fact]
-        public void OvernightContinuationTemplate_ContainsPlaceholders()
+        public void FeatureModeContinuationTemplate_ContainsPlaceholders()
         {
-            Assert.Contains("{0}", TaskLauncher.OvernightContinuationTemplate);
-            Assert.Contains("{1}", TaskLauncher.OvernightContinuationTemplate);
+            Assert.Contains("{0}", TaskLauncher.FeatureModeContinuationTemplate);
+            Assert.Contains("{1}", TaskLauncher.FeatureModeContinuationTemplate);
         }
 
         // ── Completion Summary ─────────────────────────────────────────

@@ -61,13 +61,15 @@ namespace HappyEngine.Managers
                 try
                 {
                     var summary = await TaskLauncher.GenerateCompletionSummaryAsync(
-                        task.ProjectPath, task.GitStartHash, summaryStatus, duration, ct);
+                        task.ProjectPath, task.GitStartHash, summaryStatus, duration,
+                        task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens, ct);
                     task.CompletionSummary = summary;
                     AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
                 catch (OperationCanceledException)
                 {
-                    var summary = TaskLauncher.FormatCompletionSummary(summaryStatus, duration, null);
+                    var summary = TaskLauncher.FormatCompletionSummary(summaryStatus, duration, null,
+                        task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens);
                     task.CompletionSummary = summary;
                     AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }

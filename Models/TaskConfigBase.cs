@@ -9,7 +9,7 @@ namespace HappyEngine.Models
         public bool RemoteSession { get; set; }
         public bool Headless { get; set; }
         public bool SpawnTeam { get; set; }
-        public bool IsOvernight { get; set; }
+        public bool IsFeatureMode { get; set; }
         public bool ExtendedPlanning { get; set; }
         public bool PlanOnly { get; set; }
         public bool IgnoreFileLocks { get; set; } = true;
@@ -28,7 +28,7 @@ namespace HappyEngine.Models
             target.RemoteSession = RemoteSession;
             target.Headless = Headless;
             target.SpawnTeam = SpawnTeam;
-            target.IsOvernight = IsOvernight;
+            target.IsFeatureMode = IsFeatureMode;
             target.ExtendedPlanning = ExtendedPlanning;
             target.PlanOnly = PlanOnly;
             target.IgnoreFileLocks = IgnoreFileLocks;
@@ -46,7 +46,7 @@ namespace HappyEngine.Models
             RemoteSession = source.RemoteSession;
             Headless = source.Headless;
             SpawnTeam = source.SpawnTeam;
-            IsOvernight = source.IsOvernight;
+            IsFeatureMode = source.IsFeatureMode;
             ExtendedPlanning = source.ExtendedPlanning;
             PlanOnly = source.PlanOnly;
             IgnoreFileLocks = source.IgnoreFileLocks;
@@ -64,7 +64,7 @@ namespace HappyEngine.Models
             target.RemoteSession = RemoteSession;
             target.Headless = Headless;
             target.SpawnTeam = SpawnTeam;
-            target.IsOvernight = IsOvernight;
+            target.IsFeatureMode = IsFeatureMode;
             target.ExtendedPlanning = ExtendedPlanning;
             target.PlanOnly = PlanOnly;
             target.IgnoreFileLocks = IgnoreFileLocks;

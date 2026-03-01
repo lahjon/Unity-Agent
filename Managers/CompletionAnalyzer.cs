@@ -230,7 +230,9 @@ namespace HappyEngine.Managers
         public string FormatCompletionSummary(
             AgentTaskStatus status,
             TimeSpan duration,
-            List<(string name, int added, int removed)>? fileChanges)
+            List<(string name, int added, int removed)>? fileChanges,
+            long inputTokens = 0, long outputTokens = 0,
+            long cacheReadTokens = 0, long cacheCreationTokens = 0)
         {
             var sb = new StringBuilder();
             sb.AppendLine();
@@ -239,48 +241,59 @@ namespace HappyEngine.Managers
             sb.AppendLine("───────────────────────────────────────────");
             sb.AppendLine($" Status: {status}");
             sb.AppendLine($" Duration: {(int)duration.TotalMinutes}m {duration.Seconds}s");
+            if (inputTokens > 0 || outputTokens > 0)
+            {
+                var total = inputTokens + outputTokens;
+                sb.AppendLine($" Tokens: {Helpers.FormatHelpers.FormatTokenCount(total)} ({Helpers.FormatHelpers.FormatTokenCount(inputTokens)} in / {Helpers.FormatHelpers.FormatTokenCount(outputTokens)} out)");
+                if (cacheReadTokens > 0 || cacheCreationTokens > 0)
+                    sb.AppendLine($" Cache: {Helpers.FormatHelpers.FormatTokenCount(cacheReadTokens)} read / {Helpers.FormatHelpers.FormatTokenCount(cacheCreationTokens)} created");
+            }
             sb.AppendLine("═══════════════════════════════════════════");
             return sb.ToString();
         }
 
         public string GenerateCompletionSummary(string projectPath, string? gitStartHash,
-            AgentTaskStatus status, TimeSpan duration)
+            AgentTaskStatus status, TimeSpan duration,
+            long inputTokens = 0, long outputTokens = 0,
+            long cacheReadTokens = 0, long cacheCreationTokens = 0)
         {
             try
             {
                 var fileChanges = _gitHelper.GetGitFileChanges(projectPath, gitStartHash);
-                return FormatCompletionSummary(status, duration, fileChanges);
+                return FormatCompletionSummary(status, duration, fileChanges, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("CompletionAnalyzer", "Failed to get git file changes for completion summary", ex);
-                return FormatCompletionSummary(status, duration, null);
+                return FormatCompletionSummary(status, duration, null, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
             }
         }
 
         public async Task<string> GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash,
             AgentTaskStatus status, TimeSpan duration,
+            long inputTokens = 0, long outputTokens = 0,
+            long cacheReadTokens = 0, long cacheCreationTokens = 0,
             CancellationToken cancellationToken = default)
         {
             try
             {
                 var fileChanges = await _gitHelper.GetGitFileChangesAsync(projectPath, gitStartHash, cancellationToken).ConfigureAwait(false);
-                return FormatCompletionSummary(status, duration, fileChanges);
+                return FormatCompletionSummary(status, duration, fileChanges, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
             }
             catch (OperationCanceledException)
             {
-                return FormatCompletionSummary(status, duration, null);
+                return FormatCompletionSummary(status, duration, null, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("CompletionAnalyzer", "Failed to get git file changes for completion summary", ex);
-                return FormatCompletionSummary(status, duration, null);
+                return FormatCompletionSummary(status, duration, null, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
             }
         }
 
-        // ── Overnight & Token Limit ─────────────────────────────────
+        // ── Feature Mode & Token Limit ─────────────────────────────────
 
-        public bool CheckOvernightComplete(string output)
+        public bool CheckFeatureModeComplete(string output)
         {
             var lines = output.Split('\n');
             var start = Math.Max(0, lines.Length - Constants.AppConstants.MaxOutputTailLines);

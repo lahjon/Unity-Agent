@@ -19,10 +19,14 @@ namespace HappyEngine
         {
             RemoteSessionToggle.IsChecked = false;
             SpawnTeamToggle.IsChecked = false;
-            OvernightToggle.IsChecked = false;
+            FeatureModeToggle.IsChecked = false;
             ExtendedPlanningToggle.IsChecked = false;
             PlanOnlyToggle.IsChecked = false;
             AutoDecomposeToggle.IsChecked = false;
+            if (FeatureModeIterationsPanel != null)
+                FeatureModeIterationsPanel.Visibility = Visibility.Collapsed;
+            if (FeatureModeIterationsBox != null)
+                FeatureModeIterationsBox.Text = "50";
         }
 
         /// <summary>Reads the main-window toggle controls into a <see cref="TaskConfigBase"/>.</summary>
@@ -30,7 +34,7 @@ namespace HappyEngine
         {
             target.RemoteSession = RemoteSessionToggle.IsChecked == true;
             target.SpawnTeam = SpawnTeamToggle.IsChecked == true;
-            target.IsOvernight = OvernightToggle.IsChecked == true;
+            target.IsFeatureMode = FeatureModeToggle.IsChecked == true;
             target.ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true;
             target.PlanOnly = PlanOnlyToggle.IsChecked == true;
             target.IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true;
@@ -44,13 +48,15 @@ namespace HappyEngine
         {
             RemoteSessionToggle.IsChecked = source.RemoteSession;
             SpawnTeamToggle.IsChecked = source.SpawnTeam;
-            OvernightToggle.IsChecked = source.IsOvernight;
+            FeatureModeToggle.IsChecked = source.IsFeatureMode;
             ExtendedPlanningToggle.IsChecked = source.ExtendedPlanning;
             PlanOnlyToggle.IsChecked = source.PlanOnly;
             IgnoreFileLocksToggle.IsChecked = source.IgnoreFileLocks;
             UseMcpToggle.IsChecked = source.UseMcp;
             DefaultNoGitWriteToggle.IsChecked = source.NoGitWrite;
             AutoDecomposeToggle.IsChecked = source.AutoDecompose;
+            if (FeatureModeIterationsPanel != null)
+                FeatureModeIterationsPanel.Visibility = source.IsFeatureMode ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ── Execute ────────────────────────────────────────────────
@@ -74,7 +80,7 @@ namespace HappyEngine
                 true,
                 RemoteSessionToggle.IsChecked == true,
                 false,
-                OvernightToggle.IsChecked == true,
+                FeatureModeToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,
                 SpawnTeamToggle.IsChecked == true,
@@ -87,6 +93,8 @@ namespace HappyEngine
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
             task.AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "";
+            if (task.IsFeatureMode && int.TryParse(FeatureModeIterationsBox.Text, out var iterations) && iterations > 0)
+                task.MaxIterations = iterations;
 
             // Capture dependencies before clearing
             var dependencies = _pendingDependencies.ToList();
@@ -542,8 +550,8 @@ TextureImporter:
             // If the task is still active, cancel it first
             if (task.IsRunning || task.IsPlanning || task.IsPaused || task.IsQueued)
             {
-                task.OvernightRetryTimer?.Stop();
-                task.OvernightIterationTimer?.Stop();
+                task.FeatureModeRetryTimer?.Stop();
+                task.FeatureModeIterationTimer?.Stop();
                 try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
                 task.Status = AgentTaskStatus.Cancelled;
                 task.EndTime = DateTime.Now;
@@ -875,15 +883,15 @@ TextureImporter:
                     return;
             }
 
-            if (task.OvernightRetryTimer != null)
+            if (task.FeatureModeRetryTimer != null)
             {
-                task.OvernightRetryTimer.Stop();
-                task.OvernightRetryTimer = null;
+                task.FeatureModeRetryTimer.Stop();
+                task.FeatureModeRetryTimer = null;
             }
-            if (task.OvernightIterationTimer != null)
+            if (task.FeatureModeIterationTimer != null)
             {
-                task.OvernightIterationTimer.Stop();
-                task.OvernightIterationTimer = null;
+                task.FeatureModeIterationTimer.Stop();
+                task.FeatureModeIterationTimer = null;
             }
             if (task.TokenLimitRetryTimer != null)
             {
@@ -1028,7 +1036,14 @@ TextureImporter:
 
             OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
 
+            var previousStatus = task.Status;
+            task.Status = AgentTaskStatus.Verifying;
+            _outputTabManager.UpdateTabHeader(task);
+
             await _taskExecutionManager.RunResultVerificationAsync(task, _activeTasks, _historyTasks);
+
+            task.Status = previousStatus;
+            _outputTabManager.UpdateTabHeader(task);
         }
     }
 }

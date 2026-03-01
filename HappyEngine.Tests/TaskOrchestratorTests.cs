@@ -119,7 +119,7 @@ namespace HappyEngine.Tests
             orch.AddTask(blocked, new List<string> { "dep1" });
 
             // blocked should not be runnable yet
-            Assert.Empty(orch.GetNextRunnableTasks(10).Where(t => t.Id == "blocked"));
+            Assert.DoesNotContain(orch.GetNextRunnableTasks(10), t => t.Id == "blocked");
 
             var readyTasks = new List<AgentTask>();
             orch.TaskReady += t => readyTasks.Add(t);

@@ -83,8 +83,8 @@ namespace HappyEngine.Managers
             "```TEAM\n[{\"role\": \"Backend\", \"description\": \"...\", \"depends_on\": []}, {\"role\": \"Tests\", \"description\": \"...\", \"depends_on\": [0]}]\n```\n" +
             "Prefer parallel execution. Minimize dependencies. Agents should check the message bus for sibling work.\n\n---\n";
 
-        public const string OvernightInitialTemplate =
-            "# OVERNIGHT AUTONOMOUS TASK\n" +
+        public const string FeatureModeInitialTemplate =
+            "# FEATURE MODE AUTONOMOUS TASK\n" +
             "You will be called repeatedly to iterate until complete.\n\n" +
             "## RESTRICTIONS\n" +
             "- **No git commands** of any kind.\n" +
@@ -92,46 +92,46 @@ namespace HappyEngine.Managers
             "- **Stay in project root** — never access files outside ./\n" +
             "- **No destructive operations** (recursive deletes, killing processes, etc.).\n\n" +
             "## WORKFLOW\n" +
-            "1. Create `.overnight_log.md` with: checklist of sub-tasks, exit criteria, progress log section.\n" +
+            "1. Create `.feature_log.md` with: checklist of sub-tasks, exit criteria, progress log section.\n" +
             "2. Implement — work through the checklist.\n" +
             "3. Review — look for bugs, edge cases, missing handling.\n" +
-            "4. Verify — confirm each checklist item is complete. Update `.overnight_log.md`.\n" +
+            "4. Verify — confirm each checklist item is complete. Update `.feature_log.md`.\n" +
             "5. End with exactly: `STATUS: COMPLETE` or `STATUS: NEEDS_MORE_WORK`\n\n" +
-            "# USER PROMPT\n" +
+            "# USER PROMPT / TASK\n" +
             "The following is the actual task from the user. Everything above is system configuration.\n\n";
 
-        public const string OvernightContinuationTemplate =
-            "# OVERNIGHT CONTINUATION (iteration {0}/{1})\n" +
+        public const string FeatureModeContinuationTemplate =
+            "# FEATURE MODE CONTINUATION (iteration {0}/{1})\n" +
             "Restrictions: No git, no OS modifications, stay in project root, no destructive operations.\n\n" +
             "## WORKFLOW\n" +
-            "1. Read `.overnight_log.md` for context on what's done and remaining.\n" +
+            "1. Read `.feature_log.md` for context on what's done and remaining.\n" +
             "2. Investigate: Look for bugs, edge cases, incomplete work, code quality issues, broken functionality.\n" +
             "3. Fix and improve: Bugs first, then remaining checklist items, then robustness (within scope only).\n" +
-            "4. Add a **Suggestions** section to `.overnight_log.md` with actionable improvement ideas within scope.\n" +
-            "5. Verify all checklist items and exit criteria. Update `.overnight_log.md`.\n" +
+            "4. Add a **Suggestions** section to `.feature_log.md` with actionable improvement ideas within scope.\n" +
+            "5. Verify all checklist items and exit criteria. Update `.feature_log.md`.\n" +
             "6. End with exactly: `STATUS: COMPLETE` or `STATUS: NEEDS_MORE_WORK`\n\n" +
             "Continue working now.";
 
         // ── Helpers ──────────────────────────────────────────────────
 
         /// <summary>
-        /// Returns the task-specific overnight log filename.
-        /// When taskId is provided, produces ".overnight_log_{taskId}.md" so
-        /// multiple overnight tasks on the same project don't collide.
+        /// Returns the task-specific feature mode log filename.
+        /// When taskId is provided, produces ".feature_log_{taskId}.md" so
+        /// multiple feature mode tasks on the same project don't collide.
         /// </summary>
-        public static string GetOvernightLogFilename(string? taskId = null)
-            => string.IsNullOrEmpty(taskId) ? ".overnight_log.md" : $".overnight_log_{taskId}.md";
+        public static string GetFeatureModeLogFilename(string? taskId = null)
+            => string.IsNullOrEmpty(taskId) ? ".feature_log.md" : $".feature_log_{taskId}.md";
 
-        private static string InjectOvernightLogFilename(string prompt, string? taskId)
+        private static string InjectFeatureModeLogFilename(string prompt, string? taskId)
         {
             if (string.IsNullOrEmpty(taskId)) return prompt;
-            return prompt.Replace(".overnight_log.md", GetOvernightLogFilename(taskId));
+            return prompt.Replace(".feature_log.md", GetFeatureModeLogFilename(taskId));
         }
 
         // ── Prompt Assembly ─────────────────────────────────────────
 
         public string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
-            bool isOvernight, bool extendedPlanning = false, bool noGitWrite = false,
+            bool isFeatureMode, bool extendedPlanning = false, bool noGitWrite = false,
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
@@ -143,8 +143,8 @@ namespace HappyEngine.Managers
 
             var gameBlock = isGameProject ? GameRulesBlock : "";
 
-            if (isOvernight)
-                return descBlock + projectRulesBlock + gameBlock + InjectOvernightLogFilename(OvernightInitialTemplate, taskId) + description;
+            if (isFeatureMode)
+                return descBlock + projectRulesBlock + gameBlock + InjectFeatureModeLogFilename(FeatureModeInitialTemplate, taskId) + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -153,7 +153,7 @@ namespace HappyEngine.Managers
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
-                "# USER PROMPT\nThe following is the actual task from the user. Everything above is system configuration.\n\n" + description;
+                "# USER PROMPT / TASK\nThe following is the actual task from the user. Everything above is system configuration.\n\n" + description;
         }
 
         public string BuildFullPrompt(string systemPrompt, AgentTask task,
@@ -163,9 +163,7 @@ namespace HappyEngine.Managers
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
             if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
                 description += "\n\n# Additional Instructions\n" + task.AdditionalInstructions;
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id);
-            if (!string.IsNullOrWhiteSpace(task.Summary))
-                basePrompt = $"# Task: {task.Summary}\n{basePrompt}";
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id);
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
                 basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
@@ -261,10 +259,10 @@ namespace HappyEngine.Managers
             };
         }
 
-        public string BuildOvernightContinuationPrompt(int iteration, int maxIterations, string taskId = "")
+        public string BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = "")
         {
-            var prompt = string.Format(OvernightContinuationTemplate, iteration, maxIterations);
-            return InjectOvernightLogFilename(prompt, taskId);
+            var prompt = string.Format(FeatureModeContinuationTemplate, iteration, maxIterations);
+            return InjectFeatureModeLogFilename(prompt, taskId);
         }
 
         public string BuildDependencyContext(List<string> depIds,
