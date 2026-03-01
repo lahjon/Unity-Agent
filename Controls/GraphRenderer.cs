@@ -6,10 +6,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using AgenticEngine.Helpers;
-using AgenticEngine.Managers;
+using HappyEngine.Helpers;
+using HappyEngine.Managers;
 
-namespace AgenticEngine.Controls
+namespace HappyEngine.Controls
 {
     internal class GraphRenderer
     {
@@ -26,7 +26,6 @@ namespace AgenticEngine.Controls
         public event Action<AgentTask>? ShowOutputRequested;
         public event Action<AgentTask>? CopyPromptRequested;
         public event Action<AgentTask>? RevertRequested;
-        public event Action<AgentTask>? ContinueRequested;
         public event Action<AgentTask>? ForceStartRequested;
         public event Action<AgentTask>? DependenciesRemoved;
 
@@ -95,11 +94,11 @@ namespace AgenticEngine.Controls
                             var to = nodePositions[task.Id];
                             string edgeKey = $"{depId}->{task.Id}";
                             bool highlighted = highlightedEdgeKeys.Contains(edgeKey);
-                            string color = highlighted ? "#90CAF9" : "#64B5F6";
+                            var edgeBrush = highlighted ? BrushCache.Theme("PausedBlueLight") : BrushCache.Theme("PausedBlue");
                             double thickness = highlighted ? 3 : 2;
                             double opacity = (hasHighlight && !highlighted) ? 0.25 : 1.0;
-                            DrawBezierEdge(from, to, color, false, thickness, opacity);
-                            DrawArrowHead(from, to, color, opacity);
+                            DrawBezierEdge(from, to, edgeBrush, false, thickness, opacity);
+                            DrawArrowHead(from, to, edgeBrush, opacity);
                         }
                     }
                 }
@@ -113,11 +112,11 @@ namespace AgenticEngine.Controls
                     var to = nodePositions[task.Id];
                     string edgeKey = $"{task.BlockedByTaskId}->{task.Id}";
                     bool highlighted = highlightedEdgeKeys.Contains(edgeKey);
-                    string color = highlighted ? "#FFB74D" : "#FFA726";
+                    var blockedBrush = highlighted ? BrushCache.Theme("GraphOrangeLight") : BrushCache.Theme("GraphOrange");
                     double thickness = highlighted ? 3 : 2;
                     double opacity = (hasHighlight && !highlighted) ? 0.25 : 1.0;
-                    DrawBezierEdge(from, to, color, false, thickness, opacity);
-                    DrawArrowHead(from, to, color, opacity);
+                    DrawBezierEdge(from, to, blockedBrush, false, thickness, opacity);
+                    DrawArrowHead(from, to, blockedBrush, opacity);
                 }
             }
 
@@ -136,11 +135,11 @@ namespace AgenticEngine.Controls
                             var to = nodePositions[kvp.Key];
                             string edgeKey = $"{blockerId}->{kvp.Key}";
                             bool highlighted = highlightedEdgeKeys.Contains(edgeKey);
-                            string color = highlighted ? "#EF9A9A" : "#E05555";
+                            var lockBrush = highlighted ? BrushCache.Theme("GraphRedLight") : BrushCache.Theme("DangerBright");
                             double thickness = highlighted ? 3 : 2;
                             double opacity = (hasHighlight && !highlighted) ? 0.25 : 1.0;
-                            DrawBezierEdge(from, to, color, true, thickness, opacity);
-                            DrawArrowHead(from, to, color, opacity);
+                            DrawBezierEdge(from, to, lockBrush, true, thickness, opacity);
+                            DrawArrowHead(from, to, lockBrush, opacity);
                         }
                     }
                 }
@@ -162,9 +161,7 @@ namespace AgenticEngine.Controls
                     string edgeKey = $"{task.Id}=>{childId}";
                     bool highlighted = highlightedEdgeKeys.Contains(edgeKey);
                     double opacity = (hasHighlight && !highlighted) ? 0.25 : 1.0;
-                    var greenBrush = new SolidColorBrush(
-                        (Color)ColorConverter.ConvertFromString(highlighted ? "#81C784" : "#66BB6A"));
-                    greenBrush.Opacity = opacity;
+                    var greenBrush = highlighted ? BrushCache.Theme("GraphGreenLight") : BrushCache.Theme("GraphGreen");
 
                     double startX = parentPos.X + GraphLayoutEngine.NodeWidth / 2;
                     double startY = parentPos.Y + GraphLayoutEngine.NodeHeight;
@@ -176,7 +173,8 @@ namespace AgenticEngine.Controls
                         X2 = startX, Y2 = midY,
                         Stroke = greenBrush,
                         StrokeThickness = highlighted ? 3 : 2,
-                        IsHitTestVisible = false
+                        IsHitTestVisible = false,
+                        Opacity = opacity
                     };
                     _canvas.Children.Add(vLine);
                     _edgeElements.Add(vLine);
@@ -187,7 +185,8 @@ namespace AgenticEngine.Controls
                         X2 = childPos.X, Y2 = midY,
                         Stroke = greenBrush,
                         StrokeThickness = highlighted ? 3 : 2,
-                        IsHitTestVisible = false
+                        IsHitTestVisible = false,
+                        Opacity = opacity
                     };
                     _canvas.Children.Add(hLine);
                     _edgeElements.Add(hLine);
@@ -196,11 +195,10 @@ namespace AgenticEngine.Controls
                     var arrowTip = new Point(childPos.X, midY);
                     var arrowP2 = new Point(childPos.X - arrowSize, midY - arrowSize * 0.4);
                     var arrowP3 = new Point(childPos.X - arrowSize, midY + arrowSize * 0.4);
-                    var arrowBrush = BrushCache.Get(highlighted ? "#81C784" : "#66BB6A");
                     var arrowPolygon = new Polygon
                     {
                         Points = new PointCollection { arrowTip, arrowP2, arrowP3 },
-                        Fill = arrowBrush,
+                        Fill = greenBrush,
                         IsHitTestVisible = false,
                         Opacity = opacity
                     };
@@ -218,16 +216,9 @@ namespace AgenticEngine.Controls
             Dictionary<string, Point> nodePositions,
             string? selectedNodeId,
             HashSet<string> highlightedNodeIds,
-            ScrollViewer scrollViewer,
-            ScaleTransform scaleTransform,
-            TranslateTransform translateTransform,
             ObservableCollection<AgentTask>? activeTasks)
         {
             if (!nodePositions.TryGetValue(task.Id, out var pos))
-                return;
-
-            // Viewport culling
-            if (IsNodeOutsideViewport(pos, scrollViewer, scaleTransform, translateTransform))
                 return;
 
             bool isSelected = selectedNodeId == task.Id;
@@ -235,8 +226,8 @@ namespace AgenticEngine.Controls
             bool hasFocusedSelection = highlightedNodeIds.Count > 0;
             double nodeOpacity = hasFocusedSelection && !isHighlighted && !isSelected ? 0.3 : 1.0;
 
-            var statusColor = (Color)ColorConverter.ConvertFromString(task.StatusColor);
-            var statusBrush = new SolidColorBrush(statusColor);
+            var statusBrush = BrushCache.Get(task.StatusColor);
+            var statusColor = statusBrush.Color;
             bool isParent = task.HasChildren;
             bool isSubtask = task.IsSubTask;
 
@@ -244,11 +235,11 @@ namespace AgenticEngine.Controls
             {
                 Width = GraphLayoutEngine.NodeWidth,
                 Height = GraphLayoutEngine.NodeHeight,
-                Background = new SolidColorBrush(isSelected
-                    ? Color.FromArgb(255, 50, 50, 60)
-                    : Color.FromArgb(230, 40, 40, 48)),
+                Background = isSelected
+                    ? BrushCache.Theme("GraphNodeBg")
+                    : BrushCache.Theme("GraphNodeBgDim"),
                 BorderBrush = isSelected
-                    ? new SolidColorBrush(Color.FromRgb(0x90, 0xCA, 0xF9))
+                    ? BrushCache.Theme("PausedBlueLight")
                     : statusBrush,
                 BorderThickness = new Thickness(isParent ? 3 : isSelected ? 2.5 : 2),
                 CornerRadius = new CornerRadius(8),
@@ -289,8 +280,7 @@ namespace AgenticEngine.Controls
             var projectLabel = new TextBlock
             {
                 Text = task.ProjectName,
-                Foreground = new SolidColorBrush(
-                    (Color)ColorConverter.ConvertFromString(task.ProjectColor)),
+                Foreground = BrushCache.Get(task.ProjectColor),
                 FontSize = 8,
                 FontFamily = new FontFamily("Segoe UI"),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -304,7 +294,7 @@ namespace AgenticEngine.Controls
                 badgePanel.Children.Add(new TextBlock
                 {
                     Text = " \u2502sub",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0xBB, 0x6A)),
+                    Foreground = BrushCache.Theme("GraphGreen"),
                     FontSize = 8,
                     FontFamily = new FontFamily("Consolas"),
                     VerticalAlignment = VerticalAlignment.Center
@@ -319,7 +309,7 @@ namespace AgenticEngine.Controls
                 badgePanel.Children.Add(new TextBlock
                 {
                     Text = $" [{completedChildren}/{childCount}]",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0xBB, 0x6A)),
+                    Foreground = BrushCache.Theme("GraphGreen"),
                     FontSize = 8,
                     FontFamily = new FontFamily("Consolas"),
                     VerticalAlignment = VerticalAlignment.Center
@@ -418,7 +408,7 @@ namespace AgenticEngine.Controls
                 var tokenLabel = new TextBlock
                 {
                     Text = task.TokenDisplayText,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x99, 0xAA)),
+                    Foreground = BrushCache.Theme("TextBlueGrey"),
                     FontSize = 8,
                     FontFamily = new FontFamily("Consolas"),
                     VerticalAlignment = VerticalAlignment.Center
@@ -439,7 +429,7 @@ namespace AgenticEngine.Controls
                 infoPanel.Children.Add(new TextBlock
                 {
                     Text = task.GroupName.Length > 8 ? task.GroupName[..8] : task.GroupName,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0xCE, 0x93, 0xD8)),
+                    Foreground = BrushCache.Theme("PlanBadgeText"),
                     FontSize = 7,
                     FontFamily = new FontFamily("Segoe UI"),
                     Margin = new Thickness(0, 0, 4, 0)
@@ -452,7 +442,7 @@ namespace AgenticEngine.Controls
                 infoPanel.Children.Add(new TextBlock
                 {
                     Text = $"{depCount} dep{(depCount > 1 ? "s" : "")}",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0xB5, 0xF6)),
+                    Foreground = BrushCache.Theme("PausedBlue"),
                     FontSize = 8,
                     FontFamily = new FontFamily("Segoe UI")
                 });
@@ -520,13 +510,6 @@ namespace AgenticEngine.Controls
                 var forceItem = new MenuItem { Header = "Force Start" };
                 forceItem.Click += (_, _) => ForceStartRequested?.Invoke(task);
                 menu.Items.Add(forceItem);
-            }
-
-            if (task.IsFinished && task.HasRecommendations)
-            {
-                var continueItem = new MenuItem { Header = "Continue (Recommendations)" };
-                continueItem.Click += (_, _) => ContinueRequested?.Invoke(task);
-                menu.Items.Add(continueItem);
             }
 
             var copyItem = new MenuItem { Header = "Copy Prompt" };
@@ -605,7 +588,7 @@ namespace AgenticEngine.Controls
                 panel.Children.Add(new TextBlock
                 {
                     Text = $"Tokens: {task.TokenDisplayText}",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x99, 0xAA)),
+                    Foreground = BrushCache.Theme("TextBlueGrey"),
                     FontSize = 10,
                     Margin = new Thickness(0, 2, 0, 0)
                 });
@@ -616,7 +599,7 @@ namespace AgenticEngine.Controls
                 panel.Children.Add(new TextBlock
                 {
                     Text = $"Group: {task.GroupName}",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0xCE, 0x93, 0xD8)),
+                    Foreground = BrushCache.Theme("PlanBadgeText"),
                     FontSize = 10,
                     Margin = new Thickness(0, 2, 0, 0)
                 });
@@ -631,7 +614,7 @@ namespace AgenticEngine.Controls
                 panel.Children.Add(new TextBlock
                 {
                     Text = $"Depends on: {depNums}",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0xB5, 0xF6)),
+                    Foreground = BrushCache.Theme("PausedBlue"),
                     FontSize = 10,
                     Margin = new Thickness(0, 2, 0, 0)
                 });
@@ -645,7 +628,7 @@ namespace AgenticEngine.Controls
                 panel.Children.Add(new TextBlock
                 {
                     Text = $"Blocked by: {blockerText} (file lock)",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xA7, 0x26)),
+                    Foreground = BrushCache.Theme("StatusInitQueued"),
                     FontSize = 10,
                     Margin = new Thickness(0, 2, 0, 0)
                 });
@@ -658,7 +641,7 @@ namespace AgenticEngine.Controls
                 panel.Children.Add(new TextBlock
                 {
                     Text = $"Parent task: {parentInfo}",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0xBB, 0x6A)),
+                    Foreground = BrushCache.Theme("GraphGreen"),
                     FontSize = 10,
                     Margin = new Thickness(0, 2, 0, 0)
                 });
@@ -672,7 +655,7 @@ namespace AgenticEngine.Controls
                 panel.Children.Add(new TextBlock
                 {
                     Text = $"Subtasks: {completed}/{childTasks.Count} done, {running} running",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0xBB, 0x6A)),
+                    Foreground = BrushCache.Theme("GraphGreen"),
                     FontSize = 10,
                     Margin = new Thickness(0, 2, 0, 0)
                 });
@@ -727,7 +710,7 @@ namespace AgenticEngine.Controls
         {
             var border = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(200, 30, 30, 35)),
+                Background = BrushCache.Theme("GraphLegendBg"),
                 CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(10, 6, 10, 6),
                 Margin = new Thickness(8, 0, 8, 4),
@@ -736,10 +719,10 @@ namespace AgenticEngine.Controls
 
             var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
 
-            AddLegendItem(wrap, "#64B5F6", "Dependency", false);
-            AddLegendItem(wrap, "#FFA726", "Blocked By", false);
-            AddLegendItem(wrap, "#E05555", "File Lock", true);
-            AddLegendItem(wrap, "#66BB6A", "Parent-Child", false);
+            AddLegendItem(wrap, "PausedBlue", "Dependency", false);
+            AddLegendItem(wrap, "GraphOrange", "Blocked By", false);
+            AddLegendItem(wrap, "DangerBright", "File Lock", true);
+            AddLegendItem(wrap, "GraphGreen", "Parent-Child", false);
 
             wrap.Children.Add(new TextBlock
             {
@@ -749,18 +732,18 @@ namespace AgenticEngine.Controls
                 VerticalAlignment = VerticalAlignment.Center
             });
 
-            AddStatusLegend(wrap, "#64B5F6", "Running");
-            AddStatusLegend(wrap, "#00E676", "Completed");
-            AddStatusLegend(wrap, "#FFD600", "Queued");
-            AddStatusLegend(wrap, "#CE93D8", "Paused");
-            AddStatusLegend(wrap, "#E05555", "Failed");
-            AddStatusLegend(wrap, "#B39DDB", "Planning");
+            AddStatusLegend(wrap, "PausedBlue", "Running");
+            AddStatusLegend(wrap, "SuccessBright", "Completed");
+            AddStatusLegend(wrap, "WarningYellow", "Queued");
+            AddStatusLegend(wrap, "PlanBadgeText", "Paused");
+            AddStatusLegend(wrap, "DangerBright", "Failed");
+            AddStatusLegend(wrap, "PlanningPurple", "Planning");
 
             border.Child = wrap;
             return border;
         }
 
-        private void AddLegendItem(WrapPanel panel, string color, string label, bool dashed)
+        private void AddLegendItem(WrapPanel panel, string colorKey, string label, bool dashed)
         {
             var stack = new StackPanel
             {
@@ -771,7 +754,7 @@ namespace AgenticEngine.Controls
             var line = new Line
             {
                 X1 = 0, Y1 = 5, X2 = 20, Y2 = 5,
-                Stroke = BrushCache.Get(color),
+                Stroke = BrushCache.Theme(colorKey),
                 StrokeThickness = 2,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -793,7 +776,7 @@ namespace AgenticEngine.Controls
             panel.Children.Add(stack);
         }
 
-        private void AddStatusLegend(WrapPanel panel, string color, string label)
+        private void AddStatusLegend(WrapPanel panel, string colorKey, string label)
         {
             var stack = new StackPanel
             {
@@ -805,7 +788,7 @@ namespace AgenticEngine.Controls
             {
                 Width = 6,
                 Height = 6,
-                Fill = BrushCache.Get(color),
+                Fill = BrushCache.Theme(colorKey),
                 VerticalAlignment = VerticalAlignment.Center
             };
 
@@ -866,8 +849,8 @@ namespace AgenticEngine.Controls
 
                 var card = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(200, 40, 40, 48)),
-                    BorderBrush = new SolidColorBrush(Color.FromArgb(100, 100, 100, 120)),
+                    Background = BrushCache.Theme("GraphTooltipBg"),
+                    BorderBrush = BrushCache.Theme("GraphTooltipBorder"),
                     BorderThickness = new Thickness(1),
                     CornerRadius = new CornerRadius(6),
                     Margin = new Thickness(0, 0, 0, 10),
@@ -900,7 +883,7 @@ namespace AgenticEngine.Controls
                 {
                     Height = 6,
                     CornerRadius = new CornerRadius(3),
-                    Background = new SolidColorBrush(Color.FromArgb(80, 80, 80, 90))
+                    Background = BrushCache.Theme("GraphButtonBg")
                 };
 
                 var progressBarGrid = new Grid { Height = 6 };
@@ -910,7 +893,7 @@ namespace AgenticEngine.Controls
                 {
                     Height = 6,
                     CornerRadius = new CornerRadius(3),
-                    Background = BrushCache.Get("#66BB6A"),
+                    Background = BrushCache.Theme("GraphGreen"),
                     HorizontalAlignment = HorizontalAlignment.Left
                 };
                 progressBarFill.Loaded += (s, _) =>
@@ -925,7 +908,7 @@ namespace AgenticEngine.Controls
                 foreach (var child in children)
                 {
                     if (child == null) continue;
-                    var childStatusColor = (Color)ColorConverter.ConvertFromString(child.StatusColor);
+                    var childStatusBrush = BrushCache.Get(child.StatusColor);
                     var childRow = new StackPanel
                     {
                         Orientation = Orientation.Horizontal,
@@ -936,14 +919,14 @@ namespace AgenticEngine.Controls
                     {
                         Width = 7,
                         Height = 7,
-                        Fill = new SolidColorBrush(childStatusColor),
+                        Fill = childStatusBrush,
                         Margin = new Thickness(0, 2, 6, 0)
                     });
 
                     childRow.Children.Add(new TextBlock
                     {
                         Text = $"#{child.TaskNumber} {child.Status}",
-                        Foreground = new SolidColorBrush(childStatusColor),
+                        Foreground = childStatusBrush,
                         FontSize = 10,
                         FontFamily = new FontFamily("Segoe UI")
                     });
@@ -973,7 +956,7 @@ namespace AgenticEngine.Controls
 
         // ── Drawing Helpers ──────────────────────────────────────────
 
-        private void DrawBezierEdge(Point from, Point to, string colorHex, bool dashed,
+        private void DrawBezierEdge(Point from, Point to, Brush edgeBrush, bool dashed,
             double thickness = 2, double opacity = 1.0)
         {
             var fromCenter = new Point(from.X + GraphLayoutEngine.NodeWidth / 2, from.Y + GraphLayoutEngine.NodeHeight / 2);
@@ -989,12 +972,10 @@ namespace AgenticEngine.Controls
             var pathGeo = new PathGeometry();
             pathGeo.Figures.Add(pathFig);
 
-            var brush = BrushCache.Get(colorHex);
-
             var path = new Path
             {
                 Data = pathGeo,
-                Stroke = brush,
+                Stroke = edgeBrush,
                 StrokeThickness = thickness,
                 IsHitTestVisible = false,
                 Opacity = opacity
@@ -1007,7 +988,7 @@ namespace AgenticEngine.Controls
             _edgeElements.Add(path);
         }
 
-        private void DrawArrowHead(Point from, Point to, string colorHex, double opacity = 1.0)
+        private void DrawArrowHead(Point from, Point to, Brush arrowBrush, double opacity = 1.0)
         {
             var toCenter = new Point(to.X + GraphLayoutEngine.NodeWidth / 2, to.Y + GraphLayoutEngine.NodeHeight / 2);
             var fromCenter = new Point(from.X + GraphLayoutEngine.NodeWidth / 2, from.Y + GraphLayoutEngine.NodeHeight / 2);
@@ -1033,45 +1014,16 @@ namespace AgenticEngine.Controls
             var p3 = new Point(arrowTipX - dx * arrowSize - perpX * arrowSize * 0.4,
                                arrowTipY - dy * arrowSize - perpY * arrowSize * 0.4);
 
-            var brush = BrushCache.Get(colorHex);
-
             var polygon = new Polygon
             {
                 Points = new PointCollection { p1, p2, p3 },
-                Fill = brush,
+                Fill = arrowBrush,
                 IsHitTestVisible = false,
                 Opacity = opacity
             };
 
             _canvas.Children.Add(polygon);
             _edgeElements.Add(polygon);
-        }
-
-        // ── Viewport Culling ──────────────────────────────────────────
-
-        private bool IsNodeOutsideViewport(
-            Point nodePos,
-            ScrollViewer scrollViewer,
-            ScaleTransform scaleTransform,
-            TranslateTransform translateTransform)
-        {
-            double scale = scaleTransform.ScaleX;
-            double tx = translateTransform.X;
-            double ty = translateTransform.Y;
-
-            double screenLeft = nodePos.X * scale + tx;
-            double screenTop = nodePos.Y * scale + ty;
-            double screenRight = (nodePos.X + GraphLayoutEngine.NodeWidth) * scale + tx;
-            double screenBottom = (nodePos.Y + GraphLayoutEngine.NodeHeight) * scale + ty;
-
-            double vpWidth = scrollViewer.ActualWidth;
-            double vpHeight = scrollViewer.ActualHeight;
-
-            if (vpWidth <= 0 || vpHeight <= 0)
-                return false;
-
-            return screenRight < 0 || screenLeft > vpWidth ||
-                   screenBottom < 0 || screenTop > vpHeight;
         }
 
         // ── Canvas Helpers ──────────────────────────────────────────
@@ -1098,15 +1050,15 @@ namespace AgenticEngine.Controls
             return $"{(int)running.TotalMinutes}m {running.Seconds}s";
         }
 
-        public static Brush CreateGridBrush()
+        public static DrawingBrush CreateGridBrush()
         {
             const double cellSize = 40.0;
             const int majorEvery = 5;
             double tileSize = cellSize * majorEvery;
 
-            var minorPen = new Pen(new SolidColorBrush(Color.FromArgb(18, 255, 255, 255)), 0.5);
+            var minorPen = new Pen(BrushCache.Theme("GraphGridMinor"), 0.5);
             minorPen.Freeze();
-            var majorPen = new Pen(new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)), 0.5);
+            var majorPen = new Pen(BrushCache.Theme("GraphGridMajor"), 0.5);
             majorPen.Freeze();
 
             var drawing = new DrawingGroup();
@@ -1122,14 +1074,13 @@ namespace AgenticEngine.Controls
                     new LineGeometry(new Point(offset, 0), new Point(offset, tileSize))));
             }
 
-            var brush = new DrawingBrush(drawing)
+            // Not frozen — Transform is set by the caller to track zoom/pan
+            return new DrawingBrush(drawing)
             {
                 TileMode = TileMode.Tile,
                 Viewport = new Rect(0, 0, tileSize, tileSize),
                 ViewportUnits = BrushMappingMode.Absolute
             };
-            brush.Freeze();
-            return brush;
         }
 
         public static Button CreateHeaderButton(string icon, string tooltip)

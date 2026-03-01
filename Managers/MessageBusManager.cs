@@ -4,9 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Threading;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class BusMessage
     {
@@ -112,7 +113,7 @@ namespace AgenticEngine.Managers
                     EnableRaisingEvents = true
                 };
                 watcher.Created += (_, e) =>
-                    _dispatcher.BeginInvoke(() => OnNewMessageFile(projectPath, e.FullPath));
+                    _dispatcher.BeginInvoke(async () => await OnNewMessageFileAsync(projectPath, e.FullPath));
                 ctx.Watcher = watcher;
             }
             catch (Exception ex)
@@ -160,14 +161,14 @@ namespace AgenticEngine.Managers
                 DestroyBus(projectPath);
         }
 
-        private void OnNewMessageFile(string projectPath, string filePath)
+        private async Task OnNewMessageFileAsync(string projectPath, string filePath)
         {
             if (!_buses.TryGetValue(projectPath, out var ctx)) return;
             var fileName = Path.GetFileName(filePath);
             if (ctx.ProcessedFiles.Contains(fileName)) return;
             ctx.ProcessedFiles.Add(fileName);
 
-            var message = ParseMessageFile(filePath);
+            var message = await ParseMessageFileAsync(filePath);
             if (message == null) return;
 
             message.FromSummary = ctx.TaskSummaries.GetValueOrDefault(message.From, "Unknown");
@@ -179,7 +180,7 @@ namespace AgenticEngine.Managers
             MessageReceived?.Invoke(projectPath, message);
         }
 
-        private void PollForNewMessages(string projectPath)
+        private async void PollForNewMessages(string projectPath)
         {
             if (!_buses.TryGetValue(projectPath, out var ctx)) return;
             if (!Directory.Exists(ctx.InboxDir)) return;
@@ -190,7 +191,7 @@ namespace AgenticEngine.Managers
                 {
                     var fileName = Path.GetFileName(file);
                     if (ctx.ProcessedFiles.Contains(fileName)) continue;
-                    OnNewMessageFile(projectPath, file);
+                    await OnNewMessageFileAsync(projectPath, file);
                 }
             }
             catch (Exception ex)
@@ -199,7 +200,7 @@ namespace AgenticEngine.Managers
             }
         }
 
-        private static BusMessage? ParseMessageFile(string filePath)
+        private static async Task<BusMessage?> ParseMessageFileAsync(string filePath)
         {
             try
             {
@@ -208,12 +209,12 @@ namespace AgenticEngine.Managers
                 {
                     try
                     {
-                        json = File.ReadAllText(filePath);
+                        json = await File.ReadAllTextAsync(filePath);
                         if (!string.IsNullOrWhiteSpace(json)) break;
                     }
                     catch (IOException)
                     {
-                        System.Threading.Thread.Sleep(100);
+                        await Task.Delay(100);
                     }
                 }
                 if (string.IsNullOrWhiteSpace(json)) return null;

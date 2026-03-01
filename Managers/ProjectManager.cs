@@ -13,10 +13,11 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using AgenticEngine.Dialogs;
-using AgenticEngine.Models;
+using HappyEngine.Helpers;
+using HappyEngine.Dialogs;
+using HappyEngine.Models;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class ProjectManager
     {
@@ -52,22 +53,7 @@ namespace AgenticEngine.Managers
             Converters = { new JsonStringEnumConverter() }
         };
 
-        private readonly TextBlock _promptProjectLabel;
-        private readonly TextBlock _addProjectPath;
-        private readonly StackPanel _projectListPanel;
-        private readonly ToggleButton _useMcpToggle;
-        private readonly TextBox _shortDescBox;
-        private readonly TextBox _longDescBox;
-        private readonly TextBox _ruleInstructionBox;
-        private readonly ToggleButton _editShortDescToggle;
-        private readonly ToggleButton _editLongDescToggle;
-        private readonly ToggleButton _editRuleInstructionToggle;
-        private readonly StackPanel _shortDescEditButtons;
-        private readonly StackPanel _longDescEditButtons;
-        private readonly StackPanel _ruleInstructionEditButtons;
-        private readonly ItemsControl _projectRulesList;
-        private readonly Button _regenerateDescBtn;
-        private readonly Dispatcher _dispatcher;
+        private readonly IProjectPanelView _view;
 
         public event Action<AgentTask>? McpInvestigationRequested;
         public event Action? ProjectSwapStarted;
@@ -85,41 +71,11 @@ namespace AgenticEngine.Managers
         public ProjectManager(
             string appDataDir,
             string initialProjectPath,
-            TextBlock promptProjectLabel,
-            TextBlock addProjectPath,
-            StackPanel projectListPanel,
-            ToggleButton useMcpToggle,
-            TextBox shortDescBox,
-            TextBox longDescBox,
-            TextBox ruleInstructionBox,
-            ToggleButton editShortDescToggle,
-            ToggleButton editLongDescToggle,
-            ToggleButton editRuleInstructionToggle,
-            StackPanel shortDescEditButtons,
-            StackPanel longDescEditButtons,
-            StackPanel ruleInstructionEditButtons,
-            ItemsControl projectRulesList,
-            Button regenerateDescBtn,
-            Dispatcher dispatcher)
+            IProjectPanelView view)
         {
             _projectsFile = Path.Combine(appDataDir, "projects.json");
             _projectPath = initialProjectPath;
-            _promptProjectLabel = promptProjectLabel;
-            _addProjectPath = addProjectPath;
-            _projectListPanel = projectListPanel;
-            _useMcpToggle = useMcpToggle;
-            _shortDescBox = shortDescBox;
-            _longDescBox = longDescBox;
-            _ruleInstructionBox = ruleInstructionBox;
-            _editShortDescToggle = editShortDescToggle;
-            _editLongDescToggle = editLongDescToggle;
-            _editRuleInstructionToggle = editRuleInstructionToggle;
-            _shortDescEditButtons = shortDescEditButtons;
-            _longDescEditButtons = longDescEditButtons;
-            _ruleInstructionEditButtons = ruleInstructionEditButtons;
-            _projectRulesList = projectRulesList;
-            _regenerateDescBtn = regenerateDescBtn;
-            _dispatcher = dispatcher;
+            _view = view;
         }
 
         public void SetTaskCollections(
@@ -257,7 +213,7 @@ namespace AgenticEngine.Managers
             }
             if (needsSave) SaveProjects();
 
-            _dispatcher.Invoke(() =>
+            _view.ViewDispatcher.Invoke(() =>
             {
                 RefreshProjectCombo();
                 UpdateMcpToggleForProject();
@@ -277,8 +233,8 @@ namespace AgenticEngine.Managers
         public void RefreshProjectCombo()
         {
             var proj = _savedProjects.Find(p => p.Path == _projectPath);
-            _promptProjectLabel.Text = proj?.DisplayName ?? Path.GetFileName(_projectPath);
-            _promptProjectLabel.ToolTip = _projectPath;
+            _view.PromptProjectLabel.Text = proj?.DisplayName ?? Path.GetFileName(_projectPath);
+            _view.PromptProjectLabel.ToolTip = _projectPath;
             RefreshDescriptionBoxes();
         }
 
@@ -289,28 +245,32 @@ namespace AgenticEngine.Managers
 
             if (initializing)
             {
-                _shortDescBox.Text = "Initializing...";
-                _longDescBox.Text = "Initializing...";
-                _shortDescBox.FontStyle = FontStyles.Italic;
-                _longDescBox.FontStyle = FontStyles.Italic;
+                _view.ShortDescBox.Text = "Initializing...";
+                _view.LongDescBox.Text = "Initializing...";
+                _view.ShortDescBox.FontStyle = FontStyles.Italic;
+                _view.LongDescBox.FontStyle = FontStyles.Italic;
             }
             else
             {
-                _shortDescBox.Text = entry?.ShortDescription ?? "";
-                _longDescBox.Text = entry?.LongDescription ?? "";
-                _shortDescBox.FontStyle = FontStyles.Normal;
-                _longDescBox.FontStyle = FontStyles.Normal;
+                _view.ShortDescBox.Text = entry?.ShortDescription ?? "";
+                _view.LongDescBox.Text = entry?.LongDescription ?? "";
+                _view.ShortDescBox.FontStyle = FontStyles.Normal;
+                _view.LongDescBox.FontStyle = FontStyles.Normal;
             }
 
-            _ruleInstructionBox.Text = entry?.RuleInstruction ?? "";
-            _projectRulesList.ItemsSource = null;
-            _projectRulesList.ItemsSource = entry?.ProjectRules ?? new List<string>();
+            _view.RuleInstructionBox.Text = entry?.RuleInstruction ?? "";
+            _view.ProjectRulesList.ItemsSource = null;
+            _view.ProjectRulesList.ItemsSource = entry?.ProjectRules ?? new List<string>();
 
-            _editShortDescToggle.IsChecked = false;
-            _editLongDescToggle.IsChecked = false;
-            _editRuleInstructionToggle.IsChecked = false;
-            _editShortDescToggle.IsEnabled = !initializing;
-            _editLongDescToggle.IsEnabled = !initializing;
+            var crashPaths = GetCrashLogPaths(_projectPath);
+            _view.CrashLogPathsBox.Text = string.Join("\n", crashPaths);
+            _view.EditCrashLogPathsToggle.IsChecked = false;
+
+            _view.EditShortDescToggle.IsChecked = false;
+            _view.EditLongDescToggle.IsChecked = false;
+            _view.EditRuleInstructionToggle.IsChecked = false;
+            _view.EditShortDescToggle.IsEnabled = !initializing;
+            _view.EditLongDescToggle.IsEnabled = !initializing;
         }
 
         public void HandleAddProjectPathClick(Action<string> updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings)
@@ -341,8 +301,8 @@ namespace AgenticEngine.Managers
             {
                 DarkDialog.ShowAlert("The selected path does not exist or is invalid.", "Invalid Path");
                 _addProjectSelectedPath = "";
-                _addProjectPath.Text = "Click to add project folder...";
-                _addProjectPath.Foreground = (Brush)Application.Current.FindResource("TextMuted");
+                _view.AddProjectPath.Text = "Click to add project folder...";
+                _view.AddProjectPath.Foreground = (Brush)Application.Current.FindResource("TextMuted");
                 return;
             }
             if (_savedProjects.Any(p => p.Path == path))
@@ -361,8 +321,8 @@ namespace AgenticEngine.Managers
             syncSettings();
 
             _addProjectSelectedPath = "";
-            _addProjectPath.Text = "Click to add project folder...";
-            _addProjectPath.Foreground = (Brush)Application.Current.FindResource("TextMuted");
+            _view.AddProjectPath.Text = "Click to add project folder...";
+            _view.AddProjectPath.Foreground = (Brush)Application.Current.FindResource("TextMuted");
 
             _ = GenerateProjectDescriptionInBackground(entry);
         }
@@ -449,17 +409,17 @@ namespace AgenticEngine.Managers
             var proj = _savedProjects.Find(p => p.Path == _projectPath);
             if (proj != null)
             {
-                _useMcpToggle.IsEnabled = true;
-                _useMcpToggle.IsChecked = proj.McpStatus == McpStatus.Enabled;
-                _useMcpToggle.Opacity = 1.0;
-                _useMcpToggle.ToolTip = null;
+                _view.UseMcpToggle.IsEnabled = true;
+                _view.UseMcpToggle.IsChecked = proj.McpStatus == McpStatus.Enabled;
+                _view.UseMcpToggle.Opacity = 1.0;
+                _view.UseMcpToggle.ToolTip = null;
             }
             else
             {
-                _useMcpToggle.IsChecked = false;
-                _useMcpToggle.IsEnabled = false;
-                _useMcpToggle.Opacity = 0.4;
-                _useMcpToggle.ToolTip = null;
+                _view.UseMcpToggle.IsChecked = false;
+                _view.UseMcpToggle.IsEnabled = false;
+                _view.UseMcpToggle.Opacity = 0.4;
+                _view.UseMcpToggle.ToolTip = null;
             }
         }
 
@@ -500,7 +460,7 @@ namespace AgenticEngine.Managers
             try
             {
                 var (shortDesc, longDesc) = await TaskLauncher.GenerateProjectDescriptionAsync(entry.Path);
-                _dispatcher.Invoke(() =>
+                _view.ViewDispatcher.Invoke(() =>
                 {
                     entry.ShortDescription = shortDesc;
                     entry.LongDescription = longDesc;
@@ -513,7 +473,7 @@ namespace AgenticEngine.Managers
             catch (Exception ex)
             {
                 AppLogger.Warn("ProjectManager", $"Failed to generate description for {entry.Path}", ex);
-                _dispatcher.Invoke(() =>
+                _view.ViewDispatcher.Invoke(() =>
                 {
                     entry.IsInitializing = false;
                     RefreshProjectList(null, null, null);
@@ -534,13 +494,13 @@ namespace AgenticEngine.Managers
             RefreshProjectList(null, null, null);
             RefreshDescriptionBoxes();
 
-            _regenerateDescBtn.IsEnabled = false;
-            _regenerateDescBtn.Content = "Regenerating...";
+            _view.RegenerateDescBtn.IsEnabled = false;
+            _view.RegenerateDescBtn.Content = "Regenerating...";
 
             await GenerateProjectDescriptionInBackground(entry);
 
-            _regenerateDescBtn.Content = "Regenerate Descriptions";
-            _regenerateDescBtn.IsEnabled = true;
+            _view.RegenerateDescBtn.Content = "Regenerate Descriptions";
+            _view.RegenerateDescBtn.IsEnabled = true;
             RefreshDescriptionBoxes();
         }
 
@@ -549,10 +509,10 @@ namespace AgenticEngine.Managers
             var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
             if (entry != null)
             {
-                entry.ShortDescription = _shortDescBox.Text;
+                entry.ShortDescription = _view.ShortDescBox.Text;
                 SaveProjects();
             }
-            _editShortDescToggle.IsChecked = false;
+            _view.EditShortDescToggle.IsChecked = false;
         }
 
         public void SaveLongDesc()
@@ -560,10 +520,10 @@ namespace AgenticEngine.Managers
             var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
             if (entry != null)
             {
-                entry.LongDescription = _longDescBox.Text;
+                entry.LongDescription = _view.LongDescBox.Text;
                 SaveProjects();
             }
-            _editLongDescToggle.IsChecked = false;
+            _view.EditLongDescToggle.IsChecked = false;
         }
 
         public void SaveRuleInstruction()
@@ -571,10 +531,10 @@ namespace AgenticEngine.Managers
             var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
             if (entry != null)
             {
-                entry.RuleInstruction = _ruleInstructionBox.Text;
+                entry.RuleInstruction = _view.RuleInstructionBox.Text;
                 SaveProjects();
             }
-            _editRuleInstructionToggle.IsChecked = false;
+            _view.EditRuleInstructionToggle.IsChecked = false;
         }
 
         public void AddProjectRule(string rule)
@@ -594,6 +554,39 @@ namespace AgenticEngine.Managers
             entry.ProjectRules.Remove(rule);
             SaveProjects();
             RefreshDescriptionBoxes();
+        }
+
+        private static readonly string DefaultLogDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "HappyEngine", "logs");
+
+        public static List<string> GetDefaultCrashLogPaths()
+        {
+            return new List<string>
+            {
+                Path.Combine(DefaultLogDir, "crash.log"),
+                Path.Combine(DefaultLogDir, "app.log"),
+                Path.Combine(DefaultLogDir, "hang.log")
+            };
+        }
+
+        public List<string> GetCrashLogPaths(string projectPath)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
+            if (entry != null && entry.CrashLogPaths.Count > 0)
+                return entry.CrashLogPaths;
+            return GetDefaultCrashLogPaths();
+        }
+
+        public void SaveCrashLogPaths(List<string> paths)
+        {
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
+            if (entry != null)
+            {
+                entry.CrashLogPaths = paths;
+                SaveProjects();
+            }
+            _view.EditCrashLogPathsToggle.IsChecked = false;
         }
 
         public string GetProjectRulesBlock(string projectPath)
@@ -622,8 +615,8 @@ namespace AgenticEngine.Managers
             Action? saveSettings,
             Action? syncSettings)
         {
-            if (_projectListPanel == null) return;
-            _projectListPanel.Children.Clear();
+            if (_view.ProjectListPanel == null) return;
+            _view.ProjectListPanel.Children.Clear();
 
             foreach (var proj in _savedProjects)
             {
@@ -660,13 +653,13 @@ namespace AgenticEngine.Managers
                 };
                 nameRow.Children.Add(typeIcon);
 
-                var nameColor = !string.IsNullOrEmpty(proj.Color)
-                    ? (Color)ColorConverter.ConvertFromString(proj.Color)
-                    : Color.FromRgb(0xE8, 0xE8, 0xE8);
+                var nameBrush = !string.IsNullOrEmpty(proj.Color)
+                    ? BrushCache.Get(proj.Color)
+                    : BrushCache.Theme("TextPrimary");
                 var nameBlock = new TextBlock
                 {
                     Text = proj.DisplayName,
-                    Foreground = new SolidColorBrush(nameColor),
+                    Foreground = nameBrush,
                     FontWeight = FontWeights.Bold,
                     FontSize = 14,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -736,7 +729,7 @@ namespace AgenticEngine.Managers
                         else if (ke.Key == Key.Escape) RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
                     };
 
-                    _dispatcher.BeginInvoke(new Action(() =>
+                    _view.ViewDispatcher.BeginInvoke(new Action(() =>
                     {
                         editBox.LostFocus += (_, _) => CommitRename();
                     }), DispatcherPriority.Input);
@@ -789,9 +782,9 @@ namespace AgenticEngine.Managers
                     });
                 }
 
-                var initColor = proj.IsInitialized
-                    ? Color.FromRgb(0x4C, 0xAF, 0x50)
-                    : Color.FromRgb(0x66, 0x66, 0x66);
+                var initBrush = proj.IsInitialized
+                    ? BrushCache.Theme("SuccessGreen")
+                    : BrushCache.Theme("TextMuted");
                 var initIndicator = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
@@ -802,14 +795,14 @@ namespace AgenticEngine.Managers
                 {
                     Width = 8,
                     Height = 8,
-                    Fill = new SolidColorBrush(initColor),
+                    Fill = initBrush,
                     Margin = new Thickness(0, 0, 4, 0),
                     VerticalAlignment = VerticalAlignment.Center
                 });
                 initIndicator.Children.Add(new TextBlock
                 {
                     Text = proj.IsInitialized ? "Initialized" : "Not Initialized",
-                    Foreground = new SolidColorBrush(initColor),
+                    Foreground = initBrush,
                     FontSize = 10,
                     FontFamily = new FontFamily("Segoe UI"),
                     VerticalAlignment = VerticalAlignment.Center
@@ -842,11 +835,11 @@ namespace AgenticEngine.Managers
                         line1.Inlines.Add(new System.Windows.Documents.Run(" \u00b7 ") { Foreground = (Brush)Application.Current.FindResource("TextSubdued") });
                         line1.Inlines.Add(new System.Windows.Documents.Run($"{stats.SuccessRate:P0} success")
                         {
-                            Foreground = new SolidColorBrush(stats.SuccessRate >= 0.7
-                                ? Color.FromRgb(0x4C, 0xAF, 0x50)
+                            Foreground = stats.SuccessRate >= 0.7
+                                ? BrushCache.Theme("SuccessGreen")
                                 : stats.SuccessRate >= 0.4
-                                    ? Color.FromRgb(0xE0, 0xA0, 0x30)
-                                    : Color.FromRgb(0xE0, 0x50, 0x50))
+                                    ? BrushCache.Theme("WarningAmber")
+                                    : BrushCache.Theme("DangerBright")
                         });
                         if (stats.AverageDuration > TimeSpan.Zero)
                         {
@@ -916,17 +909,17 @@ namespace AgenticEngine.Managers
 
                     if (proj.McpStatus != McpStatus.Enabled)
                     {
-                        var mcpStatusColor = proj.McpStatus switch
+                        var mcpStatusBrush = proj.McpStatus switch
                         {
-                            McpStatus.Initialized => Color.FromRgb(0xE0, 0xA0, 0x30),
-                            McpStatus.Investigating => Color.FromRgb(0xE0, 0x80, 0x30),
-                            _ => Color.FromRgb(0x66, 0x66, 0x66)
+                            McpStatus.Initialized => BrushCache.Theme("WarningAmber"),
+                            McpStatus.Investigating => BrushCache.Theme("WarningDeepOrange"),
+                            _ => BrushCache.Theme("TextMuted")
                         };
                         mcpTogglePanel.Children.Add(new System.Windows.Shapes.Ellipse
                         {
                             Width = 6,
                             Height = 6,
-                            Fill = new SolidColorBrush(mcpStatusColor),
+                            Fill = mcpStatusBrush,
                             Margin = new Thickness(4, 0, 0, 0),
                             VerticalAlignment = VerticalAlignment.Center,
                             ToolTip = proj.McpStatus.ToString()
@@ -986,7 +979,7 @@ namespace AgenticEngine.Managers
                     // Defer heavy work so we're not modifying the visual tree
                     // from inside the click handler of a card that will be destroyed.
                     // Use async to yield between operations and keep the UI responsive.
-                    _dispatcher.BeginInvoke(new Action(async () =>
+                    _view.ViewDispatcher.BeginInvoke(new Action(async () =>
                     {
                         try
                         {
@@ -1005,7 +998,7 @@ namespace AgenticEngine.Managers
                     }));
                 };
 
-                _projectListPanel.Children.Add(card);
+                _view.ProjectListPanel.Children.Add(card);
             }
         }
 

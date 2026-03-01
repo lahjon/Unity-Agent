@@ -1,4 +1,4 @@
-namespace AgenticEngine.Constants
+namespace HappyEngine.Constants
 {
     /// <summary>
     /// Centralised magic-number constants used across the application.

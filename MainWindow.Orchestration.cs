@@ -6,11 +6,11 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using AgenticEngine.Dialogs;
-using AgenticEngine.Managers;
-using AgenticEngine.Models;
+using HappyEngine.Dialogs;
+using HappyEngine.Managers;
+using HappyEngine.Models;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     public partial class MainWindow
     {
@@ -184,7 +184,7 @@ namespace AgenticEngine
             var max = _settingsManager.MaxConcurrentTasks;
             var toStart = new List<AgentTask>();
 
-            foreach (var task in _activeTasks.OrderByDescending(t => t.Priority))
+            foreach (var task in _activeTasks.OrderByDescending(t => (int)t.PriorityLevel).ThenByDescending(t => t.Priority))
             {
                 if (task.Status != AgentTaskStatus.InitQueued) continue;
                 if (CountActiveSessionTasks() >= max) break;
@@ -195,7 +195,7 @@ namespace AgenticEngine
             foreach (var task in toStart)
             {
                 task.QueuedReason = null;
-                LaunchTaskProcess(task, $"[AgenticEngine] Slot available — starting task #{task.TaskNumber}...\n\n");
+                LaunchTaskProcess(task, $"[HappyEngine] Slot available — starting task #{task.TaskNumber}...\n\n");
             }
 
             if (toStart.Count > 0) UpdateStatus();
@@ -228,12 +228,12 @@ namespace AgenticEngine
                     // Task was suspended via drag-drop — resume its process
                     _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] All dependencies resolved — resuming task #{task.TaskNumber}.\n\n",
+                        $"\n[HappyEngine] All dependencies resolved — resuming task #{task.TaskNumber}.\n\n",
                         _activeTasks, _historyTasks);
                 }
                 else
                 {
-                    LaunchTaskProcess(task, $"\n[AgenticEngine] All dependencies resolved — starting task #{task.TaskNumber}...\n\n");
+                    LaunchTaskProcess(task, $"\n[HappyEngine] All dependencies resolved — starting task #{task.TaskNumber}...\n\n");
                 }
 
                 _outputTabManager.UpdateTabHeader(task);
@@ -245,7 +245,7 @@ namespace AgenticEngine
         {
             var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
             if (task == null) return;
-            _outputTabManager.AppendOutput(taskId, $"\n[AgenticEngine] Resuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(taskId, $"\n[HappyEngine] Resuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(task);
             _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
             UpdateStatus();
@@ -287,11 +287,11 @@ namespace AgenticEngine
                 _outputTabManager.CreateTab(child);
 
                 _outputTabManager.AppendOutput(parent.Id,
-                    $"\n[AgenticEngine] Spawned subtask #{child.TaskNumber}: {child.Description}\n",
+                    $"\n[HappyEngine] Spawned subtask #{child.TaskNumber}: {child.Description}\n",
                     _activeTasks, _historyTasks);
 
                 _outputTabManager.AppendOutput(child.Id,
-                    $"[AgenticEngine] Subtask of #{parent.TaskNumber}: {parent.Description}\n",
+                    $"[HappyEngine] Subtask of #{parent.TaskNumber}: {parent.Description}\n",
                     _activeTasks, _historyTasks);
 
                 _outputTabManager.UpdateTabHeader(child);
@@ -346,7 +346,7 @@ namespace AgenticEngine
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
             _outputTabManager.AppendOutput(newTask.Id,
-                $"[AgenticEngine] Re-running task #{historicTask.TaskNumber}\n", _activeTasks, _historyTasks);
+                $"[HappyEngine] Re-running task #{historicTask.TaskNumber}\n", _activeTasks, _historyTasks);
 
             _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
             UpdateStatus();

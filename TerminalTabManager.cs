@@ -7,8 +7,9 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using HappyEngine.Helpers;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     public class TerminalTabManager : IDisposable
     {
@@ -420,7 +421,7 @@ namespace AgenticEngine
                 var label = new TextBlock
                 {
                     Text = $"  Terminal {i + 1}{(hasExited ? " (exited)" : "")}  ",
-                    Foreground = hasExited ? new SolidColorBrush(Color.FromRgb(0x66, 0x55, 0x55)) :
+                    Foreground = hasExited ? BrushCache.Theme("TerminalExitDim") :
                         isActive ? (Brush)Application.Current.FindResource("TextPrimary") :
                         (Brush)Application.Current.FindResource("TextSubdued"),
                     FontSize = 11,

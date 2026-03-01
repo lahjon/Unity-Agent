@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 
-namespace AgenticEngine.Controls
+namespace HappyEngine.Controls
 {
     internal class GraphLayoutEngine
     {

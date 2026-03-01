@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class ImageAttachmentManager
     {

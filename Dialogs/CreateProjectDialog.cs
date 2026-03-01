@@ -1,11 +1,10 @@
-using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace AgenticEngine.Dialogs
+namespace HappyEngine.Dialogs
 {
     public class CreateProjectResult
     {
@@ -19,7 +18,7 @@ namespace AgenticEngine.Dialogs
     {
         public static CreateProjectResult? Show()
         {
-            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow("Create Project", 440, 480);
+            var dlg = DarkDialogWindow.Create("Create Project", 440, 480);
 
             CreateProjectResult? result = null;
             var stack = new StackPanel { Margin = new Thickness(20, 18, 20, 18) };
@@ -336,7 +335,7 @@ namespace AgenticEngine.Dialogs
             btnPanel.Children.Add(createBtn);
             stack.Children.Add(btnPanel);
 
-            outerBorder.Child = stack;
+            dlg.SetBodyContent(stack);
 
             dlg.KeyDown += (_, ke) =>
             {

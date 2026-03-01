@@ -4,8 +4,8 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>AgenticEngine</AssemblyName>
-    <RootNamespace>AgenticEngine</RootNamespace>
+    <AssemblyName>HappyEngine</AssemblyName>
+    <RootNamespace>HappyEngine</RootNamespace>
     <Nullable>enable</Nullable>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
@@ -15,11 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="AgenticEngine.Tests\**" />
-    <None Remove="AgenticEngine.Tests\**" />
+    <Compile Remove="HappyEngine.Tests\**" />
+    <None Remove="HappyEngine.Tests\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="AgenticEngine.Tests" />
+    <InternalsVisibleTo Include="HappyEngine.Tests" />
   </ItemGroup>
 </Project>

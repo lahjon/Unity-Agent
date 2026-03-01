@@ -7,7 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     public enum AgentTaskStatus
     {
@@ -19,6 +19,14 @@ namespace AgenticEngine
         Paused,
         InitQueued,
         Planning
+    }
+
+    public enum TaskPriority
+    {
+        Low,
+        Normal,
+        High,
+        Critical
     }
 
     public enum ModelType
@@ -61,6 +69,18 @@ namespace AgenticEngine
             get => Data.Priority;
             set { Data.Priority = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasPriorityBadge)); OnPropertyChanged(nameof(PriorityBadgeText)); }
         }
+        public TaskPriority PriorityLevel
+        {
+            get => Data.PriorityLevel;
+            set
+            {
+                Data.PriorityLevel = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasPriorityBadge));
+                OnPropertyChanged(nameof(PriorityBadgeText));
+                OnPropertyChanged(nameof(PriorityBadgeColor));
+            }
+        }
         public bool UseMessageBus { get => Data.UseMessageBus; set => Data.UseMessageBus = value; }
         public bool AutoDecompose { get => Data.AutoDecompose; set => Data.AutoDecompose = value; }
         public string? GroupId { get => Data.GroupId; set => Data.GroupId = value; }
@@ -102,11 +122,19 @@ namespace AgenticEngine
 
         public bool HasRecommendations => !string.IsNullOrWhiteSpace(Recommendations);
 
-        public string ContinueReason
+        public string VerificationResult
         {
-            get => Data.ContinueReason;
-            set { Data.ContinueReason = value; OnPropertyChanged(); }
+            get => Data.VerificationResult;
+            set { Data.VerificationResult = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasVerificationResult)); }
         }
+
+        public bool IsVerified
+        {
+            get => Data.IsVerified;
+            set { Data.IsVerified = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasVerificationResult)); }
+        }
+
+        public bool HasVerificationResult => !string.IsNullOrWhiteSpace(VerificationResult);
 
         public string Summary
         {
@@ -310,8 +338,41 @@ namespace AgenticEngine
 
         public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
 
-        public bool HasPriorityBadge => Priority > 0 && (IsQueued || IsInitQueued);
-        public string PriorityBadgeText => $"P{Priority}";
+        public bool HasPriorityBadge => PriorityLevel != TaskPriority.Normal || (Priority > 0 && (IsQueued || IsInitQueued));
+
+        public string PriorityBadgeText => PriorityLevel switch
+        {
+            TaskPriority.Critical => "CRIT",
+            TaskPriority.High => "HIGH",
+            TaskPriority.Low => "LOW",
+            _ => (IsQueued || IsInitQueued) && Priority > 0 ? $"P{Priority}" : ""
+        };
+
+        public string PriorityBadgeColor => PriorityLevel switch
+        {
+            TaskPriority.Critical => "#FF5252",
+            TaskPriority.High => "#FFD600",
+            TaskPriority.Low => "#78909C",
+            _ => "#FFD600"
+        };
+
+        public bool HasActiveToggles => !string.IsNullOrEmpty(ActiveTogglesText);
+
+        public string ActiveTogglesText
+        {
+            get
+            {
+                var tags = new List<string>(4);
+                if (IsOvernight) tags.Add("OVN");
+                if (ExtendedPlanning) tags.Add("EXT");
+                if (RemoteSession) tags.Add("REM");
+                if (Headless) tags.Add("HDL");
+                if (SpawnTeam) tags.Add("TEAM");
+                if (AutoDecompose) tags.Add("DEC");
+                if (UseMcp) tags.Add("MCP");
+                return string.Join(" ", tags);
+            }
+        }
 
         public string TimeInfo
         {

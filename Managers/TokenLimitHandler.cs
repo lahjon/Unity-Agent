@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     /// <summary>
     /// Handles token/rate limit detection and automatic retry scheduling for non-overnight tasks.
@@ -63,7 +63,7 @@ namespace AgenticEngine.Managers
             if (!TaskLauncher.IsTokenLimitError(tail)) return false;
 
             var retryMinutes = _getTokenLimitRetryMinutes();
-            _outputProcessor.AppendOutput(task.Id, $"\n[AgenticEngine] Token/rate limit detected. Retrying in {retryMinutes} minutes...\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"\n[HappyEngine] Token/rate limit detected. Retrying in {retryMinutes} minutes...\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(retryMinutes) };
@@ -81,7 +81,7 @@ namespace AgenticEngine.Managers
                     _outputTabManager.UpdateTabHeader(task);
                     return;
                 }
-                _outputProcessor.AppendOutput(task.Id, "[AgenticEngine] Retrying after token limit...\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "[HappyEngine] Retrying after token limit...\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
                 RetryStarted?.Invoke(task.Id);
 
@@ -116,7 +116,7 @@ namespace AgenticEngine.Managers
                 : "--continue";
 
             var continuePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
-            _outputProcessor.AppendOutput(task.Id, $"\n[AgenticEngine] Sending retry with {resumeLabel}...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"\n[HappyEngine] Sending retry with {resumeLabel}...\n\n", activeTasks, historyTasks);
 
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
             var followUpFile = Path.Combine(_scriptDir, $"retry_{task.Id}_{DateTime.Now.Ticks}.txt");
@@ -150,13 +150,13 @@ namespace AgenticEngine.Managers
                     _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
                 task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
-                _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
+                _ = _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
                 _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
                 var statusColor = exitCode == 0
                     ? (Brush)Application.Current.FindResource("Success")
                     : (Brush)Application.Current.FindResource("DangerBright");
                 _outputProcessor.AppendColoredOutput(task.Id,
-                    $"\n[AgenticEngine] Process finished (exit code: {exitCode}).\n",
+                    $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
                     statusColor, activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
                 _fileLockManager.CheckQueuedTasks(activeTasks);
@@ -169,7 +169,7 @@ namespace AgenticEngine.Managers
             }
             catch (Exception ex)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Retry error: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Retry error: {ex.Message}\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);

@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace AgenticEngine.Tests
+namespace HappyEngine.Tests
 {
     /// <summary>
     /// Tests verifying that project swapping behaves correctly when tasks are
@@ -675,9 +675,9 @@ namespace AgenticEngine.Tests
         public void TimeInfo_Queued_ShowsDependency()
         {
             var task = MakeTask(@"C:\Projects\Alpha", AgentTaskStatus.Queued);
-            task.DependencyTaskIds = new List<string> { "abc12345" };
+            task.DependencyTaskNumbers = new List<int> { 42 };
 
-            Assert.Contains("#abc12345", task.TimeInfo);
+            Assert.Contains("#42", task.TimeInfo);
             Assert.Contains("Queued", task.TimeInfo);
         }
 
@@ -685,9 +685,9 @@ namespace AgenticEngine.Tests
         public void TimeInfo_Queued_ShowsBlockedBy()
         {
             var task = MakeTask(@"C:\Projects\Alpha", AgentTaskStatus.Queued);
-            task.BlockedByTaskId = "def67890";
+            task.BlockedByTaskNumber = 99;
 
-            Assert.Contains("#def67890", task.TimeInfo);
+            Assert.Contains("#99", task.TimeInfo);
         }
 
         [Fact]
@@ -1082,7 +1082,7 @@ namespace AgenticEngine.Tests
         [Fact]
         public async Task HistoryRoundTrip_PreservesSummary()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1107,7 +1107,7 @@ namespace AgenticEngine.Tests
         [Fact]
         public async Task HistoryRoundTrip_PreservesStoredPrompt()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1132,7 +1132,7 @@ namespace AgenticEngine.Tests
         [Fact]
         public async Task HistoryRoundTrip_EmptyStoredPrompt_LoadsAsNull()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1157,7 +1157,7 @@ namespace AgenticEngine.Tests
         [Fact]
         public async Task HistoryRoundTrip_PreservesAllFields()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1190,7 +1190,7 @@ namespace AgenticEngine.Tests
         [Fact]
         public async Task StoredTaskRoundTrip_PreservesSummaryAndPrompt()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {

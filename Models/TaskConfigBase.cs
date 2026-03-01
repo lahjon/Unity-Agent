@@ -1,6 +1,6 @@
 using System;
 
-namespace AgenticEngine.Models
+namespace HappyEngine.Models
 {
     public class TaskConfigBase
     {
@@ -19,5 +19,59 @@ namespace AgenticEngine.Models
         public bool AutoDecompose { get; set; }
         public string AdditionalInstructions { get; set; } = "";
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        /// <summary>
+        /// Copies all toggle flags from this instance to another <see cref="TaskConfigBase"/>.
+        /// </summary>
+        public void CopyFlagsTo(TaskConfigBase target)
+        {
+            target.RemoteSession = RemoteSession;
+            target.Headless = Headless;
+            target.SpawnTeam = SpawnTeam;
+            target.IsOvernight = IsOvernight;
+            target.ExtendedPlanning = ExtendedPlanning;
+            target.PlanOnly = PlanOnly;
+            target.IgnoreFileLocks = IgnoreFileLocks;
+            target.UseMcp = UseMcp;
+            target.NoGitWrite = NoGitWrite;
+            target.UseMessageBus = UseMessageBus;
+            target.AutoDecompose = AutoDecompose;
+        }
+
+        /// <summary>
+        /// Copies toggle flags from an <see cref="AgentTaskData"/> into this instance.
+        /// </summary>
+        public void CopyFlagsFrom(AgentTaskData source)
+        {
+            RemoteSession = source.RemoteSession;
+            Headless = source.Headless;
+            SpawnTeam = source.SpawnTeam;
+            IsOvernight = source.IsOvernight;
+            ExtendedPlanning = source.ExtendedPlanning;
+            PlanOnly = source.PlanOnly;
+            IgnoreFileLocks = source.IgnoreFileLocks;
+            UseMcp = source.UseMcp;
+            NoGitWrite = source.NoGitWrite;
+            UseMessageBus = source.UseMessageBus;
+            AutoDecompose = source.AutoDecompose;
+        }
+
+        /// <summary>
+        /// Applies toggle flags from this instance onto an <see cref="AgentTaskData"/>.
+        /// </summary>
+        public void ApplyFlagsTo(AgentTaskData target)
+        {
+            target.RemoteSession = RemoteSession;
+            target.Headless = Headless;
+            target.SpawnTeam = SpawnTeam;
+            target.IsOvernight = IsOvernight;
+            target.ExtendedPlanning = ExtendedPlanning;
+            target.PlanOnly = PlanOnly;
+            target.IgnoreFileLocks = IgnoreFileLocks;
+            target.UseMcp = UseMcp;
+            target.NoGitWrite = NoGitWrite;
+            target.UseMessageBus = UseMessageBus;
+            target.AutoDecompose = AutoDecompose;
+        }
     }
 }

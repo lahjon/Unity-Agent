@@ -11,7 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Windows.Threading;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     /// <summary>
     /// Manages subprocess creation, process lifecycle (start/stop/pause/resume),
@@ -307,7 +307,7 @@ namespace AgenticEngine.Managers
             }
 
             _outputTabManager.UpdateTabHeader(task);
-            _outputProcessor.AppendOutput(task.Id, "\n[AgenticEngine] Task resumed.\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Task resumed.\n", activeTasks, historyTasks);
             ProcessResumed?.Invoke(task.Id);
         }
 

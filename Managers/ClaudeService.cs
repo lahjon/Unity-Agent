@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class ClaudeService : BaseLlmService
     {

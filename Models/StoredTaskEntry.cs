@@ -1,6 +1,6 @@
 using System;
 
-namespace AgenticEngine.Models
+namespace HappyEngine.Models
 {
     internal class StoredTaskEntry : TaskRecordBase
     {

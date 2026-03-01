@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class TaskGroupState
     {

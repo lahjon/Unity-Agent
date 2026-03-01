@@ -6,9 +6,9 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using AgenticEngine.Models;
+using HappyEngine.Models;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class HistoryManager
     {

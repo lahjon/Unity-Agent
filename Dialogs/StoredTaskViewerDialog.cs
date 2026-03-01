@@ -1,25 +1,24 @@
-using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
+using HappyEngine.Helpers;
 
-namespace AgenticEngine.Dialogs
+namespace HappyEngine.Dialogs
 {
     public static class StoredTaskViewerDialog
     {
         public static void Show(AgentTask task)
         {
-            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow("Stored Task Context", 850, 560,
-                ResizeMode.CanResize, topmost: false, backgroundResource: "BgDeep");
+            var dlg = DarkDialogWindow.Create("Stored Task Context", 850, 560,
+                ResizeMode.CanResize, topmost: false, backgroundResource: "BgDeep",
+                titleColorResource: "AccentTeal");
 
-            var root = new DockPanel();
+            // Customize title
+            dlg.TitleTextBlock.Text = task.ShortDescription;
+            dlg.TitleTextBlock.TextTrimming = TextTrimming.CharacterEllipsis;
+            dlg.TitleTextBlock.MaxWidth = 600;
 
-            // Title bar
-            var (titleBar, titleBlock) = DialogFactory.CreateTitleBar(dlg, task.ShortDescription, "AccentTeal");
-            titleBlock.TextTrimming = TextTrimming.CharacterEllipsis;
-            titleBlock.MaxWidth = 600;
-
+            // Add project name to title bar
             var projectBlock = new TextBlock
             {
                 Text = task.ProjectName,
@@ -29,10 +28,9 @@ namespace AgenticEngine.Dialogs
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 0, 0)
             };
-            titleBar.Children.Add(projectBlock);
+            dlg.TitleBarPanel.Children.Add(projectBlock);
 
-            DockPanel.SetDock(titleBar, Dock.Top);
-            root.Children.Add(titleBar);
+            var root = new DockPanel();
 
             // Info bar with metadata
             var infoBar = new WrapPanel { Margin = new Thickness(18, 10, 18, 0) };
@@ -66,8 +64,8 @@ namespace AgenticEngine.Dialogs
                 infoBar.Children.Add(chip);
             }
 
-            AddInfoChip("Project", task.ProjectName, Color.FromRgb(0x4D, 0xB6, 0xAC));
-            AddInfoChip("Created", task.StartTime.ToString("yyyy-MM-dd HH:mm"), Color.FromRgb(0xAA, 0xAA, 0xAA));
+            AddInfoChip("Project", task.ProjectName, ((SolidColorBrush)BrushCache.Theme("AccentTeal")).Color);
+            AddInfoChip("Created", task.StartTime.ToString("yyyy-MM-dd HH:mm"), ((SolidColorBrush)BrushCache.Theme("TextTabHeader")).Color);
 
             DockPanel.SetDock(infoBar, Dock.Top);
             root.Children.Add(infoBar);
@@ -134,7 +132,7 @@ namespace AgenticEngine.Dialogs
             viewCombo.SelectionChanged += (_, _) => LoadContent();
             LoadContent();
 
-            outerBorder.Child = root;
+            dlg.SetBodyContent(root);
             dlg.ShowDialog();
         }
     }

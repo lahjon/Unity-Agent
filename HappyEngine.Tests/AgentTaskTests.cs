@@ -1,22 +1,22 @@
 using System.ComponentModel;
 using Xunit;
 
-namespace AgenticEngine.Tests
+namespace HappyEngine.Tests
 {
     public class AgentTaskTests
     {
         [Fact]
-        public void Id_Is8Characters()
+        public void Id_Is16Characters()
         {
             var task = new AgentTask();
-            Assert.Equal(8, task.Id.Length);
+            Assert.Equal(16, task.Id.Length);
         }
 
         [Fact]
         public void Id_IsHexadecimal()
         {
             var task = new AgentTask();
-            Assert.Matches("^[0-9a-f]{8}$", task.Id);
+            Assert.Matches("^[0-9a-f]{16}$", task.Id);
         }
 
         [Fact]
@@ -74,8 +74,8 @@ namespace AgenticEngine.Tests
         }
 
         [Theory]
-        [InlineData(AgentTaskStatus.Running, "#00E676")]
-        [InlineData(AgentTaskStatus.Completed, "#64B5F6")]
+        [InlineData(AgentTaskStatus.Running, "#64B5F6")]
+        [InlineData(AgentTaskStatus.Completed, "#00E676")]
         [InlineData(AgentTaskStatus.Cancelled, "#E0A030")]
         [InlineData(AgentTaskStatus.Failed, "#E05555")]
         [InlineData(AgentTaskStatus.Queued, "#FFD600")]

@@ -3,22 +3,18 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using AgenticEngine.Managers;
+using HappyEngine.Managers;
 
-namespace AgenticEngine.Dialogs
+namespace HappyEngine.Dialogs
 {
     public static class LogViewerDialog
     {
         public static void Show()
         {
-            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow("Application Log", 800, 520,
+            var dlg = DarkDialogWindow.Create("Application Log", 800, 520,
                 ResizeMode.CanResize, topmost: false, backgroundResource: "BgDeep");
 
-            var root = new DockPanel();
-
-            // Title bar
-            var (titleBar, _) = DialogFactory.CreateTitleBar(dlg, "Application Log");
-
+            // Add log path to title bar
             var logPathBlock = new TextBlock
             {
                 Text = AppLogger.GetLogFilePath(),
@@ -29,10 +25,9 @@ namespace AgenticEngine.Dialogs
                 Margin = new Thickness(12, 0, 0, 0),
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
-            titleBar.Children.Add(logPathBlock);
+            dlg.TitleBarPanel.Children.Add(logPathBlock);
 
-            DockPanel.SetDock(titleBar, Dock.Top);
-            root.Children.Add(titleBar);
+            var root = new DockPanel();
 
             // Button bar
             var btnBar = new StackPanel
@@ -40,6 +35,20 @@ namespace AgenticEngine.Dialogs
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(18, 10, 18, 0)
             };
+
+            var viewCombo = new ComboBox
+            {
+                Width = 130,
+                FontFamily = new FontFamily("Segoe UI"),
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 6, 0),
+                Background = (Brush)Application.Current.FindResource("BgElevated"),
+                Foreground = (Brush)Application.Current.FindResource("TextLight"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            viewCombo.Items.Add(new ComboBoxItem { Content = "Memory Buffer", Tag = "memory" });
+            viewCombo.Items.Add(new ComboBoxItem { Content = "Log File", Tag = "file" });
+            viewCombo.SelectedIndex = 0;
 
             var refreshBtn = new Button
             {
@@ -81,20 +90,6 @@ namespace AgenticEngine.Dialogs
                     AppLogger.Warn("LogViewer", "Failed to open log file", ex);
                 }
             };
-
-            var viewCombo = new ComboBox
-            {
-                Width = 130,
-                FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 12,
-                Margin = new Thickness(0, 0, 6, 0),
-                Background = (Brush)Application.Current.FindResource("BgElevated"),
-                Foreground = (Brush)Application.Current.FindResource("TextLight"),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            viewCombo.Items.Add(new ComboBoxItem { Content = "Memory Buffer", Tag = "memory" });
-            viewCombo.Items.Add(new ComboBoxItem { Content = "Log File", Tag = "file" });
-            viewCombo.SelectedIndex = 0;
 
             btnBar.Children.Add(viewCombo);
             btnBar.Children.Add(refreshBtn);
@@ -147,7 +142,7 @@ namespace AgenticEngine.Dialogs
 
             LoadContent();
 
-            outerBorder.Child = root;
+            dlg.SetBodyContent(root);
 
             dlg.KeyDown += (_, ke) =>
             {

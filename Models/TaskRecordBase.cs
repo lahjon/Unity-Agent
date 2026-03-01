@@ -1,4 +1,4 @@
-namespace AgenticEngine.Models
+namespace HappyEngine.Models
 {
     internal class TaskRecordBase
     {

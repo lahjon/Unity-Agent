@@ -5,9 +5,9 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using AgenticEngine.Managers;
+using HappyEngine.Managers;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     /// <summary>
     /// Thin static facade that delegates to focused injectable services:
@@ -83,10 +83,11 @@ namespace AgenticEngine
             string projectDescription = "", string projectRulesBlock = "",
             bool autoDecompose = false,
             bool spawnTeam = false,
-            bool isGameProject = false)
+            bool isGameProject = false,
+            string taskId = "")
             => _prompt.BuildBasePrompt(systemPrompt, description, useMcp, isOvernight,
                 extendedPlanning, noGitWrite, planOnly, projectDescription,
-                projectRulesBlock, autoDecompose, spawnTeam, isGameProject);
+                projectRulesBlock, autoDecompose, spawnTeam, isGameProject, taskId);
 
         public static string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
@@ -116,8 +117,8 @@ namespace AgenticEngine
         public static ProcessStartInfo BuildProcessStartInfo(string ps1FilePath, bool headless)
             => _prompt.BuildProcessStartInfo(ps1FilePath, headless);
 
-        public static string BuildOvernightContinuationPrompt(int iteration, int maxIterations)
-            => _prompt.BuildOvernightContinuationPrompt(iteration, maxIterations);
+        public static string BuildOvernightContinuationPrompt(int iteration, int maxIterations, string taskId = "")
+            => _prompt.BuildOvernightContinuationPrompt(iteration, maxIterations, taskId);
 
         public static string BuildDependencyContext(List<string> depIds,
             IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks)
@@ -131,11 +132,10 @@ namespace AgenticEngine
         public static string? ExtractRecommendations(string output)
             => _completion.ExtractRecommendations(output);
 
-        public static Task<ContinueVerification?> VerifyContinueNeededAsync(
-            string outputTail, string? recommendations, string taskDescription,
+        public static Task<ResultVerification?> VerifyResultAsync(
+            string outputTail, string taskDescription, string? completionSummary,
             CancellationToken ct = default)
-            => _completion.VerifyContinueNeededAsync(outputTail, recommendations,
-                taskDescription, ct);
+            => _completion.VerifyResultAsync(outputTail, taskDescription, completionSummary, ct);
 
         public static string FormatCompletionSummary(AgentTaskStatus status,
             TimeSpan duration, List<(string name, int added, int removed)>? fileChanges)

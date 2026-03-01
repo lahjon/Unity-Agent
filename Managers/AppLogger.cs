@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public enum LogLevel
     {
@@ -18,7 +18,7 @@ namespace AgenticEngine.Managers
     {
         private static readonly string LogDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AgenticEngine", "logs");
+            "HappyEngine", "logs");
         private static readonly string LogFile = Path.Combine(LogDir, "app.log");
 
         private const int MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB

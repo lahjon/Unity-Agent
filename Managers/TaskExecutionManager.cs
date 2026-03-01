@@ -13,7 +13,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     /// <summary>
     /// Thin coordinator that delegates to focused single-responsibility classes:
@@ -144,34 +144,34 @@ namespace AgenticEngine.Managers
                 TaskLauncher.BuildPowerShellScript(projectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
-            _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Task #{task.TaskNumber} starting...\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Task #{task.TaskNumber} starting...\n", activeTasks, historyTasks);
             if (!string.IsNullOrWhiteSpace(task.Summary))
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Summary: {task.Summary}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Project: {projectPath}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Summary: {task.Summary}\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Project: {projectPath}\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
             if (task.UseMessageBus)
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Message Bus: ON\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Message Bus: ON\n", activeTasks, historyTasks);
             if (task.ExtendedPlanning)
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Extended planning: ON\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Extended planning: ON\n", activeTasks, historyTasks);
             if (task.AutoDecompose)
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Auto-decompose: ON (will spawn subtasks)\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Auto-decompose: ON (will spawn subtasks)\n", activeTasks, historyTasks);
             if (task.SpawnTeam)
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Spawn Team: ON (will decompose into team roles with message bus)\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Spawn Team: ON (will decompose into team roles with message bus)\n", activeTasks, historyTasks);
             if (task.IsOvernight)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Overnight mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Safety: skip-permissions forced, git blocked, 30min iteration timeout\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Overnight mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Safety: skip-permissions forced, git blocked, 30min iteration timeout\n", activeTasks, historyTasks);
             }
             // Show the full prompt that Claude will receive
             try
             {
                 var promptContent = File.ReadAllText(promptFile, Encoding.UTF8);
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] ── Full Prompt ──────────────────────────────\n{promptContent}\n[AgenticEngine] ── End Prompt ───────────────────────────────\n\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] ── Full Prompt ──────────────────────────────\n{promptContent}\n[HappyEngine] ── End Prompt ───────────────────────────────\n\n", activeTasks, historyTasks);
             }
             catch { /* non-critical */ }
 
-            _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Connecting to Claude...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Connecting to Claude...\n\n", activeTasks, historyTasks);
 
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
@@ -184,7 +184,7 @@ namespace AgenticEngine.Managers
                     task.IsPlanningBeforeQueue = true;
                     task.Status = AgentTaskStatus.Planning;
                     task.StartTime = DateTime.Now;
-                    _outputProcessor.AppendOutput(task.Id, "\n[AgenticEngine] Restarting in plan mode...\n\n", activeTasks, historyTasks);
+                    _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Restarting in plan mode...\n\n", activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
                     return;
@@ -242,13 +242,13 @@ namespace AgenticEngine.Managers
                         _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
                     task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
                     task.EndTime = DateTime.Now;
-                    _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
+                    _ = _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
                     _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
                     var statusColor = exitCode == 0
                         ? (Brush)Application.Current.FindResource("Success")
                         : (Brush)Application.Current.FindResource("DangerBright");
                     _outputProcessor.AppendColoredOutput(task.Id,
-                        $"\n[AgenticEngine] Process finished (exit code: {exitCode}).\n",
+                        $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
                         statusColor, activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                 }
@@ -283,7 +283,7 @@ namespace AgenticEngine.Managers
             }
             catch (Exception ex)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);
@@ -355,7 +355,7 @@ namespace AgenticEngine.Managers
                 ? $"--resume {task.ConversationId}"
                 : "--continue";
 
-            _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n[AgenticEngine] Sending follow-up with {resumeLabel}...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n[HappyEngine] Sending follow-up with {resumeLabel}...\n\n", activeTasks, historyTasks);
 
             // Set iteration start AFTER the echo so the echoed prompt text
             // (which contains recommendation keywords) is excluded from
@@ -378,9 +378,9 @@ namespace AgenticEngine.Managers
             {
                 task.Status = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
-                _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
+                _ = _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
                 _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
-                _outputProcessor.AppendOutput(task.Id, "\n[AgenticEngine] Follow-up complete.\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Follow-up complete.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             });
 
@@ -390,7 +390,7 @@ namespace AgenticEngine.Managers
             }
             catch (Exception ex)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[AgenticEngine] Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
             }
         }
 
@@ -439,6 +439,12 @@ namespace AgenticEngine.Managers
 
         public void RemoveStreamingState(string taskId) => _processLauncher.RemoveStreamingState(taskId);
 
+        // ── Result Verification (delegated) ─────────────────────────
+
+        public System.Threading.Tasks.Task RunResultVerificationAsync(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+            => _outputProcessor.RunResultVerificationAsync(task, null, activeTasks, historyTasks);
+
         // ── Pause / Resume (delegated) ───────────────────────────────
 
         public void PauseTask(AgentTask task) => _processLauncher.PauseTask(task);
@@ -481,7 +487,7 @@ namespace AgenticEngine.Managers
                     task.BlockedByTaskId = blocker?.Id;
                     task.BlockedByTaskNumber = blocker?.TaskNumber;
                     _outputProcessor.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] Planning complete. Queued — waiting for dependencies: " +
+                        $"\n[HappyEngine] Planning complete. Queued — waiting for dependencies: " +
                         $"{string.Join(", ", task.DependencyTaskNumbers.Select(n => $"#{n}"))}\n",
                         activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
@@ -516,7 +522,7 @@ namespace AgenticEngine.Managers
                         BlockingTaskId = blockerId,
                         BlockedByTaskIds = new HashSet<string> { blockerId }
                     });
-                    _outputProcessor.AppendOutput(task.Id, "\n[AgenticEngine] Planning complete. Queued — waiting for file lock to clear.\n", activeTasks, historyTasks);
+                    _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Planning complete. Queued — waiting for file lock to clear.\n", activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _fileLockManager.CheckQueuedTasks(activeTasks);
                     return;
@@ -527,7 +533,7 @@ namespace AgenticEngine.Managers
             // No more blockers — start execution
             task.Status = AgentTaskStatus.Running;
             task.StartTime = DateTime.Now;
-            _outputProcessor.AppendOutput(task.Id, "\n[AgenticEngine] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
             _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
         }
@@ -701,7 +707,7 @@ namespace AgenticEngine.Managers
             if (children == null || children.Count == 0)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[AgenticEngine] Decomposition produced no valid subtasks — completing parent task.\n",
+                    "\n[HappyEngine] Decomposition produced no valid subtasks — completing parent task.\n",
                     activeTasks, historyTasks);
                 task.AutoDecompose = false;
                 task.Status = AgentTaskStatus.Failed;
@@ -716,7 +722,7 @@ namespace AgenticEngine.Managers
             task.EndTime = DateTime.Now;
             task.CompletionSummary = $"Decomposed into {children.Count} subtask(s)";
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[AgenticEngine] Task decomposed into {children.Count} subtask(s). Parent is now a coordinator.\n",
+                $"\n[HappyEngine] Task decomposed into {children.Count} subtask(s). Parent is now a coordinator.\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
@@ -849,7 +855,7 @@ namespace AgenticEngine.Managers
             if (children == null || children.Count == 0)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[AgenticEngine] Team decomposition produced no valid team members — completing parent task.\n",
+                    "\n[HappyEngine] Team decomposition produced no valid team members — completing parent task.\n",
                     activeTasks, historyTasks);
                 task.SpawnTeam = false;
                 task.Status = AgentTaskStatus.Failed;
@@ -864,7 +870,7 @@ namespace AgenticEngine.Managers
             task.EndTime = DateTime.Now;
             task.CompletionSummary = $"Spawned team of {children.Count} agent(s): {string.Join(", ", children.Select(c => c.Summary))}";
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[AgenticEngine] Team spawned with {children.Count} member(s). Parent is now a coordinator.\n",
+                $"\n[HappyEngine] Team spawned with {children.Count} member(s). Parent is now a coordinator.\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public interface IGitHelper
     {

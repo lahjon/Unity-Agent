@@ -3,9 +3,9 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
-using AgenticEngine.Helpers;
+using HappyEngine.Helpers;
 
-namespace AgenticEngine.Converters
+namespace HappyEngine.Converters
 {
     public class StringToBrushConverter : IValueConverter
     {
@@ -19,8 +19,7 @@ namespace AgenticEngine.Converters
                 }
                 catch (Exception ex) { Managers.AppLogger.Debug("StringToBrushConverter", $"Invalid color string '{colorStr}'", ex); }
             }
-            try { return (Brush)Application.Current.FindResource("TextDisabled"); }
-            catch (Exception ex) { Managers.AppLogger.Debug("StringToBrushConverter", $"TextDisabled resource not found: {ex.Message}"); return BrushCache.Get("#555555"); }
+            return BrushCache.Theme("TextDisabled");
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

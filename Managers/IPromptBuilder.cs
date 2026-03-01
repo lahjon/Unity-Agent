@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public interface IPromptBuilder
     {
@@ -10,7 +10,7 @@ namespace AgenticEngine.Managers
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
-            bool isGameProject = false);
+            bool isGameProject = false, string taskId = "");
 
         string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
@@ -31,7 +31,7 @@ namespace AgenticEngine.Managers
 
         ProcessStartInfo BuildProcessStartInfo(string ps1FilePath, bool headless);
 
-        string BuildOvernightContinuationPrompt(int iteration, int maxIterations);
+        string BuildOvernightContinuationPrompt(int iteration, int maxIterations, string taskId = "");
 
         string BuildDependencyContext(List<string> depIds,
             IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks);

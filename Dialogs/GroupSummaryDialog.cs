@@ -2,27 +2,21 @@ using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
-using AgenticEngine.Managers;
+using HappyEngine.Helpers;
+using HappyEngine.Managers;
 
-namespace AgenticEngine.Dialogs
+namespace HappyEngine.Dialogs
 {
     public static class GroupSummaryDialog
     {
         public static void Show(TaskGroupState groupState)
         {
-            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow(
+            var dlg = DarkDialogWindow.Create(
                 $"Group Summary: {groupState.GroupName}", 750, 560,
                 ResizeMode.CanResize, topmost: false, backgroundResource: "BgDeep");
 
             var root = new DockPanel();
-
-            // Title bar
-            var (titleBar, _) = DialogFactory.CreateTitleBar(dlg, $"Group Summary: {groupState.GroupName}");
-
-            DockPanel.SetDock(titleBar, Dock.Top);
-            root.Children.Add(titleBar);
 
             // Stats bar
             var elapsed = (groupState.Tasks
@@ -95,7 +89,7 @@ namespace AgenticEngine.Dialogs
             scroll.Content = taskPanel;
             root.Children.Add(scroll);
 
-            outerBorder.Child = root;
+            dlg.SetBodyContent(root);
             dlg.ShowDialog();
         }
 
@@ -109,7 +103,7 @@ namespace AgenticEngine.Dialogs
             {
                 AgentTaskStatus.Completed => (Brush)Application.Current.FindResource("Success"),
                 AgentTaskStatus.Failed => (Brush)Application.Current.FindResource("DangerBright"),
-                AgentTaskStatus.Cancelled => new SolidColorBrush(Color.FromRgb(0xE0, 0xA0, 0x30)),
+                AgentTaskStatus.Cancelled => BrushCache.Theme("WarningAmber"),
                 _ => (Brush)Application.Current.FindResource("TextSubdued")
             };
 

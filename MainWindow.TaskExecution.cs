@@ -5,11 +5,11 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using AgenticEngine.Dialogs;
-using AgenticEngine.Managers;
-using AgenticEngine.Models;
+using HappyEngine.Dialogs;
+using HappyEngine.Managers;
+using HappyEngine.Models;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     public partial class MainWindow
     {
@@ -24,6 +24,36 @@ namespace AgenticEngine
             ExtendedPlanningToggle.IsChecked = false;
             PlanOnlyToggle.IsChecked = false;
             AutoDecomposeToggle.IsChecked = false;
+        }
+
+        /// <summary>Reads the main-window toggle controls into a <see cref="TaskConfigBase"/>.</summary>
+        private void ReadUiFlagsInto(TaskConfigBase target)
+        {
+            target.RemoteSession = RemoteSessionToggle.IsChecked == true;
+            target.Headless = HeadlessToggle.IsChecked == true;
+            target.SpawnTeam = SpawnTeamToggle.IsChecked == true;
+            target.IsOvernight = OvernightToggle.IsChecked == true;
+            target.ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true;
+            target.PlanOnly = PlanOnlyToggle.IsChecked == true;
+            target.IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true;
+            target.UseMcp = UseMcpToggle.IsChecked == true;
+            target.NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true;
+            target.AutoDecompose = AutoDecomposeToggle.IsChecked == true;
+        }
+
+        /// <summary>Applies flags from a <see cref="TaskConfigBase"/> to the main-window toggle controls.</summary>
+        private void ApplyFlagsToUi(TaskConfigBase source)
+        {
+            RemoteSessionToggle.IsChecked = source.RemoteSession;
+            HeadlessToggle.IsChecked = source.Headless;
+            SpawnTeamToggle.IsChecked = source.SpawnTeam;
+            OvernightToggle.IsChecked = source.IsOvernight;
+            ExtendedPlanningToggle.IsChecked = source.ExtendedPlanning;
+            PlanOnlyToggle.IsChecked = source.PlanOnly;
+            IgnoreFileLocksToggle.IsChecked = source.IgnoreFileLocks;
+            UseMcpToggle.IsChecked = source.UseMcp;
+            DefaultNoGitWriteToggle.IsChecked = source.NoGitWrite;
+            AutoDecomposeToggle.IsChecked = source.AutoDecompose;
         }
 
         // ── Execute ────────────────────────────────────────────────
@@ -109,7 +139,7 @@ namespace AgenticEngine
                     task.PlanOnly = true;
                     task.Status = AgentTaskStatus.Planning;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[AgenticEngine] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
+                        $"[HappyEngine] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
@@ -122,7 +152,7 @@ namespace AgenticEngine
                     task.BlockedByTaskId = activeDeps[0].Id;
                     task.BlockedByTaskNumber = activeDeps[0].TaskNumber;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[AgenticEngine] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
+                        $"[HappyEngine] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                 }
@@ -133,7 +163,7 @@ namespace AgenticEngine
                 task.Status = AgentTaskStatus.InitQueued;
                 task.QueuedReason = "Max concurrent tasks reached";
                 _outputTabManager.AppendOutput(task.Id,
-                    $"[AgenticEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
+                    $"[HappyEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
                     _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             }
@@ -524,7 +554,7 @@ TextureImporter:
                 task.Cts?.Dispose();
                 task.Cts = null;
                 _outputTabManager.AppendOutput(task.Id,
-                    "\n[AgenticEngine] Task cancelled and stored.\n", _activeTasks, _historyTasks);
+                    "\n[HappyEngine] Task cancelled and stored.\n", _activeTasks, _historyTasks);
             }
 
             // Create the stored task entry
@@ -550,6 +580,30 @@ TextureImporter:
             FinalizeTask(task);
         }
 
+        private void OnTabResumeRequested(AgentTask task)
+        {
+            if (!task.IsFinished) return;
+
+            // If the task was already moved to history, bring it back to active
+            if (_historyTasks.Contains(task))
+            {
+                _historyTasks.Remove(task);
+                var topRow = RootGrid.RowDefinitions[0];
+                if (topRow.ActualHeight > 0)
+                    topRow.Height = new GridLength(topRow.ActualHeight);
+                _activeTasks.Insert(0, task);
+                RestoreStarRow();
+            }
+
+            var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
+            _outputTabManager.AppendOutput(task.Id,
+                $"\n[HappyEngine] Resumed session — type a follow-up message below. It will be sent with {resumeMethod}.\n",
+                _activeTasks, _historyTasks);
+
+            OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
+            UpdateStatus();
+        }
+
         private void OnTabInputSent(AgentTask task, TextBox inputBox) =>
             _taskExecutionManager.SendInput(task, inputBox, _activeTasks, _historyTasks);
 
@@ -564,8 +618,59 @@ TextureImporter:
             else if (task.IsRunning)
             {
                 _taskExecutionManager.PauseTask(task);
-                _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task paused.\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task paused.\n", _activeTasks, _historyTasks);
             }
+        }
+
+        private void ForceStartQueued_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            if (task.Status is not (AgentTaskStatus.Queued or AgentTaskStatus.InitQueued)) return;
+
+            if (!DarkDialog.ShowConfirm(
+                $"Force-start task #{task.TaskNumber}?\n\n" +
+                $"This will bypass any dependencies or queue limits.\n\n" +
+                $"Task: {task.ShortDescription}",
+                "Force Start Queued Task"))
+                return;
+
+            if (task.Status == AgentTaskStatus.InitQueued)
+            {
+                task.QueuedReason = null;
+                LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
+                UpdateStatus();
+                return;
+            }
+
+            // Queued task
+            if (task.DependencyTaskIdCount > 0)
+            {
+                _taskOrchestrator.MarkResolved(task.Id);
+                task.QueuedReason = null;
+                task.BlockedByTaskId = null;
+                task.BlockedByTaskNumber = null;
+                task.ClearDependencyTaskIds();
+                task.DependencyTaskNumbers.Clear();
+
+                if (task.Process is { HasExited: false })
+                {
+                    _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"\n[HappyEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
+                        _activeTasks, _historyTasks);
+                }
+                else
+                {
+                    LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n");
+                }
+            }
+            else
+            {
+                _fileLockManager.ForceStartQueuedTask(task);
+            }
+
+            _outputTabManager.UpdateTabHeader(task);
+            UpdateStatus();
         }
 
         private void ToggleFileLock_Click(object sender, RoutedEventArgs e)
@@ -614,7 +719,7 @@ TextureImporter:
             {
                 // Force-start an init-queued task (bypass max concurrent limit)
                 task.QueuedReason = null;
-                LaunchTaskProcess(task, $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
+                LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
                 UpdateStatus();
                 return;
             }
@@ -636,12 +741,12 @@ TextureImporter:
                         // Resume suspended process (was queued via drag-drop)
                         _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                         _outputTabManager.AppendOutput(task.Id,
-                            $"\n[AgenticEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
+                            $"\n[HappyEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
                             _activeTasks, _historyTasks);
                     }
                     else
                     {
-                        LaunchTaskProcess(task, $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n");
+                        LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n");
                     }
 
                     _outputTabManager.UpdateTabHeader(task);
@@ -666,6 +771,19 @@ TextureImporter:
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (!string.IsNullOrEmpty(task.Description))
                 Clipboard.SetText(task.Description);
+        }
+
+        private void SetPriorityCritical_Click(object sender, RoutedEventArgs e) => SetTaskPriority(sender, TaskPriority.Critical);
+        private void SetPriorityHigh_Click(object sender, RoutedEventArgs e) => SetTaskPriority(sender, TaskPriority.High);
+        private void SetPriorityNormal_Click(object sender, RoutedEventArgs e) => SetTaskPriority(sender, TaskPriority.Normal);
+        private void SetPriorityLow_Click(object sender, RoutedEventArgs e) => SetTaskPriority(sender, TaskPriority.Low);
+
+        private void SetTaskPriority(object sender, TaskPriority level)
+        {
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+
+            task.PriorityLevel = level;
+            RecalculateQueuePriorities();
         }
 
         private async void RevertTask_Click(object sender, RoutedEventArgs e)
@@ -700,7 +818,7 @@ TextureImporter:
                 if (result != null)
                 {
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
+                        $"\n[HappyEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
                     DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
                 }
                 else
@@ -742,7 +860,7 @@ TextureImporter:
                 _outputTabManager.UpdateTabHeader(task);
                 if (sender != null)
                 {
-                    _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task removed.\n", _activeTasks, _historyTasks);
+                    _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task removed.\n", _activeTasks, _historyTasks);
                     AnimateRemoval(sender, () => MoveToHistory(task));
                 }
                 else
@@ -781,7 +899,7 @@ TextureImporter:
             TaskExecutionManager.KillProcess(task);
             task.Cts?.Dispose();
             task.Cts = null;
-            _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task cancelled.\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task cancelled.\n", _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(task);
             FinalizeTask(task);
         }
@@ -789,7 +907,7 @@ TextureImporter:
         private void RemoveHistoryTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task removed.\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task removed.\n", _activeTasks, _historyTasks);
             AnimateRemoval(el, () =>
             {
                 _outputTabManager.CloseTab(task);
@@ -838,14 +956,14 @@ TextureImporter:
             }
 
             _outputTabManager.CreateTab(task);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Resumed session\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Original task: {task.Description}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Status: {task.StatusText}\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Resumed session\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Original task: {task.Description}\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Status: {task.StatusText}\n", _activeTasks, _historyTasks);
             if (!string.IsNullOrEmpty(task.ConversationId))
-                _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
             var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
-            _outputTabManager.AppendOutput(task.Id, $"\n[AgenticEngine] Type a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"\n[HappyEngine] Type a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
 
             _historyTasks.Remove(task);
             var topRow = RootGrid.RowDefinitions[0];
@@ -854,35 +972,6 @@ TextureImporter:
             _activeTasks.Insert(0, task);
             RestoreStarRow();
             UpdateStatus();
-        }
-
-        private void Continue_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            if (!task.HasRecommendations) return;
-
-            if (!_outputTabManager.HasTab(task.Id))
-                _outputTabManager.CreateTab(task);
-
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Continuing with recommended next steps\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[AgenticEngine] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
-
-            OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
-
-            if (_historyTasks.Remove(task))
-            {
-                var topRow = RootGrid.RowDefinitions[0];
-                if (topRow.ActualHeight > 0)
-                    topRow.Height = new GridLength(topRow.ActualHeight);
-                _activeTasks.Insert(0, task);
-                RestoreStarRow();
-            }
-            UpdateStatus();
-
-            var prompt = "Continue with the recommended next steps from the previous task. Specifically:\n\n" + task.Recommendations;
-            task.Recommendations = "";
-            task.ContinueReason = "";
-            _taskExecutionManager.SendFollowUp(task, prompt, _activeTasks, _historyTasks);
         }
 
         private void RetryTask_Click(object sender, RoutedEventArgs e)
@@ -896,6 +985,49 @@ TextureImporter:
         {
             if (sender is not FrameworkElement { DataContext: AgentTask task }) return;
             RetryTask(task);
+        }
+
+        private void StoreHistoryTask_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: AgentTask task }) return;
+            if (!task.IsFinished) return;
+
+            var output = task.OutputBuilder.ToString();
+
+            var storedTask = new AgentTask
+            {
+                Description = task.Description,
+                ProjectPath = task.ProjectPath,
+                ProjectColor = task.ProjectColor,
+                ProjectDisplayName = task.ProjectDisplayName,
+                StoredPrompt = !string.IsNullOrWhiteSpace(task.CompletionSummary) ? task.CompletionSummary : task.Description,
+                FullOutput = output,
+                SkipPermissions = task.SkipPermissions,
+                StartTime = DateTime.Now
+            };
+            storedTask.Summary = !string.IsNullOrWhiteSpace(task.Summary)
+                ? task.Summary : task.ShortDescription;
+            storedTask.Status = AgentTaskStatus.Completed;
+
+            _storedTasks.Insert(0, storedTask);
+            _historyManager.SaveStoredTasks(_storedTasks);
+            RefreshFilterCombos();
+        }
+
+        private async void VerifyTask_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            if (!task.IsFinished) return;
+
+            if (!_outputTabManager.HasTab(task.Id))
+                _outputTabManager.CreateTab(task);
+
+            _outputTabManager.AppendOutput(task.Id,
+                "\n[HappyEngine] Running result verification...\n", _activeTasks, _historyTasks);
+
+            OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
+
+            await _taskExecutionManager.RunResultVerificationAsync(task, _activeTasks, _historyTasks);
         }
     }
 }

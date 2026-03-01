@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AgenticEngine.csproj" />
+    <ProjectReference Include="..\HappyEngine.csproj" />
   </ItemGroup>
 
 </Project>

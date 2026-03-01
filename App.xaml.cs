@@ -9,13 +9,13 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     public partial class App : Application
     {
         private static readonly string LogDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AgenticEngine", "logs");
+            "HappyEngine", "logs");
         private static readonly string LogFile = Path.Combine(LogDir, "crash.log");
         private static readonly string HangLogFile = Path.Combine(LogDir, "hang.log");
 
@@ -47,7 +47,7 @@ namespace AgenticEngine
             // Show the error so the user can see what's going wrong
             var msg = e.Exception.InnerException?.Message ?? e.Exception.Message;
             var detail = e.Exception.InnerException?.GetType().Name ?? e.Exception.GetType().Name;
-            ShowDarkError($"[{detail}] {msg}\n\nFull details logged to:\n{LogFile}", "AgenticEngine Error");
+            ShowDarkError($"[{detail}] {msg}\n\nFull details logged to:\n{LogFile}", "HappyEngine Error");
 
             e.Handled = true;
         }

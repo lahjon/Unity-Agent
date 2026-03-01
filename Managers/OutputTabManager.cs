@@ -11,7 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class OutputTabManager
     {
@@ -28,6 +28,7 @@ namespace AgenticEngine.Managers
 
         public event Action<AgentTask>? TabCloseRequested;
         public event Action<AgentTask>? TabStoreRequested;
+        public event Action<AgentTask>? TabResumeRequested;
         public event Action<AgentTask, TextBox>? InputSent;
 
         public Dictionary<string, TabItem> Tabs => _tabs;
@@ -205,9 +206,10 @@ namespace AgenticEngine.Managers
             var prefix = isGemini ? "\uE91B " : "";
             var label = new TextBlock
             {
-                Text = prefix + task.ShortDescription,
+                Text = (prefix + task.ShortDescription).ReplaceLineEndings(" "),
                 MaxWidth = 120,
                 TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.NoWrap,
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = isGemini
                     ? (Brush)Application.Current.FindResource("Accent")
@@ -248,6 +250,9 @@ namespace AgenticEngine.Managers
             closeBtn.Template = closeBtnTemplate;
             closeBtn.Click += (_, _) => TabCloseRequested?.Invoke(task);
 
+            var resumeItem = new MenuItem { Header = "Resume Task" };
+            resumeItem.Click += (_, _) => TabResumeRequested?.Invoke(task);
+
             var storeItem = new MenuItem { Header = "Store Task" };
             storeItem.Click += (_, _) => TabStoreRequested?.Invoke(task);
 
@@ -255,8 +260,14 @@ namespace AgenticEngine.Managers
             closeItem.Click += (_, _) => TabCloseRequested?.Invoke(task);
 
             var ctx = new ContextMenu();
+            ctx.Items.Add(resumeItem);
             ctx.Items.Add(storeItem);
             ctx.Items.Add(closeItem);
+
+            ctx.Opened += (_, _) =>
+            {
+                resumeItem.Visibility = task.IsFinished ? Visibility.Visible : Visibility.Collapsed;
+            };
 
             panel.Children.Add(dotGrid);
             panel.Children.Add(label);
@@ -360,7 +371,7 @@ namespace AgenticEngine.Managers
                     ApplyPulseAnimation(glow, 2.0, 0, 0.3);
 
                 if (sp.Children.Count > 1 && sp.Children[1] is TextBlock label)
-                    label.Text = task.ShortDescription;
+                    label.Text = task.ShortDescription.ReplaceLineEndings(" ");
 
                 if (sp.Children.Count > 2 && sp.Children[2] is Button closeBtn)
                 {
@@ -587,6 +598,7 @@ namespace AgenticEngine.Managers
                         FontSize = 12,
                         FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal,
                         TextTrimming = TextTrimming.CharacterEllipsis,
+                        TextWrapping = TextWrapping.NoWrap,
                         MaxWidth = 200
                     };
 

@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Windows.Data;
 
-namespace AgenticEngine.Converters
+namespace HappyEngine.Converters
 {
     public class WrapTooltipTextConverter : IValueConverter
     {

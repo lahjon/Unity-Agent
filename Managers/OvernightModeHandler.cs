@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Windows.Threading;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     /// <summary>
     /// Manages overnight retry timers, iteration tracking, and consecutive failure counting.
@@ -161,7 +161,7 @@ namespace AgenticEngine.Managers
                 _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
             var duration = task.EndTime.Value - task.StartTime;
             _outputProcessor.AppendOutput(task.Id, $"[Overnight] Total runtime: {(int)duration.TotalHours}h {duration.Minutes}m across {task.CurrentIteration} iteration(s).\n", activeTasks, historyTasks);
-            _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
+            _ = _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks);
             _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
             moveToHistory(task);
@@ -176,7 +176,7 @@ namespace AgenticEngine.Managers
 
             task.LastIterationOutputStart = task.OutputBuilder.Length;
 
-            var continuationPrompt = TaskLauncher.BuildOvernightContinuationPrompt(task.CurrentIteration, task.MaxIterations);
+            var continuationPrompt = TaskLauncher.BuildOvernightContinuationPrompt(task.CurrentIteration, task.MaxIterations, task.Id);
 
             var promptFile = Path.Combine(_scriptDir, $"overnight_{task.Id}_{task.CurrentIteration}.txt");
             File.WriteAllText(promptFile, continuationPrompt, Encoding.UTF8);

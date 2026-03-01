@@ -2,14 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using AgenticEngine.Managers;
+using HappyEngine.Helpers;
+using HappyEngine.Managers;
 
-namespace AgenticEngine.Controls
+namespace HappyEngine.Controls
 {
     public class TaskNodeGraphPanel : Border
     {
@@ -58,7 +60,6 @@ namespace AgenticEngine.Controls
         public event Action<AgentTask>? ShowOutputRequested;
         public event Action<AgentTask>? CopyPromptRequested;
         public event Action<AgentTask>? RevertRequested;
-        public event Action<AgentTask>? ContinueRequested;
         public event Action<AgentTask>? ForceStartRequested;
         public event Action<AgentTask, AgentTask>? DependencyCreated;
         public event Action<AgentTask>? DependenciesRemoved;
@@ -73,7 +74,7 @@ namespace AgenticEngine.Controls
             Background = (Brush)Application.Current.FindResource("BgSurface");
             CornerRadius = new CornerRadius(8);
             BorderThickness = new Thickness(1);
-            BorderBrush = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C));
+            BorderBrush = BrushCache.Theme("BgElevated");
             Padding = new Thickness(0);
 
             var root = new DockPanel();
@@ -126,7 +127,7 @@ namespace AgenticEngine.Controls
             gridBtn.Click += (_, _) =>
             {
                 _showGrid = !_showGrid;
-                _canvas.Background = _showGrid ? _gridBrush : Brushes.Transparent;
+                _scrollViewer.Background = _showGrid ? _gridBrush : Brushes.Transparent;
             };
 
             var progressBtn = GraphRenderer.CreateHeaderButton("\uE9D2", "Toggle subtask progress panel");
@@ -155,11 +156,13 @@ namespace AgenticEngine.Controls
             _canvasTransformGroup.Children.Add(_scaleTransform);
             _canvasTransformGroup.Children.Add(_translateTransform);
 
-            _gridBrush = GraphRenderer.CreateGridBrush();
+            var gridBrush = GraphRenderer.CreateGridBrush();
+            gridBrush.Transform = _canvasTransformGroup;
+            _gridBrush = gridBrush;
 
             _canvas = new Canvas
             {
-                Background = _gridBrush,
+                Background = Brushes.Transparent,
                 ClipToBounds = false,
                 RenderTransform = _canvasTransformGroup,
                 RenderTransformOrigin = new Point(0, 0)
@@ -169,7 +172,7 @@ namespace AgenticEngine.Controls
             {
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Background = Brushes.Transparent,
+                Background = _gridBrush,
                 Content = _canvas,
                 Focusable = true
             };
@@ -183,7 +186,6 @@ namespace AgenticEngine.Controls
             _renderer.ShowOutputRequested += t => ShowOutputRequested?.Invoke(t);
             _renderer.CopyPromptRequested += t => CopyPromptRequested?.Invoke(t);
             _renderer.RevertRequested += t => RevertRequested?.Invoke(t);
-            _renderer.ContinueRequested += t => ContinueRequested?.Invoke(t);
             _renderer.ForceStartRequested += t => ForceStartRequested?.Invoke(t);
             _renderer.DependenciesRemoved += t => DependenciesRemoved?.Invoke(t);
             _renderer.NodeHighlightRequested += id => _interaction.ToggleNodeSelection(id);
@@ -237,7 +239,7 @@ namespace AgenticEngine.Controls
 
             _progressPanel = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(180, 30, 30, 36)),
+                Background = BrushCache.Theme("GraphPanelOverlay"),
                 BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
                 BorderThickness = new Thickness(1, 0, 0, 0),
                 Child = progressScroll,
@@ -262,11 +264,18 @@ namespace AgenticEngine.Controls
         public void Initialize(ObservableCollection<AgentTask> activeTasks, FileLockManager fileLockManager)
         {
             if (_activeTasks != null)
+            {
                 _activeTasks.CollectionChanged -= OnTasksChanged;
+                foreach (var task in _activeTasks)
+                    task.PropertyChanged -= OnTaskPropertyChanged;
+            }
 
             _activeTasks = activeTasks;
             _fileLockManager = fileLockManager;
             _activeTasks.CollectionChanged += OnTasksChanged;
+
+            foreach (var task in _activeTasks)
+                task.PropertyChanged += OnTaskPropertyChanged;
 
             _interaction.SetActiveTasks(_activeTasks);
 
@@ -289,8 +298,28 @@ namespace AgenticEngine.Controls
 
         private void OnTasksChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
+            if (e.OldItems != null)
+                foreach (AgentTask task in e.OldItems)
+                    task.PropertyChanged -= OnTaskPropertyChanged;
+
+            if (e.NewItems != null)
+                foreach (AgentTask task in e.NewItems)
+                    task.PropertyChanged += OnTaskPropertyChanged;
+
             _graphDirty = true;
             Dispatcher.BeginInvoke(RebuildGraph);
+        }
+
+        private void OnTaskPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            // Only mark dirty for properties that affect node appearance
+            if (e.PropertyName is "Status" or "StatusText" or "StatusColor" or "IsRunning"
+                or "IsQueued" or "IsInitQueued" or "IsFinished" or "IsPaused"
+                or "Summary" or "CurrentIteration" or "Priority" or "HasPriorityBadge"
+                or "ToolActivityText" or "HasToolActivity")
+            {
+                _graphDirty = true;
+            }
         }
 
         public void MarkDirty() => _graphDirty = true;
@@ -336,8 +365,7 @@ namespace AgenticEngine.Controls
             // Draw nodes
             foreach (var task in tasks)
                 _renderer.DrawNode(task, tasks, _nodePositions,
-                    _interaction.SelectedNodeId, _interaction.HighlightedNodeIds,
-                    _scrollViewer, _scaleTransform, _translateTransform, _activeTasks);
+                    _interaction.SelectedNodeId, _interaction.HighlightedNodeIds, _activeTasks);
 
             // Resize canvas to fit content
             _renderer.ResizeCanvas(_nodePositions);
@@ -394,7 +422,11 @@ namespace AgenticEngine.Controls
             _refreshTimer?.Stop();
             _refreshTimer = null;
             if (_activeTasks != null)
+            {
                 _activeTasks.CollectionChanged -= OnTasksChanged;
+                foreach (var task in _activeTasks)
+                    task.PropertyChanged -= OnTaskPropertyChanged;
+            }
         }
     }
 }

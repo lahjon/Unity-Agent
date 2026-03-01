@@ -9,7 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class ChatManager
     {
@@ -84,6 +84,12 @@ namespace AgenticEngine.Managers
             ClearPendingImages();
             _chatCts?.Cancel();
             Interlocked.Exchange(ref _chatBusy, 0);
+
+            // Auto-set a model if none is selected or only the placeholder is set
+            var selected = _modelCombo.SelectedItem as string;
+            if (string.IsNullOrEmpty(selected) || selected == "(no API key set)")
+                PopulateModelCombo();
+
             _input.Focus();
         }
 
@@ -266,6 +272,7 @@ namespace AgenticEngine.Managers
             var selectedModel = _modelCombo.SelectedItem as string;
             if (string.IsNullOrEmpty(selectedModel) || selectedModel == "(no API key set)")
             {
+                Interlocked.Exchange(ref _chatBusy, 0);
                 AddChatBubble("System", "No chat model available.\nConfigure a Gemini or Claude API key in Settings.",
                     (Brush)Application.Current.FindResource("DangerAlert"));
                 return;
@@ -306,7 +313,7 @@ namespace AgenticEngine.Managers
 
             try
             {
-                var systemPrompt = "You are a helpful coding assistant embedded in the Agentic Engine app. " +
+                var systemPrompt = "You are a helpful coding assistant embedded in the Happy Engine app. " +
                     "Give concise, practical suggestions. Keep responses short unless asked for detail. " +
                     "The user is working on software projects, primarily Unity game development.";
 

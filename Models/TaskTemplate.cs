@@ -1,4 +1,4 @@
-namespace AgenticEngine.Models
+namespace HappyEngine.Models
 {
     public class TaskTemplate : TaskConfigBase
     {

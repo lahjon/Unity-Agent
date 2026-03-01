@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public enum SuggestionCategory
     {

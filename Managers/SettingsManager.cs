@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
-using AgenticEngine.Models;
+using HappyEngine.Models;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class SettingsManager
     {

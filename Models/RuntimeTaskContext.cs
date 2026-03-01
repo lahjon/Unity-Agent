@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     /// <summary>
     /// Transient runtime state for an active agent task. Holds the OS process,

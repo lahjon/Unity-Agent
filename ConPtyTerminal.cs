@@ -4,10 +4,10 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using AgenticEngine.Models;
+using HappyEngine.Models;
 using Microsoft.Win32.SafeHandles;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     public sealed class ConPtyTerminal : IDisposable
     {

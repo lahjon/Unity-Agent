@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace AgenticEngine.Models
+namespace HappyEngine.Models
 {
     /// <summary>
     /// Minimal VT100 screen buffer that processes raw ConPty output.

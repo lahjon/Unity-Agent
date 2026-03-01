@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class CompletionAnalyzer : ICompletionAnalyzer
     {
@@ -134,43 +134,40 @@ namespace AgenticEngine.Managers
             return result.Length > 0 ? result : null;
         }
 
-        // ── LLM-Based Continue Verification ─────────────────────────
 
-        public async Task<ContinueVerification?> VerifyContinueNeededAsync(
-            string outputTail, string? recommendations, string taskDescription,
+        // ── Result Verification ─────────────────────────────────────
+
+        public async Task<ResultVerification?> VerifyResultAsync(
+            string outputTail, string taskDescription, string? completionSummary,
             CancellationToken ct = default)
         {
             try
             {
                 var contextTail = outputTail.Length > 2000 ? outputTail[^2000..] : outputTail;
 
-                var hasRecommendations = !string.IsNullOrWhiteSpace(recommendations);
-                var recommendationsBlock = hasRecommendations
-                    ? $"EXTRACTED RECOMMENDATIONS:\n{recommendations}\n\n"
+                var summaryBlock = !string.IsNullOrWhiteSpace(completionSummary)
+                    ? $"COMPLETION SUMMARY:\n{completionSummary}\n\n"
                     : "";
 
                 var prompt =
-                    "You are analyzing an AI coding agent's output to determine if the task needs more work.\n\n" +
+                    "You are verifying an AI coding agent's work to confirm it actually accomplished the requested task.\n\n" +
                     $"TASK DESCRIPTION:\n{taskDescription}\n\n" +
                     $"AGENT'S FINAL OUTPUT (tail):\n{contextTail}\n\n" +
-                    recommendationsBlock +
-                    "QUESTION: Did the agent complete the core task, or is there genuinely unfinished work?\n\n" +
+                    summaryBlock +
+                    "QUESTION: Did the agent's work actually accomplish what was requested? Verify the result quality.\n\n" +
                     "Rules:\n" +
-                    "- If the agent completed what was asked and any mentions of next steps are just optional improvements, " +
-                    "nice-to-haves, testing suggestions, or future enhancements → COMPLETE\n" +
-                    "- If the agent explicitly states it couldn't finish something, hit errors, left work undone, " +
-                    "or is requesting more information from the user → INCOMPLETE\n" +
-                    "- If the agent is asking questions or waiting for user input/clarification → INCOMPLETE\n" +
-                    "- Suggestions like \"add tests\", \"consider adding\", \"you might want to\" are optional → COMPLETE\n" +
-                    "- Items like \"still need to implement X\", \"couldn't fix Y\", \"remaining: Z\" are unfinished → INCOMPLETE\n\n" +
+                    "- Check that the core requirements from the task description were addressed\n" +
+                    "- If the agent made the requested changes and they appear correct → PASS\n" +
+                    "- If the agent encountered errors, made incorrect changes, or missed key requirements → FAIL\n" +
+                    "- If the task failed or was cancelled, verify whether any partial work was done correctly\n" +
+                    "- Focus on correctness, not style or optional improvements\n\n" +
                     "Respond with EXACTLY one line in this format:\n" +
-                    "COMPLETE|<one-sentence summary of what was done>\n" +
+                    "PASS|<one-sentence summary of what was verified>\n" +
                     "or\n" +
-                    "INCOMPLETE|<one-sentence description of what still needs to be done or what info is being requested>\n\n" +
+                    "FAIL|<one-sentence description of what went wrong or was missed>\n\n" +
                     "Examples:\n" +
-                    "COMPLETE|All requested changes implemented successfully\n" +
-                    "INCOMPLETE|Error handling for the API endpoint was not implemented due to build errors\n" +
-                    "INCOMPLETE|Agent is asking which database driver to use for the connection layer";
+                    "PASS|Authentication endpoint added with proper JWT validation and error handling\n" +
+                    "FAIL|The database migration was created but the API endpoint was not updated to use the new schema";
 
                 var psi = new ProcessStartInfo
                 {
@@ -199,31 +196,31 @@ namespace AgenticEngine.Managers
                 foreach (var line in processedText.Split('\n'))
                 {
                     var trimmed = line.Trim();
-                    if (trimmed.StartsWith("COMPLETE|", StringComparison.OrdinalIgnoreCase))
+                    if (trimmed.StartsWith("PASS|", StringComparison.OrdinalIgnoreCase))
                     {
-                        return new ContinueVerification
+                        return new ResultVerification
                         {
-                            ShouldContinue = false,
-                            Reason = trimmed["COMPLETE|".Length..].Trim()
+                            Passed = true,
+                            Summary = trimmed["PASS|".Length..].Trim()
                         };
                     }
-                    if (trimmed.StartsWith("INCOMPLETE|", StringComparison.OrdinalIgnoreCase))
+                    if (trimmed.StartsWith("FAIL|", StringComparison.OrdinalIgnoreCase))
                     {
-                        return new ContinueVerification
+                        return new ResultVerification
                         {
-                            ShouldContinue = true,
-                            Reason = trimmed["INCOMPLETE|".Length..].Trim()
+                            Passed = false,
+                            Summary = trimmed["FAIL|".Length..].Trim()
                         };
                     }
                 }
 
-                AppLogger.Debug("CompletionAnalyzer", $"Could not parse continue verification response: {processedText}");
+                AppLogger.Debug("CompletionAnalyzer", $"Could not parse result verification response: {processedText}");
                 return null;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                AppLogger.Debug("CompletionAnalyzer", "Continue verification failed", ex);
+                AppLogger.Debug("CompletionAnalyzer", "Result verification failed", ex);
                 return null;
             }
         }
@@ -242,33 +239,6 @@ namespace AgenticEngine.Managers
             sb.AppendLine("───────────────────────────────────────────");
             sb.AppendLine($" Status: {status}");
             sb.AppendLine($" Duration: {(int)duration.TotalMinutes}m {duration.Seconds}s");
-
-            if (fileChanges != null)
-            {
-                var totalAdded = 0;
-                var totalRemoved = 0;
-                foreach (var (_, added, removed) in fileChanges)
-                {
-                    totalAdded += added;
-                    totalRemoved += removed;
-                }
-
-                sb.AppendLine($" Files modified: {fileChanges.Count}");
-                sb.AppendLine($" Lines changed: +{totalAdded} / -{totalRemoved}");
-
-                if (fileChanges.Count > 0)
-                {
-                    sb.AppendLine("───────────────────────────────────────────");
-                    sb.AppendLine(" Modified files:");
-                    foreach (var (name, added, removed) in fileChanges)
-                        sb.AppendLine($"   {name} | +{added} -{removed}");
-                }
-            }
-            else
-            {
-                sb.AppendLine(" Files modified: (git not available)");
-            }
-
             sb.AppendLine("═══════════════════════════════════════════");
             return sb.ToString();
         }

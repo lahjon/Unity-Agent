@@ -6,9 +6,9 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using AgenticEngine.Models;
+using HappyEngine.Models;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     public partial class MainWindow
     {
@@ -18,7 +18,7 @@ namespace AgenticEngine
 
         private string SavedPromptsFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AgenticEngine", "saved_prompts.json");
+            "HappyEngine", "saved_prompts.json");
 
         private async System.Threading.Tasks.Task LoadSavedPromptsAsync()
         {
@@ -66,18 +66,9 @@ namespace AgenticEngine
                 PromptText = text,
                 DisplayName = text.Length > 40 ? text.Substring(0, 40) + "..." : text,
                 Model = modelTag,
-                RemoteSession = RemoteSessionToggle.IsChecked == true,
-                Headless = HeadlessToggle.IsChecked == true,
-                SpawnTeam = SpawnTeamToggle.IsChecked == true,
-                IsOvernight = OvernightToggle.IsChecked == true,
-                ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true,
-                PlanOnly = PlanOnlyToggle.IsChecked == true,
-                IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true,
-                UseMcp = UseMcpToggle.IsChecked == true,
-                NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true,
-                AutoDecompose = AutoDecomposeToggle.IsChecked == true,
                 AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
             };
+            ReadUiFlagsInto(entry);
 
             _savedPrompts.Insert(0, entry);
             PersistSavedPrompts();
@@ -132,16 +123,7 @@ namespace AgenticEngine
             }
 
             // Restore toggles
-            RemoteSessionToggle.IsChecked = entry.RemoteSession;
-            HeadlessToggle.IsChecked = entry.Headless;
-            SpawnTeamToggle.IsChecked = entry.SpawnTeam;
-            OvernightToggle.IsChecked = entry.IsOvernight;
-            ExtendedPlanningToggle.IsChecked = entry.ExtendedPlanning;
-            PlanOnlyToggle.IsChecked = entry.PlanOnly;
-            IgnoreFileLocksToggle.IsChecked = entry.IgnoreFileLocks;
-            UseMcpToggle.IsChecked = entry.UseMcp;
-            DefaultNoGitWriteToggle.IsChecked = entry.NoGitWrite;
-            AutoDecomposeToggle.IsChecked = entry.AutoDecompose;
+            ApplyFlagsToUi(entry);
             AdditionalInstructionsInput.Text = entry.AdditionalInstructions ?? "";
         }
 

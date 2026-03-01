@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace AgenticEngine.Models
+namespace HappyEngine.Models
 {
     public class ProjectActivityStats
     {

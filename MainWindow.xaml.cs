@@ -9,19 +9,20 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using AgenticEngine.Dialogs;
-using AgenticEngine.Managers;
-using AgenticEngine.Models;
+using HappyEngine.Dialogs;
+using HappyEngine.Managers;
+using HappyEngine.Models;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
-    public partial class MainWindow : Window, IDisposable
+    public partial class MainWindow : Window, IDisposable, IProjectPanelView
     {
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
@@ -76,6 +77,23 @@ namespace AgenticEngine
         private GridLength _terminalExpandedHeight = new(120);
 
 
+        // IProjectPanelView — expose named XAML controls to ProjectManager
+        TextBlock IProjectPanelView.PromptProjectLabel => PromptProjectLabel;
+        TextBlock IProjectPanelView.AddProjectPath => AddProjectPath;
+        StackPanel IProjectPanelView.ProjectListPanel => ProjectListPanel;
+        ToggleButton IProjectPanelView.UseMcpToggle => UseMcpToggle;
+        TextBox IProjectPanelView.ShortDescBox => ShortDescBox;
+        TextBox IProjectPanelView.LongDescBox => LongDescBox;
+        TextBox IProjectPanelView.RuleInstructionBox => RuleInstructionBox;
+        ToggleButton IProjectPanelView.EditShortDescToggle => EditShortDescToggle;
+        ToggleButton IProjectPanelView.EditLongDescToggle => EditLongDescToggle;
+        ToggleButton IProjectPanelView.EditRuleInstructionToggle => EditRuleInstructionToggle;
+        ItemsControl IProjectPanelView.ProjectRulesList => ProjectRulesList;
+        TextBox IProjectPanelView.CrashLogPathsBox => CrashLogPathsBox;
+        ToggleButton IProjectPanelView.EditCrashLogPathsToggle => EditCrashLogPathsToggle;
+        Button IProjectPanelView.RegenerateDescBtn => RegenerateDescBtn;
+        Dispatcher IProjectPanelView.ViewDispatcher => Dispatcher;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -84,7 +102,7 @@ namespace AgenticEngine
 
             var appDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "AgenticEngine");
+                "HappyEngine");
             Directory.CreateDirectory(appDataDir);
 
             var scriptDir = Path.Combine(appDataDir, "scripts");
@@ -101,6 +119,7 @@ namespace AgenticEngine
             _outputTabManager = new OutputTabManager(OutputTabs, Dispatcher);
             _outputTabManager.TabCloseRequested += OnTabCloseRequested;
             _outputTabManager.TabStoreRequested += OnTabStoreRequested;
+            _outputTabManager.TabResumeRequested += OnTabResumeRequested;
             _outputTabManager.InputSent += OnTabInputSent;
 
             // ProjectManager needs many UI refs — initialize after InitializeComponent.
@@ -109,12 +128,7 @@ namespace AgenticEngine
             _projectManager = new ProjectManager(
                 appDataDir,
                 PeekInitialProjectPath(appDataDir),
-                PromptProjectLabel, AddProjectPath, ProjectListPanel,
-                UseMcpToggle, ShortDescBox, LongDescBox, RuleInstructionBox,
-                EditShortDescToggle, EditLongDescToggle, EditRuleInstructionToggle,
-                ShortDescEditButtons, LongDescEditButtons, RuleInstructionEditButtons,
-                ProjectRulesList,
-                RegenerateDescBtn, Dispatcher);
+                this);
             _projectManager.McpInvestigationRequested += OnMcpInvestigationRequested;
             _projectManager.ProjectSwapStarted += OnProjectSwapStarted;
             _projectManager.ProjectSwapCompleted += OnProjectSwapCompleted;
@@ -417,7 +431,7 @@ namespace AgenticEngine
 
         private string SystemPromptFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AgenticEngine", "system_prompt.txt");
+            "HappyEngine", "system_prompt.txt");
 
         private async System.Threading.Tasks.Task LoadSystemPromptAsync()
         {
@@ -495,6 +509,7 @@ namespace AgenticEngine
                 _projectManager.UpdateMcpToggleForProject();
                 var activeEntry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
                 ProjectTypeGameToggle.IsChecked = activeEntry?.IsGame == true;
+                UpdateMcpVisibility(activeEntry?.IsGame == true);
                 SyncMcpSettingsFields();
                 await _helperManager.SwitchProjectAsync(_projectManager.ProjectPath);
                 RefreshFilterCombos();
@@ -564,6 +579,30 @@ namespace AgenticEngine
 
         private void SaveRuleInstruction_Click(object sender, RoutedEventArgs e) => _projectManager.SaveRuleInstruction();
 
+        private void EditCrashLogPathsToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            var editing = EditCrashLogPathsToggle.IsChecked == true;
+            CrashLogPathsBox.IsReadOnly = !editing;
+            CrashLogPathsBox.Opacity = editing ? 1.0 : 0.6;
+            CrashLogPathsEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void SaveCrashLogPaths_Click(object sender, RoutedEventArgs e)
+        {
+            var paths = CrashLogPathsBox.Text
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => p.Trim())
+                .Where(p => !string.IsNullOrEmpty(p))
+                .ToList();
+            _projectManager.SaveCrashLogPaths(paths);
+        }
+
+        private void ResetCrashLogPaths_Click(object sender, RoutedEventArgs e)
+        {
+            var defaults = ProjectManager.GetDefaultCrashLogPaths();
+            CrashLogPathsBox.Text = string.Join("\n", defaults);
+        }
+
         private void ProjectTypeGameToggle_Changed(object sender, RoutedEventArgs e)
         {
             var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
@@ -571,7 +610,17 @@ namespace AgenticEngine
             {
                 entry.IsGame = ProjectTypeGameToggle.IsChecked == true;
                 _projectManager.SaveProjects();
+                UpdateMcpVisibility(entry.IsGame);
             }
+        }
+
+        private void UpdateMcpVisibility(bool isGame)
+        {
+            var vis = isGame ? Visibility.Visible : Visibility.Collapsed;
+            McpTabItem.Visibility = vis;
+            UseMcpToggle.Visibility = vis;
+            if (!isGame)
+                UseMcpToggle.IsChecked = false;
         }
 
         // ── MCP Settings ────────────────────────────────────────────
@@ -803,7 +852,7 @@ namespace AgenticEngine
                 else if (task.IsRunning)
                 {
                     _taskExecutionManager.PauseTask(task);
-                    _outputTabManager.AppendOutput(task.Id, "\n[AgenticEngine] Task paused.\n", _activeTasks, _historyTasks);
+                    _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task paused.\n", _activeTasks, _historyTasks);
                 }
             };
             NodeGraphPanel.CopyPromptRequested += task =>
@@ -812,26 +861,6 @@ namespace AgenticEngine
                     Clipboard.SetText(task.Description);
             };
             NodeGraphPanel.RevertRequested += task => RevertTaskFromGraph(task);
-            NodeGraphPanel.ContinueRequested += task =>
-            {
-                if (!task.HasRecommendations) return;
-                if (!_outputTabManager.HasTab(task.Id))
-                    _outputTabManager.CreateTab(task);
-                _outputTabManager.AppendOutput(task.Id, "[AgenticEngine] Continuing with recommended next steps\n", _activeTasks, _historyTasks);
-                OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
-                if (_historyTasks.Remove(task))
-                {
-                    var topRow = RootGrid.RowDefinitions[0];
-                    if (topRow.ActualHeight > 0)
-                        topRow.Height = new GridLength(topRow.ActualHeight);
-                    _activeTasks.Insert(0, task);
-                    RestoreStarRow();
-                }
-                UpdateStatus();
-                var prompt = "Continue with the recommended next steps from the previous task. Specifically:\n\n" + task.Recommendations;
-                task.Recommendations = "";
-                _taskExecutionManager.SendFollowUp(task, prompt, _activeTasks, _historyTasks);
-            };
             NodeGraphPanel.ForceStartRequested += task =>
             {
                 if (task.Status == AgentTaskStatus.InitQueued)
@@ -840,7 +869,7 @@ namespace AgenticEngine
                     task.QueuedReason = null;
                     task.StartTime = DateTime.Now;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n",
+                        $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
@@ -861,7 +890,7 @@ namespace AgenticEngine
                         {
                             _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[AgenticEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
+                                $"\n[HappyEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
                                 _activeTasks, _historyTasks);
                         }
                         else
@@ -869,7 +898,7 @@ namespace AgenticEngine
                             task.Status = AgentTaskStatus.Running;
                             task.StartTime = DateTime.Now;
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[AgenticEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
+                                $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
                                 _activeTasks, _historyTasks);
                             _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                         }
@@ -913,7 +942,7 @@ namespace AgenticEngine
                 }
 
                 _outputTabManager.AppendOutput(target.Id,
-                    $"\n[AgenticEngine] Task #{target.TaskNumber} queued — waiting for #{source.TaskNumber} to complete.\n",
+                    $"\n[HappyEngine] Task #{target.TaskNumber} queued — waiting for #{source.TaskNumber} to complete.\n",
                     _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(target);
                 UpdateStatus();
@@ -936,7 +965,7 @@ namespace AgenticEngine
                         {
                             _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[AgenticEngine] Dependencies removed — resuming task #{task.TaskNumber}.\n",
+                                $"\n[HappyEngine] Dependencies removed — resuming task #{task.TaskNumber}.\n",
                                 _activeTasks, _historyTasks);
                         }
                         else
@@ -944,7 +973,7 @@ namespace AgenticEngine
                             task.Status = AgentTaskStatus.Running;
                             task.StartTime = DateTime.Now;
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[AgenticEngine] Dependencies removed — starting task #{task.TaskNumber}...\n",
+                                $"\n[HappyEngine] Dependencies removed — starting task #{task.TaskNumber}...\n",
                                 _activeTasks, _historyTasks);
                             _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                         }
@@ -1009,7 +1038,7 @@ namespace AgenticEngine
                     if (proc.ExitCode == 0)
                     {
                         _outputTabManager.AppendOutput(task.Id,
-                            $"\n[AgenticEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
+                            $"\n[HappyEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
                         Dialogs.DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
                     }
                     else
@@ -1048,6 +1077,7 @@ namespace AgenticEngine
                 GeminiApiKeyBox.Text = _geminiService.GetMaskedApiKey();
                 GeminiKeyStatus.Text = "API key saved successfully";
                 GeminiKeyStatus.Foreground = (Brush)FindResource("Success");
+                _chatManager.PopulateModelCombo();
             }
             catch (Exception ex)
             {
@@ -1406,7 +1436,7 @@ namespace AgenticEngine
             // If already Queued, dependency was added above — status stays Queued
 
             _outputTabManager.AppendOutput(dragged.Id,
-                $"\n[AgenticEngine] Task #{dragged.TaskNumber} queued — waiting for #{target.TaskNumber} to complete.\n",
+                $"\n[HappyEngine] Task #{dragged.TaskNumber} queued — waiting for #{target.TaskNumber} to complete.\n",
                 _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(dragged);
             UpdateStatus();
@@ -1428,8 +1458,9 @@ namespace AgenticEngine
         }
 
         /// <summary>
-        /// Assigns descending Priority values to all Queued/InitQueued tasks
-        /// based on their position in the active list (earlier = higher priority).
+        /// Assigns descending Priority values to all Queued/InitQueued tasks.
+        /// PriorityLevel is the primary sort key (Critical > High > Normal > Low),
+        /// then position in the active list (earlier = higher priority).
         /// </summary>
         private void RecalculateQueuePriorities()
         {
@@ -1437,8 +1468,17 @@ namespace AgenticEngine
                 .Where(t => t.IsQueued || t.IsInitQueued)
                 .ToList();
 
-            for (int i = 0; i < queuedTasks.Count; i++)
-                queuedTasks[i].Priority = queuedTasks.Count - i;
+            // Sort by PriorityLevel descending (Critical=3, High=2, Normal=1, Low=0),
+            // then by original list position (stable sort preserves relative order).
+            var sorted = queuedTasks
+                .Select((t, i) => (Task: t, Index: i))
+                .OrderByDescending(x => (int)x.Task.PriorityLevel)
+                .ThenBy(x => x.Index)
+                .Select(x => x.Task)
+                .ToList();
+
+            for (int i = 0; i < sorted.Count; i++)
+                sorted[i].Priority = sorted.Count - i;
         }
 
         private bool WouldCreateCircularDependency(AgentTask dragged, AgentTask target)
@@ -1556,7 +1596,7 @@ namespace AgenticEngine
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
             _outputTabManager.AppendOutput(newTask.Id,
-                $"[AgenticEngine] Executing stored plan from task #{task.TaskNumber}\n",
+                $"[HappyEngine] Executing stored plan from task #{task.TaskNumber}\n",
                 _activeTasks, _historyTasks);
             _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
             RefreshFilterCombos();
@@ -1707,6 +1747,7 @@ namespace AgenticEngine
             // OutputTabManager
             _outputTabManager.TabCloseRequested -= OnTabCloseRequested;
             _outputTabManager.TabStoreRequested -= OnTabStoreRequested;
+            _outputTabManager.TabResumeRequested -= OnTabResumeRequested;
             _outputTabManager.InputSent -= OnTabInputSent;
 
             // ProjectManager
@@ -2295,7 +2336,72 @@ namespace AgenticEngine
             return sb.ToString();
         }
 
-        // ── Helper ─────────────────────────────────────────────────
+        // ── Automation ─────────────────────────────────────────────
+
+        private void BuildInvestigation_Click(object sender, RoutedEventArgs e)
+        {
+            var projectPath = _projectManager.ProjectPath;
+            if (string.IsNullOrEmpty(projectPath)) return;
+
+            var crashPaths = _projectManager.GetCrashLogPaths(projectPath);
+            var pathsList = string.Join("\n", crashPaths.Select(p => $"- `{p}`"));
+
+            var desc = "Investigate recent build failures and crashes for this project.\n\n" +
+                       "## Instructions\n\n" +
+                       "1. Read the following crash/error log files and analyze their contents:\n" +
+                       $"{pathsList}\n\n" +
+                       "2. Identify the root cause of the most recent errors or crashes.\n" +
+                       "3. Propose and implement fixes for the issues found.\n" +
+                       "4. If a log file does not exist or is empty, note it and continue with the others.\n\n" +
+                       "Focus on the most recent entries first. Provide a clear summary of what went wrong and what was fixed.";
+
+            var task = TaskLauncher.CreateTask(
+                desc,
+                projectPath,
+                true,
+                RemoteSessionToggle.IsChecked == true,
+                HeadlessToggle.IsChecked == true,
+                OvernightToggle.IsChecked == true,
+                IgnoreFileLocksToggle.IsChecked == true,
+                UseMcpToggle.IsChecked == true,
+                SpawnTeamToggle.IsChecked == true,
+                ExtendedPlanningToggle.IsChecked == true,
+                DefaultNoGitWriteToggle.IsChecked == true,
+                planOnly: false,
+                imagePaths: _imageManager.DetachImages());
+            task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
+            task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
+            task.Summary = "Build Investigation";
+
+            ResetPerTaskToggles();
+
+            if (task.Headless)
+            {
+                _taskExecutionManager.LaunchHeadless(task);
+                UpdateStatus();
+                return;
+            }
+
+            AddActiveTask(task);
+            _outputTabManager.CreateTab(task);
+
+            if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
+            {
+                task.Status = AgentTaskStatus.InitQueued;
+                task.QueuedReason = "Max concurrent tasks reached";
+                _outputTabManager.AppendOutput(task.Id,
+                    $"[HappyEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
+                    _activeTasks, _historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+            }
+            else
+            {
+                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+            }
+
+            RefreshFilterCombos();
+            UpdateStatus();
+        }
 
         private async void GenerateSuggestions_Click(object sender, RoutedEventArgs e)
         {
@@ -2395,7 +2501,7 @@ namespace AgenticEngine
                 task.Status = AgentTaskStatus.InitQueued;
                 task.QueuedReason = "Max concurrent tasks reached";
                 _outputTabManager.AppendOutput(task.Id,
-                    $"[AgenticEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
+                    $"[HappyEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
                     _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             }

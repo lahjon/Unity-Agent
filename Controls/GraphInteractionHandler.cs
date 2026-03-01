@@ -8,8 +8,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using HappyEngine.Helpers;
 
-namespace AgenticEngine.Controls
+namespace HappyEngine.Controls
 {
     internal class GraphInteractionHandler
     {
@@ -171,7 +172,7 @@ namespace AgenticEngine.Controls
                             Y1 = nodePos.Y + GraphLayoutEngine.NodeHeight / 2,
                             X2 = mousePos2.X,
                             Y2 = mousePos2.Y,
-                            Stroke = new SolidColorBrush(Color.FromRgb(100, 181, 246)),
+                            Stroke = BrushCache.Theme("PausedBlue"),
                             StrokeThickness = 2,
                             StrokeDashArray = new DoubleCollection(new[] { 4.0, 3.0 }),
                             IsHitTestVisible = false
@@ -259,7 +260,7 @@ namespace AgenticEngine.Controls
                                 if (nodeBorders.TryGetValue(targetId, out var flashBorder))
                                 {
                                     var origBg = flashBorder.Background;
-                                    flashBorder.Background = new SolidColorBrush(Color.FromArgb(180, 220, 50, 50));
+                                    flashBorder.Background = BrushCache.Theme("DangerFlash");
                                     var flashTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
                                     flashTimer.Tick += (_, _) =>
                                     {
@@ -292,13 +293,14 @@ namespace AgenticEngine.Controls
             nodeBorder.MouseEnter += (s, _) =>
             {
                 if (_draggingNodeId == null && _highlightedNodeIds.Count == 0)
-                    nodeBorder.Background = new SolidColorBrush(Color.FromArgb(255, 50, 50, 58));
+                    nodeBorder.Background = BrushCache.Theme("GraphNodeHighlightBg");
             };
             nodeBorder.MouseLeave += (s, _) =>
             {
                 if (_draggingNodeId == null && _highlightedNodeIds.Count == 0)
-                    nodeBorder.Background = new SolidColorBrush(
-                        isSelected ? Color.FromArgb(255, 50, 50, 60) : Color.FromArgb(230, 40, 40, 48));
+                    nodeBorder.Background = isSelected
+                        ? BrushCache.Theme("GraphNodeBg")
+                        : BrushCache.Theme("GraphNodeBgDim");
             };
         }
 
@@ -416,12 +418,21 @@ namespace AgenticEngine.Controls
 
         private void OnMouseWheel(object sender, MouseWheelEventArgs e)
         {
+            // Only handle zoom when the graph context is initialized
+            if (_activeTasks == null) return;
+
+            // Only handle zoom when the mouse is within the graph view bounds
+            var mousePos = e.GetPosition(_scrollViewer);
+            if (mousePos.X < 0 || mousePos.Y < 0 ||
+                mousePos.X > _scrollViewer.ActualWidth || mousePos.Y > _scrollViewer.ActualHeight)
+                return;
+
             e.Handled = true;
 
             double factor = e.Delta > 0 ? 1.1 : 1.0 / 1.1;
             double newZoom = Math.Clamp(_zoom * factor, 0.3, 3.0);
 
-            var mousePos = e.GetPosition(_scrollViewer);
+            // Zoom centered on the mouse pointer position
             double canvasX = (mousePos.X - _translateTransform.X) / _zoom;
             double canvasY = (mousePos.Y - _translateTransform.Y) / _zoom;
 

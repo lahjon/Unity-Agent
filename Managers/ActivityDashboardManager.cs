@@ -8,9 +8,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using AgenticEngine.Models;
+using HappyEngine.Helpers;
+using HappyEngine.Models;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class ActivityDashboardManager
     {
@@ -181,14 +182,14 @@ namespace AgenticEngine.Managers
             var root = new StackPanel { Margin = new Thickness(isDialog ? 18 : 4, 0, isDialog ? 18 : 4, 12) };
 
             root.Children.Add(BuildSummaryHeader(stats, isDialog));
-            root.Children.Add(new Border { Height = 1, Background = Brush("#2C2C2C"), Margin = new Thickness(0, 12, 0, 8) });
+            root.Children.Add(new Border { Height = 1, Background = BrushCache.Theme("BgElevated"), Margin = new Thickness(0, 12, 0, 8) });
 
             if (stats.Count == 0)
             {
                 root.Children.Add(new TextBlock
                 {
                     Text = "No projects found. Add a project to start tracking activity.",
-                    Foreground = Brush("#666666"),
+                    Foreground = BrushCache.Theme("TextMuted"),
                     FontSize = 12,
                     FontFamily = new FontFamily("Segoe UI"),
                     Margin = new Thickness(0, 12, 0, 0)
@@ -230,32 +231,32 @@ namespace AgenticEngine.Managers
                 grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             }
 
-            var successColor = overallSuccessRate >= 0.7 ? "#5CB85C" : overallSuccessRate >= 0.4 ? "#E0A030" : "#E05555";
+            var successColorKey = overallSuccessRate >= 0.7 ? "Success" : overallSuccessRate >= 0.4 ? "WarningAmber" : "DangerBright";
 
-            var metrics = new (string label, string value, string color)[]
+            var metrics = new (string label, string value, string colorKey)[]
             {
-                ("Total Tasks", totalTasks.ToString(), "#E8E8E8"),
-                ("Success Rate", totalFinished > 0 ? $"{overallSuccessRate:P0}" : "N/A", successColor),
-                ("Total Runtime", FormatDuration(totalRuntime), "#E8E8E8"),
-                ("Active Now", activeNow.ToString(), activeNow > 0 ? "#64B5F6" : "#888888"),
-                ("Total Tokens", totalTokens > 0 ? FormatTokenCount(totalTokens) : "N/A", totalTokens > 0 ? "#8899AA" : "#888888")
+                ("Total Tasks", totalTasks.ToString(), "TextPrimary"),
+                ("Success Rate", totalFinished > 0 ? $"{overallSuccessRate:P0}" : "N/A", successColorKey),
+                ("Total Runtime", FormatDuration(totalRuntime), "TextPrimary"),
+                ("Active Now", activeNow.ToString(), activeNow > 0 ? "PausedBlue" : "TextSubdued"),
+                ("Total Tokens", totalTokens > 0 ? FormatTokenCount(totalTokens) : "N/A", totalTokens > 0 ? "TextBlueGrey" : "TextSubdued")
             };
 
             for (int i = 0; i < metrics.Length; i++)
             {
-                var (label, value, color) = metrics[i];
+                var (label, value, colorKey) = metrics[i];
                 var cell = new StackPanel { Margin = new Thickness(0, 4, 8, 4) };
                 cell.Children.Add(new TextBlock
                 {
                     Text = label,
-                    Foreground = Brush("#888888"),
+                    Foreground = BrushCache.Theme("TextSubdued"),
                     FontSize = 10,
                     FontFamily = new FontFamily("Segoe UI")
                 });
                 cell.Children.Add(new TextBlock
                 {
                     Text = value,
-                    Foreground = Brush(color),
+                    Foreground = BrushCache.Theme(colorKey),
                     FontSize = isDialog ? 20 : 16,
                     FontWeight = FontWeights.Bold,
                     FontFamily = new FontFamily("Consolas"),
@@ -277,8 +278,8 @@ namespace AgenticEngine.Managers
             return new Border
             {
                 CornerRadius = new CornerRadius(8),
-                Background = Brush("#1E1E1E"),
-                BorderBrush = Brush("#2C2C2C"),
+                Background = BrushCache.Theme("BgSection"),
+                BorderBrush = BrushCache.Theme("BgElevated"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(14, 10, 14, 10),
                 Margin = new Thickness(0, 8, 0, 0),
@@ -296,7 +297,7 @@ namespace AgenticEngine.Managers
             var dot = new Ellipse
             {
                 Width = 10, Height = 10,
-                Fill = Brush(stats.ProjectColor),
+                Fill = BrushCache.Get(stats.ProjectColor),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
             };
@@ -304,7 +305,7 @@ namespace AgenticEngine.Managers
             var nameBlock = new TextBlock
             {
                 Text = stats.ProjectName,
-                Foreground = Brush(stats.ProjectColor),
+                Foreground = BrushCache.Get(stats.ProjectColor),
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 FontFamily = new FontFamily("Segoe UI"),
@@ -317,7 +318,7 @@ namespace AgenticEngine.Managers
                 Text = stats.TotalTasks == 0 ? "No tasks" :
                        stats.TotalTasks == 1 ? "1 task" :
                        $"{stats.TotalTasks} tasks",
-                Foreground = Brush("#888888"),
+                Foreground = BrushCache.Theme("TextSubdued"),
                 FontSize = 11,
                 FontFamily = new FontFamily("Segoe UI"),
                 VerticalAlignment = VerticalAlignment.Center
@@ -335,7 +336,7 @@ namespace AgenticEngine.Managers
                 card.Children.Add(new TextBlock
                 {
                     Text = "No activity recorded yet.",
-                    Foreground = Brush("#555555"),
+                    Foreground = BrushCache.Theme("TextDisabled"),
                     FontSize = 11,
                     FontFamily = new FontFamily("Segoe UI"),
                     FontStyle = FontStyles.Italic,
@@ -350,7 +351,7 @@ namespace AgenticEngine.Managers
                 var runningText = new TextBlock
                 {
                     Text = stats.RunningTasks == 1 ? "1 task running" : $"{stats.RunningTasks} tasks running",
-                    Foreground = Brush("#64B5F6"),
+                    Foreground = BrushCache.Theme("PausedBlue"),
                     FontSize = 10,
                     FontFamily = new FontFamily("Segoe UI"),
                     Margin = new Thickness(18, 0, 0, 4)
@@ -376,11 +377,11 @@ namespace AgenticEngine.Managers
                 };
 
                 var rateRun = new System.Windows.Documents.Run($"{stats.CompletedTasks} passed")
-                    { Foreground = Brush("#5CB85C") };
+                    { Foreground = BrushCache.Theme("Success") };
                 var sepRun = new System.Windows.Documents.Run("  |  ")
-                    { Foreground = Brush("#444444") };
+                    { Foreground = BrushCache.Theme("SeparatorDark") };
                 var failRun = new System.Windows.Documents.Run($"{stats.FailedTasks} failed")
-                    { Foreground = Brush("#E05555") };
+                    { Foreground = BrushCache.Theme("DangerBright") };
 
                 rateText.Inlines.Add(rateRun);
                 rateText.Inlines.Add(sepRun);
@@ -388,8 +389,8 @@ namespace AgenticEngine.Managers
 
                 if (stats.CancelledTasks > 0)
                 {
-                    rateText.Inlines.Add(new System.Windows.Documents.Run("  |  ") { Foreground = Brush("#444444") });
-                    rateText.Inlines.Add(new System.Windows.Documents.Run($"{stats.CancelledTasks} cancelled") { Foreground = Brush("#E0A030") });
+                    rateText.Inlines.Add(new System.Windows.Documents.Run("  |  ") { Foreground = BrushCache.Theme("SeparatorDark") });
+                    rateText.Inlines.Add(new System.Windows.Documents.Run($"{stats.CancelledTasks} cancelled") { Foreground = BrushCache.Theme("WarningAmber") });
                 }
 
                 ratePanel.Children.Add(rateText);
@@ -404,7 +405,7 @@ namespace AgenticEngine.Managers
                 var avgLabel = new TextBlock
                 {
                     Text = "Avg ",
-                    Foreground = Brush("#666666"),
+                    Foreground = BrushCache.Theme("TextMuted"),
                     FontSize = 11,
                     FontFamily = new FontFamily("Segoe UI"),
                     VerticalAlignment = VerticalAlignment.Center
@@ -412,7 +413,7 @@ namespace AgenticEngine.Managers
                 var avgValue = new TextBlock
                 {
                     Text = FormatDuration(stats.AverageDuration),
-                    Foreground = Brush("#CCCCCC"),
+                    Foreground = BrushCache.Theme("TextLight"),
                     FontSize = 11,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new FontFamily("Consolas"),
@@ -421,7 +422,7 @@ namespace AgenticEngine.Managers
 
                 var rangeBlock = new TextBlock
                 {
-                    Foreground = Brush("#555555"),
+                    Foreground = BrushCache.Theme("TextDisabled"),
                     FontSize = 10,
                     FontFamily = new FontFamily("Consolas"),
                     VerticalAlignment = VerticalAlignment.Center
@@ -447,7 +448,7 @@ namespace AgenticEngine.Managers
                 var tokenLabel = new TextBlock
                 {
                     Text = "Tokens ",
-                    Foreground = Brush("#666666"),
+                    Foreground = BrushCache.Theme("TextMuted"),
                     FontSize = 11,
                     FontFamily = new FontFamily("Segoe UI"),
                     VerticalAlignment = VerticalAlignment.Center
@@ -455,7 +456,7 @@ namespace AgenticEngine.Managers
                 var tokenValue = new TextBlock
                 {
                     Text = $"{FormatTokenCount(stats.TotalInputTokens)} in / {FormatTokenCount(stats.TotalOutputTokens)} out",
-                    Foreground = Brush("#8899AA"),
+                    Foreground = BrushCache.Theme("TextBlueGrey"),
                     FontSize = 11,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new FontFamily("Consolas"),
@@ -484,8 +485,8 @@ namespace AgenticEngine.Managers
             return new Border
             {
                 CornerRadius = new CornerRadius(6),
-                Background = Brush("#1E1E1E"),
-                BorderBrush = Brush("#2C2C2C"),
+                Background = BrushCache.Theme("BgSection"),
+                BorderBrush = BrushCache.Theme("BgElevated"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(12, 10, 12, 10),
                 Margin = new Thickness(0, 4, 0, 0),
@@ -498,7 +499,7 @@ namespace AgenticEngine.Managers
             var outer = new Border
             {
                 CornerRadius = new CornerRadius(3),
-                Background = Brush("#333333"),
+                Background = BrushCache.Theme("BorderSubtle"),
                 Height = 5,
                 Width = width,
                 HorizontalAlignment = HorizontalAlignment.Left,
@@ -511,7 +512,7 @@ namespace AgenticEngine.Managers
             {
                 var green = new Border
                 {
-                    Background = Brush("#5CB85C"),
+                    Background = BrushCache.Theme("Success"),
                     HorizontalAlignment = HorizontalAlignment.Left,
                     Width = width * successRate,
                     CornerRadius = new CornerRadius(3, successRate >= 1 ? 3 : 0, successRate >= 1 ? 3 : 0, 3)
@@ -523,7 +524,7 @@ namespace AgenticEngine.Managers
             {
                 var red = new Border
                 {
-                    Background = Brush("#E05555"),
+                    Background = BrushCache.Theme("DangerBright"),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     Width = width * (1 - successRate),
                     CornerRadius = new CornerRadius(successRate <= 0 ? 3 : 0, 3, 3, successRate <= 0 ? 3 : 0)
@@ -583,7 +584,7 @@ namespace AgenticEngine.Managers
             var fillPolygon = new Polygon
             {
                 Points = fillPoints,
-                Fill = Brush(projectColor),
+                Fill = BrushCache.Get(projectColor),
                 Opacity = 0.1
             };
             canvas.Children.Add(fillPolygon);
@@ -596,7 +597,7 @@ namespace AgenticEngine.Managers
             var polyline = new Polyline
             {
                 Points = linePoints,
-                Stroke = Brush(projectColor),
+                Stroke = BrushCache.Get(projectColor),
                 StrokeThickness = 1.5,
                 Opacity = 0.6
             };
@@ -609,7 +610,7 @@ namespace AgenticEngine.Managers
                 {
                     Width = dotRadius * 2,
                     Height = dotRadius * 2,
-                    Fill = Brush(pt.Succeeded ? "#5CB85C" : "#E05555")
+                    Fill = pt.Succeeded ? BrushCache.Theme("Success") : BrushCache.Theme("DangerBright")
                 };
                 dot.ToolTip = $"{FormatDuration(pt.Duration)} - {(pt.Succeeded ? "Completed" : "Failed")} - {pt.Timestamp:HH:mm}";
                 Canvas.SetLeft(dot, x - dotRadius);
@@ -635,21 +636,5 @@ namespace AgenticEngine.Managers
 
         private static string NormalizePath(string? path) => Helpers.FormatHelpers.NormalizePath(path);
 
-        private static SolidColorBrush Brush(string hex)
-        {
-            try
-            {
-                var color = (Color)ColorConverter.ConvertFromString(hex);
-                var brush = new SolidColorBrush(color);
-                brush.Freeze();
-                return brush;
-            }
-            catch
-            {
-                var brush = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
-                brush.Freeze();
-                return brush;
-            }
-        }
     }
 }

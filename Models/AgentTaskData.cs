@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     /// <summary>
     /// Pure persistent data for an agent task. Safe to serialize and pass across
@@ -39,7 +39,6 @@ namespace AgenticEngine
         public List<string> GeneratedImagePaths { get; set; } = new();
         public string CompletionSummary { get; set; } = "";
         public string Recommendations { get; set; } = "";
-        public string ContinueReason { get; set; } = "";
         public string Summary { get; set; } = "";
         public string? DependencyContext { get; set; }
         public AgentTaskStatus Status { get; set; } = AgentTaskStatus.Running;
@@ -49,6 +48,9 @@ namespace AgenticEngine
         /// <summary>Scheduling priority. Higher values run sooner among peer tasks at the same DAG depth.</summary>
         public int Priority { get; set; }
 
+        /// <summary>User-assigned priority level. Affects scheduling order and is displayed on task cards.</summary>
+        public TaskPriority PriorityLevel { get; set; } = TaskPriority.Normal;
+
         // Parent-child task hierarchy
         public string? ParentTaskId { get; set; }
         public List<string> ChildTaskIds { get; set; } = new();
@@ -56,6 +58,10 @@ namespace AgenticEngine
         // Task group tracking
         public string? GroupId { get; set; }
         public string? GroupName { get; set; }
+
+        // Result verification
+        public string VerificationResult { get; set; } = "";
+        public bool IsVerified { get; set; }
 
         // Token usage tracking
         public long InputTokens { get; set; }

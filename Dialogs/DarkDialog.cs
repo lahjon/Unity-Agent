@@ -1,29 +1,20 @@
-using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace AgenticEngine.Dialogs
+namespace HappyEngine.Dialogs
 {
     public static class DarkDialog
     {
         public static bool ShowConfirm(string message, string title)
         {
-            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow(title, 420, 190);
+            var dlg = DarkDialogWindow.Create(title, 420, 190);
+            dlg.SizeToContent = SizeToContent.Height;
+            dlg.MaxHeight = 400;
 
             var result = false;
-            var stack = new StackPanel { Margin = new Thickness(24) };
-
-            var titleBlock = new TextBlock
-            {
-                Text = title,
-                Foreground = (Brush)Application.Current.FindResource("Accent"),
-                FontSize = 15,
-                FontWeight = FontWeights.Bold,
-                FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 12)
-            };
+            var stack = new StackPanel { Margin = new Thickness(24, 12, 24, 24) };
 
             var msgBlock = new TextBlock
             {
@@ -62,11 +53,10 @@ namespace AgenticEngine.Dialogs
             btnPanel.Children.Add(cancelBtn);
             btnPanel.Children.Add(confirmBtn);
 
-            stack.Children.Add(titleBlock);
             stack.Children.Add(msgBlock);
             stack.Children.Add(btnPanel);
 
-            outerBorder.Child = stack;
+            dlg.SetBodyContent(stack);
 
             dlg.KeyDown += (_, ke) =>
             {
@@ -78,19 +68,11 @@ namespace AgenticEngine.Dialogs
 
         public static void ShowAlert(string message, string title)
         {
-            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow(title, 420, 170);
+            var dlg = DarkDialogWindow.Create(title, 420, 170);
+            dlg.SizeToContent = SizeToContent.Height;
+            dlg.MaxHeight = 400;
 
-            var stack = new StackPanel { Margin = new Thickness(24) };
-
-            var titleBlock = new TextBlock
-            {
-                Text = title,
-                Foreground = (Brush)Application.Current.FindResource("Accent"),
-                FontSize = 15,
-                FontWeight = FontWeights.Bold,
-                FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 12)
-            };
+            var stack = new StackPanel { Margin = new Thickness(24, 12, 24, 24) };
 
             var msgBlock = new TextBlock
             {
@@ -119,31 +101,22 @@ namespace AgenticEngine.Dialogs
 
             btnPanel.Children.Add(okBtn);
 
-            stack.Children.Add(titleBlock);
             stack.Children.Add(msgBlock);
             stack.Children.Add(btnPanel);
 
-            outerBorder.Child = stack;
+            dlg.SetBodyContent(stack);
             dlg.KeyDown += (_, ke) => { if (ke.Key == Key.Enter) dlg.Close(); };
             dlg.ShowDialog();
         }
 
         public static string? ShowTextInput(string title, string prompt, string defaultValue = "")
         {
-            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow(title, 420, 200);
+            var dlg = DarkDialogWindow.Create(title, 420, 200);
+            dlg.SizeToContent = SizeToContent.Height;
+            dlg.MaxHeight = 400;
 
             string? result = null;
-            var stack = new StackPanel { Margin = new Thickness(24) };
-
-            stack.Children.Add(new TextBlock
-            {
-                Text = title,
-                Foreground = (Brush)Application.Current.FindResource("Accent"),
-                FontSize = 15,
-                FontWeight = FontWeights.Bold,
-                FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 8)
-            });
+            var stack = new StackPanel { Margin = new Thickness(24, 12, 24, 24) };
 
             stack.Children.Add(new TextBlock
             {
@@ -205,7 +178,7 @@ namespace AgenticEngine.Dialogs
             btnPanel.Children.Add(okBtn);
             stack.Children.Add(btnPanel);
 
-            outerBorder.Child = stack;
+            dlg.SetBodyContent(stack);
 
             dlg.KeyDown += (_, ke) =>
             {

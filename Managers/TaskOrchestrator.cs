@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     /// <summary>
     /// Manages a directed acyclic graph (DAG) of task dependencies and determines
@@ -54,7 +54,8 @@ namespace AgenticEngine.Managers
                     .Where(n => n.Task != null
                                 && n.UnresolvedDependencies.Count == 0
                                 && !n.IsResolved)
-                    .OrderByDescending(n => n.Task!.Priority)
+                    .OrderByDescending(n => (int)n.Task!.PriorityLevel)
+                    .ThenByDescending(n => n.Task!.Priority)
                     .Take(maxCount)
                     .Select(n => n.Task!)
                     .ToList();
@@ -93,8 +94,12 @@ namespace AgenticEngine.Managers
                     }
                 }
 
-                // Sort newly ready tasks by priority (higher first)
-                nowReady.Sort((a, b) => b.Priority.CompareTo(a.Priority));
+                // Sort newly ready tasks by priority level then priority (higher first)
+                nowReady.Sort((a, b) =>
+                {
+                    var cmp = ((int)b.PriorityLevel).CompareTo((int)a.PriorityLevel);
+                    return cmp != 0 ? cmp : b.Priority.CompareTo(a.Priority);
+                });
             }
 
             foreach (var task in nowReady)
@@ -150,7 +155,8 @@ namespace AgenticEngine.Managers
                     .Where(n => n.Task != null
                                 && n.UnresolvedDependencies.Count == 0
                                 && !n.IsResolved)
-                    .OrderByDescending(n => n.Task!.Priority)
+                    .OrderByDescending(n => (int)n.Task!.PriorityLevel)
+                    .ThenByDescending(n => n.Task!.Priority)
                     .Select(n => n.Task!)
                     .ToList();
             }

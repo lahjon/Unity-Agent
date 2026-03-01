@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Windows.Media;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     /// <summary>
     /// Handles output trimming, completion summary extraction, recommendation parsing,
@@ -37,90 +37,93 @@ namespace AgenticEngine.Managers
         }
 
         /// <summary>
-        /// Extracts recommendations from the current iteration output, verifies them with the LLM,
-        /// and generates a git-diff-based completion summary.
+        /// Generates a git-diff-based completion summary and runs result verification.
         /// </summary>
-        public async void AppendCompletionSummary(AgentTask task,
+        public async System.Threading.Tasks.Task AppendCompletionSummary(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
-            // Detect recommendations from the current iteration output only (avoids re-detecting old recommendations)
-            var fullOutput = task.OutputBuilder.ToString();
-            var outputText = task.LastIterationOutputStart > 0 && task.LastIterationOutputStart < fullOutput.Length
-                ? fullOutput[task.LastIterationOutputStart..]
-                : fullOutput;
-            var heuristicRecommendations = TaskLauncher.ExtractRecommendations(outputText);
-            task.ContinueReason = "";
-
-            var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
-
-            // Always evaluate task completion with LLM — pass heuristic recommendations as context if available
             try
             {
-                var verification = await TaskLauncher.VerifyContinueNeededAsync(
-                    outputText, heuristicRecommendations, task.Description, ct);
+                var fullOutput = task.OutputBuilder.ToString();
+                var outputText = task.LastIterationOutputStart > 0 && task.LastIterationOutputStart < fullOutput.Length
+                    ? fullOutput[task.LastIterationOutputStart..]
+                    : fullOutput;
 
-                if (verification != null)
+                var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
+
+                var duration = (task.EndTime ?? DateTime.Now) - task.StartTime;
+                try
                 {
-                    if (verification.ShouldContinue)
-                    {
-                        // Use heuristic recommendations if available, otherwise use LLM's reason as the recommendation
-                        task.Recommendations = !string.IsNullOrEmpty(heuristicRecommendations)
-                            ? heuristicRecommendations
-                            : verification.Reason;
-                        task.ContinueReason = verification.Reason;
-                        AppLogger.Debug("TaskExecution", $"Task {task.Id}: LLM verified continue needed — {verification.Reason}");
-                    }
-                    else
-                    {
-                        task.Recommendations = "";
-                        AppLogger.Debug("TaskExecution", $"Task {task.Id}: LLM verified complete — {verification.Reason}");
-                    }
+                    var summary = await TaskLauncher.GenerateCompletionSummaryAsync(
+                        task.ProjectPath, task.GitStartHash, task.Status, duration, ct);
+                    task.CompletionSummary = summary;
+                    AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
-                else
+                catch (OperationCanceledException)
                 {
-                    // Verification failed to parse — fall back to heuristic result if available
-                    if (!string.IsNullOrEmpty(heuristicRecommendations))
-                    {
-                        task.Recommendations = heuristicRecommendations;
-                        task.ContinueReason = "Agent left recommendations (verification unavailable)";
-                    }
-                    else
-                    {
-                        task.Recommendations = "";
-                    }
+                    var summary = TaskLauncher.FormatCompletionSummary(task.Status, duration, null);
+                    task.CompletionSummary = summary;
+                    AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
+
+                // Run result verification automatically
+                await RunResultVerificationAsync(task, outputText, activeTasks, historyTasks);
+
+                CompletionSummaryGenerated?.Invoke(task.Id);
             }
-            catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                AppLogger.Debug("TaskExecution", "Continue verification failed", ex);
-                if (!string.IsNullOrEmpty(heuristicRecommendations))
+                AppLogger.Error("OutputProcessor", $"AppendCompletionSummary failed for task {task.Id}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Runs LLM-based result verification on a completed task.
+        /// Can be called automatically after completion or manually via the Verify button.
+        /// </summary>
+        public async System.Threading.Tasks.Task RunResultVerificationAsync(AgentTask task,
+            string? outputText,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
+
+            if (string.IsNullOrEmpty(outputText))
+            {
+                var fullOutput = task.OutputBuilder.ToString();
+                outputText = task.LastIterationOutputStart > 0 && task.LastIterationOutputStart < fullOutput.Length
+                    ? fullOutput[task.LastIterationOutputStart..]
+                    : fullOutput;
+            }
+
+            try
+            {
+                var result = await TaskLauncher.VerifyResultAsync(
+                    outputText, task.Description, task.CompletionSummary, ct);
+
+                if (result != null)
                 {
-                    task.Recommendations = heuristicRecommendations;
-                    task.ContinueReason = "Agent left recommendations (verification unavailable)";
+                    task.IsVerified = result.Passed;
+                    task.VerificationResult = result.Summary;
+                    var label = result.Passed ? "PASSED" : "FAILED";
+                    AppendOutput(task.Id,
+                        $"\n[HappyEngine] Result Verification: {label} — {result.Summary}\n",
+                        activeTasks, historyTasks);
+                    AppLogger.Debug("TaskExecution",
+                        $"Task {task.Id}: Result verification {label} — {result.Summary}");
                 }
                 else
                 {
-                    task.Recommendations = "";
+                    task.VerificationResult = "Verification unavailable";
+                    AppLogger.Debug("TaskExecution",
+                        $"Task {task.Id}: Result verification could not parse response");
                 }
             }
-
-            var duration = (task.EndTime ?? DateTime.Now) - task.StartTime;
-            try
+            catch (OperationCanceledException) { /* ignore */ }
+            catch (Exception ex)
             {
-                var summary = await TaskLauncher.GenerateCompletionSummaryAsync(
-                    task.ProjectPath, task.GitStartHash, task.Status, duration, ct);
-                task.CompletionSummary = summary;
-                AppendOutput(task.Id, summary, activeTasks, historyTasks);
+                task.VerificationResult = "Verification failed";
+                AppLogger.Debug("TaskExecution", "Result verification failed", ex);
             }
-            catch (OperationCanceledException)
-            {
-                var summary = TaskLauncher.FormatCompletionSummary(task.Status, duration, null);
-                task.CompletionSummary = summary;
-                AppendOutput(task.Id, summary, activeTasks, historyTasks);
-            }
-
-            CompletionSummaryGenerated?.Invoke(task.Id);
         }
 
         /// <summary>

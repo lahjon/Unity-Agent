@@ -1,0 +1,49 @@
+<Window x:Class="HappyEngine.Dialogs.DarkDialogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="True"
+        ResizeMode="NoResize">
+
+    <Border x:Name="OuterBorder"
+            Background="{DynamicResource BgSurface}"
+            BorderBrush="{DynamicResource BorderMedium}"
+            BorderThickness="1"
+            CornerRadius="12"
+            MouseLeftButtonDown="OuterBorder_MouseLeftButtonDown">
+
+        <DockPanel>
+            <!-- Title bar -->
+            <DockPanel x:Name="TitleBar" DockPanel.Dock="Top" Margin="18,14,18,0">
+                <!-- Close button -->
+                <Button x:Name="CloseButton"
+                        DockPanel.Dock="Right"
+                        Content="&#x2715;"
+                        Background="Transparent"
+                        Foreground="{DynamicResource TextSubdued}"
+                        FontFamily="Segoe UI"
+                        FontSize="14"
+                        Padding="6,2,6,2"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        VerticalAlignment="Center"
+                        Click="CloseButton_Click"
+                        MouseEnter="CloseButton_MouseEnter"
+                        MouseLeave="CloseButton_MouseLeave"/>
+
+                <!-- Title text -->
+                <TextBlock x:Name="TitleBlock"
+                           Foreground="{DynamicResource Accent}"
+                           FontSize="15"
+                           FontWeight="Bold"
+                           FontFamily="Segoe UI"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+
+            <!-- Dialog body content -->
+            <ContentPresenter x:Name="BodyContent" Content="{Binding}"/>
+        </DockPanel>
+    </Border>
+</Window>

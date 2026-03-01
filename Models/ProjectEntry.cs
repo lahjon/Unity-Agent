@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace AgenticEngine.Models
+namespace HappyEngine.Models
 {
     public enum McpStatus
     {
@@ -25,6 +25,7 @@ namespace AgenticEngine.Models
         public List<string> ProjectRules { get; set; } = new();
         public string Color { get; set; } = "";
         public bool IsGame { get; set; }
+        public List<string> CrashLogPaths { get; set; } = new();
 
         [JsonIgnore]
         public bool IsInitializing { get; set; }

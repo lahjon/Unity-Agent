@@ -1,9 +1,9 @@
-<Window x:Class="AgenticEngine.MainWindow"
+<Window x:Class="HappyEngine.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:AgenticEngine"
-        xmlns:controls="clr-namespace:AgenticEngine.Controls"
-        Title="Agentic Engine" Width="1280" Height="820"
+        xmlns:local="clr-namespace:HappyEngine"
+        xmlns:controls="clr-namespace:HappyEngine.Controls"
+        Title="Happy Engine" Width="1280" Height="820"
         Background="{StaticResource BgDeep}" WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded"
         PreviewKeyDown="Window_PreviewKeyDown">
@@ -24,6 +24,13 @@
                     <ContextMenu>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
                         <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
+                        <Separator/>
+                        <MenuItem Header="Priority">
+                            <MenuItem Header="Critical" Click="SetPriorityCritical_Click"/>
+                            <MenuItem Header="High" Click="SetPriorityHigh_Click"/>
+                            <MenuItem Header="Normal" Click="SetPriorityNormal_Click"/>
+                            <MenuItem Header="Low" Click="SetPriorityLow_Click"/>
+                        </MenuItem>
                     </ContextMenu>
                 </Border.ContextMenu>
                 <Border.Background>
@@ -65,6 +72,25 @@
                     <StackPanel Grid.Row="0" Orientation="Horizontal"
                                 HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Margin="0,-2,-2,0">
+                        <!-- Force-start button (visible on queued/init-queued tasks) -->
+                        <Button Click="ForceStartQueued_Click" Margin="0,0,2,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE768;"/>
+                                    <Setter Property="Foreground" Value="#FFD600"/>
+                                    <Setter Property="ToolTip" Value="Force start (bypass queue)"/>
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsQueued}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsInitQueued}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                         <!-- Pause/Resume button -->
                         <Button Click="Pause_Click" Margin="0,0,2,0">
                             <Button.Style>
@@ -112,6 +138,23 @@
                             </Button.Style>
                         </Button>
                     </StackPanel>
+                    <!-- Verify icon top-left (visible when finished) -->
+                    <Button Grid.Row="0" Content="&#xE721;" Click="VerifyTask_Click"
+                            HorizontalAlignment="Left" VerticalAlignment="Top"
+                            Margin="-2,-2,0,0" FontSize="11"
+                            ToolTip="Run result verification">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                <Setter Property="Foreground" Value="#5C6BC0"/>
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse x:Name="StatusGlow" Width="8" Height="8"
@@ -373,52 +416,49 @@
                                 <TextBlock Text="PLAN" Foreground="{StaticResource PlanBadgeText}" FontSize="9"
                                            FontFamily="Segoe UI" FontWeight="Bold"/>
                             </Border>
-                            <!-- Priority badge (visible on queued tasks with priority > 0) -->
+                            <!-- Per-task toggle badges -->
                             <Border CornerRadius="3" Padding="4,1" Margin="4,0,0,0"
-                                    Background="#33FFD600" BorderBrush="#55FFD600" BorderThickness="1">
+                                    Background="#33607D8B" BorderBrush="#55607D8B" BorderThickness="1">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding HasPriorityBadge}" Value="True">
+                                            <DataTrigger Binding="{Binding HasActiveToggles}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <TextBlock Text="{Binding PriorityBadgeText}" Foreground="#FFD600" FontSize="9"
+                                <TextBlock Text="{Binding ActiveTogglesText}" Foreground="#90A4AE" FontSize="9"
                                            FontFamily="Segoe UI" FontWeight="Bold"/>
                             </Border>
-                            <!-- Continue button (visible when finished with recommendations) -->
-                            <Button Content="Continue" Click="Continue_Click"
-                                    Background="#00897B"
-                                    Margin="4,0,0,0">
-                                <Button.ToolTip>
-                                    <ToolTip MaxWidth="400">
-                                        <StackPanel>
-                                            <TextBlock Text="Why continue:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
-                                            <TextBlock Text="{Binding ContinueReason}" TextWrapping="Wrap" Foreground="#FFAB40" Margin="0,0,0,6"
-                                                       Visibility="{Binding ContinueReason, Converter={StaticResource StringToVisibility}}"/>
-                                            <TextBlock Text="Recommended next steps:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
-                                            <TextBlock Text="{Binding Recommendations}" TextWrapping="Wrap" Foreground="#E0E0E0"/>
-                                        </StackPanel>
-                                    </ToolTip>
-                                </Button.ToolTip>
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
+                            <!-- Priority badge -->
+                            <Border CornerRadius="3" Padding="4,1" Margin="4,0,0,0"
+                                    BorderThickness="1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
                                         <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Setter Property="Background" Value="#33FFD600"/>
+                                        <Setter Property="BorderBrush" Value="#55FFD600"/>
                                         <Style.Triggers>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding IsFinished}" Value="True"/>
-                                                    <Condition Binding="{Binding HasRecommendations}" Value="True"/>
-                                                </MultiDataTrigger.Conditions>
+                                            <DataTrigger Binding="{Binding HasPriorityBadge}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible"/>
-                                            </MultiDataTrigger>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding PriorityLevel}" Value="Critical">
+                                                <Setter Property="Background" Value="#33FF5252"/>
+                                                <Setter Property="BorderBrush" Value="#55FF5252"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding PriorityLevel}" Value="Low">
+                                                <Setter Property="Background" Value="#3378909C"/>
+                                                <Setter Property="BorderBrush" Value="#5578909C"/>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </Button.Style>
-                            </Button>
+                                </Border.Style>
+                                <TextBlock Text="{Binding PriorityBadgeText}"
+                                           Foreground="{Binding PriorityBadgeColor, Converter={StaticResource StringToBrush}}"
+                                           FontSize="9" FontFamily="Segoe UI" FontWeight="Bold"/>
+                            </Border>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -432,6 +472,7 @@
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Re-run Task" Click="RerunTask_Click"/>
+                        <MenuItem Header="Store Task" Click="StoreHistoryTask_Click"/>
                         <Separator/>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
                         <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
@@ -472,12 +513,29 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
+                    <!-- Verify icon top-left (visible when finished) -->
+                    <Button Grid.Row="0" Content="&#xE721;" Click="VerifyTask_Click"
+                            HorizontalAlignment="Left" VerticalAlignment="Top"
+                            Margin="-2,-2,0,0" FontSize="11"
+                            ToolTip="Run result verification">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                <Setter Property="Foreground" Value="#5C6BC0"/>
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <!-- Close X button top-right -->
                     <Button Grid.Row="0" Content="&#xE8BB;" Click="RemoveHistoryTask_Click"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             Style="{StaticResource IconBtn}" Margin="0,-2,-2,0"
                             ToolTip="Remove from history"/>
-                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="14,0,0,0">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse x:Name="HistStatusGlow" Width="8" Height="8"
                                      Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}">
@@ -623,6 +681,23 @@
                             </TextBlock>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <!-- Per-task toggle badges -->
+                            <Border CornerRadius="3" Padding="4,1" Margin="0,0,4,0"
+                                    Background="#33607D8B" BorderBrush="#55607D8B" BorderThickness="1"
+                                    VerticalAlignment="Center">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasActiveToggles}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding ActiveTogglesText}" Foreground="#90A4AE" FontSize="9"
+                                           FontFamily="Segoe UI" FontWeight="Bold"/>
+                            </Border>
                             <Border CornerRadius="3" Padding="4,1" Margin="0,0,8,0"
                                     Background="{StaticResource PlanBadgeBg}" BorderBrush="{StaticResource PlanBadgeBorder}" BorderThickness="1"
                                     VerticalAlignment="Center">
@@ -639,32 +714,6 @@
                                 <TextBlock Text="PLAN" Foreground="{StaticResource PlanBadgeText}" FontSize="9"
                                            FontFamily="Segoe UI" FontWeight="Bold"/>
                             </Border>
-                            <!-- Continue button (visible when recommendations exist) -->
-                            <Button Content="Continue" Click="Continue_Click"
-                                    Background="#00897B"
-                                    Margin="0,0,4,0">
-                                <Button.ToolTip>
-                                    <ToolTip MaxWidth="400">
-                                        <StackPanel>
-                                            <TextBlock Text="Why continue:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
-                                            <TextBlock Text="{Binding ContinueReason}" TextWrapping="Wrap" Foreground="#FFAB40" Margin="0,0,0,6"
-                                                       Visibility="{Binding ContinueReason, Converter={StaticResource StringToVisibility}}"/>
-                                            <TextBlock Text="Recommended next steps:" FontWeight="SemiBold" Foreground="#B2DFDB" Margin="0,0,0,4"/>
-                                            <TextBlock Text="{Binding Recommendations}" TextWrapping="Wrap" Foreground="#E0E0E0"/>
-                                        </StackPanel>
-                                    </ToolTip>
-                                </Button.ToolTip>
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding HasRecommendations}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
                             <Button Content="Retry" Click="RetryTask_Click"
                                     Background="#E07840"
                                     Margin="0,0,4,0">
@@ -679,9 +728,6 @@
                                     </Style>
                                 </Button.Style>
                             </Button>
-                            <Button Content="Resume" Click="Resume_Click"
-                                    Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
-                                    Margin="0"/>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -1550,10 +1596,10 @@
                     </DockPanel>
                 <TabControl x:Name="MainTabs" Style="{StaticResource SettingsTabControlStyle}"
                             Background="Transparent" BorderThickness="0">
-                    <!-- Helper tab -->
+                    <!-- Automation tab -->
                     <TabItem x:Name="HelperTabItem">
                         <TabItem.Header>
-                            <TextBlock Text="Suggestions" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Automation" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>
                         <DockPanel Margin="12">
                             <!-- Top controls -->
@@ -1619,6 +1665,22 @@
                                                Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"
                                                VerticalAlignment="Center" Margin="12,0,0,0"/>
                                 </StackPanel>
+                            </StackPanel>
+
+                            <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,8"/>
+
+                            <!-- Error section -->
+                            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                                <TextBlock Text="Error" Foreground="{StaticResource DangerBright}" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,6"/>
+                                <TextBlock Text="Investigate project crash logs and diagnose build failures."
+                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Margin="0,0,0,8"/>
+                                <Button x:Name="BuildInvestigationBtn" Content="Build Investigation"
+                                        Click="BuildInvestigation_Click"
+                                        Background="#3A2020" Foreground="{StaticResource DangerBright}"
+                                        Style="{StaticResource Btn}"
+                                        FontSize="12" Padding="16,8" HorizontalAlignment="Left"/>
                             </StackPanel>
 
                             <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,8"/>
@@ -2010,6 +2072,41 @@
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
+                                <!-- Crash Log Paths -->
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Crash Log Paths" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                               FontSize="13" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                    <ToggleButton x:Name="EditCrashLogPathsToggle"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="12,0,0,0"
+                                                  Checked="EditCrashLogPathsToggle_Changed"
+                                                  Unchecked="EditCrashLogPathsToggle_Changed">
+                                        <TextBlock Text="Edit" Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
+                                </DockPanel>
+                                <TextBox x:Name="CrashLogPathsBox" AcceptsReturn="True" TextWrapping="Wrap"
+                                         MinHeight="80" MaxHeight="200"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                         FontSize="12" FontFamily="Consolas" Padding="10"
+                                         IsReadOnly="True" Opacity="0.6"/>
+                                <DockPanel Margin="0,6,0,0">
+                                    <TextBlock Text="One path per line. Used by Build Investigation to locate crash and error logs."
+                                               Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
+                                               VerticalAlignment="Center"/>
+                                    <StackPanel x:Name="CrashLogPathsEditButtons" Orientation="Horizontal"
+                                                HorizontalAlignment="Right" Visibility="Collapsed">
+                                        <Button Content="Reset" Click="ResetCrashLogPaths_Click"
+                                                Style="{StaticResource GhostBtn}" Margin="0,0,6,0"
+                                                Padding="12,4" FontSize="11"/>
+                                        <Button Content="Save" Click="SaveCrashLogPaths_Click"
+                                                Style="{StaticResource SuccessBtn}"
+                                                Padding="12,4" FontSize="11"/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
+
                                 <TextBlock Text="Defaults" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                            FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,12"/>
                                 <ToggleButton x:Name="DefaultNoGitWriteToggle" IsChecked="True"
@@ -2081,7 +2178,7 @@
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,20"/>
 
                                 <TextBlock Text="About" Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"/>
-                                <TextBlock Text="Agentic Engine - Claude Code Task Manager" Foreground="{StaticResource TextDisabled}"
+                                <TextBlock Text="Happy Engine - Claude Code Task Manager" Foreground="{StaticResource TextDisabled}"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,4,0,0"/>
                             </StackPanel>
                         </ScrollViewer>
@@ -2137,7 +2234,7 @@
 
                                 <TextBlock Text="Image Storage" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
-                                <TextBlock Text="%LOCALAPPDATA%\AgenticEngine\gemini_images\" Foreground="{StaticResource TextSubdued}"
+                                <TextBlock Text="%LOCALAPPDATA%\HappyEngine\gemini_images\" Foreground="{StaticResource TextSubdued}"
                                            FontSize="11" FontFamily="Consolas" Margin="0,0,0,6"/>
                                 <Button x:Name="OpenGeminiImagesBtn" Content="Open Images Folder"
                                         Click="OpenGeminiImages_Click"
@@ -2208,7 +2305,7 @@
                         </ScrollViewer>
                     </TabItem>
                     <!-- MCP tab -->
-                    <TabItem x:Name="McpTabItem" Visibility="Collapsed">
+                    <TabItem x:Name="McpTabItem">
                         <TabItem.Header>
                             <TextBlock Text="MCP" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
                         </TabItem.Header>

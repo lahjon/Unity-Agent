@@ -7,13 +7,13 @@ using System.Text.Json;
 using System.Threading;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using AgenticEngine.Managers;
+using HappyEngine.Managers;
 using Xunit;
 
-using OvernightAction = AgenticEngine.Managers.OvernightModeHandler.OvernightAction;
-using OvernightDecision = AgenticEngine.Managers.OvernightModeHandler.OvernightDecision;
+using OvernightAction = HappyEngine.Managers.OvernightModeHandler.OvernightAction;
+using OvernightDecision = HappyEngine.Managers.OvernightModeHandler.OvernightDecision;
 
-namespace AgenticEngine.Tests
+namespace HappyEngine.Tests
 {
     /// <summary>
     /// Integration tests for the task execution engine covering:
@@ -66,7 +66,7 @@ namespace AgenticEngine.Tests
         /// </summary>
         private static (TaskExecutionManager mgr, FileLockManager flm, string tempDir) CreateManagers()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"AgenticEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
 
             var textBlock = new TextBlock();

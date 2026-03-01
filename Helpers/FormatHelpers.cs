@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace AgenticEngine.Helpers
+namespace HappyEngine.Helpers
 {
     public static class FormatHelpers
     {

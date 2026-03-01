@@ -1,14 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using AgenticEngine.Managers;
-using AgenticEngine.Models;
+using HappyEngine.Managers;
+using HappyEngine.Models;
 
-namespace AgenticEngine.Dialogs
+namespace HappyEngine.Dialogs
 {
     public static class ActivityDashboardDialog
     {
@@ -17,16 +16,10 @@ namespace AgenticEngine.Dialogs
             ObservableCollection<AgentTask> historyTasks,
             List<ProjectEntry> savedProjects)
         {
-            var (dlg, outerBorder) = DialogFactory.CreateDarkWindow("Activity Dashboard", 900, 620,
+            var dlg = DarkDialogWindow.Create("Activity Dashboard", 900, 620,
                 ResizeMode.CanResize, topmost: false, backgroundResource: "BgDeep");
 
             var root = new DockPanel();
-
-            // Title bar
-            var (titleBar, _) = DialogFactory.CreateTitleBar(dlg, "Activity Dashboard");
-
-            DockPanel.SetDock(titleBar, Dock.Top);
-            root.Children.Add(titleBar);
 
             // Button bar
             var btnBar = new StackPanel
@@ -72,7 +65,7 @@ namespace AgenticEngine.Dialogs
             refreshBtn.Click += (_, _) => LoadContent();
 
             root.Children.Add(scrollViewer);
-            outerBorder.Child = root;
+            dlg.SetBodyContent(root);
 
             dlg.KeyDown += (_, ke) =>
             {

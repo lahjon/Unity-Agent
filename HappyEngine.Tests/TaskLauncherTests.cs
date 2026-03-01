@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Xunit;
 
-namespace AgenticEngine.Tests
+namespace HappyEngine.Tests
 {
     public class TaskLauncherTests
     {
@@ -97,7 +97,9 @@ namespace AgenticEngine.Tests
         public void BuildBasePrompt_NormalMode_CombinesSystemAndDescription()
         {
             var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "do things", useMcp: false, isOvernight: false);
-            Assert.Equal("SYSTEM:do things", result);
+            Assert.StartsWith("SYSTEM:", result);
+            Assert.EndsWith("do things", result);
+            Assert.Contains("# USER PROMPT", result);
         }
 
         [Fact]
@@ -173,7 +175,9 @@ namespace AgenticEngine.Tests
                 IsOvernight = false
             };
             var result = TaskLauncher.BuildFullPrompt("SYS:", task);
-            Assert.Equal("SYS:do work", result);
+            Assert.StartsWith("SYS:", result);
+            Assert.EndsWith("do work", result);
+            Assert.Contains("# USER PROMPT", result);
         }
 
         [Fact]
@@ -641,9 +645,9 @@ namespace AgenticEngine.Tests
         }
 
         [Fact]
-        public void DefaultSystemPrompt_EndsWithTask()
+        public void DefaultSystemPrompt_EndsWithNewlines()
         {
-            Assert.EndsWith("# TASK: ", TaskLauncher.DefaultSystemPrompt);
+            Assert.EndsWith("\n\n", TaskLauncher.DefaultSystemPrompt);
         }
 
         [Fact]
@@ -702,25 +706,16 @@ namespace AgenticEngine.Tests
         }
 
         [Fact]
-        public void FormatCompletionSummary_NullFiles_ShowsNotAvailable()
+        public void FormatCompletionSummary_NullFiles_NoFileSection()
         {
             var result = TaskLauncher.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.Zero, null);
-            Assert.Contains("git not available", result);
+            Assert.DoesNotContain("Files modified", result);
+            Assert.DoesNotContain("Lines changed", result);
         }
 
         [Fact]
-        public void FormatCompletionSummary_EmptyFiles_ShowsZero()
-        {
-            var files = new List<(string name, int added, int removed)>();
-            var result = TaskLauncher.FormatCompletionSummary(
-                AgentTaskStatus.Completed, TimeSpan.Zero, files);
-            Assert.Contains("Files modified: 0", result);
-            Assert.Contains("+0 / -0", result);
-        }
-
-        [Fact]
-        public void FormatCompletionSummary_WithFiles_ShowsCorrectCounts()
+        public void FormatCompletionSummary_WithFiles_NoFileSection()
         {
             var files = new List<(string name, int added, int removed)>
             {
@@ -729,10 +724,9 @@ namespace AgenticEngine.Tests
             };
             var result = TaskLauncher.FormatCompletionSummary(
                 AgentTaskStatus.Failed, TimeSpan.FromMinutes(2), files);
-            Assert.Contains("Files modified: 2", result);
-            Assert.Contains("+37 / -13", result);
-            Assert.Contains("src/App.cs", result);
-            Assert.Contains("src/Main.cs", result);
+            Assert.DoesNotContain("Files modified", result);
+            Assert.DoesNotContain("Lines changed", result);
+            Assert.DoesNotContain("src/App.cs", result);
             Assert.Contains("Failed", result);
         }
 
@@ -745,7 +739,7 @@ namespace AgenticEngine.Tests
         }
 
         [Fact]
-        public void FormatCompletionSummary_FileDetails_ShowLineChanges()
+        public void FormatCompletionSummary_FileDetails_DoesNotListIndividualFiles()
         {
             var files = new List<(string name, int added, int removed)>
             {
@@ -753,7 +747,8 @@ namespace AgenticEngine.Tests
             };
             var result = TaskLauncher.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.Zero, files);
-            Assert.Contains("test.cs | +10 -3", result);
+            Assert.DoesNotContain("test.cs", result);
+            Assert.DoesNotContain("Modified files:", result);
         }
 
         [Fact]

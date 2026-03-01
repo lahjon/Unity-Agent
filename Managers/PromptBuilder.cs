@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
-namespace AgenticEngine.Managers
+namespace HappyEngine.Managers
 {
     public class PromptBuilder : IPromptBuilder
     {
@@ -17,9 +17,8 @@ namespace AgenticEngine.Managers
             "Never store personal security information directly in project files. " +
             "This includes API keys, tokens, passwords, secrets, credentials, and any other sensitive data. " +
             "If a task requires storing such values, they MUST be placed in the system AppData directory " +
-            "(%LOCALAPPDATA%\\AgenticEngine\\) — never in source code, config files, or any file within the project tree. " +
-            "If you encounter hardcoded secrets in the project, flag them to the user and recommend moving them to AppData. " +
-            "# TASK: ";
+            "(%LOCALAPPDATA%\\HappyEngine\\) — never in source code, config files, or any file within the project tree. " +
+            "If you encounter hardcoded secrets in the project, flag them to the user and recommend moving them to AppData.\n\n";
 
         public const string McpPromptBlock =
             "# MCP VERIFICATION " +
@@ -243,7 +242,8 @@ namespace AgenticEngine.Managers
             "STATUS: COMPLETE\n" +
             "STATUS: NEEDS_MORE_WORK\n\n" +
             "Use COMPLETE only when ALL checklist items are done AND all exit criteria are met.\n\n" +
-            "## THE TASK:\n";
+            "# USER PROMPT\n" +
+            "The following is the actual task from the user. Everything above is system configuration.\n\n";
 
         public const string OvernightContinuationTemplate =
             "You are continuing an OVERNIGHT AUTONOMOUS TASK (iteration {0}/{1}).\n\n" +
@@ -283,6 +283,22 @@ namespace AgenticEngine.Managers
             "If you found improvements to make in Step 2-3, use NEEDS_MORE_WORK to continue iterating.\n\n" +
             "Continue working on the task now.";
 
+        // ── Helpers ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the task-specific overnight log filename.
+        /// When taskId is provided, produces ".overnight_log_{taskId}.md" so
+        /// multiple overnight tasks on the same project don't collide.
+        /// </summary>
+        public static string GetOvernightLogFilename(string? taskId = null)
+            => string.IsNullOrEmpty(taskId) ? ".overnight_log.md" : $".overnight_log_{taskId}.md";
+
+        private static string InjectOvernightLogFilename(string prompt, string? taskId)
+        {
+            if (string.IsNullOrEmpty(taskId)) return prompt;
+            return prompt.Replace(".overnight_log.md", GetOvernightLogFilename(taskId));
+        }
+
         // ── Prompt Assembly ─────────────────────────────────────────
 
         public string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
@@ -290,7 +306,7 @@ namespace AgenticEngine.Managers
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
-            bool isGameProject = false)
+            bool isGameProject = false, string taskId = "")
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
@@ -299,7 +315,7 @@ namespace AgenticEngine.Managers
             var gameBlock = isGameProject ? GameRulesBlock : "";
 
             if (isOvernight)
-                return descBlock + projectRulesBlock + gameBlock + OvernightInitialTemplate + description;
+                return descBlock + projectRulesBlock + gameBlock + InjectOvernightLogFilename(OvernightInitialTemplate, taskId) + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -307,7 +323,8 @@ namespace AgenticEngine.Managers
             var gitBlock = noGitWrite ? NoGitWriteBlock : "";
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
-            return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock + description;
+            return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
+                "# USER PROMPT\nThe following is the actual task from the user. Everything above is system configuration.\n\n" + description;
         }
 
         public string BuildFullPrompt(string systemPrompt, AgentTask task,
@@ -317,7 +334,7 @@ namespace AgenticEngine.Managers
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
             if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
                 description += "\n\n# Additional Instructions\n" + task.AdditionalInstructions;
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsOvernight, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id);
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 basePrompt = $"# Task: {task.Summary}\n{basePrompt}";
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
@@ -381,13 +398,13 @@ namespace AgenticEngine.Managers
             var remoteFlag = remoteSession ? " --remote" : "";
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
-                   $"Write-Host '[AgenticEngine] Project: {projectPath}' -ForegroundColor DarkGray\n" +
-                   $"Write-Host '[AgenticEngine] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
-                   "Write-Host '[AgenticEngine] Starting Claude...' -ForegroundColor Cyan\n" +
+                   $"Write-Host '[HappyEngine] Project: {projectPath}' -ForegroundColor DarkGray\n" +
+                   $"Write-Host '[HappyEngine] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
+                   "Write-Host '[HappyEngine] Starting Claude...' -ForegroundColor Cyan\n" +
                    "Write-Host ''\n" +
                    $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{remoteFlag} --verbose\n" +
-                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[AgenticEngine] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
-                   "Write-Host \"`n[AgenticEngine] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
+                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[HappyEngine] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
+                   "Write-Host \"`n[HappyEngine] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
                    "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n";
         }
 
@@ -416,9 +433,10 @@ namespace AgenticEngine.Managers
             };
         }
 
-        public string BuildOvernightContinuationPrompt(int iteration, int maxIterations)
+        public string BuildOvernightContinuationPrompt(int iteration, int maxIterations, string taskId = "")
         {
-            return string.Format(OvernightContinuationTemplate, iteration, maxIterations);
+            var prompt = string.Format(OvernightContinuationTemplate, iteration, maxIterations);
+            return InjectOvernightLogFilename(prompt, taskId);
         }
 
         public string BuildDependencyContext(List<string> depIds,

@@ -5,9 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using AgenticEngine.Models;
+using HappyEngine.Models;
 
-namespace AgenticEngine
+namespace HappyEngine
 {
     public partial class MainWindow
     {
@@ -27,18 +27,9 @@ namespace AgenticEngine
                 Name = name,
                 Description = name,
                 AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
-                RemoteSession = RemoteSessionToggle.IsChecked == true,
-                Headless = HeadlessToggle.IsChecked == true,
-                SpawnTeam = SpawnTeamToggle.IsChecked == true,
-                IsOvernight = OvernightToggle.IsChecked == true,
-                ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true,
-                PlanOnly = PlanOnlyToggle.IsChecked == true,
-                IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true,
-                UseMcp = UseMcpToggle.IsChecked == true,
-                NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true,
-                AutoDecompose = AutoDecomposeToggle.IsChecked == true,
                 Model = modelTag,
             };
+            ReadUiFlagsInto(template);
 
             _settingsManager.TaskTemplates.Insert(0, template);
             _settingsManager.SaveTemplates();
@@ -122,16 +113,7 @@ namespace AgenticEngine
 
         private void ApplyTemplate(TaskTemplate template)
         {
-            RemoteSessionToggle.IsChecked = template.RemoteSession;
-            HeadlessToggle.IsChecked = template.Headless;
-            SpawnTeamToggle.IsChecked = template.SpawnTeam;
-            OvernightToggle.IsChecked = template.IsOvernight;
-            ExtendedPlanningToggle.IsChecked = template.ExtendedPlanning;
-            PlanOnlyToggle.IsChecked = template.PlanOnly;
-            IgnoreFileLocksToggle.IsChecked = template.IgnoreFileLocks;
-            UseMcpToggle.IsChecked = template.UseMcp;
-            DefaultNoGitWriteToggle.IsChecked = template.NoGitWrite;
-            AutoDecomposeToggle.IsChecked = template.AutoDecompose;
+            ApplyFlagsToUi(template);
 
             AdditionalInstructionsInput.Text = template.AdditionalInstructions ?? "";
 
@@ -150,16 +132,7 @@ namespace AgenticEngine
         private void ResetToNoTemplate()
         {
             if (RemoteSessionToggle == null) return; // Called during InitializeComponent before controls exist
-            RemoteSessionToggle.IsChecked = false;
-            HeadlessToggle.IsChecked = false;
-            SpawnTeamToggle.IsChecked = false;
-            OvernightToggle.IsChecked = false;
-            ExtendedPlanningToggle.IsChecked = false;
-            PlanOnlyToggle.IsChecked = false;
-            IgnoreFileLocksToggle.IsChecked = true;
-            UseMcpToggle.IsChecked = false;
-            DefaultNoGitWriteToggle.IsChecked = true;
-            AutoDecomposeToggle.IsChecked = false;
+            ApplyFlagsToUi(new TaskConfigBase()); // TaskConfigBase defaults match the desired reset values
 
             AdditionalInstructionsInput.Text = "";
             ModelCombo.SelectedIndex = 0;
