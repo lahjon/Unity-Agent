@@ -201,7 +201,7 @@ namespace HappyEngine.Tests
         public void BuildClaudeCommand_NoFlags_BasicCommand()
         {
             var cmd = TaskLauncher.BuildClaudeCommand(false, false);
-            Assert.Equal("claude -p --verbose --output-format stream-json $prompt", cmd);
+            Assert.Equal("claude -p --verbose --output-format stream-json", cmd);
         }
 
         [Fact]
@@ -248,15 +248,15 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildPowerShellScript_ContainsSetLocation()
         {
-            var script = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "claude -p $prompt");
+            var script = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "claude -p");
             Assert.Contains("Set-Location -LiteralPath 'C:\\proj'", script);
         }
 
         [Fact]
-        public void BuildPowerShellScript_ContainsGetContent()
+        public void BuildPowerShellScript_PipesPromptViaStdin()
         {
-            var script = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "claude -p $prompt");
-            Assert.Contains("Get-Content -Raw -LiteralPath 'C:\\scripts\\prompt.txt'", script);
+            var script = TaskLauncher.BuildPowerShellScript(@"C:\proj", @"C:\scripts\prompt.txt", "claude -p");
+            Assert.Contains("Get-Content -Raw -LiteralPath 'C:\\scripts\\prompt.txt' | claude -p", script);
         }
 
         [Fact]

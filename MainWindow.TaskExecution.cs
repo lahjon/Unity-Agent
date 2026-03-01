@@ -41,6 +41,9 @@ namespace HappyEngine
             target.UseMcp = UseMcpToggle.IsChecked == true;
             target.NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true;
             target.AutoDecompose = AutoDecomposeToggle.IsChecked == true;
+            target.ApplyFix = ApplyFixToggle.IsChecked == true;
+            if (int.TryParse(FeatureModeIterationsBox?.Text, out var iter) && iter > 0)
+                target.FeatureModeIterations = iter;
         }
 
         /// <summary>Applies flags from a <see cref="TaskConfigBase"/> to the main-window toggle controls.</summary>
@@ -55,8 +58,11 @@ namespace HappyEngine
             UseMcpToggle.IsChecked = source.UseMcp;
             DefaultNoGitWriteToggle.IsChecked = source.NoGitWrite;
             AutoDecomposeToggle.IsChecked = source.AutoDecompose;
+            ApplyFixToggle.IsChecked = source.ApplyFix;
             if (FeatureModeIterationsPanel != null)
                 FeatureModeIterationsPanel.Visibility = source.IsFeatureMode ? Visibility.Visible : Visibility.Collapsed;
+            if (FeatureModeIterationsBox != null)
+                FeatureModeIterationsBox.Text = source.FeatureModeIterations.ToString();
         }
 
         // ── Execute ────────────────────────────────────────────────
@@ -89,7 +95,8 @@ namespace HappyEngine
                 PlanOnlyToggle.IsChecked == true,
                 imagePaths: _imageManager.DetachImages(),
                 model: selectedModel,
-                autoDecompose: AutoDecomposeToggle.IsChecked == true);
+                autoDecompose: AutoDecomposeToggle.IsChecked == true,
+                applyFix: ApplyFixToggle.IsChecked == true);
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
             task.AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "";

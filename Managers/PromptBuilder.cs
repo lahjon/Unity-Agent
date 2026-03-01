@@ -83,6 +83,17 @@ namespace HappyEngine.Managers
             "```TEAM\n[{\"role\": \"Backend\", \"description\": \"...\", \"depends_on\": []}, {\"role\": \"Tests\", \"description\": \"...\", \"depends_on\": [0]}]\n```\n" +
             "Prefer parallel execution. Minimize dependencies. Agents should check the message bus for sibling work.\n\n---\n";
 
+        public const string ApplyFixBlock =
+            "# APPLY FIX\n" +
+            "When you identify a bug, issue, or needed change, apply the fix directly without asking for user confirmation. " +
+            "Do not end your response with questions like \"Want me to apply the fix?\" or \"Should I implement this?\". " +
+            "Instead, implement the solution immediately and explain what you changed.\n\n";
+
+        public const string ConfirmBeforeChangesBlock =
+            "# CONFIRM BEFORE CHANGES\n" +
+            "Before making any code changes, describe the issue and your proposed solution, then ask the user if they want you to proceed with the implementation. " +
+            "If no changes are needed, simply provide the information or analysis requested.\n\n";
+
         public const string FailureRecoveryBlock =
             "# FAILURE RECOVERY MODE\n" +
             "A previous attempt at this task FAILED. You are a diagnostic recovery agent.\n\n" +
@@ -96,6 +107,20 @@ namespace HappyEngine.Managers
             "- If the previous attempt partially succeeded, preserve that work and only fix what broke.\n" +
             "- If the error is environmental (missing tool, permission issue), document the blocker clearly.\n" +
             "- Check for common failure patterns: syntax errors, missing imports, wrong file paths, type mismatches.\n\n";
+
+        public const string PlanningTeamMemberBlock =
+            "# PLANNING-ONLY RESTRICTIONS\n" +
+            "You are a planning team member. You must NOT write, edit, create, or delete any project files.\n" +
+            "Do NOT create documentation files (e.g., ARCHITECTURE.md, DESIGN.md, PLAN.md, etc.).\n" +
+            "Post all findings and recommendations to the message bus only.\n" +
+            "Your output and completion summary are automatically collected — do not write them to files.\n\n" +
+            "# AUTO-COMPLETION\n" +
+            "When you have finished your exploration and posted findings to the message bus, " +
+            "you MUST stop immediately. Provide a brief final summary of your findings and then exit.\n" +
+            "Do NOT ask the user for confirmation, approval, or next steps.\n" +
+            "Do NOT re-verify, re-post, or loop back to check your own work.\n" +
+            "Do NOT say things like \"Want me to apply the fix?\" or \"Shall I continue?\".\n" +
+            "Your results are automatically collected by the orchestrator — just complete your analysis and stop.\n\n";
 
         public const string FeatureModeInitialTemplate =
             "# FEATURE MODE — PLANNING PHASE\n" +
@@ -112,7 +137,10 @@ namespace HappyEngine.Managers
             "- Include roles for different areas of the codebase affected\n" +
             "- Each member should explore specific files, patterns, and constraints\n" +
             "- Members coordinate via the shared message bus\n" +
-            "- NO member should implement anything — planning and exploration only\n\n" +
+            "- NO member should implement anything — planning and exploration only\n" +
+            "- **CRITICAL**: Each member's description MUST include the instruction: " +
+            "\"Do NOT create or modify any files. Do NOT write ARCHITECTURE.md or any documentation files. " +
+            "Post all findings to the message bus. Your output is collected automatically.\"\n\n" +
             "## OUTPUT\n" +
             "Output a team definition as JSON in a ```TEAM``` block:\n" +
             "```TEAM\n[{\"role\": \"Architect\", \"description\": \"Explore the codebase and design...\", \"depends_on\": []}]\n```\n\n" +
@@ -201,7 +229,8 @@ namespace HappyEngine.Managers
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
-            bool isGameProject = false, string taskId = "")
+            bool isGameProject = false, string taskId = "",
+            bool applyFix = true)
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
@@ -218,7 +247,8 @@ namespace HappyEngine.Managers
             var gitBlock = noGitWrite ? NoGitWriteBlock : "";
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
-            return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
+            var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;
+            return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + applyFixBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
                 "# USER PROMPT / TASK\n" + description;
         }
 
@@ -229,7 +259,7 @@ namespace HappyEngine.Managers
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
             if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
                 description += "\n\n# Additional Instructions\n" + task.AdditionalInstructions;
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix);
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
                 basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
@@ -271,7 +301,7 @@ namespace HappyEngine.Managers
         {
             var skipFlag = skipPermissions ? " --dangerously-skip-permissions" : "";
             var remoteFlag = remoteSession ? " --remote" : "";
-            return $"claude -p{skipFlag}{remoteFlag} --verbose --output-format stream-json $prompt";
+            return $"claude -p{skipFlag}{remoteFlag} --verbose --output-format stream-json";
         }
 
         public string BuildPowerShellScript(string projectPath, string promptFilePath,
@@ -279,8 +309,7 @@ namespace HappyEngine.Managers
         {
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
-                   $"$prompt = Get-Content -Raw -LiteralPath '{promptFilePath}'\n" +
-                   $"{claudeCmd}\n";
+                   $"Get-Content -Raw -LiteralPath '{promptFilePath}' | {claudeCmd}\n";
         }
 
         public string BuildHeadlessPowerShellScript(string projectPath, string promptFilePath,

@@ -1204,6 +1204,10 @@
                                                   Checked="AutoRecoverToggle_Changed" Unchecked="AutoRecoverToggle_Changed">
                                         <TextBlock Text="Auto-Recover" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
+                                    <ToggleButton x:Name="ApplyFixToggle" IsChecked="True"
+                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
+                                        <TextBlock Text="Apply Fix" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                    </ToggleButton>
                                     <!-- Separator -->
                                     <Border BorderBrush="{StaticResource SeparatorDark}" BorderThickness="0,1,0,0" Margin="0,4,0,8"/>
                                     <!-- Per-task toggles -->

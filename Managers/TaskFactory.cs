@@ -36,7 +36,8 @@ namespace HappyEngine.Managers
             List<string>? imagePaths = null,
             ModelType model = ModelType.ClaudeCode,
             string? parentTaskId = null,
-            bool autoDecompose = false)
+            bool autoDecompose = false,
+            bool applyFix = true)
         {
             var task = new AgentTask
             {
@@ -53,6 +54,7 @@ namespace HappyEngine.Managers
                 PlanOnly = planOnly,
                 UseMessageBus = useMessageBus,
                 AutoDecompose = autoDecompose,
+                ApplyFix = applyFix,
                 Model = model,
                 MaxIterations = 2,
                 ProjectPath = projectPath,

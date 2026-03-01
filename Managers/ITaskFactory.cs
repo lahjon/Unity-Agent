@@ -25,7 +25,8 @@ namespace HappyEngine.Managers
             List<string>? imagePaths = null,
             ModelType model = ModelType.ClaudeCode,
             string? parentTaskId = null,
-            bool autoDecompose = false);
+            bool autoDecompose = false,
+            bool applyFix = true);
 
         void PrepareTaskForFeatureModeStart(AgentTask task);
 

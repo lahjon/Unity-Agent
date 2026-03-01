@@ -60,10 +60,11 @@ namespace HappyEngine
             List<string>? imagePaths = null,
             ModelType model = ModelType.ClaudeCode,
             string? parentTaskId = null,
-            bool autoDecompose = false)
+            bool autoDecompose = false,
+            bool applyFix = true)
             => _factory.CreateTask(description, projectPath, skipPermissions, remoteSession,
                 headless, isFeatureMode, ignoreFileLocks, useMcp, spawnTeam, extendedPlanning,
-                noGitWrite, planOnly, useMessageBus, imagePaths, model, parentTaskId, autoDecompose);
+                noGitWrite, planOnly, useMessageBus, imagePaths, model, parentTaskId, autoDecompose, applyFix);
 
         public static void PrepareTaskForFeatureModeStart(AgentTask task)
             => _factory.PrepareTaskForFeatureModeStart(task);
@@ -84,10 +85,11 @@ namespace HappyEngine
             bool autoDecompose = false,
             bool spawnTeam = false,
             bool isGameProject = false,
-            string taskId = "")
+            string taskId = "",
+            bool applyFix = true)
             => _prompt.BuildBasePrompt(systemPrompt, description, useMcp, isFeatureMode,
                 extendedPlanning, noGitWrite, planOnly, projectDescription,
-                projectRulesBlock, autoDecompose, spawnTeam, isGameProject, taskId);
+                projectRulesBlock, autoDecompose, spawnTeam, isGameProject, taskId, applyFix);
 
         public static string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",

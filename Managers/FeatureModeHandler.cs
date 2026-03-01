@@ -30,6 +30,7 @@ namespace HappyEngine.Managers
         internal const int FeatureModeIterationTimeoutMinutes = 60;
         internal const int FeatureModeMaxConsecutiveFailures = 3;
         internal const int FeatureModeOutputCapChars = 100_000;
+        internal const int PlanningTeamMemberTimeoutMinutes = 30;
 
         /// <summary>Fires when a new feature mode iteration starts (taskId, iteration).</summary>
         public event Action<string, int>? IterationStarted;
@@ -177,6 +178,10 @@ namespace HappyEngine.Managers
                     child.UseMessageBus = true;
                     child.NoGitWrite = true;
                     child.SkipPermissions = true;
+                    // Inject planning-only restriction so team members don't write files
+                    // (e.g., ARCHITECTURE.md) that could conflict between concurrent agents
+                    child.AdditionalInstructions = PromptBuilder.PlanningTeamMemberBlock +
+                        (child.AdditionalInstructions ?? "");
                     task.FeaturePhaseChildIds.Add(child.Id);
                     FeatureModeChildSpawned?.Invoke(task, child);
                     spawnedCount++;
@@ -208,6 +213,9 @@ namespace HappyEngine.Managers
                 $"\n[Feature Mode] Planning team spawned with {spawnedCount} member(s). Waiting for team to complete...\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
+
+            // Safety timeout: kill any stuck team members after the planning timeout
+            StartPhaseTimeout(task, PlanningTeamMemberTimeoutMinutes, activeTasks, historyTasks, moveToHistory);
         }
 
         /// <summary>
@@ -219,6 +227,9 @@ namespace HappyEngine.Managers
             Action<AgentTask> moveToHistory)
         {
             if (task.Status != AgentTaskStatus.Running) return;
+
+            // Cancel phase timeout since all children completed
+            CancelPhaseTimeout(task);
 
             switch (task.FeatureModePhase)
             {
@@ -339,6 +350,9 @@ namespace HappyEngine.Managers
                 $"\n[Feature Mode] {spawnedCount} execution task(s) spawned. Waiting for completion...\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
+
+            // Safety timeout: kill stuck execution tasks after the iteration timeout
+            StartPhaseTimeout(task, FeatureModeIterationTimeoutMinutes, activeTasks, historyTasks, moveToHistory);
         }
 
         /// <summary>
@@ -443,7 +457,7 @@ namespace HappyEngine.Managers
 
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
             var remoteFlag = task.RemoteSession ? " --remote" : "";
-            var claudeCmd = $"claude -p{skipFlag}{remoteFlag} --verbose --output-format stream-json $prompt";
+            var claudeCmd = $"claude -p{skipFlag}{remoteFlag} --verbose --output-format stream-json";
 
             var ps1File = Path.Combine(_scriptDir, $"feature_{task.Id}.ps1");
             File.WriteAllText(ps1File,
@@ -623,6 +637,59 @@ namespace HappyEngine.Managers
             }
 
             return sb.ToString();
+        }
+
+        // ── Phase timeout (stuck child detection) ─────────────────────────
+
+        /// <summary>
+        /// Starts a timer that kills any still-running children after the specified timeout.
+        /// Uses the task's FeatureModeIterationTimer slot (which is free during child-wait phases).
+        /// </summary>
+        private void StartPhaseTimeout(AgentTask task, int timeoutMinutes,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            Action<AgentTask> moveToHistory)
+        {
+            CancelPhaseTimeout(task);
+
+            var timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMinutes(timeoutMinutes)
+            };
+            task.FeatureModeIterationTimer = timer;
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                task.FeatureModeIterationTimer = null;
+                if (task.Status != AgentTaskStatus.Running) return;
+
+                _outputProcessor.AppendOutput(task.Id,
+                    $"\n[Feature Mode] Phase timeout ({timeoutMinutes}min). Killing stuck child tasks...\n",
+                    activeTasks, historyTasks);
+
+                // Kill any still-running children
+                foreach (var childId in task.FeaturePhaseChildIds)
+                {
+                    var child = activeTasks.FirstOrDefault(t => t.Id == childId);
+                    if (child is { IsFinished: false, Process: { HasExited: false } })
+                    {
+                        _outputProcessor.AppendOutput(task.Id,
+                            $"[Feature Mode] Killing stuck child #{child.TaskNumber}: {child.Summary}\n",
+                            activeTasks, historyTasks);
+                        try { child.Process.Kill(true); }
+                        catch (Exception ex) { AppLogger.Warn("FeatureMode", $"Failed to kill stuck child {child.Id}", ex); }
+                    }
+                }
+            };
+            timer.Start();
+        }
+
+        private static void CancelPhaseTimeout(AgentTask task)
+        {
+            if (task.FeatureModeIterationTimer != null)
+            {
+                task.FeatureModeIterationTimer.Stop();
+                task.FeatureModeIterationTimer = null;
+            }
         }
 
         // ── Token limit retry ───────────────────────────────────────────

@@ -395,12 +395,12 @@ namespace HappyEngine.Tests
             // The PS1 script hardcodes the project path at build time.
             // Swapping projects after building should NOT affect the script.
             var originalPath = @"C:\Projects\OriginalProject";
-            var script = TaskLauncher.BuildPowerShellScript(originalPath, @"C:\temp\prompt.txt", "claude -p $prompt");
+            var script = TaskLauncher.BuildPowerShellScript(originalPath, @"C:\temp\prompt.txt", "claude -p");
 
             Assert.Contains("Set-Location -LiteralPath 'C:\\Projects\\OriginalProject'", script);
 
             // If we build another script for a different project, it's independent
-            var newScript = TaskLauncher.BuildPowerShellScript(@"C:\Projects\NewProject", @"C:\temp\prompt2.txt", "claude -p $prompt");
+            var newScript = TaskLauncher.BuildPowerShellScript(@"C:\Projects\NewProject", @"C:\temp\prompt2.txt", "claude -p");
             Assert.Contains("Set-Location -LiteralPath 'C:\\Projects\\NewProject'", newScript);
             Assert.DoesNotContain("OriginalProject", newScript);
         }

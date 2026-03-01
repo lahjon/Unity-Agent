@@ -17,6 +17,8 @@ namespace HappyEngine.Models
         public bool NoGitWrite { get; set; } = true;
         public bool UseMessageBus { get; set; }
         public bool AutoDecompose { get; set; }
+        public bool ApplyFix { get; set; } = true;
+        public int FeatureModeIterations { get; set; } = 2;
         public string AdditionalInstructions { get; set; } = "";
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
@@ -36,6 +38,8 @@ namespace HappyEngine.Models
             target.NoGitWrite = NoGitWrite;
             target.UseMessageBus = UseMessageBus;
             target.AutoDecompose = AutoDecompose;
+            target.ApplyFix = ApplyFix;
+            target.FeatureModeIterations = FeatureModeIterations;
         }
 
         /// <summary>
@@ -54,6 +58,8 @@ namespace HappyEngine.Models
             NoGitWrite = source.NoGitWrite;
             UseMessageBus = source.UseMessageBus;
             AutoDecompose = source.AutoDecompose;
+            ApplyFix = source.ApplyFix;
+            FeatureModeIterations = source.MaxIterations;
         }
 
         /// <summary>
@@ -72,6 +78,8 @@ namespace HappyEngine.Models
             target.NoGitWrite = NoGitWrite;
             target.UseMessageBus = UseMessageBus;
             target.AutoDecompose = AutoDecompose;
+            target.ApplyFix = ApplyFix;
+            target.MaxIterations = FeatureModeIterations;
         }
     }
 }

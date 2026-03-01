@@ -10,7 +10,8 @@ namespace HappyEngine.Managers
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
-            bool isGameProject = false, string taskId = "");
+            bool isGameProject = false, string taskId = "",
+            bool applyFix = true);
 
         string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
