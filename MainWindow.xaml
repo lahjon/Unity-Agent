@@ -380,71 +380,68 @@
                     <Grid Grid.Row="3" Margin="0,6,0,0">
                         <TextBlock Text="{Binding TimeInfo}" Foreground="{StaticResource TextMuted}"
                                    FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
-                        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <!-- Badge row above padlock -->
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,2">
-                                <Border CornerRadius="3" Padding="4,1"
-                                        Background="{StaticResource PlanBadgeBg}" BorderBrush="{StaticResource PlanBadgeBorder}" BorderThickness="1">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding PlanOnly}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="PLAN" Foreground="{StaticResource PlanBadgeText}" FontSize="9"
-                                               FontFamily="Segoe UI" FontWeight="Bold"/>
-                                </Border>
-                                <!-- Per-task toggle badges -->
-                                <Border CornerRadius="3" Padding="4,1" Margin="4,0,0,0"
-                                        Background="#33607D8B" BorderBrush="#55607D8B" BorderThickness="1"
-                                        ToolTip="{Binding ActiveTogglesTooltip}">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasActiveToggles}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding ActiveTogglesText}" Foreground="#90A4AE" FontSize="9"
-                                               FontFamily="Segoe UI" FontWeight="Bold"/>
-                                </Border>
-                                <!-- Priority badge -->
-                                <Border CornerRadius="3" Padding="4,1" Margin="4,0,0,0"
-                                        BorderThickness="1">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Setter Property="Background" Value="#33FFD600"/>
-                                            <Setter Property="BorderBrush" Value="#55FFD600"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasPriorityBadge}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding PriorityLevel}" Value="Critical">
-                                                    <Setter Property="Background" Value="#33FF5252"/>
-                                                    <Setter Property="BorderBrush" Value="#55FF5252"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding PriorityLevel}" Value="Low">
-                                                    <Setter Property="Background" Value="#3378909C"/>
-                                                    <Setter Property="BorderBrush" Value="#5578909C"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding PriorityBadgeText}"
-                                               Foreground="{Binding PriorityBadgeColor, Converter={StaticResource StringToBrush}}"
-                                               FontSize="9" FontFamily="Segoe UI" FontWeight="Bold"/>
-                                </Border>
-                            </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Border CornerRadius="3" Padding="4,1" VerticalAlignment="Center"
+                                    Background="{StaticResource PlanBadgeBg}" BorderBrush="{StaticResource PlanBadgeBorder}" BorderThickness="1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding PlanOnly}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="PLAN" Foreground="{StaticResource PlanBadgeText}" FontSize="9"
+                                           FontFamily="Segoe UI" FontWeight="Bold"/>
+                            </Border>
+                            <!-- Per-task toggle badges -->
+                            <Border CornerRadius="3" Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center"
+                                    Background="#33607D8B" BorderBrush="#55607D8B" BorderThickness="1"
+                                    ToolTip="{Binding ActiveTogglesTooltip}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasActiveToggles}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding ActiveTogglesText}" Foreground="#90A4AE" FontSize="9"
+                                           FontFamily="Segoe UI" FontWeight="Bold"/>
+                            </Border>
+                            <!-- Priority badge -->
+                            <Border CornerRadius="3" Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center"
+                                    BorderThickness="1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Setter Property="Background" Value="#33FFD600"/>
+                                        <Setter Property="BorderBrush" Value="#55FFD600"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasPriorityBadge}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding PriorityLevel}" Value="Critical">
+                                                <Setter Property="Background" Value="#33FF5252"/>
+                                                <Setter Property="BorderBrush" Value="#55FF5252"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding PriorityLevel}" Value="Low">
+                                                <Setter Property="Background" Value="#3378909C"/>
+                                                <Setter Property="BorderBrush" Value="#5578909C"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding PriorityBadgeText}"
+                                           Foreground="{Binding PriorityBadgeColor, Converter={StaticResource StringToBrush}}"
+                                           FontSize="9" FontFamily="Segoe UI" FontWeight="Bold"/>
+                            </Border>
                             <!-- File lock padlock toggle -->
-                            <Button Click="ToggleFileLock_Click" HorizontalAlignment="Right" Margin="0">
+                            <Button Click="ToggleFileLock_Click" Margin="4,0,0,0" VerticalAlignment="Center">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
                                         <Setter Property="Content" Value="&#xE72E;"/>
@@ -1009,6 +1006,9 @@
                                            FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"
                                            TextTrimming="CharacterEllipsis" MaxWidth="400"/>
                                 <Button Content="Save Prompt" Click="SavePromptEntry_Click"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        FontSize="11" Padding="8,4" Margin="0,0,6,0"/>
+                                <Button Content="Store Task" Click="StoreTask_Click"
                                         Background="{StaticResource BgHover}" Style="{StaticResource Btn}"
                                         Foreground="#A8A8A8"
                                         FontSize="11" Padding="6,4" Margin="0,0,6,0"/>
@@ -1438,18 +1438,44 @@
             </Grid.RowDefinitions>
 
             <!-- Node Graph Panel -->
-            <DockPanel Grid.Row="0">
-                <DockPanel DockPanel.Dock="Bottom" Margin="8,0,8,2">
-                    <Button x:Name="GraphCollapseBtn" Content="&#xE70D;"
-                            Style="{StaticResource IconBtn}" DockPanel.Dock="Left"
-                            VerticalAlignment="Center" Margin="0,0,4,0"
-                            Click="GraphCollapse_Click" ToolTip="Collapse graph"/>
-                    <TextBlock Text="GRAPH" Foreground="{StaticResource Accent}" FontWeight="Bold"
-                               FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"
-                               Margin="0,0,8,0" MouseLeftButtonDown="GraphHeader_MouseDown" Cursor="Hand"/>
+            <Border Grid.Row="0" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
+                    BorderThickness="1">
+                <Border.BorderBrush>
+                    <SolidColorBrush x:Name="GraphPanelBorder" Color="#2C2C2C"/>
+                </Border.BorderBrush>
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="GraphPanelBorder"
+                                                Storyboard.TargetProperty="Color"
+                                                To="#3A3A3A" Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ColorAnimation Storyboard.TargetName="GraphPanelBorder"
+                                                Storyboard.TargetProperty="Color"
+                                                To="#2C2C2C" Duration="0:0:0.3"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Bottom" Margin="8,0,8,2">
+                        <Button x:Name="GraphCollapseBtn" Content="&#xE70D;"
+                                Style="{StaticResource IconBtn}" DockPanel.Dock="Left"
+                                VerticalAlignment="Center" Margin="0,0,4,0"
+                                Click="GraphCollapse_Click" ToolTip="Collapse graph"/>
+                        <TextBlock Text="GRAPH" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                   FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                   Margin="0,0,8,0" MouseLeftButtonDown="GraphHeader_MouseDown" Cursor="Hand"/>
+                    </DockPanel>
+                    <controls:TaskNodeGraphPanel x:Name="NodeGraphPanel"/>
                 </DockPanel>
-                <controls:TaskNodeGraphPanel x:Name="NodeGraphPanel"/>
-            </DockPanel>
+            </Border>
 
             <!-- Splitter between graph and output -->
             <GridSplitter x:Name="GraphSplitter" Grid.Row="1" Height="6" HorizontalAlignment="Stretch"
@@ -1491,75 +1517,97 @@
             </Border>
         </Grid>
 
-        <!-- ═══ CHAT PANEL ═══ -->
+        <!-- ═══ FILE LOCKS PANEL ═══ -->
         <Thumb x:Name="ChatSplitter" Grid.Column="3" Grid.Row="0" Grid.RowSpan="5"
                Style="{StaticResource VerticalSplitterThumb}"
                DragDelta="ChatSplitter_DragDelta" Visibility="Collapsed"/>
 
         <Grid Grid.Column="6" Grid.Row="2" Grid.RowSpan="3">
-            <!-- Chat panel -->
-            <Border x:Name="ChatExpandedPanel" Background="{StaticResource BgSurface}" CornerRadius="8"
+            <!-- File Locks panel -->
+            <Border x:Name="FileLocksPanel" Background="{StaticResource BgSurface}" CornerRadius="8"
                     BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Padding="8">
                 <DockPanel>
-                    <!-- Header with New Chat button -->
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-                        <TextBlock Text="CHAT" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                        <TextBlock Text="FILE LOCKS" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                    FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                        <Button x:Name="NewChatBtn" Content="New Chat" Click="NewChat_Click"
-                                Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
-                                HorizontalAlignment="Right" FontSize="10"/>
+                        <TextBlock x:Name="FileLockBadge" Text="0" Visibility="Collapsed"
+                                   Foreground="{StaticResource WarningOrange}" FontSize="10" FontWeight="Bold"
+                                   FontFamily="Segoe UI" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </DockPanel>
-                    <!-- Image preview strip above input -->
-                    <WrapPanel x:Name="ChatImagePreview" DockPanel.Dock="Bottom" Margin="0,4,0,0"
-                               Visibility="Collapsed"/>
-                    <!-- Input area at the bottom -->
-                    <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
-                        <Button x:Name="ChatSendBtn" Content="&#xE724;" Click="ChatSend_Click"
-                                DockPanel.Dock="Right" Margin="4,0,0,0" VerticalAlignment="Center"
-                                Padding="6,6" FontSize="13" ToolTip="Send message">
-                            <Button.Style>
-                                <Style TargetType="Button">
-                                    <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
-                                    <Setter Property="Foreground" Value="White"/>
-                                    <Setter Property="Cursor" Value="Hand"/>
-                                    <Setter Property="BorderThickness" Value="0"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="Button">
-                                                <Border x:Name="Bd" Background="{StaticResource Accent}" CornerRadius="6"
-                                                        Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
-                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHover}"/>
-                                                    </Trigger>
-                                                    <Trigger Property="IsPressed" Value="True">
-                                                        <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-                        <TextBox x:Name="ChatInput" AcceptsReturn="True" TextWrapping="Wrap"
-                                 MaxHeight="60" MinHeight="28"
-                                 VerticalScrollBarVisibility="Auto"
-                                 AllowDrop="True"
-                                 PreviewDragOver="ChatInput_DragOver"
-                                 Drop="ChatInput_Drop"
-                                 Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
-                                 CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
-                                 BorderThickness="1" FontSize="12" FontFamily="Segoe UI" Padding="6,4"
-                                 PreviewKeyDown="ChatInput_PreviewKeyDown"
-                                 VerticalContentAlignment="Center"/>
-                    </DockPanel>
-                    <!-- Chat messages -->
-                    <ScrollViewer x:Name="ChatScrollViewer" VerticalScrollBarVisibility="Auto"
-                                    HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel x:Name="ChatMessagesPanel"/>
+                    <TextBlock DockPanel.Dock="Top" Text="Active file locks across all tasks"
+                               Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
+                               Margin="0,0,0,8"/>
+                    <!-- Header row -->
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="90"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="70"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="FILE" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                        <TextBlock Grid.Column="1" Text="STATUS" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                        <TextBlock Grid.Column="2" Text="TOOL" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                        <TextBlock Grid.Column="3" Text="PATH" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                        <TextBlock Grid.Column="4" Text="TASK" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                        <TextBlock Grid.Column="5" Text="SINCE" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                   FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
+                    </Grid>
+                    <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,4"/>
+                    <!-- Lock rows -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="FileLocksListView">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="8,5" Margin="0,1" CornerRadius="4"
+                                            Background="{StaticResource BgSection}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="70"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding FileName}"
+                                                       Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Consolas"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding OriginalPath}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding StatusText}"
+                                                       FontSize="11" FontFamily="Consolas">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#4EC969"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsIgnored}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Grid.Column="2" Text="{Binding ToolName}"
+                                                       Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Consolas"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding OriginalPath}"
+                                                       Foreground="{StaticResource TextDim}" FontSize="11" FontFamily="Consolas"
+                                                       TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
+                                                       Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
+                                            <TextBlock Grid.Column="5" Text="{Binding TimeText}"
+                                                       Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
@@ -1633,7 +1681,7 @@
                     <!-- Automation tab -->
                     <TabItem x:Name="HelperTabItem">
                         <TabItem.Header>
-                            <TextBlock Text="Automation" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Automation" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>
                         <DockPanel Margin="12">
                             <!-- Top controls -->
@@ -1645,7 +1693,7 @@
                                            Margin="0,0,0,12"/>
 
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Category" Foreground="{StaticResource TextLight}" FontSize="12"
+                                    <TextBlock Text="Category" Foreground="{StaticResource TextLight}" FontSize="11"
                                                FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,10,0"/>
                                     <ComboBox x:Name="HelperCategoryCombo" Width="160"
@@ -1659,7 +1707,7 @@
                                 </DockPanel>
 
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Guidance" Foreground="{StaticResource TextLight}" FontSize="12"
+                                    <TextBlock Text="Guidance" Foreground="{StaticResource TextLight}" FontSize="11"
                                                FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,10,0"/>
                                     <Grid>
@@ -1712,8 +1760,8 @@
                                            Margin="0,0,0,8"/>
                                 <Button x:Name="BuildInvestigationBtn" Content="Build Investigation"
                                         Click="BuildInvestigation_Click"
-                                        Background="{StaticResource BgHover}" Style="{StaticResource SmallBtn}"
-                                        Padding="10,4" HorizontalAlignment="Left"/>
+                                        Style="{StaticResource SecondaryBtn}"
+                                        FontSize="11" Padding="10,4" HorizontalAlignment="Left"/>
                             </StackPanel>
 
                             <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,8"/>
@@ -1815,106 +1863,17 @@
                             </ScrollViewer>
                         </DockPanel>
                     </TabItem>
-                    <!-- File Locks tab -->
-                    <TabItem x:Name="FileLocksTabHeader">
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="File Locks" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
-                                <TextBlock x:Name="FileLockBadge" Text="0" Visibility="Collapsed"
-                                           Foreground="{StaticResource WarningOrange}" FontSize="10" FontWeight="Bold"
-                                           FontFamily="Segoe UI" Margin="4,0,0,0"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <DockPanel Margin="8">
-                            <TextBlock DockPanel.Dock="Top" Text="Active file locks across all tasks"
-                                       Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
-                                       Margin="4,6,4,8"/>
-                            <!-- Header row -->
-                            <Grid DockPanel.Dock="Top" Margin="0,0,0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="160"/>
-                                    <ColumnDefinition Width="70"/>
-                                    <ColumnDefinition Width="90"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="70"/>
-                                    <ColumnDefinition Width="70"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="FILE" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="1" Text="STATUS" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="2" Text="TOOL" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="3" Text="PATH" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="4" Text="TASK" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                                <TextBlock Grid.Column="5" Text="SINCE" Foreground="{StaticResource TextMuted}" FontSize="10"
-                                           FontWeight="Bold" FontFamily="Segoe UI" Padding="8,4"/>
-                            </Grid>
-                            <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,4"/>
-                            <!-- Lock rows -->
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <ItemsControl x:Name="FileLocksListView">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Padding="8,5" Margin="0,1" CornerRadius="4"
-                                                    Background="{StaticResource BgSection}">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="160"/>
-                                                        <ColumnDefinition Width="70"/>
-                                                        <ColumnDefinition Width="90"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="70"/>
-                                                        <ColumnDefinition Width="70"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding FileName}"
-                                                               Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Consolas"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip="{Binding OriginalPath}"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding StatusText}"
-                                                               FontSize="11" FontFamily="Consolas">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="#4EC969"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsIgnored}" Value="True">
-                                                                        <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                    <TextBlock Grid.Column="2" Text="{Binding ToolName}"
-                                                               Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Consolas"/>
-                                                    <TextBlock Grid.Column="3" Text="{Binding OriginalPath}"
-                                                               Foreground="{StaticResource TextDim}" FontSize="11" FontFamily="Consolas"
-                                                               TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
-                                                    <TextBlock Grid.Column="4" Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
-                                                               Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
-                                                    <TextBlock Grid.Column="5" Text="{Binding TimeText}"
-                                                               Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas"/>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                        </DockPanel>
-                    </TabItem>
                     <!-- Activity tab -->
                     <TabItem x:Name="ActivityTabItem">
                         <TabItem.Header>
-                            <TextBlock Text="Activity" Foreground="#AAA" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Activity" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>
                         <ScrollViewer x:Name="ActivityTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
                     </TabItem>
                     <!-- Advanced tab -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Advanced" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Advanced" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                             <StackPanel MaxWidth="600">
@@ -1933,7 +1892,7 @@
                                          VerticalScrollBarVisibility="Auto"
                                          Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
                                          CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                         FontSize="12" FontFamily="Consolas" Padding="10"
+                                         FontSize="11" FontFamily="Consolas" Padding="10"
                                          IsReadOnly="True" Opacity="0.6"/>
                                 <DockPanel Margin="0,6,0,0">
                                     <TextBlock Text="This prompt is prepended to every task. MCP instructions are added automatically when the MCP toggle is enabled."
@@ -1993,17 +1952,17 @@
                                 <ToggleButton x:Name="DefaultNoGitWriteToggle" IsChecked="True"
                                               Style="{StaticResource ToggleSwitch}" Margin="0,0,0,14">
                                     <TextBlock Text="No Git Write by default" Foreground="{StaticResource TextLight}"
-                                               FontSize="12" FontFamily="Segoe UI"/>
+                                               FontSize="11" FontFamily="Segoe UI"/>
                                 </ToggleButton>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <TextBlock Text="Max concurrent tasks" Foreground="{StaticResource TextLight}"
-                                               FontSize="12" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,12,0"/>
                                     <TextBox x:Name="MaxConcurrentTasksBox" Width="60" Text="10"
                                              Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
                                              CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                             FontSize="12" FontFamily="Segoe UI" Padding="6,4"
+                                             FontSize="11" FontFamily="Segoe UI" Padding="6,4"
                                              TextAlignment="Center"
                                              LostFocus="MaxConcurrentTasks_Changed"
                                              KeyDown="MaxConcurrentTasks_KeyDown"/>
@@ -2011,7 +1970,7 @@
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <TextBlock Text="History retention" Foreground="{StaticResource TextLight}"
-                                               FontSize="12" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,12,0"/>
                                     <ComboBox x:Name="HistoryRetentionCombo" Width="120"
                                               SelectionChanged="HistoryRetention_Changed">
@@ -2025,12 +1984,12 @@
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <TextBlock Text="Token limit retry (min)" Foreground="{StaticResource TextLight}"
-                                               FontSize="12" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,12,0"/>
                                     <TextBox x:Name="TokenLimitRetryBox" Width="60" Text="30"
                                              Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
                                              CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                             FontSize="12" FontFamily="Segoe UI" Padding="6,4"
+                                             FontSize="11" FontFamily="Segoe UI" Padding="6,4"
                                              TextAlignment="Center"
                                              LostFocus="TokenLimitRetry_Changed"
                                              KeyDown="TokenLimitRetry_KeyDown"/>
@@ -2042,20 +2001,20 @@
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
                                 <Button x:Name="ViewLogsBtn" Content="View Application Log"
                                         Click="ViewLogs_Click"
-                                        Style="{StaticResource SmallBtn}"
-                                        Background="{StaticResource BgHover}"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        FontSize="11"
                                         HorizontalAlignment="Left"
                                         Padding="10,4"/>
                                 <Button Content="View Activity Dashboard"
                                         Click="ViewActivity_Click"
-                                        Style="{StaticResource SmallBtn}"
-                                        Background="{StaticResource BgHover}"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        FontSize="11"
                                         HorizontalAlignment="Left"
                                         Padding="10,4" Margin="0,6,0,0"/>
                                 <Button Content="Clear All Ignored Suggestions"
                                         Click="ClearIgnoredSuggestions_Click"
-                                        Style="{StaticResource SmallBtn}"
-                                        Background="{StaticResource BgHover}"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        FontSize="11"
                                         HorizontalAlignment="Left"
                                         Padding="10,4" Margin="0,6,0,0"/>
 
@@ -2070,7 +2029,7 @@
                     <!-- Gemini tab -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Gemini" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Gemini" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                             <StackPanel MaxWidth="600">
@@ -2080,7 +2039,7 @@
                                            Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
                                            Margin="0,0,0,16"/>
 
-                                <TextBlock Text="API Key" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
+                                <TextBlock Text="API Key" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
                                 <DockPanel Margin="0,0,0,4">
                                     <Button x:Name="SaveGeminiKeyBtn" Content="Save" Click="SaveGeminiKey_Click"
@@ -2089,7 +2048,7 @@
                                     <TextBox x:Name="GeminiApiKeyBox"
                                              Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
                                              CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                             FontSize="12" FontFamily="Consolas" Padding="8,6"/>
+                                             FontSize="11" FontFamily="Consolas" Padding="8,6"/>
                                 </DockPanel>
                                 <TextBlock x:Name="GeminiKeyStatus" Text="" Foreground="{StaticResource Success}" FontSize="11"
                                            FontFamily="Segoe UI" Margin="0,4,0,0"/>
@@ -2105,7 +2064,7 @@
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
-                                <TextBlock Text="Model" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
+                                <TextBlock Text="Model" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
                                 <ComboBox x:Name="GeminiModelCombo"
                                           FontSize="11" Padding="6,3" MinWidth="280"
@@ -2116,7 +2075,7 @@
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
 
-                                <TextBlock Text="Image Storage" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
+                                <TextBlock Text="Image Storage" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
                                 <TextBlock Text="%LOCALAPPDATA%\HappyEngine\gemini_images\" Foreground="{StaticResource TextSubdued}"
                                            FontSize="11" FontFamily="Consolas" Margin="0,0,0,6"/>
@@ -2130,17 +2089,17 @@
                     <!-- Claude tab -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Claude" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Claude" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                             <StackPanel MaxWidth="600">
                                 <TextBlock Text="Claude Chat API" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
-                                <TextBlock Text="Configure an Anthropic API key to use Claude models in the Chat panel."
+                                <TextBlock Text="Configure an Anthropic API key to use Claude models in the Chat tab."
                                            Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
                                            Margin="0,0,0,16"/>
 
-                                <TextBlock Text="API Key" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
+                                <TextBlock Text="API Key" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
                                 <DockPanel Margin="0,0,0,4">
                                     <Button x:Name="SaveClaudeKeyBtn" Content="Save" Click="SaveClaudeKey_Click"
@@ -2149,7 +2108,7 @@
                                     <TextBox x:Name="ClaudeApiKeyBox"
                                              Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
                                              CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                             FontSize="12" FontFamily="Consolas" Padding="8,6"/>
+                                             FontSize="11" FontFamily="Consolas" Padding="8,6"/>
                                 </DockPanel>
                                 <TextBlock x:Name="ClaudeKeyStatus" Text="" Foreground="{StaticResource Success}" FontSize="11"
                                            FontFamily="Segoe UI" Margin="0,4,0,0"/>
@@ -2167,100 +2126,84 @@
                     <!-- Chat tab -->
                     <TabItem>
                         <TabItem.Header>
-                            <TextBlock Text="Chat" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
+                            <TextBlock Text="Chat" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                            <StackPanel MaxWidth="600">
-                                <TextBlock Text="Chat Model" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
-                                <TextBlock Text="Select which AI model to use in the Chat panel."
-                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
-                                           Margin="0,0,0,16"/>
-
-                                <TextBlock Text="Model" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
-                                           Margin="0,0,0,6"/>
+                        <DockPanel Margin="4">
+                            <!-- Model selector at top -->
+                            <DockPanel DockPanel.Dock="Top" Margin="4,4,4,6">
+                                <Button x:Name="NewChatBtn" Content="New Chat" Click="NewChat_Click"
+                                        Style="{StaticResource GhostBtn}" Foreground="{StaticResource Accent}"
+                                        DockPanel.Dock="Right" FontSize="10"/>
+                                <TextBlock Text="Model:" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                           FontFamily="Segoe UI" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                 <ComboBox x:Name="ChatModelCombo"
-                                          FontSize="11" Padding="6,3" MinWidth="280"
-                                          HorizontalAlignment="Left" Margin="0,0,0,4"
+                                          FontSize="10" Padding="4,2" MinWidth="140"
+                                          HorizontalAlignment="Left"
                                           SelectionChanged="ChatModelCombo_Changed"/>
-                                <TextBlock Text="Available models depend on which API keys are configured (Gemini and Claude tabs)."
-                                           Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </ScrollViewer>
+                            </DockPanel>
+                            <!-- Image preview strip above input -->
+                            <WrapPanel x:Name="ChatImagePreview" DockPanel.Dock="Bottom" Margin="0,4,0,0"
+                                       Visibility="Collapsed"/>
+                            <!-- Input area at the bottom -->
+                            <DockPanel DockPanel.Dock="Bottom" Margin="4,6,4,4">
+                                <Button x:Name="ChatSendBtn" Content="&#xE724;" Click="ChatSend_Click"
+                                        DockPanel.Dock="Right" Margin="4,0,0,0" VerticalAlignment="Center"
+                                        Padding="6,6" FontSize="13" ToolTip="Send message">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                            <Setter Property="Cursor" Value="Hand"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border x:Name="Bd" Background="{StaticResource Accent}" CornerRadius="6"
+                                                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHover}"/>
+                                                            </Trigger>
+                                                            <Trigger Property="IsPressed" Value="True">
+                                                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <TextBox x:Name="ChatInput" AcceptsReturn="True" TextWrapping="Wrap"
+                                         MaxHeight="60" MinHeight="28"
+                                         VerticalScrollBarVisibility="Auto"
+                                         AllowDrop="True"
+                                         PreviewDragOver="ChatInput_DragOver"
+                                         Drop="ChatInput_Drop"
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
+                                         CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
+                                         BorderThickness="1" FontSize="12" FontFamily="Segoe UI" Padding="6,4"
+                                         PreviewKeyDown="ChatInput_PreviewKeyDown"
+                                         VerticalContentAlignment="Center"/>
+                            </DockPanel>
+                            <!-- Chat messages -->
+                            <ScrollViewer x:Name="ChatScrollViewer" VerticalScrollBarVisibility="Auto"
+                                            HorizontalScrollBarVisibility="Disabled" Margin="4,0">
+                                <StackPanel x:Name="ChatMessagesPanel"/>
+                            </ScrollViewer>
+                        </DockPanel>
                     </TabItem>
-                    <!-- MCP tab -->
-                    <TabItem x:Name="McpTabItem">
-                        <TabItem.Header>
-                            <TextBlock Text="MCP" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="12"/>
-                        </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                            <StackPanel MaxWidth="600">
-                                <TextBlock Text="MCP Server Configuration" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
-                                <TextBlock Text="Configure the Model Context Protocol server for this project. These settings control how the agent connects to the MCP server."
-                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
-                                           Margin="0,0,0,16"/>
-
-                                <!-- Server Name -->
-                                <TextBlock Text="Server Name" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
-                                           Margin="0,0,0,6"/>
-                                <TextBox x:Name="McpServerNameBox" Text="mcp-for-unity-server"
-                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
-                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                         FontSize="12" FontFamily="Segoe UI" Padding="8,6"
-                                         LostFocus="McpSettings_Changed"/>
-                                <TextBlock Text="Identifier used in the .mcp.json configuration file."
-                                           Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
-                                           Margin="0,4,0,0"/>
-
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,16"/>
-
-                                <!-- Server Address -->
-                                <TextBlock Text="Server Address" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
-                                           Margin="0,16,0,6"/>
-                                <TextBox x:Name="McpAddressBox" Text="http://127.0.0.1:8080/mcp"
-                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
-                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                         FontSize="12" FontFamily="Consolas" Padding="8,6"
-                                         LostFocus="McpSettings_Changed"/>
-                                <TextBlock Text="The HTTP URL of the MCP server endpoint."
-                                           Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
-                                           Margin="0,4,0,0"/>
-
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,16"/>
-
-                                <!-- Start Command -->
-                                <TextBlock Text="Start Command" Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
-                                           Margin="0,16,0,6"/>
-                                <TextBox x:Name="McpStartCommandBox"
-                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
-                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                         FontSize="12" FontFamily="Consolas" Padding="8,6"
-                                         LostFocus="McpSettings_Changed"/>
-                                <TextBlock Text="Shell command to start the MCP server (optional). Leave empty if the server is started externally."
-                                           Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
-                                           Margin="0,4,0,0"/>
-
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
-
-                                <!-- Status / Actions -->
-                                <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Connection" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                                </DockPanel>
-                                <DockPanel>
-                                    <TextBlock x:Name="McpConnectionStatus" Text="Disconnected"
-                                               Foreground="{StaticResource TextMuted}" FontSize="12" FontFamily="Segoe UI"
-                                               VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Button x:Name="McpTestConnectionBtn" Content="Test Connection"
-                                            Click="McpTestConnection_Click"
-                                            Style="{StaticResource SmallBtn}"
-                                            Background="{StaticResource BgHover}"
-                                            HorizontalAlignment="Left"
-                                            Padding="10,4"/>
-                                </DockPanel>
-                            </StackPanel>
-                        </ScrollViewer>
+                    <!-- MCP controls (hidden, managed via ProjectSettingsDialog gear icon) -->
+                    <TabItem x:Name="McpTabItem" Visibility="Collapsed">
+                        <StackPanel Visibility="Collapsed">
+                            <TextBox x:Name="McpServerNameBox"/>
+                            <TextBox x:Name="McpAddressBox"/>
+                            <TextBox x:Name="McpStartCommandBox"/>
+                            <TextBlock x:Name="McpConnectionStatus"/>
+                            <Button x:Name="McpTestConnectionBtn" Click="McpTestConnection_Click"/>
+                        </StackPanel>
                     </TabItem>
                 </TabControl>
                 </DockPanel>
@@ -2271,7 +2214,7 @@
 
         <!-- ═══ TERMINAL (6) ═══ -->
         <Border Grid.Row="4" Grid.Column="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
-                BorderThickness="1">
+                BorderThickness="1" Margin="0,6,0,0">
             <Border.BorderBrush>
                 <SolidColorBrush x:Name="TerminalPanelBorder" Color="#2C2C2C"/>
             </Border.BorderBrush>

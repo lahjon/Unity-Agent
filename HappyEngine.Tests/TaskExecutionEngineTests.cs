@@ -903,10 +903,10 @@ namespace HappyEngine.Tests
             var task = MakeFeatureModeTask();
             task.Status = AgentTaskStatus.Running;
 
-            Assert.Contains("1/50", task.StatusText);
+            Assert.Contains("1/2", task.StatusText);
 
-            task.CurrentIteration = 25;
-            Assert.Contains("25/50", task.StatusText);
+            task.CurrentIteration = 2;
+            Assert.Contains("2/2", task.StatusText);
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -1438,19 +1438,19 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void FeatureModeInit_DefaultMaxIterationsIs50()
+        public void FeatureModeInit_DefaultMaxIterationsIs2()
         {
             var task = MakeFeatureModeTask();
-            Assert.Equal(50, task.MaxIterations);
+            Assert.Equal(2, task.MaxIterations);
         }
 
         [Fact]
         public void FeatureModeContinuationPrompt_IncludesIterationNumbers()
         {
-            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(5, 50);
+            var prompt = TaskLauncher.BuildFeatureModeContinuationPrompt(1, 2);
 
-            Assert.Contains("5", prompt);
-            Assert.Contains("50", prompt);
+            Assert.Contains("1", prompt);
+            Assert.Contains("2", prompt);
             Assert.Contains("iteration", prompt.ToLowerInvariant());
         }
 

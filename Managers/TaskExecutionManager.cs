@@ -82,6 +82,10 @@ namespace HappyEngine.Managers
 
             // Forward token-limit handler's TaskCompleted to the coordinator's event
             _tokenLimitHandler.TaskCompleted += id => TaskCompleted?.Invoke(id);
+
+            // Wire up feature mode handler events for team/step extraction and child spawning
+            _featureModeHandler.ExtractTeamRequested += (parent, output) => ExtractAndSpawnTeamForFeatureMode(parent, output);
+            _featureModeHandler.FeatureModeChildSpawned += (parent, child) => SubTaskSpawned?.Invoke(parent, child);
         }
 
         // ── Prompt preparation ────────────────────────────────────────
@@ -207,6 +211,15 @@ namespace HappyEngine.Managers
                     return;
                 }
 
+                // Feature mode: multi-phase orchestration — always handle before SpawnTeam
+                if (task.IsFeatureMode && task.Status == AgentTaskStatus.Running)
+                {
+                    _featureModeHandler.HandleFeatureModeIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
+                    _fileLockManager.CheckQueuedTasks(activeTasks);
+                    TaskCompleted?.Invoke(task.Id);
+                    return;
+                }
+
                 // Spawn team: team decomposition phase complete — spawn team members
                 if (task.SpawnTeam && task.Status == AgentTaskStatus.Running)
                 {
@@ -224,14 +237,7 @@ namespace HappyEngine.Managers
                     return;
                 }
 
-                if (task.IsFeatureMode && task.Status == AgentTaskStatus.Running)
-                {
-                    // Don't release locks between feature mode iterations — the task
-                    // will continue working on the same files.  Locks are released
-                    // when the feature mode task finishes via FinishFeatureModeTask → moveToHistory.
-                    _featureModeHandler.HandleFeatureModeIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
-                }
-                else if (exitCode != 0 && task.Status == AgentTaskStatus.Running && _tokenLimitHandler.HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory))
+                if (exitCode != 0 && task.Status == AgentTaskStatus.Running && _tokenLimitHandler.HandleTokenLimitRetry(task, activeTasks, historyTasks, moveToHistory))
                 {
                     // Token limit detected on non-feature-mode task — retry scheduled, don't complete yet
                     return;
@@ -247,9 +253,6 @@ namespace HappyEngine.Managers
                     _ = CompleteWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
                     return;
                 }
-
-                _fileLockManager.CheckQueuedTasks(activeTasks);
-                TaskCompleted?.Invoke(task.Id);
             });
 
             try
@@ -299,6 +302,11 @@ namespace HappyEngine.Managers
 
             _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
 
+            // If a follow-up was started during summary generation, the status will
+            // have changed from Verifying to Running — don't overwrite it.
+            if (task.Status != AgentTaskStatus.Verifying)
+                return;
+
             // Now set the final status after summary is complete
             task.Status = expectedStatus;
             task.EndTime = DateTime.Now;
@@ -324,6 +332,11 @@ namespace HappyEngine.Managers
 
             await _outputProcessor.AppendCompletionSummary(task, activeTasks, historyTasks, expectedStatus);
             _outputProcessor.TryInjectSubtaskResult(task, activeTasks, historyTasks);
+
+            // If a follow-up was started during summary generation, the status will
+            // have changed from Verifying to Running — don't overwrite it.
+            if (task.Status != AgentTaskStatus.Verifying)
+                return;
 
             task.Status = expectedStatus;
             task.EndTime = DateTime.Now;
@@ -936,5 +949,105 @@ namespace HappyEngine.Managers
             [System.Text.Json.Serialization.JsonPropertyName("depends_on")]
             public List<int>? DependsOn { get; set; }
         }
+
+        // ── Feature mode team extraction (used by FeatureModeHandler) ──
+
+        /// <summary>
+        /// Extracts team members from the feature mode planning output.
+        /// Similar to ExtractAndSpawnTeam but returns children without marking the parent as Completed.
+        /// </summary>
+        private List<AgentTask>? ExtractAndSpawnTeamForFeatureMode(AgentTask parent, string output)
+        {
+            var match = Regex.Match(output, @"```TEAM\s*\n([\s\S]*?)```", RegexOptions.Multiline);
+            if (!match.Success)
+            {
+                AppLogger.Warn("FeatureMode", $"No ```TEAM``` block found in feature mode planning output for task {parent.Id}");
+                return null;
+            }
+
+            var json = match.Groups[1].Value.Trim();
+
+            List<TeamMemberEntry>? entries;
+            try
+            {
+                entries = JsonSerializer.Deserialize<List<TeamMemberEntry>>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("FeatureMode", $"Failed to deserialize TEAM JSON for feature mode task {parent.Id}", ex);
+                return null;
+            }
+
+            if (entries == null || entries.Count == 0) return null;
+            if (entries.Count > 5) entries = entries.GetRange(0, 5);
+
+            var children = new List<AgentTask>();
+            foreach (var entry in entries)
+            {
+                var child = SpawnSubtask(parent, entry.Description);
+                child.Summary = $"[{entry.Role}] {TaskLauncher.GenerateLocalSummary(entry.Description)}";
+                children.Add(child);
+            }
+
+            // Wire up inter-member dependencies
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var deps = entries[i].DependsOn;
+                if (deps == null || deps.Count == 0) continue;
+
+                var depIds = new List<string>();
+                var depNumbers = new List<int>();
+                foreach (var depIdx in deps)
+                {
+                    if (depIdx < 0 || depIdx >= children.Count || depIdx == i) continue;
+                    depIds.Add(children[depIdx].Id);
+                    depNumbers.Add(children[depIdx].TaskNumber);
+                }
+
+                if (depIds.Count > 0)
+                {
+                    children[i].Status = AgentTaskStatus.Queued;
+                    children[i].DependencyTaskIds = depIds;
+                    children[i].DependencyTaskNumbers = depNumbers;
+                    children[i].QueuedReason = $"Waiting for team member(s): {string.Join(", ", depNumbers.Select(n => $"#{n}"))}";
+                    children[i].BlockedByTaskId = depIds[0];
+                    children[i].BlockedByTaskNumber = depNumbers[0];
+                }
+            }
+
+            return children;
+        }
+
+        // ── Feature mode phase completion check ─────────────────────────
+
+        /// <summary>
+        /// Checks whether all children of a feature mode phase are complete.
+        /// If so, triggers the next phase via FeatureModeHandler.
+        /// Called from FinalizeTask when a child task completes.
+        /// </summary>
+        public void CheckFeatureModePhaseCompletion(AgentTask featureParent,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            Action<AgentTask> moveToHistory)
+        {
+            if (!featureParent.IsFeatureMode) return;
+            if (featureParent.FeatureModePhase is not (FeatureModePhase.TeamPlanning or FeatureModePhase.Execution)) return;
+            if (featureParent.FeaturePhaseChildIds.Count == 0) return;
+
+            var allComplete = featureParent.FeaturePhaseChildIds.All(id =>
+            {
+                var child = activeTasks.FirstOrDefault(t => t.Id == id)
+                         ?? historyTasks.FirstOrDefault(t => t.Id == id);
+                return child?.IsFinished == true;
+            });
+
+            if (allComplete)
+            {
+                _featureModeHandler.OnFeatureModePhaseComplete(featureParent, activeTasks, historyTasks, moveToHistory);
+            }
+        }
     }
 }
+

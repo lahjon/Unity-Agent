@@ -54,7 +54,7 @@ namespace HappyEngine.Managers
                 UseMessageBus = useMessageBus,
                 AutoDecompose = autoDecompose,
                 Model = model,
-                MaxIterations = 50,
+                MaxIterations = 2,
                 ProjectPath = projectPath,
                 ParentTaskId = parentTaskId
             };
@@ -71,6 +71,10 @@ namespace HappyEngine.Managers
             task.CurrentIteration = 1;
             task.ConsecutiveFailures = 0;
             task.LastIterationOutputStart = 0;
+            task.FeatureModePhase = FeatureModePhase.None;
+            task.FeaturePhaseChildIds.Clear();
+            if (string.IsNullOrEmpty(task.OriginalFeatureDescription))
+                task.OriginalFeatureDescription = task.Description;
         }
 
         // ── Summary Generation ──────────────────────────────────────

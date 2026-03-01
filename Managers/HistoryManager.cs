@@ -96,7 +96,7 @@ namespace HappyEngine.Managers
                         StartTime = entry.StartTime,
                         EndTime = entry.EndTime,
                         IsFeatureMode = entry.IsFeatureMode,
-                        MaxIterations = entry.MaxIterations > 0 ? entry.MaxIterations : 50,
+                        MaxIterations = entry.MaxIterations > 0 ? entry.MaxIterations : 2,
                         CurrentIteration = entry.CurrentIteration,
                         CompletionSummary = entry.CompletionSummary ?? "",
                         Recommendations = entry.Recommendations ?? "",

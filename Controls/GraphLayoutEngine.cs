@@ -20,6 +20,11 @@ namespace HappyEngine.Controls
             HashSet<string> userDraggedNodeIds,
             string? draggingNodeId)
         {
+            // Deduplicate by Id to prevent crashes when the collection contains duplicates
+            tasks = tasks
+                .GroupBy(t => t.Id)
+                .Select(g => g.First())
+                .ToList();
             var taskMap = tasks.ToDictionary(t => t.Id);
             var computed = new Dictionary<string, Point>();
             double currentY = NodePadding;
@@ -160,7 +165,9 @@ namespace HappyEngine.Controls
         {
             if (sourceId == targetId) return true;
 
-            var taskMap = tasks.ToDictionary(t => t.Id);
+            var taskMap = new Dictionary<string, AgentTask>();
+            foreach (var t in tasks)
+                taskMap.TryAdd(t.Id, t);
             var visited = new HashSet<string>();
             var queue = new Queue<string>();
             queue.Enqueue(sourceId);

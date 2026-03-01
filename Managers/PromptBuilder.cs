@@ -84,21 +84,73 @@ namespace HappyEngine.Managers
             "Prefer parallel execution. Minimize dependencies. Agents should check the message bus for sibling work.\n\n---\n";
 
         public const string FeatureModeInitialTemplate =
-            "# FEATURE MODE AUTONOMOUS TASK\n" +
-            "You will be called repeatedly to iterate until complete.\n\n" +
+            "# FEATURE MODE — PLANNING PHASE\n" +
+            "You are the planning coordinator for an iterative feature implementation.\n\n" +
             "## RESTRICTIONS\n" +
             "- **No git commands** of any kind.\n" +
-            "- **No OS modifications** (system files, registry, env vars, PATH, services, packages).\n" +
-            "- **Stay in project root** — never access files outside ./\n" +
-            "- **No destructive operations** (recursive deletes, killing processes, etc.).\n\n" +
-            "## WORKFLOW\n" +
-            "1. Create `.feature_log.md` with: checklist of sub-tasks, exit criteria, progress log section.\n" +
-            "2. Implement — work through the checklist.\n" +
-            "3. Review — look for bugs, edge cases, missing handling.\n" +
-            "4. Verify — confirm each checklist item is complete. Update `.feature_log.md`.\n" +
-            "5. End with exactly: `STATUS: COMPLETE` or `STATUS: NEEDS_MORE_WORK`\n\n" +
-            "# USER PROMPT / TASK\n" +
-            "The following is the actual task from the user. Everything above is system configuration.\n\n";
+            "- **No file modifications** — this is a planning-only phase.\n" +
+            "- **Stay in project root** — never access files outside ./\n\n" +
+            "## YOUR TASK\n" +
+            "Design a team of 2-5 specialist agents to thoroughly plan the implementation of the feature described below.\n" +
+            "Each team member should explore different aspects of the codebase and architecture relevant to this feature.\n\n" +
+            "## TEAM DESIGN GUIDELINES\n" +
+            "- Include an **Architect** role that produces the high-level design\n" +
+            "- Include roles for different areas of the codebase affected\n" +
+            "- Each member should explore specific files, patterns, and constraints\n" +
+            "- Members coordinate via the shared message bus\n" +
+            "- NO member should implement anything — planning and exploration only\n\n" +
+            "## OUTPUT\n" +
+            "Output a team definition as JSON in a ```TEAM``` block:\n" +
+            "```TEAM\n[{\"role\": \"Architect\", \"description\": \"Explore the codebase and design...\", \"depends_on\": []}]\n```\n\n" +
+            "# USER PROMPT / TASK\n";
+
+        public const string FeatureModePlanConsolidationTemplate =
+            "# FEATURE MODE — PLAN CONSOLIDATION (iteration {0}/{1})\n" +
+            "You are consolidating the planning team's findings into an actionable step-by-step implementation plan.\n\n" +
+            "## RESTRICTIONS\n" +
+            "- **No git commands** of any kind.\n" +
+            "- **No file modifications** — produce a plan only.\n" +
+            "- **Stay in project root** — never access files outside ./\n\n" +
+            "## PLANNING TEAM RESULTS\n{2}\n\n" +
+            "## YOUR TASK\n" +
+            "Based on the planning team's findings, create a detailed step-by-step implementation plan.\n" +
+            "Each step should be a self-contained task that an independent agent can execute.\n\n" +
+            "## OUTPUT FORMAT\n" +
+            "Output the plan as JSON in a ```FEATURE_STEPS``` block:\n" +
+            "```FEATURE_STEPS\n" +
+            "[{{\"description\": \"Self-contained task prompt with: what to do, which files to modify, acceptance criteria\", \"depends_on\": []}}]\n" +
+            "```\n\n" +
+            "Rules:\n" +
+            "- Each step must be fully self-contained with enough context for an independent agent\n" +
+            "- Include specific file paths, function names, and detailed changes needed\n" +
+            "- Use depends_on (0-indexed) for steps that must wait for earlier steps\n" +
+            "- Prefer parallel steps where possible\n" +
+            "- Each step should be focused and achievable by a single agent session\n" +
+            "- Include acceptance criteria for each step\n\n" +
+            "# FEATURE REQUEST\n{3}\n";
+
+        public const string FeatureModeEvaluationTemplate =
+            "# FEATURE MODE — EVALUATION (iteration {0}/{1})\n" +
+            "You are evaluating the results of a feature implementation iteration.\n\n" +
+            "## RESTRICTIONS\n" +
+            "- **No git commands** of any kind.\n" +
+            "- **Stay in project root** — never access files outside ./\n\n" +
+            "## FEATURE REQUEST\n{2}\n\n" +
+            "## IMPLEMENTATION RESULTS\n{3}\n\n" +
+            "## YOUR TASK\n" +
+            "1. Review all implementation results from the step tasks above.\n" +
+            "2. Verify the feature has been fully implemented by examining the actual code changes.\n" +
+            "3. Check for:\n" +
+            "   - Missing functionality from the original request\n" +
+            "   - Bugs or issues introduced\n" +
+            "   - Integration problems between steps\n" +
+            "   - Edge cases not handled\n" +
+            "   - Build or compilation errors\n" +
+            "4. If issues are found, fix them directly.\n" +
+            "5. End with exactly one of:\n" +
+            "   - `STATUS: COMPLETE` — if the feature is fully implemented and working\n" +
+            "   - `STATUS: NEEDS_MORE_WORK` — if there are remaining issues that need another iteration\n\n" +
+            "If NEEDS_MORE_WORK, list the specific issues that need to be addressed in the next iteration.\n";
 
         public const string FeatureModeContinuationTemplate =
             "# FEATURE MODE CONTINUATION (iteration {0}/{1})\n" +
@@ -144,7 +196,7 @@ namespace HappyEngine.Managers
             var gameBlock = isGameProject ? GameRulesBlock : "";
 
             if (isFeatureMode)
-                return descBlock + projectRulesBlock + gameBlock + InjectFeatureModeLogFilename(FeatureModeInitialTemplate, taskId) + description;
+                return descBlock + projectRulesBlock + gameBlock + FeatureModeInitialTemplate + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -153,7 +205,7 @@ namespace HappyEngine.Managers
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
-                "# USER PROMPT / TASK\nThe following is the actual task from the user. Everything above is system configuration.\n\n" + description;
+                "# USER PROMPT / TASK\n" + description;
         }
 
         public string BuildFullPrompt(string systemPrompt, AgentTask task,
@@ -263,6 +315,16 @@ namespace HappyEngine.Managers
         {
             var prompt = string.Format(FeatureModeContinuationTemplate, iteration, maxIterations);
             return InjectFeatureModeLogFilename(prompt, taskId);
+        }
+
+        public string BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription)
+        {
+            return string.Format(FeatureModePlanConsolidationTemplate, iteration, maxIterations, teamResults, featureDescription);
+        }
+
+        public string BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults)
+        {
+            return string.Format(FeatureModeEvaluationTemplate, iteration, maxIterations, featureDescription, implementationResults);
         }
 
         public string BuildDependencyContext(List<string> depIds,

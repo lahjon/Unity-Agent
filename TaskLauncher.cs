@@ -120,6 +120,12 @@ namespace HappyEngine
         public static string BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = "")
             => _prompt.BuildFeatureModeContinuationPrompt(iteration, maxIterations, taskId);
 
+        public static string BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription)
+            => _prompt.BuildFeatureModePlanConsolidationPrompt(iteration, maxIterations, teamResults, featureDescription);
+
+        public static string BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults)
+            => _prompt.BuildFeatureModeEvaluationPrompt(iteration, maxIterations, featureDescription, implementationResults);
+
         public static string BuildDependencyContext(List<string> depIds,
             IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks)
             => _prompt.BuildDependencyContext(depIds, activeTasks, historyTasks);

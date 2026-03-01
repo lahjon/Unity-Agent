@@ -37,6 +37,15 @@ namespace HappyEngine
         GeminiGameArt
     }
 
+    public enum FeatureModePhase
+    {
+        None = 0,
+        TeamPlanning = 1,
+        PlanConsolidation = 2,
+        Execution = 3,
+        Evaluation = 4
+    }
+
     public class AgentTask : INotifyPropertyChanged
     {
         /// <summary>Persistent task data, safe for serialization and cross-boundary passing.</summary>
@@ -201,6 +210,11 @@ namespace HappyEngine
 
         public string? ParentTaskId { get => Data.ParentTaskId; set => Data.ParentTaskId = value; }
         public List<string> ChildTaskIds { get => Data.ChildTaskIds; set => Data.ChildTaskIds = value; }
+
+        // ── Feature mode multi-phase tracking ────────────────────────
+        public FeatureModePhase FeatureModePhase { get => Data.FeatureModePhase; set => Data.FeatureModePhase = value; }
+        public List<string> FeaturePhaseChildIds { get => Data.FeaturePhaseChildIds; set => Data.FeaturePhaseChildIds = value; }
+        public string OriginalFeatureDescription { get => Data.OriginalFeatureDescription; set => Data.OriginalFeatureDescription = value; }
         public int SubTaskCounter { get => Runtime.SubTaskCounter; set => Runtime.SubTaskCounter = value; }
 
         public bool IsSubTask => ParentTaskId != null;
@@ -293,9 +307,19 @@ namespace HappyEngine
             !string.IsNullOrEmpty(ProjectDisplayName) ? ProjectDisplayName :
             string.IsNullOrEmpty(ProjectPath) ? "" : Path.GetFileName(ProjectPath);
 
-        public string ShortDescription =>
-            !string.IsNullOrWhiteSpace(Summary) ? Summary :
-            Description.Length > 45 ? Description[..45] + "..." : Description;
+        public string ShortDescription
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(Summary))
+                {
+                    var line = Summary.Split('\n')[0].TrimEnd('\r').Trim();
+                    return line.Length > 80 ? line[..80] + "..." : line;
+                }
+                var desc = Description.Split('\n')[0].TrimEnd('\r').Trim();
+                return desc.Length > 45 ? desc[..45] + "..." : desc;
+            }
+        }
 
         public bool IsWaitingForRetry => TokenLimitRetryTimer != null || FeatureModeRetryTimer != null;
 

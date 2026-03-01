@@ -26,7 +26,7 @@ namespace HappyEngine
             if (FeatureModeIterationsPanel != null)
                 FeatureModeIterationsPanel.Visibility = Visibility.Collapsed;
             if (FeatureModeIterationsBox != null)
-                FeatureModeIterationsBox.Text = "50";
+                FeatureModeIterationsBox.Text = "2";
         }
 
         /// <summary>Reads the main-window toggle controls into a <see cref="TaskConfigBase"/>.</summary>
@@ -773,7 +773,8 @@ TextureImporter:
 
         private void CopyPrompt_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
             if (!string.IsNullOrEmpty(task.Description))
                 Clipboard.SetText(task.Description);
         }
@@ -783,17 +784,42 @@ TextureImporter:
         private void SetPriorityNormal_Click(object sender, RoutedEventArgs e) => SetTaskPriority(sender, TaskPriority.Normal);
         private void SetPriorityLow_Click(object sender, RoutedEventArgs e) => SetTaskPriority(sender, TaskPriority.Low);
 
+        private static AgentTask? GetTaskFromContextMenuItem(object sender)
+        {
+            // Direct DataContext binding (works when item itself has the context)
+            if (sender is FrameworkElement { DataContext: AgentTask task })
+                return task;
+
+            // Walk up the logical tree from the MenuItem to find the ContextMenu,
+            // then resolve PlacementTarget (the card that was right-clicked).
+            if (sender is MenuItem mi)
+            {
+                DependencyObject? current = mi;
+                while (current != null)
+                {
+                    if (current is ContextMenu ctx && ctx.PlacementTarget is FrameworkElement target
+                                                   && target.DataContext is AgentTask t)
+                        return t;
+                    current = LogicalTreeHelper.GetParent(current);
+                }
+            }
+
+            return null;
+        }
+
         private void SetTaskPriority(object sender, TaskPriority level)
         {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
 
             task.PriorityLevel = level;
-            RecalculateQueuePriorities();
+            ReorderByPriority();
         }
 
         private async void RevertTask_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
 
             if (string.IsNullOrEmpty(task.GitStartHash))
             {

@@ -18,6 +18,10 @@ namespace HappyEngine
 
         private void AddActiveTask(AgentTask task)
         {
+            // Guard against duplicate insertions (can happen during concurrent spawning)
+            if (_activeTasks.Any(t => t.Id == task.Id))
+                return;
+
             // Pin Row 0 to pixel height to prevent layout jitter when populating the task list
             var topRow = RootGrid.RowDefinitions[0];
             if (topRow.ActualHeight > 0)
@@ -146,6 +150,17 @@ namespace HappyEngine
 
             // Notify group tracker
             _taskGroupTracker.OnTaskCompleted(task);
+
+            // Check if this task is a child of a feature mode coordinator
+            if (task.ParentTaskId != null)
+            {
+                var featureParent = _activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
+                if (featureParent is { IsFeatureMode: true, Status: AgentTaskStatus.Running })
+                {
+                    _taskExecutionManager.CheckFeatureModePhaseCompletion(
+                        featureParent, _activeTasks, _historyTasks, MoveToHistory);
+                }
+            }
 
             // Launch init-queued tasks now that a slot may be free
             DrainInitQueue();

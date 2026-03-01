@@ -79,6 +79,34 @@ namespace HappyEngine
             ResetPerTaskToggles();
         }
 
+        private void StoreTask_Click(object sender, RoutedEventArgs e)
+        {
+            var text = TaskInput.Text?.Trim();
+            if (string.IsNullOrEmpty(text)) return;
+
+            var storedTask = new AgentTask
+            {
+                Description = text,
+                ProjectPath = _projectManager.ProjectPath,
+                ProjectColor = _projectManager.GetProjectColor(_projectManager.ProjectPath),
+                ProjectDisplayName = _projectManager.GetProjectDisplayName(_projectManager.ProjectPath),
+                StoredPrompt = text,
+                SkipPermissions = true,
+                StartTime = DateTime.Now,
+                AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
+            };
+            storedTask.Summary = text.Length > 80 ? text[..80] + "..." : text;
+            storedTask.Status = AgentTaskStatus.Completed;
+
+            _storedTasks.Insert(0, storedTask);
+            _historyManager.SaveStoredTasks(_storedTasks);
+            RefreshFilterCombos();
+
+            TaskInput.Text = string.Empty;
+            AdditionalInstructionsInput.Clear();
+            ResetPerTaskToggles();
+        }
+
         private void SavedPromptCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not SavedPromptEntry entry) return;

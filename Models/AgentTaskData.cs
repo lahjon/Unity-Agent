@@ -30,7 +30,7 @@ namespace HappyEngine
         public string? ConversationId { get; set; }
         public string? FullOutput { get; set; }
         public ModelType Model { get; set; } = ModelType.ClaudeCode;
-        public int MaxIterations { get; set; } = 50;
+        public int MaxIterations { get; set; } = 2;
         public int CurrentIteration { get; set; }
         public string ProjectPath { get; set; } = "";
         public string ProjectColor { get; set; } = "#666666";
@@ -68,5 +68,10 @@ namespace HappyEngine
         public long OutputTokens { get; set; }
         public long CacheReadTokens { get; set; }
         public long CacheCreationTokens { get; set; }
+
+        // Feature mode multi-phase tracking
+        public FeatureModePhase FeatureModePhase { get; set; }
+        public List<string> FeaturePhaseChildIds { get; set; } = new();
+        public string OriginalFeatureDescription { get; set; } = "";
     }
 }

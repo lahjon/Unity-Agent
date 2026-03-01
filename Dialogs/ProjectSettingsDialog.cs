@@ -295,6 +295,73 @@ namespace HappyEngine.Dialogs
             };
             stack.Children.Add(saveMcpBtn);
 
+            // Connection test
+            var connRow = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+            var connStatus = new TextBlock
+            {
+                Text = entry.McpStatus switch
+                {
+                    McpStatus.Enabled => "Connected",
+                    McpStatus.Initialized => "Initialized",
+                    McpStatus.Investigating => "Investigating...",
+                    _ => "Disconnected"
+                },
+                Foreground = entry.McpStatus switch
+                {
+                    McpStatus.Enabled => (Brush)Application.Current.FindResource("Success"),
+                    McpStatus.Investigating => (Brush)Application.Current.FindResource("WarningOrange"),
+                    _ => (Brush)Application.Current.FindResource("TextMuted")
+                },
+                FontSize = 11,
+                FontFamily = new FontFamily("Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            var testBtn = new Button
+            {
+                Content = "Test Connection",
+                Style = Application.Current.TryFindResource("SecondaryBtn") as Style,
+                FontSize = 11,
+                Padding = new Thickness(10, 4, 10, 4),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+            testBtn.Click += async (_, _) =>
+            {
+                connStatus.Text = "Testing...";
+                connStatus.Foreground = (Brush)Application.Current.FindResource("TextMuted");
+                testBtn.IsEnabled = false;
+                try
+                {
+                    var address = mcpAddrBox.Text?.Trim();
+                    if (string.IsNullOrEmpty(address)) { connStatus.Text = "No address"; return; }
+                    using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                    var response = await http.GetAsync(address);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        connStatus.Text = "Connected";
+                        connStatus.Foreground = (Brush)Application.Current.FindResource("Success");
+                    }
+                    else
+                    {
+                        connStatus.Text = $"Error: {(int)response.StatusCode}";
+                        connStatus.Foreground = (Brush)Application.Current.FindResource("Danger");
+                    }
+                }
+                catch
+                {
+                    connStatus.Text = "Unreachable";
+                    connStatus.Foreground = (Brush)Application.Current.FindResource("Danger");
+                }
+                finally
+                {
+                    testBtn.IsEnabled = true;
+                }
+            };
+            DockPanel.SetDock(testBtn, Dock.Left);
+            connRow.Children.Add(testBtn);
+            connRow.Children.Add(connStatus);
+            stack.Children.Add(connRow);
+
             // ── Color ──
             AddSeparator(stack);
             AddSectionHeader(stack, "Project Color");

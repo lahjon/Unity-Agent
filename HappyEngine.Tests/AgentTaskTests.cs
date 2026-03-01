@@ -36,9 +36,9 @@ namespace HappyEngine.Tests
         [Fact]
         public void StatusText_Running_FeatureMode_ShowsIteration()
         {
-            var task = new AgentTask { IsFeatureMode = true, MaxIterations = 50 };
-            task.CurrentIteration = 3;
-            Assert.Equal("Running (3/50)", task.StatusText);
+            var task = new AgentTask { IsFeatureMode = true, MaxIterations = 2 };
+            task.CurrentIteration = 1;
+            Assert.Equal("Running (1/2)", task.StatusText);
         }
 
         [Fact]
@@ -167,10 +167,10 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void MaxIterations_DefaultIs50()
+        public void MaxIterations_DefaultIs2()
         {
             var task = new AgentTask();
-            Assert.Equal(50, task.MaxIterations);
+            Assert.Equal(2, task.MaxIterations);
         }
 
         [Fact]

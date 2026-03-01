@@ -56,7 +56,7 @@ namespace HappyEngine.Tests
             Assert.True(task.IgnoreFileLocks);
             Assert.True(task.UseMcp);
             Assert.True(task.SpawnTeam);
-            Assert.Equal(50, task.MaxIterations);
+            Assert.Equal(2, task.MaxIterations);
         }
 
         [Fact]
@@ -85,10 +85,10 @@ namespace HappyEngine.Tests
         }
 
         [Fact]
-        public void CreateTask_MaxIterationsIs50()
+        public void CreateTask_MaxIterationsIs2()
         {
             var task = TaskLauncher.CreateTask("desc", @"C:\proj", false, false, false, false, false, false);
-            Assert.Equal(50, task.MaxIterations);
+            Assert.Equal(2, task.MaxIterations);
         }
 
         // ── Prompt Building ─────────────────────────────────────────
@@ -116,7 +116,7 @@ namespace HappyEngine.Tests
         public void BuildBasePrompt_FeatureMode_UsesFeatureModeTemplate()
         {
             var result = TaskLauncher.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isFeatureMode: true);
-            Assert.StartsWith("# FEATURE MODE AUTONOMOUS TASK", result);
+            Assert.StartsWith("# FEATURE MODE", result);
             Assert.EndsWith("fix bugs", result);
             Assert.DoesNotContain("SYSTEM:", result);
         }
@@ -143,7 +143,7 @@ namespace HappyEngine.Tests
         {
             var result = TaskLauncher.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: true);
             Assert.DoesNotContain("# MCP\n", result);
-            Assert.StartsWith("# FEATURE MODE AUTONOMOUS TASK", result);
+            Assert.StartsWith("# FEATURE MODE", result);
         }
 
         [Fact]
@@ -676,8 +676,8 @@ namespace HappyEngine.Tests
         public void FeatureModeInitialTemplate_ContainsRestrictions()
         {
             Assert.Contains("No git commands", TaskLauncher.FeatureModeInitialTemplate);
-            Assert.Contains("No OS modifications", TaskLauncher.FeatureModeInitialTemplate);
-            Assert.Contains("STATUS: COMPLETE", TaskLauncher.FeatureModeInitialTemplate);
+            Assert.Contains("No file modifications", TaskLauncher.FeatureModeInitialTemplate);
+            Assert.Contains("TEAM", TaskLauncher.FeatureModeInitialTemplate);
         }
 
         [Fact]

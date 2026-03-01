@@ -628,7 +628,6 @@ namespace HappyEngine
         private void UpdateMcpVisibility(bool isGame)
         {
             var vis = isGame ? Visibility.Visible : Visibility.Collapsed;
-            McpTabItem.Visibility = vis;
             UseMcpToggle.Visibility = vis;
             if (!isGame)
                 UseMcpToggle.IsChecked = false;
@@ -1505,6 +1504,48 @@ namespace HappyEngine
 
             for (int i = 0; i < sorted.Count; i++)
                 sorted[i].Priority = sorted.Count - i;
+        }
+
+        /// <summary>
+        /// Reorders queued tasks in the active list by PriorityLevel,
+        /// preserving running/non-queued task positions, then recalculates
+        /// numeric Priority values.
+        /// </summary>
+        private void ReorderByPriority()
+        {
+            var queuedTasks = _activeTasks
+                .Where(t => t.IsQueued || t.IsInitQueued)
+                .ToList();
+
+            if (queuedTasks.Count <= 1)
+            {
+                RecalculateQueuePriorities();
+                return;
+            }
+
+            // Sort queued tasks: Critical first, then High, Normal, Low.
+            // Stable sort preserves relative order within the same priority level.
+            var sorted = queuedTasks
+                .OrderByDescending(t => (int)t.PriorityLevel)
+                .ToList();
+
+            // Collect the indices currently occupied by queued tasks (these are the "slots")
+            var queuedSlots = _activeTasks
+                .Select((t, i) => (Task: t, Index: i))
+                .Where(x => x.Task.IsQueued || x.Task.IsInitQueued)
+                .Select(x => x.Index)
+                .ToList();
+
+            // Place sorted tasks into those slots
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                var currentIdx = _activeTasks.IndexOf(sorted[i]);
+                var targetIdx = queuedSlots[i];
+                if (currentIdx != targetIdx)
+                    _activeTasks.Move(currentIdx, targetIdx);
+            }
+
+            RecalculateQueuePriorities();
         }
 
         private bool WouldCreateCircularDependency(AgentTask dragged, AgentTask target)
