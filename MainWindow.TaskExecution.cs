@@ -911,6 +911,14 @@ TextureImporter:
                 return;
             }
 
+            // Validate git hash to prevent command injection
+            if (!_gitHelper.IsValidGitHash(task.GitStartHash))
+            {
+                DarkDialog.ShowAlert("Invalid git hash format detected. Cannot perform revert.", "Invalid Git Hash");
+                AppLogger.Warn("TaskExecution", $"Invalid git hash detected in revert operation: {task.GitStartHash}");
+                return;
+            }
+
             var shortHash = task.GitStartHash.Length > 7 ? task.GitStartHash[..7] : task.GitStartHash;
             if (!DarkDialog.ShowConfirm(
                 $"This will hard-reset the project to the state before this task ran (commit {shortHash}).\n\n" +
@@ -1192,8 +1200,15 @@ TextureImporter:
                 var lockedFiles = task.Runtime.LockedFilesForCommit;
                 if (lockedFiles == null || lockedFiles.Count == 0)
                 {
-                    // No files locked by this task, nothing to commit
-                    return (false, "No files were modified by this task to commit");
+                    // If not set in runtime (manual commit), get from file lock manager
+                    lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
+                    if (lockedFiles == null || lockedFiles.Count == 0)
+                    {
+                        // No files locked by this task, nothing to commit
+                        return (false, "No files were modified by this task to commit");
+                    }
+                    // Store for later use
+                    task.Runtime.LockedFilesForCommit = lockedFiles;
                 }
 
                 // Build relative paths from the project root for the git commands
@@ -1215,12 +1230,11 @@ TextureImporter:
                     relativePaths.Add(rel.Replace('\\', '/'));
                 }
 
-                // Serialize git operations to prevent concurrent commits from racing
-                await TaskExecutionManager.GitCommitSemaphore.WaitAsync();
-                try
+                // Use GitOperationGuard to serialize git operations
+                var (success, errorMessage) = await _gitOperationGuard.ExecuteGitOperationAsync(async () =>
                 {
                     // Stage only the locked files (handles new/untracked files)
-                    var pathArgs = string.Join(" ", relativePaths.Select(p => $"\"{p}\""));
+                    var pathArgs = string.Join(" ", relativePaths.Select(GitHelper.EscapeGitPath));
                     var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
 
                     // Check if git add failed
@@ -1232,9 +1246,10 @@ TextureImporter:
 
                     // Commit only these specific files — the pathspec ensures no other
                     // staged changes from concurrent tasks leak into this commit
-                    var result = await _gitHelper.RunGitCommandAsync(
+                    var result = await _gitHelper.CommitSecureAsync(
                         task.ProjectPath,
-                        $"commit -F - -- {pathArgs}", commitMessage);
+                        commitMessage,
+                        pathArgs);
 
                     if (result != null)
                     {
@@ -1252,7 +1267,7 @@ TextureImporter:
                             // Release deferred file locks if any
                             ReleaseTaskLocksAfterCommit(task);
 
-                            return (true, null);
+                            return (true, (string?)null);
                         }
                         else
                         {
@@ -1263,11 +1278,9 @@ TextureImporter:
                     {
                         return (false, "Git commit command failed. This could be due to no changes to commit, pre-commit hooks failing, or other git issues");
                     }
-                }
-                finally
-                {
-                    TaskExecutionManager.GitCommitSemaphore.Release();
-                }
+                }, $"commit for task #{task.TaskNumber}");
+
+                return success ? (true, (string?)null) : (false, errorMessage);
             }
             catch (Exception ex)
             {

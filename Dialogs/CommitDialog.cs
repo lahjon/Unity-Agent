@@ -22,18 +22,7 @@ namespace HappyEngine.Dialogs
             var dlg = DarkDialogWindow.Create("Create Commit", 600, 500);
 
             var result = new CommitResult();
-            var stack = new StackPanel { Margin = new Thickness(20, 18, 20, 18) };
-
-            // Title
-            stack.Children.Add(new TextBlock
-            {
-                Text = "Create Commit",
-                Foreground = (Brush)Application.Current.FindResource("Accent"),
-                FontSize = 15,
-                FontWeight = FontWeights.Bold,
-                FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 12)
-            });
+            var stack = new StackPanel { Margin = new Thickness(20, 8, 20, 20) };
 
             // Subtitle showing selected files
             stack.Children.Add(new TextBlock
@@ -52,7 +41,7 @@ namespace HappyEngine.Dialogs
                 Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
                 FontSize = 12,
                 FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 4)
+                Margin = new Thickness(0, 0, 0, 6)
             });
 
             // Commit message textbox
@@ -65,7 +54,7 @@ namespace HappyEngine.Dialogs
                 FontSize = 12,
                 FontFamily = new FontFamily("Consolas"),
                 BorderThickness = new Thickness(1),
-                Padding = new Thickness(8),
+                Padding = new Thickness(10),
                 Height = 100,
                 TextWrapping = TextWrapping.Wrap,
                 AcceptsReturn = true,
@@ -74,10 +63,6 @@ namespace HappyEngine.Dialogs
             };
             stack.Children.Add(messageBox);
 
-            // Focus and select all text
-            messageBox.Focus();
-            messageBox.SelectAll();
-
             // Files list label
             stack.Children.Add(new TextBlock
             {
@@ -85,33 +70,38 @@ namespace HappyEngine.Dialogs
                 Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
                 FontSize = 12,
                 FontFamily = new FontFamily("Segoe UI"),
-                Margin = new Thickness(0, 0, 0, 4)
+                Margin = new Thickness(0, 0, 0, 6)
             });
 
-            // Scrollable files list
+            // Scrollable files list with border for consistency
+            var filesBorder = new Border
+            {
+                Background = (Brush)Application.Current.FindResource("BgSection"),
+                BorderBrush = (Brush)Application.Current.FindResource("BorderSubtle"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+
             var scrollViewer = new ScrollViewer
             {
                 Height = 150,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
-                Background = (Brush)Application.Current.FindResource("BgSection"),
-                BorderBrush = (Brush)Application.Current.FindResource("BorderSubtle"),
-                BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 0, 0, 16)
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden
             };
 
-            var filesList = new StackPanel { Margin = new Thickness(8) };
+            var filesList = new StackPanel { Margin = new Thickness(10) };
             foreach (var file in selectedFiles.OrderBy(f => f.FilePath))
             {
-                var fileRow = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
+                var fileRow = new DockPanel { Margin = new Thickness(0, 3, 0, 3) };
 
                 // Status badge
                 var statusBadge = new Border
                 {
                     Background = GetStatusColor(file.Status),
                     CornerRadius = new CornerRadius(3),
-                    Padding = new Thickness(4, 1, 4, 1),
-                    Margin = new Thickness(0, 0, 6, 0),
+                    Padding = new Thickness(5, 2, 5, 2),
+                    Margin = new Thickness(0, 0, 8, 0),
                     VerticalAlignment = VerticalAlignment.Center,
                     Child = new TextBlock
                     {
@@ -138,36 +128,43 @@ namespace HappyEngine.Dialogs
                 filesList.Children.Add(fileRow);
             }
             scrollViewer.Content = filesList;
-            stack.Children.Add(scrollViewer);
+            filesBorder.Child = scrollViewer;
+            stack.Children.Add(filesBorder);
 
             // Buttons
-            var buttonPanel = new WrapPanel
+            var buttonPanel = new DockPanel
             {
-                HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(0, 10, 0, 0)
             };
 
             var cancelButton = new Button
             {
                 Content = "Cancel",
-                Width = 80,
-                Height = 28,
-                Margin = new Thickness(0, 0, 8, 0),
-                IsCancel = true
+                Width = 90,
+                Height = 32,
+                Margin = new Thickness(0, 0, 10, 0),
+                IsCancel = true,
+                Background = (Brush)Application.Current.FindResource("BgSection"),
+                Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
+                BorderBrush = (Brush)Application.Current.FindResource("BorderSubtle"),
+                Style = Application.Current.TryFindResource("ModernButtonStyle") as Style
             };
             cancelButton.Click += (s, e) =>
             {
                 result.Cancelled = true;
                 dlg.DialogResult = false;
             };
-            buttonPanel.Children.Add(cancelButton);
 
             var commitButton = new Button
             {
                 Content = "Commit",
-                Width = 80,
-                Height = 28,
-                IsDefault = true
+                Width = 90,
+                Height = 32,
+                IsDefault = true,
+                Background = (Brush)Application.Current.FindResource("Accent"),
+                Foreground = Brushes.White,
+                BorderBrush = (Brush)Application.Current.FindResource("Accent"),
+                Style = Application.Current.TryFindResource("ModernButtonStyle") as Style
             };
             commitButton.Click += (s, e) =>
             {
@@ -180,11 +177,25 @@ namespace HappyEngine.Dialogs
                 result.Cancelled = false;
                 dlg.DialogResult = true;
             };
+
+            DockPanel.SetDock(commitButton, Dock.Right);
+            DockPanel.SetDock(cancelButton, Dock.Right);
             buttonPanel.Children.Add(commitButton);
+            buttonPanel.Children.Add(cancelButton);
+            buttonPanel.Children.Add(new TextBlock()); // Spacer
 
             stack.Children.Add(buttonPanel);
 
-            dlg.Content = stack;
+            // Set the body content instead of setting Content directly
+            dlg.SetBodyContent(stack);
+
+            // Focus and select all text after the dialog is loaded
+            dlg.Loaded += (s, e) =>
+            {
+                messageBox.Focus();
+                messageBox.SelectAll();
+            };
+
             dlg.ShowDialog();
 
             return result;

@@ -121,10 +121,10 @@ namespace HappyEngine.Managers
                 var gitCheck = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse --is-inside-work-tree", ct);
                 if (ct.IsCancellationRequested) return;
 
-                if (gitCheck == null || gitCheck.Trim() != "true")
+                if (!gitCheck.IsSuccess || gitCheck.Output.Trim() != "true")
                 {
                     _gitAvailable = false;
-                    _lastError = "Not a git repository or git is not installed.";
+                    _lastError = gitCheck.IsSuccess ? "Not a git repository" : gitCheck.GetErrorMessage();
                     _uiCacheValid = false; // Invalidate cache when git becomes unavailable
                     _dispatcher.Invoke(() => container.Content = BuildContent());
                     return;
@@ -137,8 +137,9 @@ namespace HappyEngine.Managers
                 var previousBranch = _currentBranch;
 
                 // Get current branch
-                _currentBranch = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse --abbrev-ref HEAD", ct);
+                var branchResult = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse --abbrev-ref HEAD", ct);
                 if (ct.IsCancellationRequested) return;
+                _currentBranch = branchResult.TrimmedOutput;
 
                 // Invalidate cache if branch changed
                 if (previousBranch != _currentBranch)
@@ -147,9 +148,11 @@ namespace HappyEngine.Managers
                 }
 
                 // Get remote name
-                _remoteName = await _gitHelper.RunGitCommandAsync(projectPath, "remote", ct);
+                var remoteResult = await _gitHelper.RunGitCommandAsync(projectPath, "remote", ct);
                 if (ct.IsCancellationRequested) return;
-                _remoteName = _remoteName?.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim();
+                _remoteName = remoteResult.IsSuccess && !string.IsNullOrEmpty(remoteResult.Output)
+                    ? remoteResult.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim()
+                    : null;
 
                 // Get unpushed commits
                 await LoadUnpushedCommitsAsync(projectPath, ct);
@@ -198,13 +201,13 @@ namespace HappyEngine.Managers
             // Check if remote tracking branch exists
             var trackingRef = await _gitHelper.RunGitCommandAsync(projectPath,
                 $"rev-parse --verify {_remoteName}/{_currentBranch}", ct);
-            if (trackingRef == null) return; // No remote tracking branch
+            if (!trackingRef.IsSuccess) return; // No remote tracking branch
 
-            var logOutput = await _gitHelper.RunGitCommandAsync(projectPath,
+            var logResult = await _gitHelper.RunGitCommandAsync(projectPath,
                 $"log {_remoteName}/{_currentBranch}..HEAD --format=%H|%h|%an|%ar|%s", ct);
-            if (string.IsNullOrEmpty(logOutput)) return;
+            if (!logResult.IsSuccess || string.IsNullOrEmpty(logResult.Output)) return;
 
-            foreach (var line in logOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line in logResult.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 var parts = line.Split('|', 5);
                 if (parts.Length < 5) continue;
@@ -224,11 +227,11 @@ namespace HappyEngine.Managers
             _uncommittedChanges.Clear();
             _selectedFiles.Clear(); // Clear selections when refreshing
 
-            var statusOutput = await _gitHelper.RunGitCommandAsync(projectPath,
+            var statusResult = await _gitHelper.RunGitCommandAsync(projectPath,
                 "status --porcelain", ct);
-            if (string.IsNullOrEmpty(statusOutput)) return;
+            if (!statusResult.IsSuccess || string.IsNullOrEmpty(statusResult.Output)) return;
 
-            foreach (var line in statusOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line in statusResult.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 if (line.Length < 3) continue;
                 var statusCode = line[..2].Trim();
@@ -498,6 +501,11 @@ namespace HappyEngine.Managers
                 TextWrapping = TextWrapping.Wrap
             };
 
+            // Check if this is an active operation (contains "..." or verbs ending in "ing")
+            bool isActiveOperation = _lastOperationStatus?.Contains("...", StringComparison.Ordinal) == true ||
+                                   (_lastOperationStatus?.Contains("ing ", StringComparison.OrdinalIgnoreCase) == true &&
+                                    !_lastOperationStatus.Contains("nothing", StringComparison.OrdinalIgnoreCase));
+
             // Style based on message type
             if (_lastOperationStatus?.Contains("Successfully") == true)
             {
@@ -512,11 +520,33 @@ namespace HappyEngine.Managers
                 icon.Foreground = BrushCache.Theme("TextMuted");
                 message.Foreground = BrushCache.Theme("TextMuted");
             }
-            else if (_lastOperationStatus?.Contains("Fetching") == true)
+            else if (_lastOperationStatus?.Contains("failed", StringComparison.OrdinalIgnoreCase) == true ||
+                     _lastOperationStatus?.Contains("error", StringComparison.OrdinalIgnoreCase) == true)
             {
+                icon.Text = "\uE814"; // Error
+                icon.Foreground = BrushCache.Theme("ErrorRed");
+                message.Foreground = BrushCache.Theme("ErrorRed");
+            }
+            else if (isActiveOperation)
+            {
+                // For active operations, use sync icon with spinning animation
                 icon.Text = "\uE895"; // Sync icon
                 icon.Foreground = BrushCache.Theme("Accent");
                 message.Foreground = BrushCache.Theme("Accent");
+
+                // Add spinning animation
+                var rotateTransform = new RotateTransform(0);
+                icon.RenderTransform = rotateTransform;
+                icon.RenderTransformOrigin = new Point(0.5, 0.5);
+
+                var animation = new DoubleAnimation
+                {
+                    From = 0,
+                    To = 360,
+                    Duration = TimeSpan.FromSeconds(2),
+                    RepeatBehavior = RepeatBehavior.Forever
+                };
+                rotateTransform.BeginAnimation(RotateTransform.AngleProperty, animation);
             }
             else
             {
@@ -1115,28 +1145,37 @@ namespace HappyEngine.Managers
                 _lastOperationStatus = "Fetching latest changes from remote...";
                 _lastOperationTime = DateTime.Now;
                 MarkDirty();
+
+                // Force immediate UI update to show the fetching status
                 if (scrollViewer != null)
                 {
-                    await _dispatcher.InvokeAsync(async () => await RefreshAsync(scrollViewer));
+                    await _dispatcher.InvokeAsync(async () =>
+                    {
+                        await RefreshAsync(scrollViewer);
+                    });
+
+                    // Give UI time to render the status message
+                    await Task.Delay(100);
                 }
 
                 // Get current HEAD before fetch
-                var headBefore = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse HEAD");
+                var headBeforeResult = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse HEAD");
+                var headBefore = headBeforeResult.TrimmedOutput;
 
                 // Fetch first
-                var fetchResult = await _gitHelper.RunGitCommandAsync(projectPath, "fetch --prune");
-                if (fetchResult == null)
+                var fetchResult = await _gitHelper.RunGitCommandAsync(projectPath, "fetch --prune", TimeSpan.FromSeconds(120));
+                if (!fetchResult.IsSuccess)
                 {
-                    _lastOperationStatus = "Failed to fetch from remote. Check your network connection and credentials.";
+                    _lastOperationStatus = $"Fetch failed: {fetchResult.GetErrorMessage()}";
                     _lastOperationTime = DateTime.Now;
                     MarkDirty();
-                    throw new InvalidOperationException("Failed to fetch from remote");
+                    throw new InvalidOperationException($"Failed to fetch from remote: {fetchResult.GetErrorMessage()}");
                 }
 
                 // Check if remote branch has new commits
                 var remoteBranch = $"{_remoteName}/{_currentBranch}";
-                var behindCount = await _gitHelper.RunGitCommandAsync(projectPath, $"rev-list --count HEAD..{remoteBranch}");
-                var behind = int.TryParse(behindCount?.Trim(), out var count) ? count : 0;
+                var behindCountResult = await _gitHelper.RunGitCommandAsync(projectPath, $"rev-list --count HEAD..{remoteBranch}");
+                var behind = behindCountResult.IsSuccess && int.TryParse(behindCountResult.Output.Trim(), out var count) ? count : 0;
 
                 if (behind == 0)
                 {
@@ -1147,17 +1186,18 @@ namespace HappyEngine.Managers
                 else
                 {
                     // Pull with rebase to keep history clean
-                    var pullResult = await _gitHelper.RunGitCommandAsync(projectPath, "pull --rebase");
-                    if (pullResult == null)
+                    var pullResult = await _gitHelper.RunGitCommandAsync(projectPath, "pull --rebase", TimeSpan.FromSeconds(120));
+                    if (!pullResult.IsSuccess)
                     {
-                        _lastOperationStatus = "Pull failed. There may be conflicts or uncommitted changes preventing the merge.";
+                        _lastOperationStatus = $"Pull failed: {pullResult.GetErrorMessage()}";
                         _lastOperationTime = DateTime.Now;
-                        throw new InvalidOperationException("Pull failed");
+                        throw new InvalidOperationException($"Pull failed: {pullResult.GetErrorMessage()}");
                     }
                     else
                     {
                         // Get current HEAD after pull
-                        var headAfter = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse HEAD");
+                        var headAfterResult = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse HEAD");
+                        var headAfter = headAfterResult.TrimmedOutput;
 
                         if (headBefore != headAfter)
                         {
@@ -1168,7 +1208,7 @@ namespace HappyEngine.Managers
                             _lastOperationStatus = "Pull completed, but no new commits were applied";
                         }
                         _lastOperationTime = DateTime.Now;
-                        AppLogger.Info("GitPanelManager", $"Get Latest completed: {pullResult}");
+                        AppLogger.Info("GitPanelManager", $"Get Latest completed: {pullResult.Output}");
                     }
                 }
 
@@ -1223,11 +1263,11 @@ namespace HappyEngine.Managers
                 AppLogger.Info("GitPanelManager", $"Initializing git repository for {projectPath}");
 
                 var result = await _gitHelper.RunGitCommandAsync(projectPath, "init");
-                if (result == null)
+                if (!result.IsSuccess)
                 {
-                    _lastOperationStatus = "Failed to initialize git repository";
+                    _lastOperationStatus = $"Failed to initialize git repository: {result.GetErrorMessage()}";
                     _lastOperationTime = DateTime.Now;
-                    throw new InvalidOperationException("Git init command failed");
+                    throw new InvalidOperationException($"Git init command failed: {result.GetErrorMessage()}");
                 }
 
                 _lastOperationStatus = "Git repository initialized successfully!";
@@ -1319,12 +1359,44 @@ secrets.json
                 _lastOperationTime = DateTime.Now;
                 MarkDirty();
 
-                var result = await _gitHelper.RunGitCommandAsync(projectPath, "push");
-                if (result == null)
+                // Force immediate UI update to show the pushing status
+                if (_dispatcher != null)
                 {
-                    _lastOperationStatus = "Push failed. The remote may have new changes. Try 'Get Latest' first.";
+                    await _dispatcher.InvokeAsync(async () =>
+                    {
+                        // Find the parent ScrollViewer
+                        ScrollViewer? scrollViewer = null;
+                        if (_cachedRoot?.Parent is ScrollViewer sv)
+                        {
+                            scrollViewer = sv;
+                        }
+                        else
+                        {
+                            // Try to find it in the visual tree
+                            var parent = _cachedRoot?.Parent as DependencyObject;
+                            while (parent != null && !(parent is ScrollViewer))
+                            {
+                                parent = System.Windows.Media.VisualTreeHelper.GetParent(parent);
+                            }
+                            scrollViewer = parent as ScrollViewer;
+                        }
+
+                        if (scrollViewer != null)
+                        {
+                            await RefreshAsync(scrollViewer);
+                        }
+                    });
+
+                    // Give UI time to render the status message
+                    await Task.Delay(100);
+                }
+
+                var result = await _gitHelper.RunGitCommandAsync(projectPath, "push", TimeSpan.FromSeconds(120));
+                if (!result.IsSuccess)
+                {
+                    _lastOperationStatus = $"Push failed: {result.GetErrorMessage()}";
                     _lastOperationTime = DateTime.Now;
-                    throw new InvalidOperationException("Push failed");
+                    throw new InvalidOperationException($"Push failed: {result.GetErrorMessage()}");
                 }
                 else
                 {
@@ -1334,6 +1406,15 @@ secrets.json
                 }
 
                 MarkDirty();
+
+                // Force refresh after successful push
+                await _dispatcher.InvokeAsync(async () =>
+                {
+                    if (_cachedRoot?.Parent is ScrollViewer sv)
+                    {
+                        await RefreshAsync(sv);
+                    }
+                });
             }, "push");
 
             if (!success)
@@ -1365,16 +1446,47 @@ secrets.json
 
         private async Task ExecutePushUpToInternalAsync(string projectPath, string commitHash)
         {
+            // Count how many commits we're pushing
+            var commitIndex = _unpushedCommits.FindIndex(c => c.FullHash == commitHash);
+            var commitsToPush = commitIndex >= 0 ? _unpushedCommits.Count - commitIndex : 0;
+
+            // Show pushing status
+            _lastOperationStatus = $"Pushing {commitsToPush} selected commit{(commitsToPush != 1 ? "s" : "")} to remote...";
+            _lastOperationTime = DateTime.Now;
+            MarkDirty();
+
+            // Force immediate UI update
+            await _dispatcher.InvokeAsync(async () =>
+            {
+                if (_cachedRoot?.Parent is ScrollViewer sv)
+                {
+                    await RefreshAsync(sv);
+                }
+            });
+
             AppLogger.Info("GitPanelManager", $"Pushing up to {commitHash} for {projectPath}");
             var result = await _gitHelper.RunGitCommandAsync(projectPath,
-                $"push {_remoteName} {commitHash}:{_currentBranch}");
-            if (result == null)
+                $"push {_remoteName} {commitHash}:{_currentBranch}", TimeSpan.FromSeconds(120));
+            if (!result.IsSuccess)
             {
-                throw new InvalidOperationException("Push failed. The remote may have new changes.\n\nTry 'Get Latest' first, then push again.");
+                _lastOperationStatus = $"Push failed: {result.GetErrorMessage()}";
+                _lastOperationTime = DateTime.Now;
+                throw new InvalidOperationException($"Push failed: {result.GetErrorMessage()}\n\nTry 'Get Latest' first, then push again.");
             }
 
             AppLogger.Info("GitPanelManager", "Selective push completed successfully");
+            _lastOperationStatus = $"Successfully pushed {commitsToPush} commit{(commitsToPush != 1 ? "s" : "")}";
+            _lastOperationTime = DateTime.Now;
             MarkDirty();
+
+            // Force refresh after successful push
+            await _dispatcher.InvokeAsync(async () =>
+            {
+                if (_cachedRoot?.Parent is ScrollViewer sv)
+                {
+                    await RefreshAsync(sv);
+                }
+            });
         }
 
         private async Task ExecuteCommitAllAsync(string message)
@@ -1408,21 +1520,21 @@ secrets.json
                 AppLogger.Info("GitPanelManager", $"Committing {filePaths.Count} file(s) for {projectPath}");
 
                 var addResult = await _gitHelper.RunGitCommandAsync(projectPath, $"add -- {pathArgs}");
-                if (addResult == null)
+                if (!addResult.IsSuccess)
                 {
-                    _lastOperationStatus = "Failed to stage changes";
+                    _lastOperationStatus = $"Failed to stage changes: {addResult.GetErrorMessage()}";
                     _lastOperationTime = DateTime.Now;
                     MarkDirty();
-                    throw new InvalidOperationException("Failed to stage changes");
+                    throw new InvalidOperationException($"Failed to stage changes: {addResult.GetErrorMessage()}");
                 }
 
                 // Use the secure commit method to prevent shell injection
                 var commitResult = await _gitHelper.CommitSecureAsync(projectPath, message, pathArgs);
-                if (commitResult == null)
+                if (!commitResult.IsSuccess)
                 {
-                    _lastOperationStatus = "Commit failed. There may be nothing to commit or a hook rejected it";
+                    _lastOperationStatus = $"Commit failed: {commitResult.GetErrorMessage()}";
                     _lastOperationTime = DateTime.Now;
-                    throw new InvalidOperationException("Commit failed");
+                    throw new InvalidOperationException($"Commit failed: {commitResult.GetErrorMessage()}");
                 }
                 else
                 {
@@ -1432,6 +1544,15 @@ secrets.json
                 }
 
                 MarkDirty();
+
+                // Force refresh after successful commit
+                await _dispatcher.InvokeAsync(async () =>
+                {
+                    if (_cachedRoot?.Parent is ScrollViewer sv)
+                    {
+                        await RefreshAsync(sv);
+                    }
+                });
             }, "commit");
 
             if (!success)
@@ -1480,6 +1601,18 @@ secrets.json
                 _lastOperationTime = DateTime.Now;
                 MarkDirty();
 
+                // Force immediate UI update to show the committing status
+                await _dispatcher.InvokeAsync(async () =>
+                {
+                    if (_cachedRoot?.Parent is ScrollViewer sv)
+                    {
+                        await RefreshAsync(sv);
+                    }
+                });
+
+                // Give UI time to render the status message
+                await Task.Delay(100);
+
                 // Stage only the selected files
                 var filePaths = selectedChanges
                     .Select(c => GitHelper.EscapeGitPath(c.FilePath))
@@ -1489,21 +1622,21 @@ secrets.json
                 AppLogger.Info("GitPanelManager", $"Committing {filePaths.Count} selected file(s) for {projectPath}");
 
                 var addResult = await _gitHelper.RunGitCommandAsync(projectPath, $"add -- {pathArgs}");
-                if (addResult == null)
+                if (!addResult.IsSuccess)
                 {
-                    _lastOperationStatus = "Failed to stage selected changes";
+                    _lastOperationStatus = $"Failed to stage selected changes: {addResult.GetErrorMessage()}";
                     _lastOperationTime = DateTime.Now;
                     MarkDirty();
-                    throw new InvalidOperationException("Failed to stage selected changes");
+                    throw new InvalidOperationException($"Failed to stage selected changes: {addResult.GetErrorMessage()}");
                 }
 
                 // Use the secure commit method to prevent shell injection
                 var commitResult = await _gitHelper.CommitSecureAsync(projectPath, result.Message, pathArgs);
-                if (commitResult == null)
+                if (!commitResult.IsSuccess)
                 {
-                    _lastOperationStatus = "Commit failed. There may be nothing to commit or a hook rejected it";
+                    _lastOperationStatus = $"Commit failed: {commitResult.GetErrorMessage()}";
                     _lastOperationTime = DateTime.Now;
-                    throw new InvalidOperationException("Commit failed");
+                    throw new InvalidOperationException($"Commit failed: {commitResult.GetErrorMessage()}");
                 }
                 else
                 {
@@ -1512,6 +1645,16 @@ secrets.json
                 }
 
                 MarkDirty();
+
+                // Force refresh after successful commit
+                await _dispatcher.InvokeAsync(async () =>
+                {
+                    _selectedFiles.Clear(); // Clear selected files after commit
+                    if (_cachedRoot?.Parent is ScrollViewer sv)
+                    {
+                        await RefreshAsync(sv);
+                    }
+                });
             }, "commit");
 
             if (!success)

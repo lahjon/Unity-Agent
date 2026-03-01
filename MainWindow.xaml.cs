@@ -192,6 +192,7 @@ namespace HappyEngine
             _taskExecutionManager = new TaskExecutionManager(
                 scriptDir, _fileLockManager, _outputTabManager,
                 _gitHelper, _completionAnalyzer, _promptBuilder, _taskFactory,
+                _gitOperationGuard,
                 () => SystemPrompt,
                 task => _projectManager.GetProjectDescription(task),
                 path => _projectManager.GetProjectRulesBlock(path),
@@ -1224,6 +1225,15 @@ namespace HappyEngine
                 Dialogs.DarkDialog.ShowAlert("The project path for this task no longer exists.", "Revert Unavailable");
                 return;
             }
+
+            // Validate git hash to prevent command injection
+            if (!_gitHelper.IsValidGitHash(task.GitStartHash))
+            {
+                Dialogs.DarkDialog.ShowAlert("Invalid git hash format detected. Cannot perform revert.", "Invalid Git Hash");
+                AppLogger.Warn("MainWindow", $"Invalid git hash detected in revert operation: {task.GitStartHash}");
+                return;
+            }
+
             var shortHash = task.GitStartHash[..Math.Min(8, task.GitStartHash.Length)];
             if (!Dialogs.DarkDialog.ShowConfirm(
                 $"This will run 'git reset --hard {shortHash}' in:\n{task.ProjectPath}\n\nAll uncommitted changes will be lost. Continue?",
@@ -1231,28 +1241,18 @@ namespace HappyEngine
                 return;
             try
             {
-                var psi = new System.Diagnostics.ProcessStartInfo("git", $"reset --hard {task.GitStartHash}")
+                var result = await _gitHelper.RunGitCommandAsync(
+                    task.ProjectPath, $"reset --hard {task.GitStartHash}");
+
+                if (result != null)
                 {
-                    WorkingDirectory = task.ProjectPath,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                var proc = System.Diagnostics.Process.Start(psi);
-                if (proc != null)
+                    _outputTabManager.AppendOutput(task.Id,
+                        $"\n[HappyEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
+                    Dialogs.DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
+                }
+                else
                 {
-                    await proc.WaitForExitAsync();
-                    if (proc.ExitCode == 0)
-                    {
-                        _outputTabManager.AppendOutput(task.Id,
-                            $"\n[HappyEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
-                        Dialogs.DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
-                    }
-                    else
-                    {
-                        Dialogs.DarkDialog.ShowAlert("Git reset failed. The commit may no longer exist or the repository state may have changed.", "Revert Failed");
-                    }
+                    Dialogs.DarkDialog.ShowAlert("Git reset failed. The commit may no longer exist or the repository state may have changed.", "Revert Failed");
                 }
             }
             catch (Exception ex)

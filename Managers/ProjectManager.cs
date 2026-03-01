@@ -618,6 +618,14 @@ namespace HappyEngine.Managers
             Action? syncSettings)
         {
             if (_view.ProjectListPanel == null) return;
+
+            // Ensure the projects panel doesn't cause layout issues
+            _view.ViewDispatcher.Invoke(() =>
+            {
+                // Force the layout to update before clearing
+                _view.ProjectListPanel.UpdateLayout();
+            });
+
             _view.ProjectListPanel.Children.Clear();
 
             foreach (var proj in _savedProjects)
@@ -634,7 +642,8 @@ namespace HappyEngine.Managers
                     BorderBrush = isActive
                         ? (Brush)Application.Current.FindResource("Accent")
                         : (Brush)Application.Current.FindResource("BorderMedium"),
-                    Cursor = Cursors.Hand
+                    Cursor = Cursors.Hand,
+                    MaxHeight = 200 // Prevent project cards from growing too tall
                 };
 
                 var grid = new Grid();

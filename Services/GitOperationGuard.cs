@@ -113,17 +113,53 @@ namespace HappyEngine.Services
             string operationName,
             CancellationToken cancellationToken = default)
         {
-            // First check if any file locks are held
-            var lockCount = _fileLockManager.LockCount;
-            if (lockCount > 0)
-            {
-                return (false, $"Cannot {operationName} while file locks are active");
-            }
+            // First acquire the semaphore to prevent race conditions
+            await _gitOperationSemaphore.WaitAsync(cancellationToken);
 
             try
             {
-                await ExecuteGitOperationAsync(gitOperation, operationName, cancellationToken);
-                return (true, null);
+                // Check if any file locks are held inside the semaphore-protected region
+                var lockCount = _fileLockManager.LockCount;
+                if (lockCount > 0)
+                {
+                    // Release the semaphore before returning the error
+                    _gitOperationSemaphore.Release();
+                    return (false, $"Cannot {operationName} while file locks are active");
+                }
+
+                // We already have the semaphore, so call the inner ExecuteGitOperationAsync logic directly
+                // to avoid double-acquiring the semaphore
+                try
+                {
+                    // Set the flag to prevent new file lock acquisitions
+                    lock (_stateLock)
+                    {
+                        _gitOperationInProgress = true;
+                    }
+                    _fileLockManager.SetGitOperationInProgress(true);
+
+                    AppLogger.Info("GitOperationGuard", $"Executing {operationName}");
+
+                    // Execute the git operation
+                    await gitOperation();
+                    return (true, null);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("GitOperationGuard", $"{operationName} failed", ex);
+                    throw;
+                }
+                finally
+                {
+                    // Always clear the flag
+                    lock (_stateLock)
+                    {
+                        _gitOperationInProgress = false;
+                    }
+                    _fileLockManager.SetGitOperationInProgress(false);
+
+                    AppLogger.Info("GitOperationGuard", $"Released lock for {operationName}");
+                }
             }
             catch (OperationCanceledException)
             {
@@ -132,6 +168,14 @@ namespace HappyEngine.Services
             catch (Exception ex)
             {
                 return (false, $"{operationName} failed: {ex.Message}");
+            }
+            finally
+            {
+                // Always release the semaphore (but only if we didn't already release it in the lock check)
+                if (_gitOperationSemaphore.CurrentCount == 0)
+                {
+                    _gitOperationSemaphore.Release();
+                }
             }
         }
     }

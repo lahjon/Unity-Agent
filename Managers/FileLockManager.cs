@@ -15,6 +15,10 @@ namespace HappyEngine.Managers
 {
     public class FileLockManager
     {
+        // Constants for lock count limits
+        private const int MaxLocks = 500; // Maximum total lock count across all tasks
+        private const int MaxLocksPerTask = 100; // Maximum lock count per individual task
+
         private readonly Dictionary<string, FileLock> _fileLocks = new();
         private readonly ObservableCollection<FileLock> _fileLocksView = new();
         private readonly Dictionary<string, HashSet<string>> _taskLockedFiles = new();
@@ -107,6 +111,20 @@ namespace HappyEngine.Managers
                     existing.OnPropertyChanged(nameof(FileLock.StatusText));
                     return true;
                 }
+                return false;
+            }
+
+            // Check if we've reached the maximum total lock count
+            if (_fileLocks.Count >= MaxLocks)
+            {
+                AppLogger.Warn("FileLockManager", $"Maximum total lock count ({MaxLocks}) reached. Cannot acquire lock for {filePath} by task {taskId}");
+                return false;
+            }
+
+            // Check if this task has reached its per-task lock limit
+            if (_taskLockedFiles.TryGetValue(taskId, out var existingTaskFiles) && existingTaskFiles.Count >= MaxLocksPerTask)
+            {
+                AppLogger.Warn("FileLockManager", $"Task {taskId} has reached maximum lock count ({MaxLocksPerTask}). Cannot acquire lock for {filePath}");
                 return false;
             }
 
@@ -253,16 +271,6 @@ namespace HappyEngine.Managers
             var blockingTaskId = blockingLock?.OwnerTaskId ?? "unknown";
             var blockerTask = activeTasks.FirstOrDefault(t => t.Id == blockingTaskId);
             var blockerNum = blockerTask?.TaskNumber;
-
-            // Debug logging
-            AppLogger.Info("FileLockManager", $"[DEBUG] Looking for blocking task ID: {blockingTaskId}");
-            AppLogger.Info("FileLockManager", $"[DEBUG] Active tasks count: {activeTasks.Count}");
-            foreach (var t in activeTasks)
-            {
-                AppLogger.Info("FileLockManager", $"[DEBUG] Task ID: {t.Id}, TaskNumber: {t.TaskNumber}");
-            }
-            AppLogger.Info("FileLockManager", $"[DEBUG] Blocker task found: {blockerTask != null}");
-            AppLogger.Info("FileLockManager", $"[DEBUG] Blocker TaskNumber: {blockerNum}");
 
             // Important: Do NOT kill the process - we want to preserve the conversation state
             // The process will be paused/suspended so it can resume later

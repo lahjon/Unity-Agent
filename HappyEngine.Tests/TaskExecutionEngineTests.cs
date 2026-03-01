@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using HappyEngine.Helpers;
 using HappyEngine.Managers;
+using HappyEngine.Services;
 using Xunit;
 
 using FeatureModeAction = HappyEngine.Managers.FeatureModeHandler.FeatureModeAction;
@@ -81,11 +82,13 @@ namespace HappyEngine.Tests
 
             var flm = new FileLockManager(textBlock, dispatcher);
             var otm = new OutputTabManager(tabControl, dispatcher);
+            var gitOperationGuard = new GitOperationGuard(flm);
 
             var mbm = new MessageBusManager(dispatcher);
             var mgr = new TaskExecutionManager(
                 tempDir, flm, otm,
                 _git, _completion, _prompt, _factory,
+                gitOperationGuard,
                 () => "test prompt",
                 _ => "test project",
                 _ => "",

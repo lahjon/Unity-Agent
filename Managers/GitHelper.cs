@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using HappyEngine.Models;
 
 namespace HappyEngine.Managers
 {
@@ -19,14 +21,26 @@ namespace HappyEngine.Managers
             return "\"" + arg.Replace("\"", "\\\"") + "\"";
         }
 
-        public async Task<string?> RunGitCommandAsync(string workingDirectory, string arguments,
+        public async Task<GitResult> RunGitCommandAsync(string workingDirectory, string arguments,
             CancellationToken cancellationToken = default)
         {
-            return await RunGitCommandAsync(workingDirectory, arguments, null, cancellationToken);
+            return await RunGitCommandAsync(workingDirectory, arguments, TimeSpan.FromSeconds(30), cancellationToken);
         }
 
-        public async Task<string?> RunGitCommandAsync(string workingDirectory, string arguments,
+        public async Task<GitResult> RunGitCommandAsync(string workingDirectory, string arguments,
+            TimeSpan timeout, CancellationToken cancellationToken = default)
+        {
+            return await RunGitCommandAsync(workingDirectory, arguments, null, timeout, cancellationToken);
+        }
+
+        public async Task<GitResult> RunGitCommandAsync(string workingDirectory, string arguments,
             string? standardInput, CancellationToken cancellationToken = default)
+        {
+            return await RunGitCommandAsync(workingDirectory, arguments, standardInput, TimeSpan.FromSeconds(30), cancellationToken);
+        }
+
+        public async Task<GitResult> RunGitCommandAsync(string workingDirectory, string arguments,
+            string? standardInput, TimeSpan timeout, CancellationToken cancellationToken = default)
         {
             Process? process = null;
             try
@@ -43,7 +57,7 @@ namespace HappyEngine.Managers
                     CreateNoWindow = true
                 };
                 process = Process.Start(psi);
-                if (process == null) return null;
+                if (process == null) return new GitResult("", "Failed to start git process", -1);
 
                 if (standardInput != null)
                 {
@@ -52,22 +66,31 @@ namespace HappyEngine.Managers
                     process.StandardInput.Close();
                 }
 
-                var output = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-                using var timeoutCts = new CancellationTokenSource(5000);
+                // Read both stdout and stderr concurrently to prevent deadlocks
+                var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+                var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+
+                // Wait for process to exit
+                using var timeoutCts = new CancellationTokenSource(timeout);
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, cancellationToken);
                 await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
-                return process.ExitCode == 0 ? output.Trim() : null;
+
+                // Get both outputs - they should complete quickly after process exits
+                var output = await outputTask.ConfigureAwait(false);
+                var error = await errorTask.ConfigureAwait(false);
+
+                return new GitResult(output, error, process.ExitCode);
             }
             catch (OperationCanceledException)
             {
                 try { if (process is { HasExited: false }) process.Kill(true); } catch (Exception ex) { AppLogger.Debug("GitHelper", $"Failed to kill cancelled git process: {ex.Message}"); }
                 AppLogger.Warn("GitHelper", $"Git command timed out or cancelled: git {arguments}");
-                return null;
+                return new GitResult("", "Git command timed out or was cancelled", -1);
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("GitHelper", "Async git command failed", ex);
-                return null;
+                return new GitResult("", $"Git command failed: {ex.Message}", -1);
             }
             finally
             {
@@ -78,17 +101,18 @@ namespace HappyEngine.Managers
         public async Task<string?> CaptureGitHeadAsync(string projectPath,
             CancellationToken cancellationToken = default)
         {
-            return await RunGitCommandAsync(projectPath, "rev-parse HEAD", cancellationToken).ConfigureAwait(false);
+            var result = await RunGitCommandAsync(projectPath, "rev-parse HEAD", cancellationToken).ConfigureAwait(false);
+            return result.TrimmedOutput;
         }
 
-        public async Task<string?> CommitSecureAsync(string workingDirectory, string message,
+        public async Task<GitResult> CommitSecureAsync(string workingDirectory, string message,
             string? pathSpec = null, CancellationToken cancellationToken = default)
         {
             // Validate the commit message doesn't contain null bytes which could be used for injection
             if (message.Contains('\0'))
             {
                 AppLogger.Warn("GitHelper", "Commit message contains null bytes, rejecting for security");
-                return null;
+                return new GitResult("", "Commit message contains null bytes", -1);
             }
 
             // Build the git commit command
@@ -112,11 +136,11 @@ namespace HappyEngine.Managers
             CancellationToken cancellationToken = default)
         {
             var diffRef = gitStartHash ?? "HEAD";
-            var numstatOutput = await RunGitCommandAsync(projectPath, $"diff {diffRef} --numstat", cancellationToken).ConfigureAwait(false);
-            if (numstatOutput == null) return null;
+            var result = await RunGitCommandAsync(projectPath, $"diff {diffRef} --numstat", cancellationToken).ConfigureAwait(false);
+            if (!result.IsSuccess || string.IsNullOrEmpty(result.Output)) return null;
 
             var files = new List<(string name, int added, int removed)>();
-            foreach (var line in numstatOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line in result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 var parts = line.Split('\t');
                 if (parts.Length < 3) continue;
@@ -137,6 +161,23 @@ namespace HappyEngine.Managers
             path = path.Replace('\\', '/');
             // Use the internal escape method
             return EscapeShellArgument(path);
+        }
+
+        /// <summary>
+        /// Validates that a string is a valid git commit hash (SHA-1).
+        /// Valid hashes are 7-40 hexadecimal characters.
+        /// </summary>
+        /// <param name="hash">The hash string to validate</param>
+        /// <returns>True if the hash is valid, false otherwise</returns>
+        public bool IsValidGitHash(string? hash)
+        {
+            if (string.IsNullOrWhiteSpace(hash))
+                return false;
+
+            // Git hashes are SHA-1, which can be abbreviated to 7-40 characters
+            // and consist only of hexadecimal characters (0-9, a-f)
+            var gitHashRegex = new Regex(@"^[0-9a-f]{7,40}$", RegexOptions.IgnoreCase);
+            return gitHashRegex.IsMatch(hash);
         }
     }
 }

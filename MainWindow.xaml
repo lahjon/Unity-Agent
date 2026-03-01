@@ -1115,16 +1115,16 @@
         </Grid.ColumnDefinitions>
 
         <!-- ═══ PROJECTS (1) ═══ -->
-        <Border Grid.Row="2" Grid.Column="0" Grid.RowSpan="3" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="10"
-                BorderThickness="1">
+        <Border x:Name="ProjectsPanelBorder" Grid.Row="2" Grid.Column="0" Grid.RowSpan="3" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="10"
+                BorderThickness="1" ClipToBounds="True">
                 <Border.BorderBrush>
-                    <SolidColorBrush x:Name="ProjectsPanelBorder" Color="#2C2C2C"/>
+                    <SolidColorBrush x:Name="ProjectsPanelBorderBrush" Color="#2C2C2C"/>
                 </Border.BorderBrush>
                 <Border.Triggers>
                     <EventTrigger RoutedEvent="MouseEnter">
                         <BeginStoryboard>
                             <Storyboard>
-                                <ColorAnimation Storyboard.TargetName="ProjectsPanelBorder"
+                                <ColorAnimation Storyboard.TargetName="ProjectsPanelBorderBrush"
                                                 Storyboard.TargetProperty="Color"
                                                 To="#3A3A3A" Duration="0:0:0.2"/>
                             </Storyboard>
@@ -1133,7 +1133,7 @@
                     <EventTrigger RoutedEvent="MouseLeave">
                         <BeginStoryboard>
                             <Storyboard>
-                                <ColorAnimation Storyboard.TargetName="ProjectsPanelBorder"
+                                <ColorAnimation Storyboard.TargetName="ProjectsPanelBorderBrush"
                                                 Storyboard.TargetProperty="Color"
                                                 To="#2C2C2C" Duration="0:0:0.3"/>
                             </Storyboard>
@@ -1143,7 +1143,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
@@ -1153,8 +1153,11 @@
 
                     <!-- Project list with ScrollViewer -->
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel x:Name="ProjectListPanel" Margin="0"/>
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  CanContentScroll="True"
+                                  PanningMode="VerticalOnly">
+                        <StackPanel x:Name="ProjectListPanel" Margin="0"
+                                    VerticalAlignment="Top"/>
                     </ScrollViewer>
 
                     <!-- Add / Create Project form -->
@@ -1780,13 +1783,6 @@
                     </DockPanel>
                     <TabControl x:Name="StatisticsTabs" Style="{StaticResource SettingsTabControlStyle}"
                                 Background="Transparent" BorderThickness="0">
-                        <!-- Git tab -->
-                        <TabItem x:Name="GitTabItem">
-                            <TabItem.Header>
-                                <TextBlock Text="Git" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
-                            </TabItem.Header>
-                            <ScrollViewer x:Name="GitTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
-                        </TabItem>
                         <!-- File Locks tab -->
                         <TabItem x:Name="FileLocksTabItem">
                             <TabItem.Header>
@@ -1825,6 +1821,9 @@
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Foreground" Value="#4EC969"/>
                                                                         <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding StatusText}" Value="Waiting">
+                                                                                <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
+                                                                            </DataTrigger>
                                                                             <DataTrigger Binding="{Binding IsIgnored}" Value="True">
                                                                                 <Setter Property="Foreground" Value="{StaticResource WarningOrange}"/>
                                                                             </DataTrigger>
@@ -1873,6 +1872,13 @@
                                 </ListView>
                                 </ScrollViewer>
                             </DockPanel>
+                        </TabItem>
+                        <!-- Git tab -->
+                        <TabItem x:Name="GitTabItem">
+                            <TabItem.Header>
+                                <TextBlock Text="Git" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            </TabItem.Header>
+                            <ScrollViewer x:Name="GitTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
                         </TabItem>
                         <!-- Todo tab -->
                         <TabItem x:Name="TodoTabItem">

@@ -14,6 +14,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using HappyEngine.Helpers;
+using HappyEngine.Services;
+using HappyEngine.Models;
 
 namespace HappyEngine.Managers
 {
@@ -41,24 +43,13 @@ namespace HappyEngine.Managers
         private readonly ICompletionAnalyzer _completionAnalyzer;
         private readonly IPromptBuilder _promptBuilder;
         private readonly ITaskFactory _taskFactory;
+        private readonly GitOperationGuard _gitOperationGuard;
 
         // ── Focused sub-handlers ─────────────────────────────────────
         private readonly OutputProcessor _outputProcessor;
         private readonly TaskProcessLauncher _processLauncher;
         private readonly FeatureModeHandler _featureModeHandler;
         private readonly TokenLimitHandler _tokenLimitHandler;
-
-        // ── Static git operation serialization ──────────────────────
-        /// <summary>
-        /// Serializes git operations across all tasks to prevent concurrent git commits
-        /// from racing against each other and hitting git's index.lock.
-        /// </summary>
-        private static readonly SemaphoreSlim _gitCommitSemaphore = new SemaphoreSlim(1, 1);
-
-        /// <summary>
-        /// Gets the git commit semaphore for external use (e.g., MainWindow commit operations).
-        /// </summary>
-        public static SemaphoreSlim GitCommitSemaphore => _gitCommitSemaphore;
 
         /// <summary>Exposes the streaming tool state dictionary for external consumers.</summary>
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _processLauncher.StreamingToolState;
@@ -80,6 +71,7 @@ namespace HappyEngine.Managers
             ICompletionAnalyzer completionAnalyzer,
             IPromptBuilder promptBuilder,
             ITaskFactory taskFactory,
+            GitOperationGuard gitOperationGuard,
             Func<string> getSystemPrompt,
             Func<AgentTask, string> getProjectDescription,
             Func<string, string> getProjectRulesBlock,
@@ -96,6 +88,7 @@ namespace HappyEngine.Managers
             _completionAnalyzer = completionAnalyzer;
             _promptBuilder = promptBuilder;
             _taskFactory = taskFactory;
+            _gitOperationGuard = gitOperationGuard;
             _getSystemPrompt = getSystemPrompt;
             _getProjectDescription = getProjectDescription;
             _getProjectRulesBlock = getProjectRulesBlock;
@@ -580,9 +573,8 @@ namespace HappyEngine.Managers
                     relativePaths.Add(rel.Replace('\\', '/'));
                 }
 
-                // Serialize git operations to prevent concurrent commits from racing
-                await _gitCommitSemaphore.WaitAsync();
-                try
+                // Use GitOperationGuard to serialize git operations
+                await _gitOperationGuard.ExecuteGitOperationAsync(async () =>
                 {
                     // Stage only the locked files (handles new/untracked files)
                     var escapedPaths = relativePaths.Select(GitHelper.EscapeGitPath).ToList();
@@ -590,10 +582,10 @@ namespace HappyEngine.Managers
                     var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
 
                     // Check if git add failed
-                    if (addResult == null)
+                    if (!addResult.IsSuccess)
                     {
                         _outputProcessor.AppendOutput(task.Id,
-                            "[HappyEngine] Failed to stage files for auto-commit\n",
+                            $"[HappyEngine] Failed to stage files for auto-commit: {addResult.GetErrorMessage()}\n",
                             activeTasks, historyTasks);
                         return;
                     }
@@ -605,7 +597,7 @@ namespace HappyEngine.Managers
                     var commitMsg = $"Task #{task.TaskNumber}: {desc}";
                     var result = await _gitHelper.CommitSecureAsync(task.ProjectPath, commitMsg, pathArgs);
 
-                    if (result != null)
+                    if (result.IsSuccess)
                     {
                         // Get the commit hash after successful commit
                         var commitHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts?.Token ?? CancellationToken.None);
@@ -624,11 +616,13 @@ namespace HappyEngine.Managers
                                 activeTasks, historyTasks);
                         }
                     }
-                }
-                finally
-                {
-                    _gitCommitSemaphore.Release();
-                }
+                    else
+                    {
+                        _outputProcessor.AppendOutput(task.Id,
+                            $"[HappyEngine] Commit failed: {result.GetErrorMessage()}\n",
+                            activeTasks, historyTasks);
+                    }
+                }, $"auto-commit for task #{task.TaskNumber}");
             }
             catch (Exception ex)
             {
