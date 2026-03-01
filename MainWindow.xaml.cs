@@ -52,6 +52,7 @@ namespace HappyEngine
         private ICollectionView? _storedView;
         private ICollectionView? _fileLocksView;
         private readonly DispatcherTimer _statusTimer;
+        private readonly DispatcherTimer _periodicSaveTimer;
 
         // Managers
         private readonly SettingsManager _settingsManager;
@@ -263,6 +264,15 @@ namespace HappyEngine
                 _outputTabManager.UpdateOutputTabWidths();
                 App.TraceUi("StatusTimer.UpdateStatus");
                 UpdateStatus();
+            };
+
+            // Initialize periodic save timer to checkpoint active queue every 5 minutes
+            _periodicSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
+            _periodicSaveTimer.Tick += (_, _) =>
+            {
+                App.TraceUi("PeriodicSaveTimer.SaveActiveQueue");
+                // Use background write for periodic saves to avoid blocking UI thread
+                _historyManager.SaveActiveQueue(_activeTasks, _activeTasksLock, useBackgroundWrite: true);
             };
 
             Closing += OnWindowClosing;
@@ -487,6 +497,7 @@ namespace HappyEngine
                 await MigrateAllProjectBusesAsync();
 
                 _statusTimer.Start();
+                _periodicSaveTimer.Start();
                 UpdateStatus();
 
                 // Offer to re-queue recovered tasks from a previous session
@@ -2175,6 +2186,7 @@ namespace HappyEngine
 
             // ── 2. Stop all timers so no callbacks fire during teardown ──
             _statusTimer.Stop();
+            _periodicSaveTimer.Stop();
             _helperAnimTimer?.Stop();
 
             // ── 3. Cancel in-flight async work ──
@@ -3114,6 +3126,36 @@ namespace HappyEngine
             StatusText.Text = $"{projectName}  |  Running: {running}{planningPart}  |  Queued: {queued}{waitingPart}  |  " +
                               $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
                               $"Locks: {locks}  |  {_projectManager.ProjectPath}";
+        }
+
+        /// <summary>Updates the queue position for all InitQueued tasks based on their priority ordering.</summary>
+        private void UpdateQueuePositions()
+        {
+            // Get all InitQueued tasks sorted by priority (same order as DrainInitQueue uses)
+            var initQueuedTasks = _activeTasks
+                .Where(t => t.Status == AgentTaskStatus.InitQueued)
+                .OrderByDescending(t => (int)t.PriorityLevel)
+                .ThenByDescending(t => t.Priority)
+                .ToList();
+
+            // Update queue positions (1-based)
+            for (int i = 0; i < initQueuedTasks.Count; i++)
+            {
+                var task = initQueuedTasks[i];
+                var newPosition = i + 1;
+                if (task.QueuePosition != newPosition)
+                {
+                    task.QueuePosition = newPosition;
+                    _outputTabManager.UpdateTabHeader(task);
+                }
+            }
+
+            // Clear queue position for non-InitQueued tasks
+            foreach (var task in _activeTasks.Where(t => t.Status != AgentTaskStatus.InitQueued && t.QueuePosition > 0))
+            {
+                task.QueuePosition = 0;
+                _outputTabManager.UpdateTabHeader(task);
+            }
         }
 
     }

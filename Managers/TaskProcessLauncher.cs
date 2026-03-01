@@ -323,7 +323,36 @@ namespace HappyEngine.Managers
             if (task.Status is not (AgentTaskStatus.Paused or AgentTaskStatus.Queued)) return;
             if (task.Process is not { HasExited: false }) return;
 
-            ResumeProcessTree(task.Process);
+            try
+            {
+                ResumeProcessTree(task.Process);
+            }
+            catch (Exception ex)
+            {
+                // Process exited between the check and resume call (race window)
+                AppLogger.Warn("TaskExecution", $"Failed to resume task #{task.TaskNumber} - process exited during resume: {ex.Message}");
+                task.Process = null;
+                task.Status = AgentTaskStatus.Failed;
+                task.EndTime = DateTime.Now;
+                _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] ERROR: Process terminated unexpectedly during resume.\n", activeTasks, historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+                // Caller (TaskExecutionManager) will handle finalization when it sees the Failed status
+                return;
+            }
+
+            // Post-resume validation: check if process exited during the resume operation
+            if (task.Process.HasExited)
+            {
+                AppLogger.Warn("TaskExecution", $"Task #{task.TaskNumber} process exited immediately after resume");
+                task.Process = null;
+                task.Status = AgentTaskStatus.Failed;
+                task.EndTime = DateTime.Now;
+                _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] ERROR: Process terminated immediately after resume.\n", activeTasks, historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
+                // Caller (TaskExecutionManager) will handle finalization when it sees the Failed status
+                return;
+            }
+
             task.Status = task.IsPlanningBeforeQueue ? AgentTaskStatus.Planning : AgentTaskStatus.Running;
 
             // Restart feature mode timers if applicable

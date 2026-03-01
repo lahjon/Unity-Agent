@@ -34,5 +34,7 @@ namespace HappyEngine.Models
         public bool AutoDecompose { get; set; }
         public bool ApplyFix { get; set; } = true;
         public string AdditionalInstructions { get; set; } = "";
+        public string FullOutput { get; set; } = "";
+        public string? DependencyContext { get; set; }
     }
 }

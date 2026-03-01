@@ -751,11 +751,28 @@ namespace HappyEngine.Managers
                     // Format the message as a proper user message in the conversation
                     // Claude CLI expects messages to be properly formatted to maintain conversation context
                     var formattedMessage = $"\n\nHuman: {text}\n\nAssistant:";
-                    task.Process.StandardInput.WriteLine(formattedMessage);
-                    task.Process.StandardInput.Flush();
 
-                    // Store the message in conversation history for proper context tracking
-                    AppLogger.Info("FollowUp", $"[{task.Id}] Sent formatted user message to Claude process");
+                    try
+                    {
+                        task.Process.StandardInput.WriteLine(formattedMessage);
+                        task.Process.StandardInput.Flush();
+
+                        // Store the message in conversation history for proper context tracking
+                        AppLogger.Info("FollowUp", $"[{task.Id}] Sent formatted user message to Claude process");
+                    }
+                    catch (Exception writeEx)
+                    {
+                        AppLogger.Error("FollowUp", $"[{task.Id}] Failed to write message to StandardInput", writeEx);
+
+                        // Process any remaining queued messages to prevent deadlock
+                        ProcessQueuedMessages(task, activeTasks, historyTasks);
+                    }
+                    finally
+                    {
+                        // Always reset the processing flag to prevent queue deadlock
+                        task.Runtime.IsProcessingMessage = false;
+                    }
+
                     return;
                 }
                 catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to write to stdin for task {task.Id}, starting follow-up", ex); }

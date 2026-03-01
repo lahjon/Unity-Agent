@@ -206,9 +206,13 @@ namespace HappyEngine.Managers
                 ApplyPulseAnimation(glow, 2.0, 0, 0.3);
 
             var prefix = isGemini ? "\uE91B " : "";
+            var labelText = task.ShortDescription.ReplaceLineEndings(" ");
+            if (task.IsInitQueued && task.QueuePosition > 0)
+                labelText = $"{labelText} - Queued (#{task.QueuePosition})";
+
             var label = new TextBlock
             {
-                Text = (prefix + task.ShortDescription).ReplaceLineEndings(" "),
+                Text = (prefix + labelText),
                 MaxWidth = 120,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 TextWrapping = TextWrapping.NoWrap,
@@ -373,7 +377,13 @@ namespace HappyEngine.Managers
                     ApplyPulseAnimation(glow, 2.0, 0, 0.3);
 
                 if (sp.Children.Count > 1 && sp.Children[1] is TextBlock label)
-                    label.Text = task.ShortDescription.ReplaceLineEndings(" ");
+                {
+                    // Show queue position for InitQueued tasks
+                    if (task.IsInitQueued)
+                        label.Text = $"{task.ShortDescription.ReplaceLineEndings(" ")} - {task.QueueStatusText}";
+                    else
+                        label.Text = task.ShortDescription.ReplaceLineEndings(" ");
+                }
 
                 if (sp.Children.Count > 2 && sp.Children[2] is Button closeBtn)
                 {

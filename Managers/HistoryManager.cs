@@ -156,7 +156,8 @@ namespace HappyEngine.Managers
         /// Persists active tasks that are in InitQueued, Queued, or Planning state so they
         /// can be recovered on the next startup if the app crashes or is closed unexpectedly.
         /// </summary>
-        public void SaveActiveQueue(ObservableCollection<AgentTask> activeTasks, object activeTasksLock)
+        /// <param name="useBackgroundWrite">If true, uses SafeFileWriter.WriteInBackground; if false, uses synchronous write.</param>
+        public void SaveActiveQueue(ObservableCollection<AgentTask> activeTasks, object activeTasksLock, bool useBackgroundWrite = false)
         {
             try
             {
@@ -169,7 +170,9 @@ namespace HappyEngine.Managers
                     entries = activeTasks
                         .Where(t => t.Status is AgentTaskStatus.InitQueued
                                               or AgentTaskStatus.Queued
-                                              or AgentTaskStatus.Planning)
+                                              or AgentTaskStatus.Planning
+                                              or AgentTaskStatus.Running
+                                              or AgentTaskStatus.Paused)
                         .Select(t => new TaskHistoryEntry
                         {
                             WasActive = true,
@@ -208,7 +211,9 @@ namespace HappyEngine.Managers
                             UseMessageBus = t.UseMessageBus,
                             AutoDecompose = t.AutoDecompose,
                             ApplyFix = t.ApplyFix,
-                            AdditionalInstructions = t.AdditionalInstructions ?? ""
+                            AdditionalInstructions = t.AdditionalInstructions ?? "",
+                            FullOutput = t.FullOutput ?? "",
+                            DependencyContext = t.DependencyContext
                         }).ToList();
                 }
 
@@ -221,8 +226,17 @@ namespace HappyEngine.Managers
                 }
 
                 var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
-                // Write synchronously — this runs during Dispose, so background writes may not complete
-                File.WriteAllText(_activeQueueFile, json);
+
+                if (useBackgroundWrite)
+                {
+                    // Use background write for periodic saves during normal operation
+                    SafeFileWriter.WriteInBackground(_activeQueueFile, json, "HistoryManager");
+                }
+                else
+                {
+                    // Write synchronously during Dispose/shutdown, so background writes don't get cut off
+                    File.WriteAllText(_activeQueueFile, json);
+                }
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save active queue for recovery", ex); }
         }
@@ -268,10 +282,14 @@ namespace HappyEngine.Managers
                         UseMessageBus = entry.UseMessageBus,
                         AutoDecompose = entry.AutoDecompose,
                         ApplyFix = entry.ApplyFix,
-                        AdditionalInstructions = entry.AdditionalInstructions ?? ""
+                        AdditionalInstructions = entry.AdditionalInstructions ?? "",
+                        FullOutput = entry.FullOutput ?? "",
+                        DependencyContext = entry.DependencyContext
                     };
                     task.Summary = entry.Summary ?? "";
                     task.Model = Enum.TryParse<ModelType>(entry.Model, out var m) ? m : ModelType.ClaudeCode;
+                    // Reset status to fresh state for re-launch
+                    task.Status = AgentTaskStatus.InitQueued;
 
                     results.Add(task);
                 }

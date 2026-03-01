@@ -41,6 +41,13 @@ namespace HappyEngine.Managers
         public bool TryAcquireOrConflict(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
         {
+            // Validate file path - reject null, empty, or "null" string
+            if (string.IsNullOrWhiteSpace(filePath) || filePath.Equals("null", StringComparison.OrdinalIgnoreCase))
+            {
+                AppLogger.Warn("FileLockManager", $"Invalid file path in TryAcquireOrConflict: '{filePath}' for task {taskId}");
+                return true; // Return true to not block the operation, just skip the lock
+            }
+
             lock (_lockSync)
             {
                 var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
@@ -70,6 +77,13 @@ namespace HappyEngine.Managers
         private bool TryAcquireFileLockInternal(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, bool isIgnored = false)
         {
+            // Validate file path - reject null, empty, or "null" string
+            if (string.IsNullOrWhiteSpace(filePath) || filePath.Equals("null", StringComparison.OrdinalIgnoreCase))
+            {
+                AppLogger.Warn("FileLockManager", $"Invalid file path for lock acquisition: '{filePath}'");
+                return false;
+            }
+
             // Reject new lock acquisitions during git operations
             if (_gitOperationInProgress)
             {
@@ -227,6 +241,13 @@ namespace HappyEngine.Managers
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
             if (task == null) return;
 
+            // Validate file path - don't handle conflicts for invalid paths
+            if (string.IsNullOrWhiteSpace(filePath) || filePath.Equals("null", StringComparison.OrdinalIgnoreCase))
+            {
+                AppLogger.Warn("FileLockManager", $"Invalid file path in HandleFileLockConflictInternal: '{filePath}'");
+                return;
+            }
+
             var normalized = Helpers.FormatHelpers.NormalizePath(filePath, task.ProjectPath);
             var blockingLock = _fileLocks.GetValueOrDefault(normalized);
             var blockingTaskId = blockingLock?.OwnerTaskId ?? "unknown";
@@ -303,10 +324,10 @@ namespace HappyEngine.Managers
 
         public void CheckQueuedTasks(ObservableCollection<AgentTask> activeTasks)
         {
-            List<(string taskId, QueuedTaskInfo qi)> toResume;
+            List<(string taskId, AgentTask task)> toResume;
             lock (_lockSync)
             {
-                toResume = new List<(string, QueuedTaskInfo)>();
+                toResume = new List<(string, AgentTask)>();
 
                 foreach (var kvp in _queuedTaskInfo)
                 {
@@ -326,10 +347,24 @@ namespace HappyEngine.Managers
                         allClear = false;
 
                     if (allClear)
-                        toResume.Add((kvp.Key, qi));
+                        toResume.Add((kvp.Key, qi.Task));
                 }
 
-                foreach (var (taskId, _) in toResume)
+                // Don't remove from _queuedTaskInfo yet - wait until after successful resume
+            }
+
+            // Invoke the event outside the lock with validation
+            foreach (var (taskId, task) in toResume)
+            {
+                // Validate task status immediately before invoking the event
+                if (task.Status != AgentTaskStatus.Queued)
+                {
+                    AppLogger.Warn("FileLockManager", $"Task {taskId} status changed to {task.Status} before resume could be invoked");
+                    continue;
+                }
+
+                // Only remove from queued info after confirming status is still Queued
+                lock (_lockSync)
                 {
                     _queuedTaskInfo.Remove(taskId);
 
@@ -343,16 +378,6 @@ namespace HappyEngine.Managers
                         });
                     }
                 }
-            }
-
-            foreach (var (taskId, qi) in toResume)
-            {
-                var task = qi.Task;
-                task.Status = AgentTaskStatus.Running;
-                task.QueuedReason = null;
-                task.BlockedByTaskId = null;
-                task.BlockedByTaskNumber = null;
-                task.StartTime = DateTime.Now;
 
                 QueuedTaskResumed?.Invoke(taskId);
             }
@@ -374,11 +399,10 @@ namespace HappyEngine.Managers
                     });
                 }
             }
-            task.Status = AgentTaskStatus.Running;
-            task.QueuedReason = null;
-            task.BlockedByTaskId = null;
-            task.BlockedByTaskNumber = null;
-            task.StartTime = DateTime.Now;
+
+            // Validate task status before invoking the event
+            if (task.Status != AgentTaskStatus.Queued)
+                return;
 
             QueuedTaskResumed?.Invoke(task.Id);
         }
@@ -484,15 +508,35 @@ namespace HappyEngine.Managers
         public static string? TryExtractFilePathFromPartial(string partialJson)
         {
             var match = Regex.Match(partialJson, @"""file_path""\s*:\s*""([^""]+)""");
-            return match.Success ? match.Groups[1].Value : null;
+            if (match.Success)
+            {
+                var path = match.Groups[1].Value;
+                // Reject "null" string as a valid file path
+                if (path.Equals("null", StringComparison.OrdinalIgnoreCase))
+                    return null;
+                return path;
+            }
+            return null;
         }
 
         public static string? ExtractFilePath(JsonElement input)
         {
             if (input.TryGetProperty("file_path", out var fp))
-                return fp.GetString();
+            {
+                var filePath = fp.GetString();
+                // Reject "null" string as a valid file path
+                if (filePath != null && filePath.Equals("null", StringComparison.OrdinalIgnoreCase))
+                    return null;
+                return filePath;
+            }
             if (input.TryGetProperty("path", out var p))
-                return p.GetString();
+            {
+                var path = p.GetString();
+                // Reject "null" string as a valid file path
+                if (path != null && path.Equals("null", StringComparison.OrdinalIgnoreCase))
+                    return null;
+                return path;
+            }
 
             // For Bash commands, try to extract file paths from common file-modifying patterns
             if (input.TryGetProperty("command", out var cmd))

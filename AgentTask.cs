@@ -320,6 +320,23 @@ namespace HappyEngine
         public string? PendingFileLockBlocker { get => Runtime.PendingFileLockBlocker; set => Runtime.PendingFileLockBlocker = value; }
         public int SubTaskCounter { get => Runtime.SubTaskCounter; set => Runtime.SubTaskCounter = value; }
 
+        // ── Queue position tracking ───────────────────────────────────
+
+        private int _queuePosition = 0;
+
+        /// <summary>Gets or sets the position of this task in the InitQueued queue (1-based, 0 means not queued).</summary>
+        public int QueuePosition
+        {
+            get => _queuePosition;
+            set
+            {
+                if (SetField(ref _queuePosition, value))
+                {
+                    OnPropertyChanged(nameof(QueueStatusText));
+                }
+            }
+        }
+
         // ── Computed properties ───────────────────────────────────────
 
         public bool HasRecommendations => !string.IsNullOrWhiteSpace(Recommendations);
@@ -379,6 +396,17 @@ namespace HappyEngine
             AgentTaskStatus.Verifying => "Verifying",
             _ => "?"
         };
+
+        /// <summary>Gets the status text with queue position for InitQueued tasks.</summary>
+        public string QueueStatusText
+        {
+            get
+            {
+                if (IsInitQueued && QueuePosition > 0)
+                    return $"Queued (#{QueuePosition})";
+                return StatusText;
+            }
+        }
 
         public string StatusColor => Status switch
         {

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -812,16 +813,16 @@ namespace HappyEngine.Managers
                 return section;
             }
 
-            // Commit list with checkboxes for selective push
-            var commitCheckboxes = new List<CheckBox>();
+            // Commit list with toggle switches for selective push
+            var commitToggles = new List<ToggleButton>();
             foreach (var commit in _unpushedCommits)
             {
-                var commitRow = BuildCommitRow(commit, commitCheckboxes);
+                var commitRow = BuildCommitRow(commit, commitToggles);
                 section.Children.Add(commitRow);
             }
 
             // Push Selected button - always show if there are commits
-            if (commitCheckboxes.Count > 0)
+            if (commitToggles.Count > 0)
             {
                 var tooltip = "Push only selected commits (interactive rebase)";
                 if (!HasNoFileLocks())
@@ -832,9 +833,9 @@ namespace HappyEngine.Managers
                 pushSelectedBtn.IsEnabled = HasNoFileLocks();
                 pushSelectedBtn.Click += async (_, _) =>
                 {
-                    var selected = commitCheckboxes
-                        .Where(cb => cb.IsChecked == true)
-                        .Select(cb => cb.Tag as string)
+                    var selected = commitToggles
+                        .Where(tb => tb.IsChecked == true)
+                        .Select(tb => tb.Tag as string)
                         .Where(h => h != null)
                         .ToList();
 
@@ -862,24 +863,25 @@ namespace HappyEngine.Managers
             return section;
         }
 
-        private Border BuildCommitRow(GitCommitInfo commit, List<CheckBox> checkboxes)
+        private Border BuildCommitRow(GitCommitInfo commit, List<ToggleButton> toggles)
         {
             var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // checkbox
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // toggle
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) }); // hash
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // message
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) }); // time
 
-            var cb = new CheckBox
+            var toggle = new ToggleButton
             {
                 IsChecked = true,
                 Tag = commit.FullHash,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 6, 0)
+                Margin = new Thickness(0, 0, 12, 0),
+                Style = Application.Current.TryFindResource("ToggleSwitch") as Style
             };
-            checkboxes.Add(cb);
-            Grid.SetColumn(cb, 0);
-            grid.Children.Add(cb);
+            toggles.Add(toggle);
+            Grid.SetColumn(toggle, 0);
+            grid.Children.Add(toggle);
 
             var hash = new TextBlock
             {
@@ -1004,28 +1006,29 @@ namespace HappyEngine.Managers
             {
                 var row = new DockPanel { Margin = new Thickness(0, 1, 0, 1) };
 
-                // Add checkbox for file selection
-                var checkBox = new CheckBox
+                // Add toggle switch for file selection
+                var toggle = new ToggleButton
                 {
                     IsChecked = _selectedFiles.Contains(change.FilePath),
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 6, 0)
+                    Margin = new Thickness(0, 0, 12, 0),
+                    Style = Application.Current.TryFindResource("ToggleSwitch") as Style
                 };
 
-                // Handle checkbox state changes
-                checkBox.Checked += (_, _) =>
+                // Handle toggle state changes
+                toggle.Checked += (_, _) =>
                 {
                     _selectedFiles.Add(change.FilePath);
                     UpdateCommitButtonState();
                 };
-                checkBox.Unchecked += (_, _) =>
+                toggle.Unchecked += (_, _) =>
                 {
                     _selectedFiles.Remove(change.FilePath);
                     UpdateCommitButtonState();
                 };
 
-                DockPanel.SetDock(checkBox, Dock.Left);
-                row.Children.Add(checkBox);
+                DockPanel.SetDock(toggle, Dock.Left);
+                row.Children.Add(toggle);
 
                 var statusBadge = new Border
                 {
@@ -1593,33 +1596,44 @@ secrets.json
 
         private static Button MakeActionButton(string icon, string label, string tooltip)
         {
-            var stack = new StackPanel { Orientation = Orientation.Horizontal };
-            stack.Children.Add(new TextBlock
-            {
-                Text = icon,
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 4, 0)
-            });
-            stack.Children.Add(new TextBlock
-            {
-                Text = label,
-                FontSize = 11,
-                FontFamily = new FontFamily("Segoe UI"),
-                VerticalAlignment = VerticalAlignment.Center
-            });
-
+            // Create an icon-only button to match task card style
             var button = new Button
             {
-                Content = stack,
+                Content = icon,
                 ToolTip = tooltip,
-                Style = Application.Current.TryFindResource("SmallBtn") as Style,
-                Background = BrushCache.Theme("Accent"),
-                Margin = new Thickness(0, 0, 6, 4)
+                Style = Application.Current.TryFindResource("IconBtn") as Style,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 14,
+                Width = 24,
+                Height = 24,
+                Margin = new Thickness(0, 0, 4, 0)
             };
 
+            // Apply accent color on hover using triggers from IconBtn style
+            button.MouseEnter += (s, e) => button.Foreground = BrushCache.Theme("Accent");
+            button.MouseLeave += (s, e) => button.Foreground = BrushCache.Get("#4A4A4A");
+
             return button;
+        }
+
+        private static ToggleButton MakeToggleSwitch(bool isChecked, string labelText)
+        {
+            var toggle = new ToggleButton
+            {
+                IsChecked = isChecked,
+                Style = Application.Current.TryFindResource("ToggleSwitch") as Style
+            };
+
+            // Add the label text
+            toggle.Content = new TextBlock
+            {
+                Text = labelText,
+                Foreground = BrushCache.Theme("TextLight"),
+                FontSize = 11,
+                FontFamily = new FontFamily("Segoe UI")
+            };
+
+            return toggle;
         }
 
         private static Border MakeSeparator()

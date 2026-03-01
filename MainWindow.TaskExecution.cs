@@ -719,6 +719,7 @@ TextureImporter:
             {
                 task.QueuedReason = null;
                 LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
+                UpdateQueuePositions();
                 UpdateStatus();
                 return;
             }
@@ -801,6 +802,7 @@ TextureImporter:
                 // Force-start an init-queued task (bypass max concurrent limit)
                 task.QueuedReason = null;
                 LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
+                UpdateQueuePositions();
                 UpdateStatus();
                 return;
             }

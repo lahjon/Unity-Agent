@@ -305,6 +305,9 @@ namespace HappyEngine
                 LaunchTaskProcess(task, $"[HappyEngine] Slot available — starting task #{task.TaskNumber}...\n\n");
             }
 
+            // Update queue positions for remaining InitQueued tasks
+            UpdateQueuePositions();
+
             if (toStart.Count > 0) UpdateStatus();
         }
 
@@ -322,6 +325,8 @@ namespace HappyEngine
                 {
                     task.DependencyContext = _promptBuilder.BuildDependencyContext(
                         depSnapshot, _activeTasks, _historyTasks);
+                    // Persist the dependency context so it survives app restart
+                    task.Data.DependencyContext = task.DependencyContext;
                 }
 
                 task.QueuedReason = null;
@@ -357,19 +362,35 @@ namespace HappyEngine
             AppLogger.Debug("OnQueuedTaskResumed", $"Task #{task.TaskNumber} - ConversationId: {task.ConversationId}, Process: {task.Process?.Id}, HasExited: {task.Process?.HasExited}");
 
             _outputTabManager.AppendOutput(taskId, $"\n[HappyEngine] Resuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
-            _outputTabManager.UpdateTabHeader(task);
 
             // Check if we have an existing process that was paused
             if (task.Process is { HasExited: false })
             {
-                // Resume the existing process
+                // Resume the existing process - ResumeTask will handle status change
                 AppLogger.Info("OnQueuedTaskResumed", $"Resuming existing process for task #{task.TaskNumber}");
                 _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
+
+                // Clear queued properties after successful resume
+                task.QueuedReason = null;
+                task.BlockedByTaskId = null;
+                task.BlockedByTaskNumber = null;
+                if (task.StartTime == DateTime.MinValue)
+                    task.StartTime = DateTime.Now;
+                _outputTabManager.UpdateTabHeader(task);
             }
             else
             {
                 // No existing process, start a new one
                 AppLogger.Info("OnQueuedTaskResumed", $"Starting new process for task #{task.TaskNumber} (no existing process)");
+
+                // For new process, we need to reset the status and properties before starting
+                task.Status = AgentTaskStatus.Running;
+                task.QueuedReason = null;
+                task.BlockedByTaskId = null;
+                task.BlockedByTaskNumber = null;
+                task.StartTime = DateTime.Now;
+                _outputTabManager.UpdateTabHeader(task);
+
                 _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
             }
 
@@ -558,6 +579,7 @@ namespace HappyEngine
             }
 
             RefreshFilterCombos();
+            UpdateQueuePositions();
             UpdateStatus();
         }
 

@@ -363,7 +363,7 @@
                                 </Ellipse.Style>
                             </Ellipse>
                         </Grid>
-                        <TextBlock Text="{Binding StatusText}"
+                        <TextBlock Text="{Binding QueueStatusText}"
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
                                    VerticalAlignment="Center">
@@ -793,7 +793,7 @@
                                 </Ellipse.Style>
                             </Ellipse>
                         </Grid>
-                        <TextBlock Text="{Binding StatusText}"
+                        <TextBlock Text="{Binding QueueStatusText}"
                                    Foreground="{Binding StatusColor, Converter={StaticResource StringToBrush}}"
                                    FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
                                    VerticalAlignment="Center">
@@ -1099,7 +1099,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*" MinHeight="120"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="150" MinHeight="60"/>
+            <RowDefinition Height="*" MinHeight="60"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition x:Name="TerminalRow" Height="Auto" MinHeight="0"/>
             <RowDefinition Height="Auto"/>
