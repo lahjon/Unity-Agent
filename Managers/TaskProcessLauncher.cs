@@ -502,6 +502,23 @@ namespace HappyEngine.Managers
                         {
                             _outputProcessor.AppendOutput(taskId, $"\n[Result: {subtype.GetString()}]\n", activeTasks, historyTasks);
                         }
+                        // Extract token usage from Claude Code CLI result event
+                        if (root.TryGetProperty("usage", out var resultUsage))
+                        {
+                            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                            if (task != null)
+                            {
+                                var inTok = resultUsage.TryGetProperty("input_tokens", out var rit) ? rit.GetInt64() : 0;
+                                var outTok = resultUsage.TryGetProperty("output_tokens", out var rot) ? rot.GetInt64() : 0;
+                                var cacheRead = resultUsage.TryGetProperty("cache_read_input_tokens", out var rcrt) ? rcrt.GetInt64() : 0;
+                                var cacheCreate = resultUsage.TryGetProperty("cache_creation_input_tokens", out var rcct) ? rcct.GetInt64() : 0;
+                                // Result event contains cumulative totals, so set directly instead of adding
+                                task.InputTokens = inTok;
+                                task.OutputTokens = outTok;
+                                task.CacheReadTokens = cacheRead;
+                                task.CacheCreationTokens = cacheCreate;
+                            }
+                        }
                         break;
 
                     case "system":
