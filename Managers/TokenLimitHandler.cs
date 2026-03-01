@@ -6,6 +6,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using HappyEngine.Constants;
 
 namespace HappyEngine.Managers
 {
@@ -66,8 +67,25 @@ namespace HappyEngine.Managers
             var tail = output.Length > 3000 ? output[^3000..] : output;
             if (!_completionAnalyzer.IsTokenLimitError(tail)) return false;
 
+            // Increment retry count
+            task.Runtime.TokenLimitRetryCount++;
+
+            // Check if we've exceeded maximum retries
+            if (task.Runtime.TokenLimitRetryCount > AppConstants.MaxTokenLimitRetries)
+            {
+                _outputProcessor.AppendOutput(task.Id,
+                    $"\n[HappyEngine] Token limit retry count exceeded (max: {AppConstants.MaxTokenLimitRetries}). Task failed.\n",
+                    activeTasks, historyTasks);
+                task.Status = AgentTaskStatus.Failed;
+                task.EndTime = DateTime.Now;
+                _outputTabManager.UpdateTabHeader(task);
+                return false;
+            }
+
             var retryMinutes = _getTokenLimitRetryMinutes();
-            _outputProcessor.AppendOutput(task.Id, $"\n[HappyEngine] Token/rate limit detected. Retrying in {retryMinutes} minutes...\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id,
+                $"\n[HappyEngine] Token/rate limit detected. Retry {task.Runtime.TokenLimitRetryCount}/{AppConstants.MaxTokenLimitRetries} in {retryMinutes} minutes...\n",
+                activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(retryMinutes) };
@@ -119,7 +137,26 @@ namespace HappyEngine.Managers
                 ? $"--resume {task.ConversationId}"
                 : "--continue";
 
-            var continuePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
+            string continuePrompt;
+
+            // Apply context reduction if we have a token estimate from the previous attempt
+            if (task.Runtime.LastPromptTokenEstimate > 0 && task.Runtime.TokenLimitRetryCount > 0)
+            {
+                var basePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
+                continuePrompt = ContextReducer.ReducePromptContext(
+                    basePrompt,
+                    task.Runtime.TokenLimitRetryCount - 1,
+                    task.Runtime.LastPromptTokenEstimate);
+
+                _outputProcessor.AppendOutput(task.Id,
+                    $"[HappyEngine] Applying context reduction (retry {task.Runtime.TokenLimitRetryCount}, reduction factor: {AppConstants.TokenRetryReductionFactors[Math.Min(task.Runtime.TokenLimitRetryCount - 1, AppConstants.TokenRetryReductionFactors.Length - 1)]:P0})\n",
+                    activeTasks, historyTasks);
+            }
+            else
+            {
+                continuePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
+            }
+
             _outputProcessor.AppendOutput(task.Id, $"\n[HappyEngine] Sending retry with {resumeLabel}...\n\n", activeTasks, historyTasks);
 
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";

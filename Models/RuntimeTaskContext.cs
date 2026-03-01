@@ -29,6 +29,8 @@ namespace HappyEngine
 
         // Token limit retry (all task types)
         public System.Windows.Threading.DispatcherTimer? TokenLimitRetryTimer { get; set; }
+        public int TokenLimitRetryCount { get; set; }
+        public long LastPromptTokenEstimate { get; set; }
 
         // Queue / dependency tracking
         public string? QueuedReason { get; set; }
@@ -64,6 +66,7 @@ namespace HappyEngine
         // Plan-before-queue workflow
         public bool IsPlanningBeforeQueue { get; set; }
         public bool NeedsPlanRestart { get; set; }
+        public bool PlanPhaseReady { get; set; }  // Set when ExitPlanMode is detected
         public string? PendingFileLockPath { get; set; }
         public string? PendingFileLockBlocker { get; set; }
 
@@ -96,6 +99,8 @@ namespace HappyEngine
         private readonly object _messageQueueLock = new();
         private Queue<string> _pendingMessages = new();
         private bool _isProcessingMessage = false;
+        private bool _allowInterrupts = true; // Enable/disable interrupt capability
+        private Queue<string> _interruptMessages = new(); // High-priority interrupt messages
 
         /// <summary>
         /// Queue for storing messages that arrive while the task is busy processing.
@@ -144,6 +149,54 @@ namespace HappyEngine
         {
             get { lock (_messageQueueLock) return _isProcessingMessage; }
             set { lock (_messageQueueLock) _isProcessingMessage = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the task allows interrupt messages. Thread-safe.
+        /// </summary>
+        public bool AllowInterrupts
+        {
+            get { lock (_messageQueueLock) return _allowInterrupts; }
+            set { lock (_messageQueueLock) _allowInterrupts = value; }
+        }
+
+        /// <summary>
+        /// Adds an interrupt message that should be processed immediately. Thread-safe.
+        /// </summary>
+        public void EnqueueInterruptMessage(string message)
+        {
+            lock (_messageQueueLock)
+            {
+                _interruptMessages.Enqueue(message);
+            }
+        }
+
+        /// <summary>
+        /// Attempts to dequeue an interrupt message. Thread-safe.
+        /// Returns null if no interrupt messages are available.
+        /// </summary>
+        public string? DequeueInterruptMessage()
+        {
+            lock (_messageQueueLock)
+            {
+                return _interruptMessages.Count > 0 ? _interruptMessages.Dequeue() : null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the count of pending interrupt messages. Thread-safe.
+        /// </summary>
+        public int InterruptMessageCount
+        {
+            get { lock (_messageQueueLock) return _interruptMessages.Count; }
+        }
+
+        /// <summary>
+        /// Checks if there are any interrupt messages waiting. Thread-safe.
+        /// </summary>
+        public bool HasInterruptMessages
+        {
+            get { lock (_messageQueueLock) return _interruptMessages.Count > 0; }
         }
 
         public void Dispose()

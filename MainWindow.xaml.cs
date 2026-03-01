@@ -147,6 +147,7 @@ namespace HappyEngine
             _outputTabManager.TabStoreRequested += OnTabStoreRequested;
             _outputTabManager.TabResumeRequested += OnTabResumeRequested;
             _outputTabManager.InputSent += OnTabInputSent;
+            _outputTabManager.InterruptInputSent += OnTabInterruptInputSent;
 
             // ProjectManager needs many UI refs — initialize after InitializeComponent.
             // Use a quick sync peek at settings for the initial project path (tiny file);
@@ -2124,6 +2125,7 @@ namespace HappyEngine
             _outputTabManager.TabStoreRequested -= OnTabStoreRequested;
             _outputTabManager.TabResumeRequested -= OnTabResumeRequested;
             _outputTabManager.InputSent -= OnTabInputSent;
+            _outputTabManager.InterruptInputSent -= OnTabInterruptInputSent;
 
             // ProjectManager
             _projectManager.McpInvestigationRequested -= OnMcpInvestigationRequested;

@@ -29,6 +29,7 @@ namespace HappyEngine.Managers
         public event Action<AgentTask>? TabStoreRequested;
         public event Action<AgentTask>? TabResumeRequested;
         public event Action<AgentTask, TextBox>? InputSent;
+        public event Action<AgentTask, TextBox>? InterruptInputSent;
 
         public Dictionary<string, TabItem> Tabs => _tabs;
         public Dictionary<string, RichTextBox> OutputBoxes => _outputBoxes;
@@ -70,7 +71,8 @@ namespace HappyEngine.Managers
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 13,
                 Padding = new Thickness(8, 6, 8, 6),
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                ToolTip = "Enter: Send message (queues if task is busy)\nShift+Enter: Send interrupt message (injects immediately)"
             };
 
             var sendBtn = new Button
@@ -84,13 +86,47 @@ namespace HappyEngine.Managers
                 Margin = new Thickness(4, 0, 0, 0)
             };
 
-            sendBtn.Click += (_, _) => InputSent?.Invoke(task, inputBox);
+            sendBtn.Click += (_, _) =>
+            {
+                if (Keyboard.Modifiers == ModifierKeys.Shift)
+                    InterruptInputSent?.Invoke(task, inputBox);
+                else
+                    InputSent?.Invoke(task, inputBox);
+            };
+
+            // Update button appearance when Shift is held
+            inputBox.PreviewKeyDown += (_, ke) =>
+            {
+                if (ke.Key == Key.LeftShift || ke.Key == Key.RightShift)
+                {
+                    sendBtn.Content = "Interrupt";
+                    sendBtn.Background = (Brush)Application.Current.FindResource("Warning");
+                }
+            };
+            inputBox.PreviewKeyUp += (_, ke) =>
+            {
+                if (ke.Key == Key.LeftShift || ke.Key == Key.RightShift)
+                {
+                    sendBtn.Content = "Send";
+                    sendBtn.Background = (Brush)Application.Current.FindResource("Accent");
+                }
+            };
             inputBox.KeyDown += (_, ke) =>
             {
-                if (ke.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control))
+                if (ke.Key == Key.Enter)
                 {
-                    InputSent?.Invoke(task, inputBox);
-                    ke.Handled = true;
+                    if (Keyboard.Modifiers == ModifierKeys.Shift)
+                    {
+                        // Shift+Enter for interrupt send
+                        InterruptInputSent?.Invoke(task, inputBox);
+                        ke.Handled = true;
+                    }
+                    else if (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control)
+                    {
+                        // Normal send
+                        InputSent?.Invoke(task, inputBox);
+                        ke.Handled = true;
+                    }
                 }
             };
 

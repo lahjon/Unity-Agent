@@ -688,6 +688,15 @@ TextureImporter:
         private void OnTabInputSent(AgentTask task, TextBox inputBox) =>
             _taskExecutionManager.SendInput(task, inputBox, _activeTasks, _historyTasks);
 
+        private void OnTabInterruptInputSent(AgentTask task, TextBox inputBox)
+        {
+            var text = inputBox.Text?.Trim();
+            if (string.IsNullOrEmpty(text)) return;
+            inputBox.Clear();
+            // Pass true for isInterrupt parameter
+            _taskExecutionManager.SendFollowUp(task, text, _activeTasks, _historyTasks, isInterrupt: true);
+        }
+
         private void Pause_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;

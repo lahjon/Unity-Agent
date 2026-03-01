@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Threading;
+using HappyEngine.Constants;
 
 namespace HappyEngine.Managers
 {
@@ -28,6 +29,8 @@ namespace HappyEngine.Managers
         private readonly IPromptBuilder _promptBuilder;
         private readonly ITaskFactory _taskFactory;
         private readonly Func<int> _getTokenLimitRetryMinutes;
+        private readonly SmartTruncationService _smartTruncationService;
+        private readonly ModelComplexityAnalyzer _modelComplexityAnalyzer;
 
         internal const int FeatureModeMaxRuntimeHours = 12;
         internal const int FeatureModeIterationTimeoutMinutes = 60;
@@ -56,7 +59,9 @@ namespace HappyEngine.Managers
             ICompletionAnalyzer completionAnalyzer,
             IPromptBuilder promptBuilder,
             ITaskFactory taskFactory,
-            Func<int> getTokenLimitRetryMinutes)
+            Func<int> getTokenLimitRetryMinutes,
+            SmartTruncationService? smartTruncationService = null,
+            ModelComplexityAnalyzer? modelComplexityAnalyzer = null)
         {
             _scriptDir = scriptDir;
             _processLauncher = processLauncher;
@@ -67,6 +72,8 @@ namespace HappyEngine.Managers
             _promptBuilder = promptBuilder;
             _taskFactory = taskFactory;
             _getTokenLimitRetryMinutes = getTokenLimitRetryMinutes;
+            _smartTruncationService = smartTruncationService ?? new SmartTruncationService();
+            _modelComplexityAnalyzer = modelComplexityAnalyzer ?? new ModelComplexityAnalyzer();
         }
 
         // ── Main entry point: called when a feature mode task's process exits ──
@@ -517,7 +524,9 @@ namespace HappyEngine.Managers
             var promptFile = Path.Combine(_scriptDir, $"feature_{task.Id}_{task.CurrentIteration}_{(int)task.FeatureModePhase}.txt");
             File.WriteAllText(promptFile, prompt, Encoding.UTF8);
 
-            var phaseModel = PromptBuilder.GetCliModelForPhase(task.FeatureModePhase);
+            // Dynamic model selection based on complexity
+            var phaseModel = DetermineOptimalModel(task, activeTasks, historyTasks);
+
             _outputProcessor.AppendOutput(task.Id,
                 $"\n[HappyEngine] Phase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
                 activeTasks, historyTasks);
@@ -611,6 +620,7 @@ namespace HappyEngine.Managers
         {
             var children = new List<AgentTask>();
 
+            // First pass: Create all tasks (without message bus decision)
             foreach (var step in steps)
             {
                 var child = _taskFactory.CreateTask(
@@ -626,7 +636,7 @@ namespace HappyEngine.Managers
                     extendedPlanning: true,
                     noGitWrite: parent.NoGitWrite,
                     planOnly: false,
-                    useMessageBus: true,
+                    useMessageBus: false, // Start with false, will determine later
                     model: parent.Model,
                     parentTaskId: parent.Id);
 
@@ -666,6 +676,9 @@ namespace HappyEngine.Managers
                 }
             }
 
+            // Second pass: Determine which tasks need message bus
+            DetermineMessageBusUsage(children, steps, parent);
+
             return children;
         }
 
@@ -680,21 +693,21 @@ namespace HappyEngine.Managers
         private string CollectChildResults(AgentTask parent,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
-            var sb = new StringBuilder();
-            int idx = 0;
+            var childResults = new Dictionary<string, string>();
+            var childMetadata = new Dictionary<string, (string title, AgentTaskStatus status)>();
 
+            // Collect raw results from children
             foreach (var childId in parent.FeaturePhaseChildIds)
             {
                 var child = activeTasks.FirstOrDefault(t => t.Id == childId)
                          ?? historyTasks.FirstOrDefault(t => t.Id == childId);
                 if (child == null) continue;
 
-                idx++;
                 var title = !string.IsNullOrWhiteSpace(child.Summary) ? child.Summary : $"Task #{child.TaskNumber}";
+                childMetadata[childId] = (title, child.Status);
 
-                // Build per-child content using Summary (short title) instead of full Description
+                // Build per-child content
                 var childSb = new StringBuilder();
-                childSb.AppendLine($"### Result #{idx}: {title}");
                 childSb.AppendLine($"**Status:** {child.Status}");
                 childSb.AppendLine($"**Task:** {child.Summary ?? $"Task #{child.TaskNumber}"}");
 
@@ -704,24 +717,52 @@ namespace HappyEngine.Managers
                 if (!string.IsNullOrWhiteSpace(child.Recommendations))
                     childSb.AppendLine($"**Recommendations:**\n{child.Recommendations}");
 
-                childSb.AppendLine();
-
-                // Cap each child's combined output
-                var childText = childSb.ToString();
-                if (childText.Length > MaxPerChildChars)
-                    childText = childText.Substring(0, MaxPerChildChars) + "\n[...truncated]\n";
-
-                sb.Append(childText);
+                childResults[childId] = childSb.ToString();
             }
 
-            // Apply total results cap
-            var result = sb.ToString();
-            if (result.Length > MaxTotalResultsChars)
+            // Use smart truncation to preserve important information
+            var truncatedResults = _smartTruncationService.TruncateMultipleResults(
+                childResults,
+                MaxTotalResultsChars / 4, // Convert chars to approximate tokens
+                preserveBalance: true);
+
+            // Build final output with truncated results
+            var sb = new StringBuilder();
+            int idx = 0;
+
+            foreach (var truncated in truncatedResults)
             {
+                idx++;
+                if (childMetadata.TryGetValue(truncated.ChildId!, out var metadata))
+                {
+                    sb.AppendLine($"### Result #{idx}: {metadata.title}");
+                    sb.Append(truncated.Content);
+
+                    // Add truncation notice if significant content was removed
+                    if (truncated.TruncationMetrics.TruncationRatio > 0.3)
+                    {
+                        sb.AppendLine($"\n[Smart truncation: preserved {truncated.PreservedSections.Count} key sections, " +
+                                    $"{truncated.TruncationMetrics.ErrorsPreserved} errors, " +
+                                    $"{truncated.TruncationMetrics.DecisionsPreserved} decisions]");
+                    }
+                    sb.AppendLine();
+                }
+            }
+
+            var result = sb.ToString();
+
+            // Log truncation statistics
+            if (truncatedResults.Any(r => r.TruncationMetrics.TruncationRatio > 0))
+            {
+                var totalOriginal = truncatedResults.Sum(r => r.OriginalLength);
+                var totalTruncated = truncatedResults.Sum(r => r.TruncatedLength);
+                var avgImportance = truncatedResults.Average(r => r.ImportanceScore);
+
                 _outputProcessor.AppendOutput(parent.Id,
-                    $"\n[Feature Mode] Token optimization: child results truncated from {result.Length:N0} to {MaxTotalResultsChars:N0} chars ({idx} children, phase {parent.FeatureModePhase})\n",
+                    $"\n[Feature Mode] Smart truncation: {totalOriginal:N0} → {totalTruncated:N0} chars " +
+                    $"({(1.0 - (double)totalTruncated / totalOriginal) * 100:F1}% reduction, " +
+                    $"importance score: {avgImportance:F2}, {idx} children)\n",
                     activeTasks, historyTasks);
-                result = result.Substring(0, MaxTotalResultsChars) + "\n[...remaining results truncated]\n";
             }
 
             return result;
@@ -822,6 +863,137 @@ namespace HappyEngine.Managers
                 }
             };
             timer.Start();
+        }
+
+        /// <summary>
+        /// Determines which execution tasks need message bus based on dependencies.
+        /// Only enables message bus when tasks have explicit dependencies that require coordination.
+        /// </summary>
+        private void DetermineMessageBusUsage(List<AgentTask> tasks, List<FeatureStepEntry> steps, AgentTask parent)
+        {
+            // Build dependency graph to identify which tasks are depended upon
+            var tasksDependedUpon = new HashSet<string>();
+            var tasksWithDependencies = new HashSet<string>();
+
+            for (int i = 0; i < steps.Count; i++)
+            {
+                if (steps[i].DependsOn != null && steps[i].DependsOn.Count > 0)
+                {
+                    tasksWithDependencies.Add(tasks[i].Id);
+                    foreach (var depIdx in steps[i].DependsOn)
+                    {
+                        if (depIdx >= 0 && depIdx < tasks.Count && depIdx != i)
+                        {
+                            tasksDependedUpon.Add(tasks[depIdx].Id);
+                        }
+                    }
+                }
+            }
+
+            // Enable message bus for tasks that:
+            // 1. Have dependencies (need to read from bus)
+            // 2. Are depended upon (need to write to bus)
+            // 3. User explicitly enabled it on parent
+            int messageBusEnabledCount = 0;
+            foreach (var task in tasks)
+            {
+                bool needsMessageBus = false;
+                string reason = "";
+
+                if (parent.UseMessageBus)
+                {
+                    // User explicitly enabled message bus for parent
+                    needsMessageBus = true;
+                    reason = "parent has message bus enabled";
+                }
+                else if (tasksWithDependencies.Contains(task.Id))
+                {
+                    // This task depends on others
+                    needsMessageBus = true;
+                    reason = "has dependencies";
+                }
+                else if (tasksDependedUpon.Contains(task.Id))
+                {
+                    // Other tasks depend on this one
+                    needsMessageBus = true;
+                    reason = "is depended upon";
+                }
+
+                task.UseMessageBus = needsMessageBus;
+                if (needsMessageBus)
+                {
+                    messageBusEnabledCount++;
+                }
+            }
+
+            // Log the optimization
+            if (messageBusEnabledCount < tasks.Count)
+            {
+                _outputProcessor.AppendOutput(parent.Id,
+                    $"[Token Optimization] Message bus selectively enabled for {messageBusEnabledCount}/{tasks.Count} execution tasks " +
+                    $"(saved {tasks.Count - messageBusEnabledCount} unnecessary bus connections)\n",
+                    null, null);
+            }
+        }
+
+        /// <summary>
+        /// Determines the optimal model for the current phase using complexity analysis.
+        /// </summary>
+        private string DetermineOptimalModel(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks,
+            ObservableCollection<AgentTask> historyTasks)
+        {
+            // For phases that don't involve consolidation/evaluation, use default selection
+            if (task.FeatureModePhase != FeatureModePhase.PlanConsolidation &&
+                task.FeatureModePhase != FeatureModePhase.Evaluation)
+            {
+                return PromptBuilder.GetCliModelForPhase(task.FeatureModePhase);
+            }
+
+            // Collect child results for complexity analysis
+            var childResults = new Dictionary<string, string>();
+            bool hasErrors = false;
+
+            foreach (var childId in task.FeaturePhaseChildIds)
+            {
+                var child = activeTasks.FirstOrDefault(t => t.Id == childId)
+                         ?? historyTasks.FirstOrDefault(t => t.Id == childId);
+                if (child == null) continue;
+
+                // Build simple result content for analysis
+                var content = $"Status: {child.Status}\n";
+                if (!string.IsNullOrWhiteSpace(child.CompletionSummary))
+                    content += $"Summary: {child.CompletionSummary}\n";
+                if (!string.IsNullOrWhiteSpace(child.Recommendations))
+                    content += $"Recommendations: {child.Recommendations}\n";
+
+                childResults[childId] = content;
+
+                // Check for errors
+                if (child.Status == AgentTaskStatus.Failed ||
+                    content.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("failed", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasErrors = true;
+                }
+            }
+
+            // Analyze complexity
+            var analysis = _modelComplexityAnalyzer.AnalyzeComplexity(
+                task.FeaturePhaseChildIds.Count,
+                childResults,
+                task.FeatureModePhase,
+                hasErrors);
+
+            // Log the decision
+            _outputProcessor.AppendOutput(task.Id,
+                $"[Model Selection] {analysis.Reasoning.Split('\n')[0]}\n",
+                activeTasks, historyTasks);
+
+            // Return the appropriate model constant
+            return analysis.RecommendedModel.ToLowerInvariant() == "opus"
+                ? PromptBuilder.CliOpusModel
+                : PromptBuilder.CliSonnetModel;
         }
 
         // ── Cleanup helpers ─────────────────────────────────────────────

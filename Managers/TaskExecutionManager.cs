@@ -685,7 +685,8 @@ namespace HappyEngine.Managers
         }
 
         public void SendFollowUp(AgentTask task, string text,
-            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
+            bool isInterrupt = false)
         {
             if (string.IsNullOrEmpty(text)) return;
 
@@ -716,7 +717,36 @@ namespace HappyEngine.Managers
                     // Check if the task is currently processing a message or busy with tool execution
                     if (task.Runtime.IsProcessingMessage || task.HasToolActivity)
                     {
-                        // Queue the message for later delivery
+                        // If this is an interrupt message and interrupts are allowed, inject immediately
+                        if (isInterrupt && task.Runtime.AllowInterrupts)
+                        {
+                            AppLogger.Info("FollowUp", $"[{task.Id}] Injecting interrupt message mid-task");
+                            _outputProcessor.AppendOutput(task.Id,
+                                $"\n[INTERRUPT] Modifying current prompt:\n> {text}\n",
+                                activeTasks, historyTasks);
+
+                            // Format as an interrupt message that Claude can recognize
+                            var interruptMessage = $"\n\n[SYSTEM INTERRUPT]\nThe user has provided additional context that modifies the current task:\n\nHuman: {text}\n\nPlease acknowledge this modification and adjust your approach accordingly.\n\nAssistant:";
+
+                            try
+                            {
+                                task.Process.StandardInput.WriteLine(interruptMessage);
+                                task.Process.StandardInput.Flush();
+                                AppLogger.Info("FollowUp", $"[{task.Id}] Interrupt message sent successfully");
+                            }
+                            catch (Exception ex)
+                            {
+                                AppLogger.Error("FollowUp", $"[{task.Id}] Failed to send interrupt message", ex);
+                                // Fall back to queuing
+                                task.Runtime.EnqueueMessage(text);
+                                _outputProcessor.AppendOutput(task.Id,
+                                    $"\n[Interrupt failed - message queued instead]\n",
+                                    activeTasks, historyTasks);
+                            }
+                            return;
+                        }
+
+                        // Otherwise queue the message for later delivery
                         task.Runtime.EnqueueMessage(text);
                         AppLogger.Info("FollowUp", $"[{task.Id}] Task is busy, queuing message. Queue size: {task.Runtime.PendingMessageCount}");
                         _outputProcessor.AppendOutput(task.Id,

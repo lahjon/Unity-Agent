@@ -38,5 +38,36 @@ namespace HappyEngine.Constants
 
         /// <summary>Interval (in seconds) for the status-refresh timer.</summary>
         public const int StatusTimerIntervalSeconds = 3;
+
+        // ── Message Bus ──────────────────────────────────────────────
+
+        /// <summary>Time-to-live for message bus messages in minutes before expiration.</summary>
+        public const int MessageBusTTLMinutes = 60;
+
+        /// <summary>Maximum number of messages to keep in the bus history.</summary>
+        public const int MessageBusMaxMessages = 500;
+
+        /// <summary>Interval in seconds for cleaning up expired messages from the bus.</summary>
+        public const int MessageBusCleanupIntervalSeconds = 300;
+
+        /// <summary>Poll interval in seconds when message bus is active (recent activity).</summary>
+        public const int MessageBusActivePollSeconds = 5;
+
+        /// <summary>Poll interval in seconds when message bus is idle (no recent activity).</summary>
+        public const int MessageBusIdlePollSeconds = 30;
+
+        // ── Token Optimization ──────────────────────────────────────────────
+
+        /// <summary>Maximum retry attempts for token limit errors before giving up.</summary>
+        public const int MaxTokenLimitRetries = 4;
+
+        /// <summary>Context reduction factors for each retry attempt (0.8 = 80% of original).</summary>
+        public static readonly double[] TokenRetryReductionFactors = { 0.8, 0.6, 0.4, 0.3 };
+
+        /// <summary>Maximum tokens for child result truncation in feature mode.</summary>
+        public const int MaxChildResultTokens = 2000;
+
+        /// <summary>Threshold for using Sonnet vs Opus in feature mode consolidation (0-1 scale).</summary>
+        public const double ModelComplexityThreshold = 0.5;
     }
 }

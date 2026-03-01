@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using HappyEngine.Constants;
 
 namespace HappyEngine.Managers
 {
@@ -20,6 +21,9 @@ namespace HappyEngine.Managers
         public List<string> Mentions { get; set; } = new();
         public DateTime Timestamp { get; set; }
         public string SourceFile { get; set; } = "";
+        public DateTime ExpiresAt { get; set; }
+
+        public bool IsExpired() => DateTime.Now > ExpiresAt;
     }
 
     public class BusParticipant
@@ -38,6 +42,10 @@ namespace HappyEngine.Managers
         public Dictionary<string, string> TaskSummaries { get; set; } = new();
         public List<BusMessage> Messages { get; set; } = new();
         public HashSet<string> ProcessedFiles { get; set; } = new();
+        public DateTime LastCleanupTime { get; set; } = DateTime.Now;
+        public DateTime LastActivityTime { get; set; } = DateTime.Now;
+        public bool ScratchpadDirty { get; set; } = true;
+        public string LastScratchpadContent { get; set; } = "";
     }
 
     public class MessageBusManager : IDisposable
@@ -108,6 +116,7 @@ namespace HappyEngine.Managers
 
             ctx.ParticipantTaskIds.Add(taskId);
             ctx.TaskSummaries[taskId] = taskSummary;
+            ctx.ScratchpadDirty = true;
             RebuildScratchpad(projectPath);
             AppLogger.Info("MessageBus", $"Task {taskId} joined bus for {projectPath} ({ctx.ParticipantTaskIds.Count} participants)");
         }
@@ -118,6 +127,7 @@ namespace HappyEngine.Managers
 
             ctx.ParticipantTaskIds.Remove(taskId);
             ctx.TaskSummaries.Remove(taskId);
+            ctx.ScratchpadDirty = true;
             AppLogger.Info("MessageBus", $"Task {taskId} left bus for {projectPath} ({ctx.ParticipantTaskIds.Count} remaining)");
 
             if (ctx.ParticipantTaskIds.Count == 0)
@@ -173,7 +183,7 @@ namespace HappyEngine.Managers
                 AppLogger.Warn("MessageBus", $"FileSystemWatcher failed for {inboxDir}, relying on polling", ex);
             }
 
-            var poll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            var poll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(AppConstants.MessageBusActivePollSeconds) };
             poll.Tick += (_, _) => PollForNewMessages(projectPath);
             poll.Start();
             ctx.PollTimer = poll;
@@ -311,8 +321,19 @@ namespace HappyEngine.Managers
 
             message.FromSummary = ctx.TaskSummaries.GetValueOrDefault(message.From, "Unknown");
             message.SourceFile = fileName;
+            message.ExpiresAt = DateTime.Now.AddMinutes(AppConstants.MessageBusTTLMinutes);
 
             ctx.Messages.Add(message);
+            ctx.LastActivityTime = DateTime.Now;
+            ctx.ScratchpadDirty = true;
+
+            // Update polling interval to active
+            if (ctx.PollTimer != null)
+            {
+                ctx.PollTimer.Interval = TimeSpan.FromSeconds(AppConstants.MessageBusActivePollSeconds);
+            }
+
+            CleanupExpiredMessages(ctx);
             RebuildScratchpad(projectPath);
             AppLogger.Info("MessageBus", $"Message from {message.From}: [{message.Type}] {message.Topic}");
             MessageReceived?.Invoke(projectPath, message);
@@ -325,12 +346,28 @@ namespace HappyEngine.Managers
 
             try
             {
+                bool foundNewMessage = false;
                 foreach (var file in Directory.GetFiles(ctx.InboxDir, "*.json"))
                 {
                     var fileName = Path.GetFileName(file);
                     if (ctx.ProcessedFiles.Contains(fileName)) continue;
                     await OnNewMessageFileAsync(projectPath, file);
+                    foundNewMessage = true;
                 }
+
+                // Adjust polling interval based on activity
+                if (!foundNewMessage && ctx.PollTimer != null)
+                {
+                    var timeSinceLastActivity = DateTime.Now - ctx.LastActivityTime;
+                    if (timeSinceLastActivity.TotalMinutes > 2)
+                    {
+                        // Switch to idle polling after 2 minutes of inactivity
+                        ctx.PollTimer.Interval = TimeSpan.FromSeconds(AppConstants.MessageBusIdlePollSeconds);
+                    }
+                }
+
+                // Periodic cleanup check
+                CleanupExpiredMessages(ctx);
             }
             catch (Exception ex)
             {
@@ -359,7 +396,7 @@ namespace HappyEngine.Managers
 
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
-                return new BusMessage
+                var message = new BusMessage
                 {
                     From = root.TryGetProperty("from", out var f) ? f.GetString() ?? "" : "",
                     Type = root.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "",
@@ -370,6 +407,8 @@ namespace HappyEngine.Managers
                         : new List<string>(),
                     Timestamp = DateTime.Now
                 };
+                message.ExpiresAt = message.Timestamp.AddMinutes(AppConstants.MessageBusTTLMinutes);
+                return message;
             }
             catch (Exception ex)
             {
@@ -378,9 +417,40 @@ namespace HappyEngine.Managers
             }
         }
 
+        private void CleanupExpiredMessages(BusContext ctx)
+        {
+            var now = DateTime.Now;
+            if ((now - ctx.LastCleanupTime).TotalSeconds < AppConstants.MessageBusCleanupIntervalSeconds)
+                return;
+
+            ctx.LastCleanupTime = now;
+            var originalCount = ctx.Messages.Count;
+
+            // Remove expired messages
+            ctx.Messages.RemoveAll(m => m.IsExpired());
+
+            // Keep only most recent if still too many
+            if (ctx.Messages.Count > AppConstants.MessageBusMaxMessages)
+            {
+                ctx.Messages = ctx.Messages
+                    .OrderByDescending(m => m.Timestamp)
+                    .Take(AppConstants.MessageBusMaxMessages)
+                    .ToList();
+            }
+
+            if (originalCount != ctx.Messages.Count)
+            {
+                ctx.ScratchpadDirty = true;
+                AppLogger.Debug("MessageBus", $"Cleaned up {originalCount - ctx.Messages.Count} expired/excess messages");
+            }
+        }
+
         private void RebuildScratchpad(string projectPath)
         {
             if (!_buses.TryGetValue(projectPath, out var ctx)) return;
+
+            // Skip rebuild if not dirty
+            if (!ctx.ScratchpadDirty) return;
 
             var sb = new StringBuilder();
             sb.AppendLine("# Agent Message Bus - Scratchpad");
@@ -426,15 +496,24 @@ namespace HappyEngine.Managers
                 }
             }
 
-            try
+            var newContent = sb.ToString();
+
+            // Only write if content actually changed
+            if (newContent != ctx.LastScratchpadContent)
             {
-                var scratchpadPath = Path.Combine(ctx.BusDir, "_scratchpad.md");
-                File.WriteAllText(scratchpadPath, sb.ToString());
+                try
+                {
+                    var scratchpadPath = Path.Combine(ctx.BusDir, "_scratchpad.md");
+                    File.WriteAllText(scratchpadPath, newContent);
+                    ctx.LastScratchpadContent = newContent;
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("MessageBus", "Failed to write scratchpad", ex);
+                }
             }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("MessageBus", "Failed to write scratchpad", ex);
-            }
+
+            ctx.ScratchpadDirty = false;
         }
     }
 }
