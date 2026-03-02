@@ -497,7 +497,7 @@ namespace HappyEngine.Managers
         {
             try
             {
-                var (shortDesc, longDesc) = await _taskFactory!.GenerateProjectDescriptionAsync(entry.Path);
+                var (shortDesc, longDesc) = await _taskFactory!.GenerateProjectDescriptionAsync(entry.Path, default, entry.IsGame);
                 _view.ViewDispatcher.Invoke(() =>
                 {
                     entry.ShortDescription = shortDesc;
@@ -1074,7 +1074,7 @@ namespace HappyEngine.Managers
                         // Refresh UI after MCP/game toggle changes
                         RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
                         syncSettings?.Invoke();
-                    });
+                    }, this);
                     // Refresh after dialog closes in case settings changed
                     RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
                     syncSettings?.Invoke();
@@ -1245,7 +1245,7 @@ namespace HappyEngine.Managers
                             if (!existing.HasExited)
                             {
                                 AppLogger.Info("ProjectManager", $"Killing stale process {pid} ({existing.ProcessName}) on port {port}");
-                                entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Killing stale process on port {port} (PID {pid})...");
+                                entry.McpOutput.AppendLine($"Killing stale process on port {port} (PID {pid})...");
                                 existing.Kill();
                                 existing.WaitForExit(5000);
                             }
@@ -1269,24 +1269,25 @@ namespace HappyEngine.Managers
             {
                 entry.McpStatus = McpStatus.Connecting;
                 entry.McpOutput.Clear(); // Clear any previous output
-                entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Connecting to server...");
+                entry.McpOutput.AppendLine($"Connecting to server...");
                 SaveProjects();
                 RefreshProjectList(null, null, null);
 
                 // First check if server is already running
                 AppLogger.Info("ProjectManager", $"Checking if MCP server is already running at {entry.McpAddress}");
-                entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Checking if MCP server is already running at {entry.McpAddress}");
+                entry.McpOutput.AppendLine($"Checking if MCP server is already running at {entry.McpAddress}");
 
                 if (await CheckMcpHealth(entry.McpAddress))
                 {
                     AppLogger.Info("ProjectManager", "MCP server is already running, connecting...");
-                    entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server already running, verifying connection...");
+                    entry.McpOutput.AppendLine($"Server already running, verifying connection...");
 
                     // Register with Claude Code
                     await RegisterMcpWithClaudeAsync(entry.McpServerName);
 
                     entry.McpStatus = McpStatus.Connected;
-                    entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server connected successfully!");
+                    entry.McpOutput.AppendLine($"✓ Connection verified - MCP server is ready!");
+                    entry.McpOutput.AppendLine($"Unity operations available: create scene items, make prefabs, take screenshots");
                     SaveProjects();
                     RefreshProjectList(null, null, null);
                     return true;
@@ -1303,7 +1304,7 @@ namespace HappyEngine.Managers
                 for (int retry = 1; retry <= MAX_RETRIES; retry++)
                 {
                     AppLogger.Info("ProjectManager", $"Attempting to start MCP server (attempt {retry}/{MAX_RETRIES})");
-                    entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Starting MCP server (attempt {retry}/{MAX_RETRIES})...");
+                    entry.McpOutput.AppendLine($"Starting MCP server (attempt {retry}/{MAX_RETRIES})...");
 
                     // Start the server process asynchronously
                     var processInfo = new System.Diagnostics.ProcessStartInfo
@@ -1335,7 +1336,7 @@ namespace HappyEngine.Managers
                                     {
                                         Application.Current?.Dispatcher?.InvokeAsync(() =>
                                         {
-                                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] {args.Data}");
+                                            entry.McpOutput.AppendLine(args.Data);
                                             // Notify any UI listeners that output has changed
                                             McpOutputChanged?.Invoke(entry.Path);
                                         });
@@ -1349,7 +1350,7 @@ namespace HappyEngine.Managers
                                     {
                                         Application.Current?.Dispatcher?.InvokeAsync(() =>
                                         {
-                                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] ERROR: {args.Data}");
+                                            entry.McpOutput.AppendLine(args.Data);
                                             McpOutputChanged?.Invoke(entry.Path);
                                         });
                                         AppLogger.Warn("ProjectManager", $"MCP server error: {args.Data}");
@@ -1366,7 +1367,7 @@ namespace HappyEngine.Managers
                         catch (Exception ex)
                         {
                             AppLogger.Error("ProjectManager", $"Failed to start process on attempt {retry}", ex);
-                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Failed to start process: {ex.Message}");
+                            entry.McpOutput.AppendLine($"Failed to start process: {ex.Message}");
                             return false;
                         }
                     });
@@ -1388,7 +1389,7 @@ namespace HappyEngine.Managers
 
                     // Wait for server to start (up to 30 seconds)
                     AppLogger.Info("ProjectManager", $"Waiting for MCP server to start (up to {SERVER_START_TIMEOUT_SECONDS} seconds)...");
-                    entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Waiting for server to respond...");
+                    entry.McpOutput.AppendLine($"Waiting for server to respond...");
 
                     var startTime = DateTime.Now;
                     while ((DateTime.Now - startTime).TotalSeconds < SERVER_START_TIMEOUT_SECONDS)
@@ -1396,14 +1397,15 @@ namespace HappyEngine.Managers
                         if (await CheckMcpHealth(entry.McpAddress))
                         {
                             AppLogger.Info("ProjectManager", $"MCP server started successfully after {(DateTime.Now - startTime).TotalSeconds:F1} seconds");
-                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server started successfully!");
-                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Verifying connection...");
+                            entry.McpOutput.AppendLine($"Server started successfully!");
+                            entry.McpOutput.AppendLine($"Verifying MCP connection...");
 
                             // Register with Claude Code
                             await RegisterMcpWithClaudeAsync(entry.McpServerName);
 
                             entry.McpStatus = McpStatus.Connected;
-                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server connected!");
+                            entry.McpOutput.AppendLine($"✓ Connection verified - MCP server is ready!");
+                            entry.McpOutput.AppendLine($"Unity operations available: create scene items, make prefabs, take screenshots");
                             SaveProjects();
                             RefreshProjectList(null, null, null);
                             return true;
@@ -1488,7 +1490,7 @@ namespace HappyEngine.Managers
                 }
 
                 entry.McpStatus = McpStatus.NotConnected;
-                entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server disconnected.");
+                entry.McpOutput.AppendLine($"Server disconnected.");
                 SaveProjects();
                 RefreshProjectList(null, null, null);
             }

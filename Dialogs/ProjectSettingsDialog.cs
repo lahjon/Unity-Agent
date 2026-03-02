@@ -13,7 +13,7 @@ namespace HappyEngine.Dialogs
 {
     public static class ProjectSettingsDialog
     {
-        public static void Show(ProjectEntry entry, Action saveProjects, Action? onMcpVisibilityChanged = null)
+        public static void Show(ProjectEntry entry, Action saveProjects, Action? onMcpVisibilityChanged = null, ProjectManager? projectManager = null)
         {
             var dlg = DarkDialogWindow.Create($"Project Settings \u2014 {entry.DisplayName}", 520, 600,
                 resizeMode: ResizeMode.CanResizeWithGrip);
@@ -58,6 +58,48 @@ namespace HappyEngine.Dialogs
                 entry.LongDescription = longDescBox.Text;
                 saveProjects();
             });
+
+            // ── Regenerate Descriptions Button ──
+            var regenerateBtn = new Button
+            {
+                Content = "Regenerate Descriptions",
+                Style = Application.Current.TryFindResource("SecondaryBtn") as Style,
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 8, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+            regenerateBtn.Click += async (_, _) =>
+            {
+                if (projectManager == null)
+                {
+                    MessageBox.Show("Cannot regenerate descriptions: ProjectManager not available.", "Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                regenerateBtn.IsEnabled = false;
+                regenerateBtn.Content = "Regenerating...";
+
+                try
+                {
+                    await projectManager.GenerateProjectDescriptionInBackground(entry);
+
+                    // Update the text boxes with the new descriptions
+                    shortDescBox.Text = entry.ShortDescription;
+                    longDescBox.Text = entry.LongDescription;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to regenerate descriptions: {ex.Message}", "Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    regenerateBtn.IsEnabled = true;
+                    regenerateBtn.Content = "Regenerate Descriptions";
+                }
+            };
+            stack.Children.Add(regenerateBtn);
 
             AddSeparator(stack);
 

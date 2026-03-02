@@ -33,6 +33,6 @@ namespace HappyEngine.Managers
         string GenerateLocalSummary(string description);
 
         Task<(string Short, string Long)> GenerateProjectDescriptionAsync(
-            string projectPath, CancellationToken cancellationToken = default);
+            string projectPath, CancellationToken cancellationToken = default, bool? isGameProject = null);
     }
 }

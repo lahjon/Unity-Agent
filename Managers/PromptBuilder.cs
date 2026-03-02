@@ -75,11 +75,16 @@ namespace HappyEngine.Managers
         public const string McpPromptBlock =
             "# MCP\n" +
             "MCP server: mcp-for-unity-server at http://127.0.0.1:8080/mcp. " +
-            "Verify it is reachable before starting. " +
-            "Use MCP for Unity Editor operations (prefabs, scenes, screenshots, GameObjects) " +
-            "that cannot be done through file edits alone. " +
-            "IMPORTANT: Batch MCP commands whenever possible - combine multiple operations " +
-            "into a single request to improve performance and reduce token usage.\n\n";
+            "Use MCP for Unity Editor operations that cannot be done through file edits alone.\n" +
+            "**PREFERRED APPROACH**: Create GameObjects directly in the current scene and convert them to Prefabs. " +
+            "This is the Unity workflow - work visually in the scene, then save as reusable Prefabs.\n" +
+            "**NEVER GENERATE SCRIPTS** for GameObject creation - always use MCP scene operations instead. " +
+            "Scripts should only handle gameplay logic, not scene construction.\n" +
+            "**CRITICAL EFFICIENCY**: Always plan ahead and batch MCP commands together. " +
+            "Use the `batch_execute` tool to combine ALL related operations into a single request. " +
+            "Example: If creating 5 GameObjects with components, use ONE batch_execute with all operations, " +
+            "not 5 separate calls. This dramatically improves performance (10-100x faster) and reduces token usage. " +
+            "Review all your intended MCP operations first, then execute them in the largest batch possible.\n\n";
 
         public const string NoGitWriteBlock =
             "# NO GIT WRITES\n" +
