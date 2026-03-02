@@ -22,7 +22,7 @@ namespace HappyEngine.Models
         public McpStatus McpStatus { get; set; } = McpStatus.NotConnected;
         public string McpServerName { get; set; } = "mcp-for-unity-server";
         public string McpAddress { get; set; } = "http://127.0.0.1:8080/mcp";
-        public string McpStartCommand { get; set; } = @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
+        public string McpStartCommand { get; set; } = @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
         public string ShortDescription { get; set; } = "";
         public string LongDescription { get; set; } = "";
         public string RuleInstruction { get; set; } = "";

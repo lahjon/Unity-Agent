@@ -1880,42 +1880,42 @@
                             </TabItem.Header>
                             <ScrollViewer x:Name="GitTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
                         </TabItem>
-                        <!-- Todo tab -->
-                        <TabItem x:Name="TodoTabItem">
+                        <!-- Tasks tab -->
+                        <TabItem x:Name="TasksTabItem">
                             <TabItem.Header>
-                                <TextBlock Text="Todo" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                                <TextBlock Text="Tasks" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                             </TabItem.Header>
                             <DockPanel Margin="0,6,0,0">
                                 <!-- Input area -->
                                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                    <Button x:Name="AddTodoBtn" Content="Add" Click="AddTodo_Click"
+                                    <Button x:Name="AddTaskBtn" Content="Add" Click="AddTask_Click"
                                             Style="{StaticResource SmallBtn}" DockPanel.Dock="Right"
                                             Margin="8,0,0,0" Width="50">
                                         <Button.Background>
                                             <StaticResource ResourceKey="Accent"/>
                                         </Button.Background>
                                     </Button>
-                                    <TextBox x:Name="TodoInputBox"
+                                    <TextBox x:Name="TaskInputBox"
                                              FontSize="12" Padding="8,6"
-                                             KeyDown="TodoInput_KeyDown">
+                                             KeyDown="TaskInput_KeyDown">
                                         <TextBox.Tag>
-                                            <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Add a new todo item...</sys:String>
+                                            <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Add a new task...</sys:String>
                                         </TextBox.Tag>
                                     </TextBox>
                                 </DockPanel>
 
-                                <!-- Todo list -->
+                                <!-- Task list -->
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <ItemsControl x:Name="TodoListControl">
+                                    <ItemsControl x:Name="TaskListControl">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border x:Name="TodoItemBorder"
+                                                <Border x:Name="TaskItemBorder"
                                                         Background="{StaticResource BgSubtle}"
                                                         CornerRadius="6"
                                                         Padding="12,8"
                                                         Margin="0,0,0,4"
                                                         Cursor="Hand"
-                                                        MouseLeftButtonUp="TodoItem_Click">
+                                                        MouseLeftButtonUp="TaskItem_Click">
                                                     <Border.Triggers>
                                                         <EventTrigger RoutedEvent="MouseEnter">
                                                             <BeginStoryboard>
@@ -1953,7 +1953,7 @@
                                                                   Visibility="Collapsed"/>
                                                         </Border>
 
-                                                        <!-- Todo text -->
+                                                        <!-- Task text -->
                                                         <TextBlock Grid.Column="1"
                                                                    Text="{Binding Text}"
                                                                    Foreground="{StaticResource TextLight}"
@@ -2375,7 +2375,7 @@
                                 <TextBlock Text="Start Command" Foreground="{StaticResource TextLight}"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
                                 <TextBox x:Name="DefaultMcpStartCommandBox"
-                                         Text='C:\Users\fredr\.local\bin\uvx.exe --from "mcpforunityserver==9.4.7" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools'
+                                         Text='%USERPROFILE%\.local\bin\uvx.exe --from "mcpforunityserver==9.4.7" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools'
                                          Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
                                          CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                          FontSize="11" FontFamily="Consolas" Padding="6,4" Margin="0,0,0,10"
@@ -2640,6 +2640,29 @@
                                 <StackPanel x:Name="ChatMessagesPanel"/>
                             </ScrollViewer>
                         </DockPanel>
+                    </TabItem>
+                    <!-- Export tab -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <TextBlock Text="Export" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                            <StackPanel MaxWidth="600">
+                                <TextBlock Text="BUILD EXPORT" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <TextBlock Text="Export your application for distribution." Foreground="{StaticResource TextMuted}"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,16" TextWrapping="Wrap"/>
+
+                                <!-- Export Build button -->
+                                <Button x:Name="ExportBuildBtn" Content="Export Build" Click="ExportBuild_Click"
+                                        Background="{StaticResource Accent}" Style="{StaticResource Btn}"
+                                        Padding="12,8,12,8" HorizontalAlignment="Left"/>
+
+                                <!-- Build output -->
+                                <TextBlock x:Name="ExportStatusText" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                           FontFamily="Segoe UI" Margin="0,12,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
                     <!-- MCP controls (hidden, managed via ProjectSettingsDialog gear icon) -->
                     <TabItem x:Name="McpTabItem" Visibility="Collapsed">

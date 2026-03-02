@@ -420,7 +420,17 @@ namespace HappyEngine.Managers
 
             _dispatcher.InvokeAsync(() =>
             {
-                _cachedCreateCommitButton.IsEnabled = _selectedFiles.Count > 0;
+                // Update enabled state
+                _cachedCreateCommitButton.IsEnabled = _selectedFiles.Count > 0 && HasNoFileLocks();
+
+                // Update tooltip based on state
+                string tooltip = "Create a commit with selected changes";
+                if (_selectedFiles.Count == 0)
+                    tooltip = "Select files to commit";
+                else if (!HasNoFileLocks())
+                    tooltip = "Cannot commit while files are locked by running tasks";
+
+                _cachedCreateCommitButton.ToolTip = tooltip;
             });
         }
 
@@ -692,11 +702,18 @@ namespace HappyEngine.Managers
             }
 
             // Create Commit button (show when there are uncommitted changes)
-            if (_uncommittedChanges.Count > 0 && HasNoFileLocks())
+            if (_uncommittedChanges.Count > 0)
             {
-                _cachedCreateCommitButton = MakeActionButton("\uE73E", "Create Commit", "Create a commit with selected changes");
+                // Determine tooltip based on state
+                var tooltip = "Create a commit with selected changes";
+                if (_selectedFiles.Count == 0)
+                    tooltip = "Select files to commit";
+                else if (!HasNoFileLocks())
+                    tooltip = "Cannot commit while files are locked by running tasks";
+
+                _cachedCreateCommitButton = MakeActionButton("\uE73E", "Create Commit", tooltip);
                 _cachedCreateCommitButton.Click += async (_, _) => await ExecuteCreateCommitAsync();
-                _cachedCreateCommitButton.IsEnabled = _selectedFiles.Count > 0; // Only enabled when files are selected
+                _cachedCreateCommitButton.IsEnabled = _selectedFiles.Count > 0 && HasNoFileLocks(); // Enabled when files are selected AND no locks
                 panel.Children.Add(_cachedCreateCommitButton);
             }
 

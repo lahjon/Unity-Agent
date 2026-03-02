@@ -335,7 +335,7 @@ namespace HappyEngine.Managers
                 Color = PickProjectColor(),
                 McpServerName = _settingsManager?.DefaultMcpServerName ?? "mcp-for-unity-server",
                 McpAddress = _settingsManager?.DefaultMcpAddress ?? "http://127.0.0.1:8080/mcp",
-                McpStartCommand = _settingsManager?.DefaultMcpStartCommand ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools"
+                McpStartCommand = _settingsManager?.DefaultMcpStartCommand ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools"
             };
             _savedProjects.Add(entry);
             SaveProjects();
@@ -412,7 +412,7 @@ namespace HappyEngine.Managers
                 IsGame = result.IsGame,
                 McpServerName = _settingsManager?.DefaultMcpServerName ?? "mcp-for-unity-server",
                 McpAddress = _settingsManager?.DefaultMcpAddress ?? "http://127.0.0.1:8080/mcp",
-                McpStartCommand = _settingsManager?.DefaultMcpStartCommand ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools",
+                McpStartCommand = _settingsManager?.DefaultMcpStartCommand ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools",
                 McpStatus = result.IsGame ? McpStatus.NotConnected : McpStatus.Disabled
             };
             _savedProjects.Add(entry);

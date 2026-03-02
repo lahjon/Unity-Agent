@@ -18,7 +18,7 @@ This project uses MCP (Model Context Protocol) for Unity-specific operations.
 The MCP server is automatically started by Happy Engine when you click "Connect to MCP" on a game project card. The default command is:
 
 ```
-C:\Users\fredr\.local\bin\uvx.exe --from "mcpforunityserver==9.4.7" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools
+%USERPROFILE%\.local\bin\uvx.exe --from "mcpforunityserver==9.4.7" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools
 ```
 
 ## Usage

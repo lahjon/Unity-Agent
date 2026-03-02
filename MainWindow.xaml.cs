@@ -68,7 +68,7 @@ namespace HappyEngine
         private GeminiService _geminiService = null!;
         private ClaudeService _claudeService = null!;
         private ModelConfigManager _modelConfigManager = null!;
-        private TodoManager _todoManager = null!;
+        private ProjectTaskManager _projectTaskManager = null!;
         private HelperManager _helperManager = null!;
         private ActivityDashboardManager _activityDashboard = null!;
         private GitPanelManager _gitPanelManager = null!;
@@ -169,7 +169,7 @@ namespace HappyEngine
             _modelConfigManager = new ModelConfigManager(appDataDir);
             ClaudeService.AvailableModels = _modelConfigManager.ClaudeModels;
             GeminiService.AvailableModels = _modelConfigManager.GeminiModels;
-            _todoManager = new TodoManager(appDataDir);
+            _projectTaskManager = new ProjectTaskManager(appDataDir);
             _chatManager = new ChatManager(
                 ChatMessagesPanel, ChatScrollViewer, ChatInput, ChatSendBtn,
                 ChatModelCombo, _claudeService, _geminiService,
@@ -473,9 +473,9 @@ namespace HappyEngine
                 var historyTask = _historyManager.LoadHistoryAsync(_settingsManager.HistoryRetentionHours);
                 var storedTask = _historyManager.LoadStoredTasksAsync();
                 var activeQueueTask = _historyManager.LoadActiveQueueAsync();
-                var todosTask = _todoManager.LoadTodosAsync();
+                var tasksTask = _projectTaskManager.LoadTasksAsync();
 
-                await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask, activeQueueTask, todosTask);
+                await System.Threading.Tasks.Task.WhenAll(settingsTask, projectsTask, historyTask, storedTask, activeQueueTask, tasksTask);
                 ct.ThrowIfCancellationRequested();
 
                 // Populate collections on the UI thread — pin Row 0 to prevent layout jitter
@@ -495,7 +495,7 @@ namespace HappyEngine
                 RestoreStarRow();
                 RefreshFilterCombos();
                 RefreshActivityDashboard();
-                InitializeTodoList();
+                InitializeTaskList();
                 _projectManager.RefreshProjectList(
                     p => _terminalManager?.UpdateWorkingDirectory(p),
                     () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
@@ -706,6 +706,7 @@ namespace HappyEngine
             }
 
             UpdateStatus();
+            UpdateFileLocks(); // Update file locks display for the new project
 
             ct.ThrowIfCancellationRequested();
 
@@ -1073,7 +1074,7 @@ namespace HappyEngine
 
             _settingsManager.DefaultMcpServerName = DefaultMcpServerNameBox.Text?.Trim() ?? "mcp-for-unity-server";
             _settingsManager.DefaultMcpAddress = DefaultMcpAddressBox.Text?.Trim() ?? "http://127.0.0.1:8080/mcp";
-            _settingsManager.DefaultMcpStartCommand = DefaultMcpStartCommandBox.Text?.Trim() ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
+            _settingsManager.DefaultMcpStartCommand = DefaultMcpStartCommandBox.Text?.Trim() ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
 
             _settingsManager.SaveSettings(_projectManager.ProjectPath);
         }
@@ -2151,6 +2152,16 @@ namespace HappyEngine
                     return false;
                 };
                 _fileLocksView.Refresh();
+
+                // Update the badge to show only the count of visible locks for current project
+                var visibleCount = 0;
+                foreach (var item in _fileLocksView)
+                {
+                    visibleCount++;
+                }
+
+                FileLockBadge.Text = visibleCount.ToString();
+                FileLockBadge.Visibility = visibleCount > 0 ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
@@ -3076,49 +3087,178 @@ namespace HappyEngine
         private void ChatInput_Drop(object sender, DragEventArgs e) => _chatManager.HandleDrop(e);
         private void ChatModelCombo_Changed(object sender, SelectionChangedEventArgs e) => _chatManager.HandleModelComboChanged();
 
-        // ── Todo Panel ─────────────────────────────────────────────
+        // ── Export Build ─────────────────────────────────────────────
 
-        private void InitializeTodoList()
+        private async void ExportBuild_Click(object sender, RoutedEventArgs e)
         {
-            if (_todoManager?.Todos != null)
+            var button = sender as Button;
+            if (button == null) return;
+
+            try
             {
-                TodoListControl.ItemsSource = new ObservableCollection<TodoItem>(_todoManager.Todos);
+                button.IsEnabled = false;
+                ExportStatusText.Text = "Building application...";
+                ExportStatusText.Foreground = (Brush)Application.Current.FindResource("TextMuted");
+                ExportStatusText.Visibility = Visibility.Visible;
+
+                // Run dotnet publish command
+                // Use AppDomain.CurrentDomain.BaseDirectory which is more reliable than Assembly.Location
+                var baseDir = AppDomain.CurrentDomain.BaseDirectory ?? Environment.CurrentDirectory;
+
+                // Find the project file by navigating up from the base directory
+                var projectFile = FindProjectFile(baseDir);
+                if (projectFile == null)
+                {
+                    ExportStatusText.Text = "Could not find HappyEngine.csproj file.";
+                    ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
+                    ExportStatusText.Visibility = Visibility.Visible;
+                    button.IsEnabled = true;
+                    return;
+                }
+
+                var projectDir = System.IO.Path.GetDirectoryName(projectFile)!;
+                var publishDir = System.IO.Path.Combine(projectDir, "publish");
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "dotnet",
+                        Arguments = $"publish \"{projectFile}\" -c Release -r win-x64 --self-contained true",
+                        WorkingDirectory = projectDir,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                var outputLines = new List<string>();
+                process.OutputDataReceived += (s, args) => { if (args.Data != null) outputLines.Add(args.Data); };
+                process.ErrorDataReceived += (s, args) => { if (args.Data != null) outputLines.Add(args.Data); };
+
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                await Task.Run(() => process.WaitForExit());
+
+                if (process.ExitCode == 0)
+                {
+                    // Build succeeded - verify the output directory exists
+                    var expectedPath = System.IO.Path.Combine(projectDir, @"bin\Release\net9.0-windows\win-x64\publish\");
+                    var fullPath = System.IO.Path.GetFullPath(expectedPath);
+
+                    if (System.IO.Directory.Exists(fullPath))
+                    {
+                        ExportStatusText.Text = $"Build completed successfully! Opening folder...";
+                        ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Success");
+
+                        // Open the folder in Windows Explorer
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "explorer.exe",
+                            Arguments = fullPath,
+                            UseShellExecute = true
+                        });
+                    }
+                    else
+                    {
+                        ExportStatusText.Text = $"Build completed but output directory not found at: {fullPath}";
+                        ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
+                    }
+                }
+                else
+                {
+                    // Build failed
+                    ExportStatusText.Text = $"Build failed with exit code {process.ExitCode}. Check output for errors.";
+                    ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
+
+                    // Log output for debugging
+                    if (outputLines.Count > 0)
+                    {
+                        ExportStatusText.Text += "\n\nBuild output:\n" + string.Join("\n", outputLines.TakeLast(10));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ExportStatusText.Text = $"Export failed: {ex.Message}";
+                ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
+                ExportStatusText.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                button.IsEnabled = true;
             }
         }
 
-        private void AddTodo_Click(object sender, RoutedEventArgs e)
+        private string? FindProjectFile(string startDirectory)
         {
-            AddTodoItem();
+            // Look for HappyEngine.csproj file by traversing up the directory tree
+            var dir = new System.IO.DirectoryInfo(startDirectory);
+            while (dir != null)
+            {
+                var projectFile = System.IO.Path.Combine(dir.FullName, "HappyEngine.csproj");
+                if (System.IO.File.Exists(projectFile))
+                {
+                    return projectFile;
+                }
+                dir = dir.Parent;
+            }
+            return null;
         }
 
-        private void TodoInput_KeyDown(object sender, KeyEventArgs e)
+        // ── Tasks Panel ─────────────────────────────────────────────
+
+        private void InitializeTaskList()
+        {
+            if (_projectTaskManager?.Tasks != null)
+            {
+                TaskListControl.ItemsSource = new ObservableCollection<ProjectTaskItem>(_projectTaskManager.Tasks);
+            }
+        }
+
+        private void AddTask_Click(object sender, RoutedEventArgs e)
+        {
+            AddTaskItem();
+        }
+
+        private void TaskInput_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter)
             {
                 e.Handled = true;
-                AddTodoItem();
+                AddTaskItem();
             }
         }
 
-        private void AddTodoItem()
+        private void AddTaskItem()
         {
-            var text = TodoInputBox.Text?.Trim();
-            if (string.IsNullOrEmpty(text) || text == TodoInputBox.Tag?.ToString())
+            var text = TaskInputBox.Text?.Trim();
+            if (string.IsNullOrEmpty(text) || text == TaskInputBox.Tag?.ToString())
                 return;
 
-            _todoManager.AddTodo(text);
-            TodoInputBox.Clear();
-
-            // Add to UI
-            if (TodoListControl.ItemsSource is ObservableCollection<TodoItem> todos)
+            try
             {
-                todos.Add(_todoManager.Todos.Last());
+                // Fix: Get the returned task instead of accessing the list
+                var newTask = _projectTaskManager.AddTask(text);
+                TaskInputBox.Clear();
+
+                // Add to UI
+                if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
+                {
+                    tasks.Add(newTask);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Tasks", "Failed to add task", ex);
             }
         }
 
-        private async void TodoItem_Click(object sender, MouseButtonEventArgs e)
+        private async void TaskItem_Click(object sender, MouseButtonEventArgs e)
         {
-            if (sender is Border border && border.DataContext is TodoItem todo)
+            if (sender is Border border && border.DataContext is ProjectTaskItem task)
             {
                 // Find the check mark path
                 var checkMark = FindVisualChild<System.Windows.Shapes.Path>(border, "CheckMark");
@@ -3142,7 +3282,7 @@ namespace HappyEngine
                 brush.BeginAnimation(SolidColorBrush.ColorProperty, bgAnimation);
 
                 // Mark as completed
-                _todoManager.CompleteTodo(todo);
+                _projectTaskManager.CompleteTask(task);
 
                 // Wait for animation, then remove with fade out
                 await System.Threading.Tasks.Task.Delay(400);
@@ -3150,9 +3290,9 @@ namespace HappyEngine
                 var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
                 fadeOut.Completed += (s, args) =>
                 {
-                    if (TodoListControl.ItemsSource is ObservableCollection<TodoItem> todos)
+                    if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
                     {
-                        todos.Remove(todo);
+                        tasks.Remove(task);
                     }
                 };
                 border.BeginAnimation(OpacityProperty, fadeOut);

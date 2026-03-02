@@ -21,7 +21,7 @@ namespace HappyEngine.Managers
         private bool _autoCommit;
         private string _defaultMcpServerName = "mcp-for-unity-server";
         private string _defaultMcpAddress = "http://127.0.0.1:8080/mcp";
-        private string _defaultMcpStartCommand = @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
+        private string _defaultMcpStartCommand = @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
 
         public List<TaskTemplate> TaskTemplates { get; } = new();
 
@@ -88,7 +88,7 @@ namespace HappyEngine.Managers
         public string DefaultMcpStartCommand
         {
             get => _defaultMcpStartCommand;
-            set => _defaultMcpStartCommand = value ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
+            set => _defaultMcpStartCommand = value ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
         }
 
         public SettingsManager(string appDataDir)
@@ -127,7 +127,7 @@ namespace HappyEngine.Managers
                 if (dict.TryGetValue("defaultMcpAddress", out var dma))
                     _defaultMcpAddress = dma.GetString() ?? "http://127.0.0.1:8080/mcp";
                 if (dict.TryGetValue("defaultMcpStartCommand", out var dmsc))
-                    _defaultMcpStartCommand = dmsc.GetString() ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
+                    _defaultMcpStartCommand = dmsc.GetString() ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
             }
             catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to load settings", ex); }
         }
