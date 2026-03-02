@@ -37,6 +37,7 @@
     <SolidColorBrush x:Key="TextLight" Color="#CCCCCC"/>
     <SolidColorBrush x:Key="TextBright" Color="#E0E0E0"/>
     <SolidColorBrush x:Key="TextPrimary" Color="#E8E8E8"/>
+    <SolidColorBrush x:Key="TextTerminal" Color="#C8C8C8"/>
 
     <!-- ── Accents ── -->
     <SolidColorBrush x:Key="Accent" Color="#DA7756"/>
@@ -55,6 +56,7 @@
     <SolidColorBrush x:Key="DangerAlert" Color="#FF6B6B"/>
     <SolidColorBrush x:Key="DangerDeleteHover" Color="#E57373"/>
     <SolidColorBrush x:Key="DangerFlash" Color="#BCDC3232"/>
+    <SolidColorBrush x:Key="Warning" Color="#E0A030"/>
     <SolidColorBrush x:Key="WarningYellow" Color="#FFD600"/>
     <SolidColorBrush x:Key="WarningAmber" Color="#E0A030"/>
     <SolidColorBrush x:Key="WarningOrange" Color="#CC8800"/>
