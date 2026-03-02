@@ -480,6 +480,24 @@ namespace HappyEngine
             UpdateStatus();
         }
 
+        private void OnMcpOutputChanged(string projectPath)
+        {
+            // Only update if it's for the current project
+            if (projectPath != _projectManager.ProjectPath) return;
+
+            var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == projectPath);
+            if (entry?.McpOutput != null)
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    McpOutputTextBox.Text = entry.McpOutput.ToString();
+
+                    // Auto-scroll to bottom
+                    McpOutputScrollViewer.ScrollToEnd();
+                });
+            }
+        }
+
         /// <summary>
         /// Creates a new task from a historic task's configuration and launches it.
         /// Works for any history task (failed, cancelled, or completed).

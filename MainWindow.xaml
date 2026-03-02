@@ -1981,6 +1981,31 @@
                             </TabItem.Header>
                             <ScrollViewer x:Name="ActivityTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
                         </TabItem>
+                        <!-- MCP tab -->
+                        <TabItem x:Name="McpProjectTabItem" Visibility="Collapsed">
+                            <TabItem.Header>
+                                <TextBlock Text="MCP" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            </TabItem.Header>
+                            <DockPanel Margin="0,6,0,0">
+                                <TextBlock DockPanel.Dock="Top" Text="MCP Server Output"
+                                           Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
+                                           Margin="0,0,0,8"/>
+                                <ScrollViewer x:Name="McpOutputScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                                    <TextBox x:Name="McpOutputTextBox"
+                                             IsReadOnly="True"
+                                             FontFamily="Consolas"
+                                             FontSize="11"
+                                             Background="{StaticResource BgDarkTerminal}"
+                                             Foreground="{StaticResource TextTerminal}"
+                                             BorderThickness="0"
+                                             Padding="8"
+                                             TextWrapping="NoWrap"
+                                             AcceptsReturn="True"
+                                             VerticalScrollBarVisibility="Hidden"
+                                             HorizontalScrollBarVisibility="Hidden"/>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </TabItem>
                     </TabControl>
                 </DockPanel>
             </Border>

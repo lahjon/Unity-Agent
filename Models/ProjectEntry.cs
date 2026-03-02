@@ -38,6 +38,10 @@ namespace HappyEngine.Models
         [JsonIgnore]
         public int McpProcessId { get; set; } // Track the MCP server process
         [JsonIgnore]
+        public System.Text.StringBuilder McpOutput { get; } = new System.Text.StringBuilder();
+        [JsonIgnore]
+        public System.Diagnostics.Process McpProcess { get; set; }
+        [JsonIgnore]
         public string FolderName => string.IsNullOrEmpty(Path) ? "" : System.IO.Path.GetFileName(Path);
         [JsonIgnore]
         public string DisplayName => string.IsNullOrWhiteSpace(Name) ? FolderName : Name;

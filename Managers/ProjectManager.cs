@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -58,6 +59,7 @@ namespace HappyEngine.Managers
         private SettingsManager? _settingsManager;
 
         public event Action<AgentTask>? McpInvestigationRequested;
+        public event Action<string>? McpOutputChanged; // (projectPath)
         public event Action? ProjectSwapStarted;
         public event Action? ProjectSwapCompleted;
         public event Action<string, string>? ProjectRenamed; // (projectPath, newName)
@@ -977,15 +979,22 @@ namespace HappyEngine.Managers
                     // Connect/Disconnect button
                     var mcpButton = new Button
                     {
-                        Content = proj.McpStatus == McpStatus.Connected ? "Disconnect" : "Connect to MCP",
-                        Background = (Brush)Application.Current.FindResource("BgSection"),
-                        Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
-                        BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
-                        BorderThickness = new Thickness(1),
-                        Padding = new Thickness(8, 3, 8, 3),
-                        FontSize = 11,
-                        FontFamily = new FontFamily("Segoe UI"),
-                        Cursor = Cursors.Hand,
+                        Content = proj.McpStatus switch
+                        {
+                            McpStatus.Connected => "Disconnect",
+                            McpStatus.Connecting => "Connecting...",
+                            _ => "Connect to MCP"
+                        },
+                        Style = (Style)Application.Current.FindResource("SmallBtn"),
+                        Background = proj.McpStatus switch
+                        {
+                            McpStatus.Connected => (Brush)Application.Current.FindResource("BgHover"),
+                            McpStatus.Connecting => (Brush)Application.Current.FindResource("BgMuted"),
+                            _ => (Brush)Application.Current.FindResource("StatusOrange")
+                        },
+                        Foreground = proj.McpStatus == McpStatus.Connecting
+                            ? (Brush)Application.Current.FindResource("TextMuted")
+                            : (Brush)Application.Current.FindResource("Fg"),
                         Tag = proj.Path,
                         IsEnabled = proj.McpStatus != McpStatus.Connecting
                     };
@@ -1126,13 +1135,16 @@ namespace HappyEngine.Managers
 
             if (!success)
             {
-                // If failed, try to diagnose
+                // If failed after 3 retries, try to diagnose
                 var investigateTask = new AgentTask
                 {
-                    Description = $"Failed to start MCP server. Please ensure:\n" +
+                    Description = $"Failed to start MCP server after 3 attempts (waited 30 seconds each). Please check:\n" +
                         "1. Unity Editor is running with the MCP plugin installed\n" +
-                        "2. The command is correct: {entry.McpStartCommand}\n" +
-                        "3. Port 8080 is not already in use",
+                        "2. The MCP start command is correct: {entry.McpStartCommand}\n" +
+                        "3. The MCP address is accessible: {entry.McpAddress}\n" +
+                        "4. No firewall or antivirus is blocking the connection\n" +
+                        "5. Port is not already in use by another process\n\n" +
+                        "Check the logs for more detailed error information.",
                     SkipPermissions = true,
                     ProjectPath = projectPath,
                     ProjectColor = GetProjectColor(projectPath),
@@ -1169,62 +1181,173 @@ namespace HappyEngine.Managers
 
         private async Task<bool> StartMcpServerAsync(ProjectEntry entry)
         {
+            const int MAX_RETRIES = 3;
+            const int SERVER_START_TIMEOUT_SECONDS = 30;
+
             try
             {
                 entry.McpStatus = McpStatus.Connecting;
+                entry.McpOutput.Clear(); // Clear any previous output
+                entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Connecting to server...");
                 SaveProjects();
                 RefreshProjectList(null, null, null);
 
-                // Check if server is already running
+                // First check if server is already running
+                AppLogger.Info("ProjectManager", $"Checking if MCP server is already running at {entry.McpAddress}");
+                entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Checking if MCP server is already running at {entry.McpAddress}");
+
                 if (await CheckMcpHealth(entry.McpAddress))
                 {
+                    AppLogger.Info("ProjectManager", "MCP server is already running, connecting...");
+                    entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server already running, verifying connection...");
+
+                    // Register with Claude Code
+                    await RegisterMcpWithClaudeAsync(entry.McpServerName);
+
                     entry.McpStatus = McpStatus.Connected;
+                    entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server connected successfully!");
                     SaveProjects();
                     RefreshProjectList(null, null, null);
                     return true;
                 }
 
-                // Start the server process
-                var processInfo = new System.Diagnostics.ProcessStartInfo
+                // Try to start the server with retries
+                for (int retry = 1; retry <= MAX_RETRIES; retry++)
                 {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c {entry.McpStartCommand}",
-                    WorkingDirectory = entry.Path,
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
+                    AppLogger.Info("ProjectManager", $"Attempting to start MCP server (attempt {retry}/{MAX_RETRIES})");
+                    entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Starting MCP server (attempt {retry}/{MAX_RETRIES})...");
 
-                var process = System.Diagnostics.Process.Start(processInfo);
-                if (process == null)
-                {
-                    entry.McpStatus = McpStatus.Failed;
-                    SaveProjects();
-                    RefreshProjectList(null, null, null);
-                    return false;
-                }
-
-                entry.McpProcessId = process.Id;
-
-                // Wait for server to start (max 10 seconds)
-                var startTime = DateTime.Now;
-                while ((DateTime.Now - startTime).TotalSeconds < 10)
-                {
-                    if (await CheckMcpHealth(entry.McpAddress))
+                    // Start the server process asynchronously
+                    var processInfo = new System.Diagnostics.ProcessStartInfo
                     {
-                        // Register with Claude Code
-                        await RegisterMcpWithClaudeAsync(entry.McpServerName);
+                        FileName = "cmd.exe",
+                        Arguments = $"/c {entry.McpStartCommand}",
+                        WorkingDirectory = entry.Path,
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
 
-                        entry.McpStatus = McpStatus.Connected;
-                        SaveProjects();
-                        RefreshProjectList(null, null, null);
-                        return true;
+                    // Start the process asynchronously without waiting
+                    var startTask = Task.Run(() =>
+                    {
+                        try
+                        {
+                            var process = System.Diagnostics.Process.Start(processInfo);
+                            if (process != null)
+                            {
+                                entry.McpProcessId = process.Id;
+                                entry.McpProcess = process;
+
+                                // Capture output asynchronously in real-time
+                                process.OutputDataReceived += (sender, args) =>
+                                {
+                                    if (!string.IsNullOrEmpty(args.Data))
+                                    {
+                                        Application.Current?.Dispatcher?.InvokeAsync(() =>
+                                        {
+                                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] {args.Data}");
+                                            // Notify any UI listeners that output has changed
+                                            McpOutputChanged?.Invoke(entry.Path);
+                                        });
+                                        AppLogger.Debug("ProjectManager", $"MCP server output: {args.Data}");
+                                    }
+                                };
+
+                                process.ErrorDataReceived += (sender, args) =>
+                                {
+                                    if (!string.IsNullOrEmpty(args.Data))
+                                    {
+                                        Application.Current?.Dispatcher?.InvokeAsync(() =>
+                                        {
+                                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] ERROR: {args.Data}");
+                                            McpOutputChanged?.Invoke(entry.Path);
+                                        });
+                                        AppLogger.Warn("ProjectManager", $"MCP server error: {args.Data}");
+                                    }
+                                };
+
+                                process.BeginOutputReadLine();
+                                process.BeginErrorReadLine();
+
+                                return true;
+                            }
+                            return false;
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("ProjectManager", $"Failed to start process on attempt {retry}", ex);
+                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Failed to start process: {ex.Message}");
+                            return false;
+                        }
+                    });
+
+                    var processStarted = await startTask;
+                    if (!processStarted)
+                    {
+                        AppLogger.Warn("ProjectManager", $"Failed to start MCP server process on attempt {retry}");
+                        if (retry < MAX_RETRIES)
+                        {
+                            await Task.Delay(2000); // Wait 2 seconds before retry
+                            continue;
+                        }
+                        else
+                        {
+                            break; // All retries failed
+                        }
                     }
-                    await Task.Delay(500);
+
+                    // Wait for server to start (up to 30 seconds)
+                    AppLogger.Info("ProjectManager", $"Waiting for MCP server to start (up to {SERVER_START_TIMEOUT_SECONDS} seconds)...");
+                    entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Waiting for server to respond...");
+
+                    var startTime = DateTime.Now;
+                    while ((DateTime.Now - startTime).TotalSeconds < SERVER_START_TIMEOUT_SECONDS)
+                    {
+                        if (await CheckMcpHealth(entry.McpAddress))
+                        {
+                            AppLogger.Info("ProjectManager", $"MCP server started successfully after {(DateTime.Now - startTime).TotalSeconds:F1} seconds");
+                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server started successfully!");
+                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Verifying connection...");
+
+                            // Register with Claude Code
+                            await RegisterMcpWithClaudeAsync(entry.McpServerName);
+
+                            entry.McpStatus = McpStatus.Connected;
+                            entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server connected!");
+                            SaveProjects();
+                            RefreshProjectList(null, null, null);
+                            return true;
+                        }
+
+                        // Check less frequently at the beginning, more frequently as time goes on
+                        var elapsed = (DateTime.Now - startTime).TotalSeconds;
+                        var delay = elapsed < 5 ? 1000 : elapsed < 15 ? 500 : 250;
+                        await Task.Delay(delay);
+                    }
+
+                    AppLogger.Warn("ProjectManager", $"MCP server failed to respond within {SERVER_START_TIMEOUT_SECONDS} seconds on attempt {retry}");
+
+                    // Kill the process if it's still running and we're going to retry
+                    if (retry < MAX_RETRIES && entry.McpProcessId > 0)
+                    {
+                        try
+                        {
+                            var process = System.Diagnostics.Process.GetProcessById(entry.McpProcessId);
+                            if (!process.HasExited)
+                            {
+                                process.Kill();
+                                await Task.Delay(1000); // Give it time to clean up
+                            }
+                        }
+                        catch { /* Process may have already exited */ }
+                        entry.McpProcessId = 0;
+                    }
                 }
 
-                // Timeout - server didn't start
+                // All retries failed
+                AppLogger.Error("ProjectManager", $"Failed to start MCP server after {MAX_RETRIES} attempts");
                 entry.McpStatus = McpStatus.Failed;
                 SaveProjects();
                 RefreshProjectList(null, null, null);
@@ -1232,7 +1355,7 @@ namespace HappyEngine.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Error("ProjectManager", "Failed to start MCP server", ex);
+                AppLogger.Error("ProjectManager", "Unexpected error starting MCP server", ex);
                 entry.McpStatus = McpStatus.Failed;
                 SaveProjects();
                 RefreshProjectList(null, null, null);
@@ -1244,23 +1367,34 @@ namespace HappyEngine.Managers
         {
             try
             {
-                if (entry.McpProcessId > 0)
+                if (entry.McpProcessId > 0 || entry.McpProcess != null)
                 {
                     try
                     {
-                        var process = System.Diagnostics.Process.GetProcessById(entry.McpProcessId);
-                        if (!process.HasExited)
+                        var process = entry.McpProcess ?? (entry.McpProcessId > 0 ? System.Diagnostics.Process.GetProcessById(entry.McpProcessId) : null);
+                        if (process != null && !process.HasExited)
                         {
+                            // Stop reading output
+                            try
+                            {
+                                process.CancelOutputRead();
+                                process.CancelErrorRead();
+                            }
+                            catch { }
+
                             process.Kill();
                             process.WaitForExit(5000);
+                            process.Dispose();
                         }
                     }
                     catch { /* Process may have already exited */ }
 
                     entry.McpProcessId = 0;
+                    entry.McpProcess = null;
                 }
 
                 entry.McpStatus = McpStatus.NotConnected;
+                entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server disconnected.");
                 SaveProjects();
                 RefreshProjectList(null, null, null);
             }

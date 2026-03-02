@@ -157,6 +157,7 @@ namespace HappyEngine
                 PeekInitialProjectPath(appDataDir),
                 this);
             _projectManager.McpInvestigationRequested += OnMcpInvestigationRequested;
+            _projectManager.McpOutputChanged += OnMcpOutputChanged;
             _projectManager.ProjectSwapStarted += OnProjectSwapStarted;
             _projectManager.ProjectSwapCompleted += OnProjectSwapCompleted;
             _projectManager.ProjectRenamed += OnProjectRenamed;
@@ -796,6 +797,7 @@ namespace HappyEngine
         private void UpdateMcpVisibility(bool isGame)
         {
             UseMcpToggle.Visibility = isGame ? Visibility.Visible : Visibility.Collapsed;
+            McpProjectTabItem.Visibility = isGame ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ── MCP Settings ────────────────────────────────────────────
@@ -821,6 +823,9 @@ namespace HappyEngine
                     Models.McpStatus.Investigating => FindResource("WarningOrange") as System.Windows.Media.Brush,
                     _ => FindResource("TextMuted") as System.Windows.Media.Brush
                 } ?? FindResource("TextMuted") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Gray;
+
+                // Update MCP output display
+                McpOutputTextBox.Text = entry.McpOutput?.ToString() ?? "";
             }
         }
 
@@ -2144,6 +2149,7 @@ namespace HappyEngine
 
             // ProjectManager
             _projectManager.McpInvestigationRequested -= OnMcpInvestigationRequested;
+            _projectManager.McpOutputChanged -= OnMcpOutputChanged;
             _projectManager.ProjectSwapStarted -= OnProjectSwapStarted;
             _projectManager.ProjectSwapCompleted -= OnProjectSwapCompleted;
             _projectManager.ProjectRenamed -= OnProjectRenamed;
