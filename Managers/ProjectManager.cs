@@ -1169,8 +1169,46 @@ namespace HappyEngine.Managers
         {
             try
             {
-                var response = await _httpClient.GetAsync(url);
-                return response.IsSuccessStatusCode;
+                // MCP servers expect JSON-RPC requests, not plain GET requests
+                var jsonRequest = new
+                {
+                    jsonrpc = "2.0",
+                    method = "initialize",
+                    @params = new
+                    {
+                        protocolVersion = "2024-11-05",
+                        capabilities = new
+                        {
+                            experimental = new { }
+                        },
+                        clientInfo = new
+                        {
+                            name = "HappyEngine",
+                            version = "1.0.0"
+                        }
+                    },
+                    id = 1
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(jsonRequest);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                // Use POST request with proper headers for JSON-RPC
+                using var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Content = content;
+                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                var response = await _httpClient.SendAsync(request);
+
+                // For MCP health check, we just need to know if the server responds
+                // Even error responses indicate the server is running
+                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable &&
+                       response.StatusCode != System.Net.HttpStatusCode.NotFound;
+            }
+            catch (HttpRequestException)
+            {
+                // Connection refused or timeout - server not running
+                return false;
             }
             catch (Exception ex)
             {

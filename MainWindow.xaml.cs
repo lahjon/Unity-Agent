@@ -8,6 +8,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -500,6 +501,13 @@ namespace HappyEngine
                     () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
                     SyncSettingsForProject);
 
+                // Sync Game/App UI for the initially selected project
+                _projectManager.UpdateMcpToggleForProject();
+                var activeEntry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
+                ProjectTypeGameToggle.IsChecked = activeEntry?.IsGame == true;
+                UpdateMcpVisibility(activeEntry?.IsGame == true);
+                SyncMcpSettingsFields();
+
                 // Migrate .agent-bus folders from project directories to appData
                 await MigrateAllProjectBusesAsync();
 
@@ -861,8 +869,40 @@ namespace HappyEngine
 
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(_windowCts.Token);
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(2));
-                var response = await SharedHttpClient.GetAsync(uri, timeoutCts.Token);
-                if (response.IsSuccessStatusCode)
+
+                // MCP servers expect JSON-RPC requests
+                var jsonRequest = new
+                {
+                    jsonrpc = "2.0",
+                    method = "initialize",
+                    @params = new
+                    {
+                        protocolVersion = "2024-11-05",
+                        capabilities = new
+                        {
+                            experimental = new { }
+                        },
+                        clientInfo = new
+                        {
+                            name = "HappyEngine",
+                            version = "1.0.0"
+                        }
+                    },
+                    id = 1
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(jsonRequest);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, uri);
+                request.Content = content;
+                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                var response = await SharedHttpClient.SendAsync(request, timeoutCts.Token);
+
+                // For MCP test, accept any response that's not a server error or not found
+                if (response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable &&
+                    response.StatusCode != System.Net.HttpStatusCode.NotFound)
                 {
                     McpConnectionStatus.Text = "Connected";
                     McpConnectionStatus.Foreground = FindResource("Success") as System.Windows.Media.Brush
