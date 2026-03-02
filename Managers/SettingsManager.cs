@@ -19,6 +19,9 @@ namespace HappyEngine.Managers
         private bool _autoVerify;
         private bool _autoRecover;
         private bool _autoCommit;
+        private string _defaultMcpServerName = "mcp-for-unity-server";
+        private string _defaultMcpAddress = "http://127.0.0.1:8080/mcp";
+        private string _defaultMcpStartCommand = @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
 
         public List<TaskTemplate> TaskTemplates { get; } = new();
 
@@ -70,6 +73,24 @@ namespace HappyEngine.Managers
             set => _autoCommit = value;
         }
 
+        public string DefaultMcpServerName
+        {
+            get => _defaultMcpServerName;
+            set => _defaultMcpServerName = value ?? "mcp-for-unity-server";
+        }
+
+        public string DefaultMcpAddress
+        {
+            get => _defaultMcpAddress;
+            set => _defaultMcpAddress = value ?? "http://127.0.0.1:8080/mcp";
+        }
+
+        public string DefaultMcpStartCommand
+        {
+            get => _defaultMcpStartCommand;
+            set => _defaultMcpStartCommand = value ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
+        }
+
         public SettingsManager(string appDataDir)
         {
             _settingsFile = Path.Combine(appDataDir, "settings.json");
@@ -101,6 +122,12 @@ namespace HappyEngine.Managers
                     _autoRecover = ar.GetBoolean();
                 if (dict.TryGetValue("autoCommit", out var ac))
                     _autoCommit = ac.GetBoolean();
+                if (dict.TryGetValue("defaultMcpServerName", out var dmsn))
+                    _defaultMcpServerName = dmsn.GetString() ?? "mcp-for-unity-server";
+                if (dict.TryGetValue("defaultMcpAddress", out var dma))
+                    _defaultMcpAddress = dma.GetString() ?? "http://127.0.0.1:8080/mcp";
+                if (dict.TryGetValue("defaultMcpStartCommand", out var dmsc))
+                    _defaultMcpStartCommand = dmsc.GetString() ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
             }
             catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to load settings", ex); }
         }
@@ -118,7 +145,10 @@ namespace HappyEngine.Managers
                     ["tokenLimitRetryMinutes"] = _tokenLimitRetryMinutes,
                     ["autoVerify"] = _autoVerify,
                     ["autoRecover"] = _autoRecover,
-                    ["autoCommit"] = _autoCommit
+                    ["autoCommit"] = _autoCommit,
+                    ["defaultMcpServerName"] = _defaultMcpServerName,
+                    ["defaultMcpAddress"] = _defaultMcpAddress,
+                    ["defaultMcpStartCommand"] = _defaultMcpStartCommand
                 };
                 var json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
                 SafeFileWriter.WriteInBackground(_settingsFile, json, "SettingsManager");

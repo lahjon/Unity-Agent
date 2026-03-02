@@ -189,6 +189,7 @@ namespace HappyEngine
             _promptBuilder = new Managers.PromptBuilder();
             _taskFactory = new Managers.TaskFactory();
             _projectManager.SetTaskFactory(_taskFactory);
+            _projectManager.SetSettingsManager(_settingsManager);
 
             _taskExecutionManager = new TaskExecutionManager(
                 scriptDir, _fileLockManager, _outputTabManager,
@@ -405,6 +406,9 @@ namespace HappyEngine
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
             AutoRecoverToggle.IsChecked = _settingsManager.AutoRecover;
             AutoCommitToggle.IsChecked = _settingsManager.AutoCommit;
+            DefaultMcpServerNameBox.Text = _settingsManager.DefaultMcpServerName;
+            DefaultMcpAddressBox.Text = _settingsManager.DefaultMcpAddress;
+            DefaultMcpStartCommandBox.Text = _settingsManager.DefaultMcpStartCommand;
 
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
@@ -1016,6 +1020,17 @@ namespace HappyEngine
             {
                 TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
             }
+        }
+
+        private void DefaultMcpSettings_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_settingsManager == null || _projectManager == null) return;
+
+            _settingsManager.DefaultMcpServerName = DefaultMcpServerNameBox.Text?.Trim() ?? "mcp-for-unity-server";
+            _settingsManager.DefaultMcpAddress = DefaultMcpAddressBox.Text?.Trim() ?? "http://127.0.0.1:8080/mcp";
+            _settingsManager.DefaultMcpStartCommand = DefaultMcpStartCommandBox.Text?.Trim() ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
+
+            _settingsManager.SaveSettings(_projectManager.ProjectPath);
         }
 
         private void ViewLogs_Click(object sender, RoutedEventArgs e)

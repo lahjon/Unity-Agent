@@ -1386,7 +1386,7 @@
                         <Border DockPanel.Dock="Bottom" Margin="0,3,0,3" Height="1"
                                 Background="{StaticResource BorderSubtle}" Opacity="0.4"/>
                         <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
-                                 MinHeight="50" MaxHeight="120"
+                                 MinHeight="80"
                                  VerticalScrollBarVisibility="Auto"
                                  Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
                                  CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
@@ -2325,6 +2325,43 @@
                                     <TextBlock Text="No Git Write by default" Foreground="{StaticResource TextLight}"
                                                FontSize="11" FontFamily="Segoe UI"/>
                                 </ToggleButton>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
+
+                                <TextBlock Text="MCP Defaults" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,12"/>
+
+                                <TextBlock Text="Server Name" Foreground="{StaticResource TextLight}"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
+                                <TextBox x:Name="DefaultMcpServerNameBox" Text="mcp-for-unity-server"
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                         FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,10"
+                                         LostFocus="DefaultMcpSettings_Changed"/>
+
+                                <TextBlock Text="Server Address" Foreground="{StaticResource TextLight}"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
+                                <TextBox x:Name="DefaultMcpAddressBox" Text="http://127.0.0.1:8080/mcp"
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                         FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,10"
+                                         LostFocus="DefaultMcpSettings_Changed"/>
+
+                                <TextBlock Text="Start Command" Foreground="{StaticResource TextLight}"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
+                                <TextBox x:Name="DefaultMcpStartCommandBox"
+                                         Text='C:\Users\fredr\.local\bin\uvx.exe --from "mcpforunityserver==9.4.7" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools'
+                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                         FontSize="11" FontFamily="Consolas" Padding="6,4" Margin="0,0,0,10"
+                                         TextWrapping="Wrap" AcceptsReturn="False"
+                                         LostFocus="DefaultMcpSettings_Changed"/>
+
+                                <TextBlock Text="These values will auto-populate when creating new projects."
+                                           Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
+                                           TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <TextBlock Text="Max concurrent tasks" Foreground="{StaticResource TextLight}"

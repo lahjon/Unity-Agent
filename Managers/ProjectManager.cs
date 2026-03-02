@@ -55,6 +55,7 @@ namespace HappyEngine.Managers
 
         private readonly IProjectPanelView _view;
         private ITaskFactory? _taskFactory;
+        private SettingsManager? _settingsManager;
 
         public event Action<AgentTask>? McpInvestigationRequested;
         public event Action? ProjectSwapStarted;
@@ -82,6 +83,11 @@ namespace HappyEngine.Managers
         public void SetTaskFactory(ITaskFactory taskFactory)
         {
             _taskFactory = taskFactory;
+        }
+
+        public void SetSettingsManager(SettingsManager settingsManager)
+        {
+            _settingsManager = settingsManager;
         }
 
         public void SetTaskCollections(
@@ -319,7 +325,16 @@ namespace HappyEngine.Managers
             }
 
             var name = Path.GetFileName(path);
-            var entry = new ProjectEntry { Name = name, Path = path, IsInitializing = true, Color = PickProjectColor() };
+            var entry = new ProjectEntry
+            {
+                Name = name,
+                Path = path,
+                IsInitializing = true,
+                Color = PickProjectColor(),
+                McpServerName = _settingsManager?.DefaultMcpServerName ?? "mcp-for-unity-server",
+                McpAddress = _settingsManager?.DefaultMcpAddress ?? "http://127.0.0.1:8080/mcp",
+                McpStartCommand = _settingsManager?.DefaultMcpStartCommand ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools"
+            };
             _savedProjects.Add(entry);
             SaveProjects();
             _projectPath = path;
@@ -386,7 +401,18 @@ namespace HappyEngine.Managers
                 }
             }
 
-            var entry = new ProjectEntry { Name = result.Name, Path = fullPath, IsInitializing = true, Color = PickProjectColor(), IsGame = result.IsGame };
+            var entry = new ProjectEntry
+            {
+                Name = result.Name,
+                Path = fullPath,
+                IsInitializing = true,
+                Color = PickProjectColor(),
+                IsGame = result.IsGame,
+                McpServerName = _settingsManager?.DefaultMcpServerName ?? "mcp-for-unity-server",
+                McpAddress = _settingsManager?.DefaultMcpAddress ?? "http://127.0.0.1:8080/mcp",
+                McpStartCommand = _settingsManager?.DefaultMcpStartCommand ?? @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools",
+                McpStatus = result.IsGame ? McpStatus.NotConnected : McpStatus.Disabled
+            };
             _savedProjects.Add(entry);
             SaveProjects();
             _projectPath = fullPath;
@@ -417,9 +443,12 @@ namespace HappyEngine.Managers
             if (proj != null)
             {
                 _view.UseMcpToggle.IsEnabled = true;
-                _view.UseMcpToggle.IsChecked = proj.McpStatus == McpStatus.Enabled;
+                // For game projects with MCP connected, enable by default
+                _view.UseMcpToggle.IsChecked = proj.IsGame && proj.McpStatus == McpStatus.Connected;
                 _view.UseMcpToggle.Opacity = 1.0;
-                _view.UseMcpToggle.ToolTip = null;
+                _view.UseMcpToggle.ToolTip = proj.IsGame && proj.McpStatus == McpStatus.Connected
+                    ? "MCP is connected and will be used for Unity-specific commands"
+                    : "Enable to use MCP for this project";
             }
             else
             {
@@ -883,62 +912,102 @@ namespace HappyEngine.Managers
                     }
                 }
 
-                if (proj.McpStatus != McpStatus.Disabled)
+                if (proj.IsGame) // Only show MCP for game projects
                 {
-                    var mcpTogglePanel = new StackPanel
+                    var mcpPanel = new StackPanel
                     {
                         Orientation = Orientation.Horizontal,
-                        Margin = new Thickness(0, 4, 0, 0),
-                        ToolTip = $"MCP: {proj.McpStatus}"
+                        Margin = new Thickness(0, 4, 0, 0)
                     };
-                    var mcpToggle = new ToggleButton
+
+                    // Status indicator
+                    var statusColor = proj.McpStatus switch
                     {
-                        IsChecked = true,
-                        Style = (Style)Application.Current.FindResource("ToggleSwitch"),
-                        Tag = proj.Path,
-                        VerticalAlignment = VerticalAlignment.Center
+                        McpStatus.Connected => BrushCache.Theme("SuccessGreen"),
+                        McpStatus.Connecting => BrushCache.Theme("WarningAmber"),
+                        McpStatus.Failed => BrushCache.Theme("DangerBright"),
+                        _ => BrushCache.Theme("TextMuted")
                     };
-                    mcpToggle.Content = new TextBlock
+
+                    var statusText = proj.McpStatus switch
                     {
-                        Text = "MCP",
-                        Foreground = (Brush)Application.Current.FindResource("TextLight"),
+                        McpStatus.Connected => "Connected",
+                        McpStatus.Connecting => "Connecting...",
+                        McpStatus.Failed => "Failed",
+                        _ => "Not Connected"
+                    };
+
+                    var statusIndicator = new System.Windows.Shapes.Ellipse
+                    {
+                        Width = 8,
+                        Height = 8,
+                        Fill = statusColor,
+                        Margin = new Thickness(0, 0, 6, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        ToolTip = $"MCP Status: {statusText}"
+                    };
+
+                    // Add pulsing animation for Connecting and Connected states
+                    if (proj.McpStatus == McpStatus.Connecting || proj.McpStatus == McpStatus.Connected)
+                    {
+                        var animation = new System.Windows.Media.Animation.DoubleAnimation
+                        {
+                            From = 0.3,
+                            To = 1.0,
+                            Duration = new Duration(TimeSpan.FromSeconds(1)),
+                            AutoReverse = true,
+                            RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+                        };
+                        statusIndicator.BeginAnimation(UIElement.OpacityProperty, animation);
+                    }
+
+                    mcpPanel.Children.Add(statusIndicator);
+
+                    // Status text
+                    mcpPanel.Children.Add(new TextBlock
+                    {
+                        Text = statusText,
+                        Foreground = statusColor,
                         FontSize = 10,
                         FontFamily = new FontFamily("Segoe UI"),
-                        VerticalAlignment = VerticalAlignment.Center
-                    };
-                    mcpToggle.Checked += async (s, ev) =>
-                    {
-                        ev.Handled = true;
-                        if (s is ToggleButton tb && tb.Tag is string path)
-                            await ConnectMcpAsync(path);
-                    };
-                    mcpToggle.Unchecked += (s, ev) =>
-                    {
-                        ev.Handled = true;
-                        if (s is ToggleButton tb && tb.Tag is string path)
-                            DisconnectMcp(path);
-                    };
-                    mcpTogglePanel.Children.Add(mcpToggle);
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 8, 0)
+                    });
 
-                    if (proj.McpStatus != McpStatus.Enabled)
+                    // Connect/Disconnect button
+                    var mcpButton = new Button
                     {
-                        var mcpStatusBrush = proj.McpStatus switch
+                        Content = proj.McpStatus == McpStatus.Connected ? "Disconnect" : "Connect to MCP",
+                        Background = (Brush)Application.Current.FindResource("BgSection"),
+                        Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
+                        BorderBrush = (Brush)Application.Current.FindResource("BorderMedium"),
+                        BorderThickness = new Thickness(1),
+                        Padding = new Thickness(8, 3, 8, 3),
+                        FontSize = 11,
+                        FontFamily = new FontFamily("Segoe UI"),
+                        Cursor = Cursors.Hand,
+                        Tag = proj.Path,
+                        IsEnabled = proj.McpStatus != McpStatus.Connecting
+                    };
+
+                    mcpButton.Click += async (s, ev) =>
+                    {
+                        ev.Handled = true;
+                        if (s is Button b && b.Tag is string path)
                         {
-                            McpStatus.Initialized => BrushCache.Theme("WarningAmber"),
-                            McpStatus.Investigating => BrushCache.Theme("WarningDeepOrange"),
-                            _ => BrushCache.Theme("TextMuted")
-                        };
-                        mcpTogglePanel.Children.Add(new System.Windows.Shapes.Ellipse
-                        {
-                            Width = 6,
-                            Height = 6,
-                            Fill = mcpStatusBrush,
-                            Margin = new Thickness(4, 0, 0, 0),
-                            VerticalAlignment = VerticalAlignment.Center,
-                            ToolTip = proj.McpStatus.ToString()
-                        });
-                    }
-                    infoPanel.Children.Add(mcpTogglePanel);
+                            var projEntry = _savedProjects.FirstOrDefault(p => p.Path == path);
+                            if (projEntry != null)
+                            {
+                                if (projEntry.McpStatus == McpStatus.Connected)
+                                    DisconnectMcp(path);
+                                else
+                                    await ConnectMcpAsync(path);
+                            }
+                        }
+                    };
+
+                    mcpPanel.Children.Add(mcpButton);
+                    infoPanel.Children.Add(mcpPanel);
                 }
 
                 Grid.SetColumn(infoPanel, 0);
@@ -1052,57 +1121,27 @@ namespace HappyEngine.Managers
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
             if (entry == null) return;
 
-            var mcpUrl = string.IsNullOrWhiteSpace(entry.McpAddress) ? "http://127.0.0.1:8080/mcp" : entry.McpAddress;
-            var serverName = string.IsNullOrWhiteSpace(entry.McpServerName) ? "mcp-for-unity-server" : entry.McpServerName;
-            var mcpJsonPath = Path.Combine(projectPath, ".mcp.json");
-            var mcpJsonContent = "{\n  \"mcpServers\": {\n    \"" + serverName + "\": {\n      \"type\": \"http\",\n      \"url\": \"" + mcpUrl + "\"\n    }\n  }\n}";
+            // Start the MCP server
+            var success = await StartMcpServerAsync(entry);
 
-            var reachable = await CheckMcpHealth(mcpUrl);
-
-            if (reachable)
+            if (!success)
             {
-                if (!File.Exists(mcpJsonPath))
-                    await Task.Run(() => File.WriteAllText(mcpJsonPath, mcpJsonContent));
-
-                entry.McpStatus = McpStatus.Enabled;
-                SaveProjects();
-                RefreshProjectList(null, null, null);
-                UpdateMcpToggleForProject();
-                return;
-            }
-
-            if (!File.Exists(mcpJsonPath))
-            {
-                await Task.Run(() => File.WriteAllText(mcpJsonPath, mcpJsonContent));
-                entry.McpStatus = McpStatus.Initialized;
-                SaveProjects();
-                RefreshProjectList(null, null, null);
-
-                reachable = await CheckMcpHealth(mcpUrl);
-                if (reachable)
+                // If failed, try to diagnose
+                var investigateTask = new AgentTask
                 {
-                    entry.McpStatus = McpStatus.Enabled;
-                    SaveProjects();
-                    RefreshProjectList(null, null, null);
-                    UpdateMcpToggleForProject();
-                    return;
-                }
+                    Description = $"Failed to start MCP server. Please ensure:\n" +
+                        "1. Unity Editor is running with the MCP plugin installed\n" +
+                        "2. The command is correct: {entry.McpStartCommand}\n" +
+                        "3. Port 8080 is not already in use",
+                    SkipPermissions = true,
+                    ProjectPath = projectPath,
+                    ProjectColor = GetProjectColor(projectPath),
+                    ProjectDisplayName = GetProjectDisplayName(projectPath)
+                };
+                McpInvestigationRequested?.Invoke(investigateTask);
             }
 
-            entry.McpStatus = McpStatus.Investigating;
-            SaveProjects();
-            RefreshProjectList(null, null, null);
-
-            var investigateTask = new AgentTask
-            {
-                Description = $"The MCP server {serverName} at {mcpUrl} is not responding. " +
-                    "Diagnose and fix the connection. Check if the Unity Editor is running with the MCP plugin installed and enabled.",
-                SkipPermissions = true,
-                ProjectPath = projectPath,
-                ProjectColor = GetProjectColor(projectPath),
-                ProjectDisplayName = GetProjectDisplayName(projectPath)
-            };
-            McpInvestigationRequested?.Invoke(investigateTask);
+            UpdateMcpToggleForProject();
         }
 
         public void DisconnectMcp(string projectPath)
@@ -1110,9 +1149,7 @@ namespace HappyEngine.Managers
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
             if (entry == null) return;
 
-            entry.McpStatus = McpStatus.Disabled;
-            SaveProjects();
-            RefreshProjectList(null, null, null);
+            StopMcpServer(entry);
             UpdateMcpToggleForProject();
         }
 
@@ -1127,6 +1164,135 @@ namespace HappyEngine.Managers
             {
                 AppLogger.Debug("ProjectManager", $"MCP health check failed for {url}", ex);
                 return false;
+            }
+        }
+
+        private async Task<bool> StartMcpServerAsync(ProjectEntry entry)
+        {
+            try
+            {
+                entry.McpStatus = McpStatus.Connecting;
+                SaveProjects();
+                RefreshProjectList(null, null, null);
+
+                // Check if server is already running
+                if (await CheckMcpHealth(entry.McpAddress))
+                {
+                    entry.McpStatus = McpStatus.Connected;
+                    SaveProjects();
+                    RefreshProjectList(null, null, null);
+                    return true;
+                }
+
+                // Start the server process
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c {entry.McpStartCommand}",
+                    WorkingDirectory = entry.Path,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                var process = System.Diagnostics.Process.Start(processInfo);
+                if (process == null)
+                {
+                    entry.McpStatus = McpStatus.Failed;
+                    SaveProjects();
+                    RefreshProjectList(null, null, null);
+                    return false;
+                }
+
+                entry.McpProcessId = process.Id;
+
+                // Wait for server to start (max 10 seconds)
+                var startTime = DateTime.Now;
+                while ((DateTime.Now - startTime).TotalSeconds < 10)
+                {
+                    if (await CheckMcpHealth(entry.McpAddress))
+                    {
+                        // Register with Claude Code
+                        await RegisterMcpWithClaudeAsync(entry.McpServerName);
+
+                        entry.McpStatus = McpStatus.Connected;
+                        SaveProjects();
+                        RefreshProjectList(null, null, null);
+                        return true;
+                    }
+                    await Task.Delay(500);
+                }
+
+                // Timeout - server didn't start
+                entry.McpStatus = McpStatus.Failed;
+                SaveProjects();
+                RefreshProjectList(null, null, null);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("ProjectManager", "Failed to start MCP server", ex);
+                entry.McpStatus = McpStatus.Failed;
+                SaveProjects();
+                RefreshProjectList(null, null, null);
+                return false;
+            }
+        }
+
+        private void StopMcpServer(ProjectEntry entry)
+        {
+            try
+            {
+                if (entry.McpProcessId > 0)
+                {
+                    try
+                    {
+                        var process = System.Diagnostics.Process.GetProcessById(entry.McpProcessId);
+                        if (!process.HasExited)
+                        {
+                            process.Kill();
+                            process.WaitForExit(5000);
+                        }
+                    }
+                    catch { /* Process may have already exited */ }
+
+                    entry.McpProcessId = 0;
+                }
+
+                entry.McpStatus = McpStatus.NotConnected;
+                SaveProjects();
+                RefreshProjectList(null, null, null);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ProjectManager", "Error stopping MCP server", ex);
+            }
+        }
+
+        private async Task RegisterMcpWithClaudeAsync(string serverName)
+        {
+            try
+            {
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "claude",
+                    Arguments = $"mcp add --scope local --transport http {serverName} http://127.0.0.1:8080/mcp",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                var process = await Task.Run(() => System.Diagnostics.Process.Start(processInfo));
+                if (process != null)
+                {
+                    await process.WaitForExitAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ProjectManager", "Failed to register MCP server with Claude", ex);
             }
         }
     }

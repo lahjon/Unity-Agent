@@ -6,6 +6,10 @@ namespace HappyEngine.Models
     public enum McpStatus
     {
         Disabled,
+        NotConnected,
+        Connecting,
+        Connected,
+        Failed,
         Initialized,
         Investigating,
         Enabled
@@ -15,10 +19,10 @@ namespace HappyEngine.Models
     {
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
-        public McpStatus McpStatus { get; set; } = McpStatus.Disabled;
+        public McpStatus McpStatus { get; set; } = McpStatus.NotConnected;
         public string McpServerName { get; set; } = "mcp-for-unity-server";
         public string McpAddress { get; set; } = "http://127.0.0.1:8080/mcp";
-        public string McpStartCommand { get; set; } = "";
+        public string McpStartCommand { get; set; } = @"C:\Users\fredr\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
         public string ShortDescription { get; set; } = "";
         public string LongDescription { get; set; } = "";
         public string RuleInstruction { get; set; } = "";
@@ -31,6 +35,8 @@ namespace HappyEngine.Models
 
         [JsonIgnore]
         public bool IsInitializing { get; set; }
+        [JsonIgnore]
+        public int McpProcessId { get; set; } // Track the MCP server process
         [JsonIgnore]
         public string FolderName => string.IsNullOrEmpty(Path) ? "" : System.IO.Path.GetFileName(Path);
         [JsonIgnore]

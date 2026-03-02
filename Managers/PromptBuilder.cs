@@ -77,7 +77,9 @@ namespace HappyEngine.Managers
             "MCP server: mcp-for-unity-server at http://127.0.0.1:8080/mcp. " +
             "Verify it is reachable before starting. " +
             "Use MCP for Unity Editor operations (prefabs, scenes, screenshots, GameObjects) " +
-            "that cannot be done through file edits alone.\n\n";
+            "that cannot be done through file edits alone. " +
+            "IMPORTANT: Batch MCP commands whenever possible - combine multiple operations " +
+            "into a single request to improve performance and reduce token usage.\n\n";
 
         public const string NoGitWriteBlock =
             "# NO GIT WRITES\n" +
