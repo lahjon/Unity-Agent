@@ -8,6 +8,18 @@
     <RootNamespace>HappyEngine</RootNamespace>
     <Nullable>enable</Nullable>
     <ApplicationIcon>icon.ico</ApplicationIcon>
+
+    <!-- Single file publish configuration -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+
+    <!-- Exclude localization satellite assemblies -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>

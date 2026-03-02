@@ -373,6 +373,8 @@ namespace HappyEngine
                     var line = Summary.Split('\n')[0].TrimEnd('\r').Trim();
                     return line.Length > 80 ? line[..80] + "..." : line;
                 }
+                if (string.IsNullOrWhiteSpace(Description))
+                    return $"Task #{TaskNumber}";
                 var desc = Description.Split('\n')[0].TrimEnd('\r').Trim();
                 return desc.Length > 45 ? desc[..45] + "..." : desc;
             }

@@ -2141,6 +2141,10 @@ namespace HappyEngine
                 {
                     if (obj is FileLock fileLock)
                     {
+                        // Skip any file locks with "null" as the path
+                        if (fileLock.OriginalPath.Equals("null", StringComparison.OrdinalIgnoreCase))
+                            return false;
+
                         // Find the task that owns this lock
                         var ownerTask = _activeTasks.FirstOrDefault(t => t.Id == fileLock.OwnerTaskId);
                         if (ownerTask != null)
@@ -3277,7 +3281,7 @@ namespace HappyEngine
                     Duration = TimeSpan.FromMilliseconds(300)
                 };
 
-                var brush = new SolidColorBrush((Color)FindResource("BgSubtleColor"));
+                var brush = new SolidColorBrush(((SolidColorBrush)FindResource("BgSurface")).Color);
                 border.Background = brush;
                 brush.BeginAnimation(SolidColorBrush.ColorProperty, bgAnimation);
 

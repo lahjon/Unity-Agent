@@ -1910,7 +1910,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border x:Name="TaskItemBorder"
-                                                        Background="{StaticResource BgSubtle}"
+                                                        Background="{StaticResource BgSurface}"
                                                         CornerRadius="6"
                                                         Padding="12,8"
                                                         Margin="0,0,0,4"
