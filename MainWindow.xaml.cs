@@ -206,7 +206,6 @@ namespace HappyEngine
                 () => _settingsManager.AutoVerify);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
-            _taskExecutionManager.TaskNeedsOrchestratorRegistration += (task, deps) => _taskOrchestrator.AddTask(task, deps);
 
             _failureRecoveryManager = new FailureRecoveryManager(
                 _taskExecutionManager, _outputTabManager, _taskFactory,
@@ -214,6 +213,7 @@ namespace HappyEngine
 
             _taskOrchestrator = new TaskOrchestrator();
             _taskOrchestrator.TaskReady += OnOrchestratorTaskReady;
+            _taskExecutionManager.TaskNeedsOrchestratorRegistration += (task, deps) => _taskOrchestrator.AddTask(task, deps);
 
             _taskGroupTracker = new TaskGroupTracker();
             _taskGroupTracker.GroupCompleted += OnTaskGroupCompleted;
@@ -2228,14 +2228,17 @@ namespace HappyEngine
             // ── 5. Wait for all background file writes to complete ──
             Managers.SafeFileWriter.FlushAll(timeoutMs: 5000);
 
-            // ── 6. Cancel CTS, stop feature mode timers, kill & dispose processes ──
+            // ── 6. Stop all MCP servers and kill stale port processes ──
+            _projectManager.StopAllMcpServers();
+
+            // ── 7. Cancel CTS, stop feature mode timers, kill & dispose processes ──
             foreach (var task in _activeTasks)
             {
                 TaskExecutionManager.KillProcess(task);
                 task.Runtime.Dispose();
             }
 
-            // ── 7. Clean up remaining state ──
+            // ── 8. Clean up remaining state ──
             _messageBusManager.Dispose();
             _fileLockManager.ClearAll();
             _taskExecutionManager.StreamingToolState.Clear();

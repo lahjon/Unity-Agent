@@ -1565,7 +1565,7 @@ namespace HappyEngine.Managers
                 }
 
                 // Filter out cancelled children from FeaturePhaseChildIds before proceeding
-                var cancelledIds = cancelledChildren.Where(c => c != null).Select(c => c.Id).ToHashSet();
+                var cancelledIds = cancelledChildren.Where(c => c != null).Select(c => c!.Id).ToHashSet();
                 var validChildIds = featureParent.FeaturePhaseChildIds
                     .Where(id => !cancelledIds.Contains(id))
                     .ToList();

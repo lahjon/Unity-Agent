@@ -989,12 +989,12 @@ namespace HappyEngine.Managers
                         Background = proj.McpStatus switch
                         {
                             McpStatus.Connected => (Brush)Application.Current.FindResource("BgHover"),
-                            McpStatus.Connecting => (Brush)Application.Current.FindResource("BgMuted"),
-                            _ => (Brush)Application.Current.FindResource("StatusOrange")
+                            McpStatus.Connecting => (Brush)Application.Current.FindResource("BgCard"),
+                            _ => (Brush)Application.Current.FindResource("Accent")
                         },
                         Foreground = proj.McpStatus == McpStatus.Connecting
                             ? (Brush)Application.Current.FindResource("TextMuted")
-                            : (Brush)Application.Current.FindResource("Fg"),
+                            : (Brush)Application.Current.FindResource("TextPrimary"),
                         Tag = proj.Path,
                         IsEnabled = proj.McpStatus != McpStatus.Connecting
                     };
@@ -1179,6 +1179,49 @@ namespace HappyEngine.Managers
             }
         }
 
+        private void KillProcessOnPort(int port, ProjectEntry entry)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c netstat -ano | findstr \"LISTENING\" | findstr \":{port} \"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true
+                };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                if (proc == null) return;
+                var output = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit(5000);
+
+                foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 5 && int.TryParse(parts[^1], out var pid) && pid > 0)
+                    {
+                        try
+                        {
+                            var existing = System.Diagnostics.Process.GetProcessById(pid);
+                            if (!existing.HasExited)
+                            {
+                                AppLogger.Info("ProjectManager", $"Killing stale process {pid} ({existing.ProcessName}) on port {port}");
+                                entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Killing stale process on port {port} (PID {pid})...");
+                                existing.Kill();
+                                existing.WaitForExit(5000);
+                            }
+                        }
+                        catch { /* Process may have already exited */ }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ProjectManager", $"Error checking port {port}", ex);
+            }
+        }
+
         private async Task<bool> StartMcpServerAsync(ProjectEntry entry)
         {
             const int MAX_RETRIES = 3;
@@ -1209,6 +1252,13 @@ namespace HappyEngine.Managers
                     SaveProjects();
                     RefreshProjectList(null, null, null);
                     return true;
+                }
+
+                // Kill any stale process holding the port before starting
+                if (Uri.TryCreate(entry.McpAddress, UriKind.Absolute, out var uri))
+                {
+                    KillProcessOnPort(uri.Port, entry);
+                    await Task.Delay(500); // Brief pause for port release
                 }
 
                 // Try to start the server with retries
@@ -1393,6 +1443,12 @@ namespace HappyEngine.Managers
                     entry.McpProcess = null;
                 }
 
+                // Also kill any stale process holding the port
+                if (Uri.TryCreate(entry.McpAddress, UriKind.Absolute, out var uri))
+                {
+                    KillProcessOnPort(uri.Port, entry);
+                }
+
                 entry.McpStatus = McpStatus.NotConnected;
                 entry.McpOutput.AppendLine($"[{DateTime.Now:HH:mm:ss}] Server disconnected.");
                 SaveProjects();
@@ -1401,6 +1457,14 @@ namespace HappyEngine.Managers
             catch (Exception ex)
             {
                 AppLogger.Warn("ProjectManager", "Error stopping MCP server", ex);
+            }
+        }
+
+        public void StopAllMcpServers()
+        {
+            foreach (var entry in _savedProjects.Where(p => p.McpStatus is McpStatus.Connected or McpStatus.Connecting))
+            {
+                StopMcpServer(entry);
             }
         }
 

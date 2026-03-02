@@ -877,10 +877,10 @@ namespace HappyEngine.Managers
 
             for (int i = 0; i < steps.Count; i++)
             {
-                if (steps[i].DependsOn != null && steps[i].DependsOn.Count > 0)
+                if (steps[i].DependsOn is { Count: > 0 })
                 {
                     tasksWithDependencies.Add(tasks[i].Id);
-                    foreach (var depIdx in steps[i].DependsOn)
+                    foreach (var depIdx in steps[i].DependsOn!)
                     {
                         if (depIdx >= 0 && depIdx < tasks.Count && depIdx != i)
                         {
@@ -898,25 +898,18 @@ namespace HappyEngine.Managers
             foreach (var task in tasks)
             {
                 bool needsMessageBus = false;
-                string reason = "";
 
                 if (parent.UseMessageBus)
                 {
-                    // User explicitly enabled message bus for parent
                     needsMessageBus = true;
-                    reason = "parent has message bus enabled";
                 }
                 else if (tasksWithDependencies.Contains(task.Id))
                 {
-                    // This task depends on others
                     needsMessageBus = true;
-                    reason = "has dependencies";
                 }
                 else if (tasksDependedUpon.Contains(task.Id))
                 {
-                    // Other tasks depend on this one
                     needsMessageBus = true;
-                    reason = "is depended upon";
                 }
 
                 task.UseMessageBus = needsMessageBus;
@@ -932,7 +925,7 @@ namespace HappyEngine.Managers
                 _outputProcessor.AppendOutput(parent.Id,
                     $"[Token Optimization] Message bus selectively enabled for {messageBusEnabledCount}/{tasks.Count} execution tasks " +
                     $"(saved {tasks.Count - messageBusEnabledCount} unnecessary bus connections)\n",
-                    null, null);
+                    null!, null!);
             }
         }
 

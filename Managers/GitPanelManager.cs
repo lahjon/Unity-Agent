@@ -1408,13 +1408,15 @@ secrets.json
                 MarkDirty();
 
                 // Force refresh after successful push
+#pragma warning disable CS8602 // InvokeAsync always returns non-null DispatcherOperation
                 await _dispatcher.InvokeAsync(async () =>
                 {
-                    if (_cachedRoot?.Parent is ScrollViewer sv)
+                    if (_cachedRoot is not null && _cachedRoot.Parent is ScrollViewer sv)
                     {
                         await RefreshAsync(sv);
                     }
                 });
+#pragma warning restore CS8602
             }, "push");
 
             if (!success)

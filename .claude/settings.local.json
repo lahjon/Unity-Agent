@@ -11,7 +11,8 @@
       "Bash(tail:*)",
       "Bash(cat:*)",
       "Bash(powershell:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(netstat:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

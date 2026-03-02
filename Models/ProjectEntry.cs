@@ -40,7 +40,7 @@ namespace HappyEngine.Models
         [JsonIgnore]
         public System.Text.StringBuilder McpOutput { get; } = new System.Text.StringBuilder();
         [JsonIgnore]
-        public System.Diagnostics.Process McpProcess { get; set; }
+        public System.Diagnostics.Process? McpProcess { get; set; }
         [JsonIgnore]
         public string FolderName => string.IsNullOrEmpty(Path) ? "" : System.IO.Path.GetFileName(Path);
         [JsonIgnore]
