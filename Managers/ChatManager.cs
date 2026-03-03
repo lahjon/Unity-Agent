@@ -333,9 +333,7 @@ namespace HappyEngine.Managers
 
             try
             {
-                var systemPrompt = "You are a helpful coding assistant embedded in the Happy Engine app. " +
-                    "Give concise, practical suggestions. Keep responses short unless asked for detail. " +
-                    "The user is working on software projects, primarily Unity game development.";
+                var systemPrompt = PromptBuilder.ChatAssistantSystemPrompt;
 
                 if (useClaude)
                     _claudeService.SelectedModel = selectedModel;

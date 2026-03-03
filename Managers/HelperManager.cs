@@ -132,22 +132,7 @@ namespace HappyEngine.Managers
                     _ => "general improvements"
                 };
 
-                var prompt =
-                    "You are a project analysis agent. Thoroughly explore this project's codebase and suggest improvements.\n\n" +
-                    "STEP 1 — EXPLORE:\n" +
-                    "- List the top-level directory structure\n" +
-                    "- Read key source files, configs, and entry points\n" +
-                    "- Understand the architecture, patterns, and current state\n\n" +
-                    "STEP 2 — SUGGEST:\n" +
-                    $"Focus on: {categoryFilter}\n\n" +
-                    "Generate 5-8 actionable suggestions. For each suggestion, provide:\n" +
-                    "- A short title starting with an action verb (e.g. \"Add\", \"Refactor\", \"Fix\", \"Implement\")\n" +
-                    "- A detailed description (2-4 sentences) written as implementation instructions: specify which files to change, what code to write, and the expected outcome. Do NOT write analytical observations — write step-by-step instructions an engineer can execute immediately.\n\n" +
-                    "STEP 3 — OUTPUT:\n" +
-                    "Output ONLY a JSON array with objects having \"title\" and \"description\" fields.\n" +
-                    "Example:\n" +
-                    "[{\"title\": \"Add email validation to login form\", \"description\": \"In LoginForm.cs, add a regex check on the email field in the Submit handler. Return an error message if the format is invalid. Add a unit test in LoginFormTests.cs to verify both valid and invalid emails.\"}]\n\n" +
-                    "Output ONLY the JSON array, no other text, no markdown code blocks.";
+                var prompt = string.Format(PromptBuilder.ProjectSuggestionPromptTemplate, categoryFilter);
 
                 if (!string.IsNullOrWhiteSpace(guidance))
                 {

@@ -503,8 +503,7 @@ namespace HappyEngine.Managers
         {
             var prompt = PromptBuilder.FeatureModeInitialTemplate +
                 task.OriginalFeatureDescription +
-                "\n\n# PREVIOUS ITERATION EVALUATION\n" +
-                "The following is the evaluation from the previous iteration. Address the identified issues:\n\n" +
+                "\n\n" + PromptBuilder.FeatureModeIterationPlanningTemplate +
                 previousEvaluation;
 
             StartFeatureModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);

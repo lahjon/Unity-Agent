@@ -25,24 +25,7 @@ namespace HappyEngine.Dialogs
 
     public static class WorkflowComposerDialog
     {
-        private const string SystemPrompt =
-            "You are a workflow decomposition assistant. The user will describe a multi-step workflow in plain English. " +
-            "Your job is to break it down into discrete tasks with dependency relationships.\n\n" +
-            "Respond with ONLY a valid JSON array (no markdown fences, no explanation). Each element must have:\n" +
-            "- \"taskName\": a short name for the task (max 60 chars)\n" +
-            "- \"description\": a detailed description of what the task should accomplish\n" +
-            "- \"dependsOn\": an array of taskName strings this task depends on (empty array if no dependencies)\n\n" +
-            "Rules:\n" +
-            "- Tasks should be ordered logically\n" +
-            "- Only reference taskNames that appear earlier in the array\n" +
-            "- Keep task names concise but descriptive\n" +
-            "- Make descriptions actionable and specific\n" +
-            "- Identify parallelizable work (tasks with no mutual dependencies)\n" +
-            "- Ensure the dependency graph is a valid DAG (no cycles)\n\n" +
-            "Example output:\n" +
-            "[{\"taskName\":\"Refactor auth module\",\"description\":\"Refactor the authentication module to use JWT tokens instead of session cookies\",\"dependsOn\":[]}," +
-            "{\"taskName\":\"Update API endpoints\",\"description\":\"Update all API endpoints to use the new JWT-based auth from the refactored auth module\",\"dependsOn\":[\"Refactor auth module\"]}," +
-            "{\"taskName\":\"Run integration tests\",\"description\":\"Run the full integration test suite to verify all endpoints work with the new auth system\",\"dependsOn\":[\"Update API endpoints\"]}]";
+        private const string SystemPrompt = PromptBuilder.WorkflowDecompositionSystemPrompt;
 
         public static Task<WorkflowComposerResult?> ShowAsync(
             ClaudeService claudeService,

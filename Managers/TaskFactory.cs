@@ -145,52 +145,11 @@ namespace HappyEngine.Managers
                 string prompt;
                 if (isGame)
                 {
-                    prompt = "You are a game project exploration agent. Explore this game project, then produce a token-efficient description.\n\n" +
-                        "STEP 1 — EXPLORE (use your tools, do NOT guess):\n" +
-                        "- List the top-level directory structure\n" +
-                        "- Check for Unity project (ProjectSettings/, Assets/), Unreal (*.uproject), or other game engines\n" +
-                        "- Read key config files (ProjectSettings/ProjectSettings.asset, *.uproject, project.json, etc.)\n" +
-                        "- Look for main game scripts in Scripts/, Source/, or similar directories\n" +
-                        "- Identify the game type, genre, and key systems\n\n" +
-                        "STEP 2 — Output EXACTLY this format:\n\n" +
-                        "<short>\nOne-line summary: game genre/type + engine. Max 200 chars. No preamble.\n</short>\n\n" +
-                        "<long>\nCompact bullet-point summary using this structure (keep each line terse, no filler words):\n" +
-                        "- Game: [type/genre and brief description]\n" +
-                        "- Engine: [Unity, Unreal, Godot, custom, etc.]\n" +
-                        "- Platform: [target platforms if identifiable]\n" +
-                        "- Key dirs: [main directories like Assets/, Scripts/, etc.]\n" +
-                        "- Systems: [major gameplay systems, components]\n" +
-                        "- Tech: [rendering pipeline, multiplayer, physics, etc.]\n" +
-                        "Max 800 characters total. Omit any section that has nothing notable. No preamble.\n</long>\n\n" +
-                        "RULES:\n" +
-                        "- Focus on game-specific aspects, not generic code structure.\n" +
-                        "- Skip large binary folders (Library/, Temp/, Builds/, etc.).\n" +
-                        "- Output ONLY <short> and <long> tags. Nothing else.\n" +
-                        "- Write factual project summaries, not agent responses.";
+                    prompt = PromptBuilder.GameProjectExplorationPrompt;
                 }
                 else
                 {
-                    prompt = "You are a codebase exploration agent. Explore this project's source code, then produce a token-efficient description.\n\n" +
-                        "STEP 1 — EXPLORE (use your tools, do NOT guess):\n" +
-                        "- List the top-level directory structure\n" +
-                        "- Read project config files (.csproj, package.json, Cargo.toml, etc.)\n" +
-                        "- Read the main entry point and key source files\n" +
-                        "- Identify the architecture, patterns, and major components\n\n" +
-                        "STEP 2 — Output EXACTLY this format:\n\n" +
-                        "<short>\nOne-line summary: what it is + tech stack. Max 200 chars. No preamble.\n</short>\n\n" +
-                        "<long>\nCompact bullet-point summary using this structure (keep each line terse, no filler words):\n" +
-                        "- Purpose: [what the project does]\n" +
-                        "- Stack: [languages, frameworks, runtime]\n" +
-                        "- Architecture: [pattern, e.g. MVVM, MVC, microservices]\n" +
-                        "- Key dirs: [top-level source directories]\n" +
-                        "- Components: [major classes/modules and their roles]\n" +
-                        "- Patterns: [notable conventions, DI, async, etc.]\n" +
-                        "Max 800 characters total. Omit any section that has nothing notable. No preamble.\n</long>\n\n" +
-                        "RULES:\n" +
-                        "- Base descriptions on actual files read, not assumptions.\n" +
-                        "- Output ONLY <short> and <long> tags. Nothing else.\n" +
-                        "- No conversational text, preamble, or commentary.\n" +
-                        "- Write factual project summaries, not agent responses.";
+                    prompt = PromptBuilder.CodebaseExplorationPrompt;
                 }
 
                 await process.StandardInput.WriteAsync(prompt);

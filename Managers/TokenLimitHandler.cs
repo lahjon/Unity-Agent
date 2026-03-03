@@ -142,9 +142,8 @@ namespace HappyEngine.Managers
             // Apply context reduction if we have a token estimate from the previous attempt
             if (task.Runtime.LastPromptTokenEstimate > 0 && task.Runtime.TokenLimitRetryCount > 0)
             {
-                var basePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
                 continuePrompt = ContextReducer.ReducePromptContext(
-                    basePrompt,
+                    PromptBuilder.TokenLimitRetryContinuationPrompt,
                     task.Runtime.TokenLimitRetryCount - 1,
                     task.Runtime.LastPromptTokenEstimate);
 
@@ -154,7 +153,7 @@ namespace HappyEngine.Managers
             }
             else
             {
-                continuePrompt = "Continue where you left off. The previous attempt was interrupted by a token/rate limit. Pick up from where you stopped.";
+                continuePrompt = PromptBuilder.TokenLimitRetryContinuationPrompt;
             }
 
             _outputProcessor.AppendOutput(task.Id, $"\n[HappyEngine] Sending retry with {resumeLabel}...\n\n", activeTasks, historyTasks);

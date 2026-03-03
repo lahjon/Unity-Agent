@@ -149,26 +149,8 @@ namespace HappyEngine.Managers
                     ? $"COMPLETION SUMMARY:\n{completionSummary}\n\n"
                     : "";
 
-                var prompt =
-                    "You are verifying an AI coding agent's work to confirm it actually accomplished the requested task.\n\n" +
-                    $"TASK DESCRIPTION:\n{taskDescription}\n\n" +
-                    $"AGENT'S FINAL OUTPUT (tail):\n{contextTail}\n\n" +
-                    summaryBlock +
-                    "QUESTION: Did the agent's work actually accomplish what was requested? Verify the result quality.\n\n" +
-                    "Rules:\n" +
-                    "- Check that the core requirements from the task description were addressed\n" +
-                    "- If the agent made the requested changes and they appear correct → PASS\n" +
-                    "- If the agent encountered errors, made incorrect changes, or missed key requirements → FAIL\n" +
-                    "- If the task failed or was cancelled, verify whether any partial work was done correctly\n" +
-                    "- Focus on correctness, not style or optional improvements\n\n" +
-                    "Respond with EXACTLY one line in this format:\n" +
-                    "PASS|<one-sentence summary of what was verified>\n" +
-                    "or\n" +
-                    "FAIL|<one-sentence description of what went wrong or was missed>\n\n" +
-                    "Examples:\n" +
-                    "PASS|Authentication endpoint added with proper JWT validation and error handling\n" +
-                    "FAIL|The database migration was created but the API endpoint was not updated to use the new schema\n\n" +
-                    "IMPORTANT: Output ONLY the single PASS or FAIL line. No explanation, preamble, or follow-up text.";
+                var prompt = string.Format(PromptBuilder.ResultVerificationPromptTemplate,
+                    taskDescription, contextTail, summaryBlock);
 
                 var psi = new ProcessStartInfo
                 {
