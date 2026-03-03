@@ -6,6 +6,7 @@
     <conv:NestingDepthToMarginConverter x:Key="NestingDepthToMargin"/>
     <conv:StringToVisibilityConverter x:Key="StringToVisibility"/>
     <conv:WrapTooltipTextConverter x:Key="WrapTooltipText"/>
+    <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
     <!-- ── Backgrounds (darkest → lightest) ── -->
     <SolidColorBrush x:Key="BgAbyss" Color="#0A0A0A"/>
     <SolidColorBrush x:Key="BgPit" Color="#0E0E0E"/>
