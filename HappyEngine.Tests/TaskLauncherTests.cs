@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using HappyEngine.Constants;
 using HappyEngine.Helpers;
 using HappyEngine.Managers;
 using Xunit;
@@ -221,8 +222,8 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildClaudeCommand_WithModel_IncludesModelFlag()
         {
-            var cmd = _prompt.BuildClaudeCommand(false, false, "claude-opus-4-20250514");
-            Assert.Contains("--model claude-opus-4-20250514", cmd);
+            var cmd = _prompt.BuildClaudeCommand(false, false, AppConstants.ClaudeOpus);
+            Assert.Contains($"--model {AppConstants.ClaudeOpus}", cmd);
         }
 
         [Fact]
@@ -249,10 +250,10 @@ namespace HappyEngine.Tests
         [Fact]
         public void BuildClaudeCommand_AllFlags()
         {
-            var cmd = _prompt.BuildClaudeCommand(true, true, "claude-sonnet-4-20250514");
+            var cmd = _prompt.BuildClaudeCommand(true, true, AppConstants.ClaudeSonnet);
             Assert.Contains("--dangerously-skip-permissions", cmd);
             Assert.Contains("--remote", cmd);
-            Assert.Contains("--model claude-sonnet-4-20250514", cmd);
+            Assert.Contains($"--model {AppConstants.ClaudeSonnet}", cmd);
             Assert.DoesNotContain("--spawn-team", cmd);
             Assert.Contains("--verbose", cmd);
             Assert.Contains("--output-format stream-json", cmd);

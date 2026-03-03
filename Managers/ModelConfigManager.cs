@@ -6,18 +6,13 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using HappyEngine.Constants;
 
 namespace HappyEngine.Managers
 {
     public class ModelConfigManager
     {
-        private static readonly string[] DefaultClaudeModels =
-        {
-            "claude-sonnet-4-20250514",
-            "claude-haiku-4-20250414",
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022",
-        };
+        private static readonly string[] DefaultClaudeModels = AppConstants.ClaudeAvailableModels;
 
         private static readonly string[] DefaultGeminiModels =
         {

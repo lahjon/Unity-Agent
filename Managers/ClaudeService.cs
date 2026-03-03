@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using HappyEngine.Constants;
 
 namespace HappyEngine.Managers
 {
@@ -15,16 +16,10 @@ namespace HappyEngine.Managers
         private ClaudeUsageManager? _usageManager;
 
         public static string[] AvailableModels { get; set; } =
-        {
-            "claude-opus-4-20250514",
-            "claude-sonnet-4-20250514",
-            "claude-haiku-4-20250414",
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022",
-        };
+            (string[])AppConstants.ClaudeAvailableModels.Clone();
 
         protected override string ServiceName => "ClaudeService";
-        protected override string DefaultModelId => "claude-sonnet-4-20250514";
+        protected override string DefaultModelId => AppConstants.ClaudeDefaultChatModel;
 
         public ClaudeService(string appDataDir) : base(appDataDir, "claude_chat_config.json") { }
 

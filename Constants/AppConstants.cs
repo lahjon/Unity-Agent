@@ -6,6 +6,28 @@ namespace HappyEngine.Constants
     /// </summary>
     public static class AppConstants
     {
+        // ── Claude Models ────────────────────────────────────────────
+        // Single source of truth for all Claude model identifiers.
+        // Change these when upgrading to newer model versions.
+
+        /// <summary>Claude Opus — highest capability, used for planning and execution tasks.</summary>
+        public const string ClaudeOpus = "claude-opus-4-latest";
+
+        /// <summary>Claude Sonnet — balanced, used for exploration tasks (codebase analysis, decomposition).</summary>
+        public const string ClaudeSonnet = "claude-sonnet-4-latest";
+
+        /// <summary>Claude Haiku — fastest/cheapest, used for lightweight classification tasks.</summary>
+        public const string ClaudeHaiku = "claude-haiku-4-5-latest";
+
+        /// <summary>Default model for the Claude chat panel (API-based conversations).</summary>
+        public const string ClaudeDefaultChatModel = ClaudeSonnet;
+
+        /// <summary>Default model for CLI prompt execution (task running).</summary>
+        public const string ClaudeDefaultPromptModel = ClaudeOpus;
+
+        /// <summary>Ordered list of Claude models shown in the UI and available for selection.</summary>
+        public static readonly string[] ClaudeAvailableModels = { ClaudeOpus, ClaudeSonnet, ClaudeHaiku };
+
         // ── Task Services ────────────────────────────────────────────
 
         /// <summary>Number of lines from the end of output to scan for status markers.</summary>

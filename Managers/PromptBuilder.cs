@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using HappyEngine.Constants;
 
 namespace HappyEngine.Managers
 {
@@ -11,10 +12,10 @@ namespace HappyEngine.Managers
         // ── CLI Model Constants ─────────────────────────────────────
 
         /// <summary>Model used for exploration tasks (codebase analysis, decomposition, team design).</summary>
-        public const string CliSonnetModel = "claude-sonnet-4-20250514";
+        public const string CliSonnetModel = AppConstants.ClaudeSonnet;
 
         /// <summary>Model used for planning and execution tasks.</summary>
-        public const string CliOpusModel = "claude-opus-4-20250514";
+        public const string CliOpusModel = AppConstants.ClaudeOpus;
 
         /// <summary>
         /// Determines the CLI model ID for a task based on its flags.

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using HappyEngine.Constants;
 
 namespace HappyEngine.Managers
 {
@@ -155,7 +156,7 @@ namespace HappyEngine.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = "-p --output-format text --model claude-haiku-4-5-20251001 --max-turns 1 --append-system-prompt \"Respond with exactly one line. No additional text.\"",
+                    Arguments = $"-p --output-format text --model {AppConstants.ClaudeHaiku} --max-turns 1 --append-system-prompt \"Respond with exactly one line. No additional text.\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
