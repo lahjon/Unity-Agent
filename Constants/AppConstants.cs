@@ -56,6 +56,14 @@ namespace HappyEngine.Constants
         /// <summary>Poll interval in seconds when message bus is idle (no recent activity).</summary>
         public const int MessageBusIdlePollSeconds = 30;
 
+        // ── Task Timeout ──────────────────────────────────────────────
+
+        /// <summary>Default timeout for tasks in minutes.</summary>
+        public const int DefaultTaskTimeoutMinutes = 120;
+
+        /// <summary>Percentage of timeout elapsed before warning (0.8 = 80%).</summary>
+        public const double TaskTimeoutWarningPercent = 0.8;
+
         // ── Token Optimization ──────────────────────────────────────────────
 
         /// <summary>Maximum retry attempts for token limit errors before giving up.</summary>

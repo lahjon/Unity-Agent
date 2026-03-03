@@ -664,8 +664,8 @@ namespace HappyEngine.Managers
         {
             var panel = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
 
-            // Get Latest button
-            var fetchBtn = MakeActionButton("\uE895", "Get Latest", "Fetch and pull latest changes from remote");
+            // Get Latest button - using download arrow icon
+            var fetchBtn = MakeActionButton("\uE74A", "Get Latest", "Fetch and pull latest changes from remote");
             fetchBtn.Click += async (_, _) => await ExecuteGetLatestAsync();
             panel.Children.Add(fetchBtn);
 
@@ -980,36 +980,34 @@ namespace HappyEngine.Managers
         {
             var section = new StackPanel();
 
-            // Header with select all/none controls
-            var headerPanel = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
-
+            // Header without select controls
             var header = new TextBlock
             {
                 Text = $"Uncommitted Changes ({_uncommittedChanges.Count})",
                 Foreground = BrushCache.Theme("TextLight"),
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
-                FontFamily = new FontFamily("Segoe UI")
+                FontFamily = new FontFamily("Segoe UI"),
+                Margin = new Thickness(0, 0, 0, 6)
             };
-            DockPanel.SetDock(header, Dock.Left);
-            headerPanel.Children.Add(header);
+            section.Children.Add(header);
 
-            // Add select all/none links
-            var selectControls = new WrapPanel
+            // Add select all/none buttons above the file list
+            var buttonPanel = new StackPanel
             {
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 8)
             };
 
-            var selectAll = new TextBlock
+            var selectAllButton = new Button
             {
-                Text = "Select All",
-                Foreground = BrushCache.Theme("Accent"),
-                FontSize = 10,
-                Cursor = System.Windows.Input.Cursors.Hand,
+                Content = "Select All",
+                Style = Application.Current.TryFindResource("SmallBtn") as Style,
+                MinWidth = 80,
+                Height = 26,
                 Margin = new Thickness(0, 0, 8, 0)
             };
-            selectAll.MouseLeftButtonDown += (_, _) =>
+            selectAllButton.Click += (_, _) =>
             {
                 foreach (var change in _uncommittedChanges)
                 {
@@ -1018,27 +1016,24 @@ namespace HappyEngine.Managers
                 UpdateUncommittedSection();
                 UpdateCommitButtonState();
             };
-            selectControls.Children.Add(selectAll);
+            buttonPanel.Children.Add(selectAllButton);
 
-            var selectNone = new TextBlock
+            var selectNoneButton = new Button
             {
-                Text = "Select None",
-                Foreground = BrushCache.Theme("Accent"),
-                FontSize = 10,
-                Cursor = System.Windows.Input.Cursors.Hand
+                Content = "Select None",
+                Style = Application.Current.TryFindResource("SmallBtn") as Style,
+                MinWidth = 80,
+                Height = 26
             };
-            selectNone.MouseLeftButtonDown += (_, _) =>
+            selectNoneButton.Click += (_, _) =>
             {
                 _selectedFiles.Clear();
                 UpdateUncommittedSection();
                 UpdateCommitButtonState();
             };
-            selectControls.Children.Add(selectNone);
+            buttonPanel.Children.Add(selectNoneButton);
 
-            DockPanel.SetDock(selectControls, Dock.Right);
-            headerPanel.Children.Add(selectControls);
-
-            section.Children.Add(headerPanel);
+            section.Children.Add(buttonPanel);
             section.Children.Add(BuildUncommittedFilesList());
 
             return section;
@@ -1768,11 +1763,27 @@ secrets.json
                 FontSize = 14,
                 Width = 24,
                 Height = 24,
-                Margin = new Thickness(0, 0, 4, 0)
+                Margin = new Thickness(0, 0, 4, 0),
+                // Make buttons orange for better visibility
+                Foreground = BrushCache.Theme("StatusOrange")
             };
 
-            // The IconBtn style already handles hover effects through triggers
-            // No need for manual mouse events
+            // Override hover color to maintain orange visibility
+            button.MouseEnter += (s, e) =>
+            {
+                if (button.IsEnabled)
+                    button.Foreground = BrushCache.Theme("WarningDeepOrange");
+            };
+            button.MouseLeave += (s, e) =>
+            {
+                button.Foreground = button.IsEnabled ? BrushCache.Theme("StatusOrange") : BrushCache.Theme("TextMuted");
+            };
+
+            // Update color when enabled state changes
+            button.IsEnabledChanged += (s, e) =>
+            {
+                button.Foreground = button.IsEnabled ? BrushCache.Theme("StatusOrange") : BrushCache.Theme("TextMuted");
+            };
 
             return button;
         }

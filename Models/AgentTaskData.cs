@@ -61,6 +61,12 @@ namespace HappyEngine
         /// <summary>User-assigned priority level. Affects scheduling order and is displayed on task cards.</summary>
         public TaskPriority PriorityLevel { get; set; } = TaskPriority.Normal;
 
+        /// <summary>Timeout in minutes for task execution. Uses default if not specified.</summary>
+        public int? TimeoutMinutes { get; set; }
+
+        /// <summary>Indicates if a timeout warning has been shown for this task.</summary>
+        public bool HasTimeoutWarning { get; set; }
+
         // Parent-child task hierarchy
         public string? ParentTaskId { get; set; }
         public List<string> ChildTaskIds { get; set; } = new();

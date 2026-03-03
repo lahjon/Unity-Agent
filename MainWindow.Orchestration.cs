@@ -18,6 +18,9 @@ namespace HappyEngine
     {
         // ── Orchestration ──────────────────────────────────────────
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
         private void AddActiveTask(AgentTask task)
         {
             // Guard against duplicate insertions (can happen during concurrent spawning)
@@ -225,6 +228,34 @@ namespace HappyEngine
             RefreshFilterCombos();
             RefreshInlineProjectStats();
             UpdateStatus();
+
+            // Show notification if window is not in foreground
+            try
+            {
+                var foregroundWindow = GetForegroundWindow();
+                var currentWindowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+
+                if (foregroundWindow != currentWindowHandle && foregroundWindow != IntPtr.Zero)
+                {
+                    // Window is in background, show notification
+                    var title = $"Task #{task.TaskNumber} {task.Status}";
+                    var message = task.Description.Length > 100
+                        ? task.Description.Substring(0, 97) + "..."
+                        : task.Description;
+
+                    var icon = task.Status == AgentTaskStatus.Completed
+                        ? System.Windows.Forms.ToolTipIcon.Info
+                        : task.Status == AgentTaskStatus.Failed
+                            ? System.Windows.Forms.ToolTipIcon.Error
+                            : System.Windows.Forms.ToolTipIcon.Warning;
+
+                    App.ShowBalloonNotification(title, message, icon);
+                }
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Debug("Orchestration", $"Failed to show task completion notification: {ex.Message}");
+            }
 
             // Resume tasks that were waiting on file locks or dependencies
             _fileLockManager.CheckQueuedTasks(_activeTasks);
@@ -496,6 +527,76 @@ namespace HappyEngine
                     McpOutputScrollViewer.ScrollToEnd();
                 });
             }
+
+            // Handle MCP health monitoring
+            if (entry != null)
+            {
+                if (entry.McpStatus == Models.McpStatus.Connected)
+                {
+                    // Start health monitoring if not already started
+                    if (_mcpHealthMonitor == null || _mcpHealthMonitor.McpStatus == McpHealthStatus.Disconnected)
+                    {
+                        _mcpHealthMonitor?.Dispose();
+                        _mcpHealthMonitor = new McpHealthMonitor(projectPath, _projectManager);
+                        _mcpHealthMonitor.McpStatusChanged += OnMcpHealthStatusChanged;
+                        _mcpHealthMonitor.Start();
+                    }
+                }
+                else if (entry.McpStatus == Models.McpStatus.NotConnected || entry.McpStatus == Models.McpStatus.Disabled)
+                {
+                    // Stop health monitoring
+                    _mcpHealthMonitor?.Stop();
+                    _mcpHealthMonitor?.Dispose();
+                    _mcpHealthMonitor = null;
+                    UpdateMcpHealthIndicator(McpHealthStatus.Disconnected, "");
+                }
+            }
+        }
+
+        private void OnMcpHealthStatusChanged(McpHealthStatus status, string message)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                UpdateMcpHealthIndicator(status, message);
+
+                // Log the status change
+                AppLogger.Info("McpHealthMonitor", $"MCP health status: {status} - {message}");
+            });
+        }
+
+        private void UpdateMcpHealthIndicator(McpHealthStatus status, string message)
+        {
+            if (McpHealthIndicator == null) return;
+
+            var (color, tooltip) = status switch
+            {
+                McpHealthStatus.Connected => (FindResource("SuccessGreen") as System.Windows.Media.Brush, "MCP connected"),
+                McpHealthStatus.Reconnecting => (FindResource("WarningAmber") as System.Windows.Media.Brush, "MCP reconnecting..."),
+                McpHealthStatus.Disconnected => (FindResource("TextMuted") as System.Windows.Media.Brush, "MCP disconnected"),
+                _ => (FindResource("TextMuted") as System.Windows.Media.Brush, "MCP status unknown")
+            };
+
+            McpHealthIndicator.Fill = color ?? System.Windows.Media.Brushes.Gray;
+            McpHealthIndicator.ToolTip = string.IsNullOrEmpty(message) ? tooltip : $"{tooltip}: {message}";
+
+            // Add pulsing animation for reconnecting state
+            if (status == McpHealthStatus.Reconnecting)
+            {
+                var animation = new System.Windows.Media.Animation.DoubleAnimation
+                {
+                    From = 0.3,
+                    To = 1.0,
+                    Duration = new Duration(TimeSpan.FromSeconds(1)),
+                    AutoReverse = true,
+                    RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+                };
+                McpHealthIndicator.BeginAnimation(UIElement.OpacityProperty, animation);
+            }
+            else
+            {
+                McpHealthIndicator.BeginAnimation(UIElement.OpacityProperty, null);
+                McpHealthIndicator.Opacity = 1.0;
+            }
         }
 
         /// <summary>
@@ -504,9 +605,20 @@ namespace HappyEngine
         /// </summary>
         private void RetryTask(AgentTask historicTask)
         {
-            var prompt = historicTask.StoredPrompt ?? historicTask.Description;
+            var originalPrompt = historicTask.StoredPrompt ?? historicTask.Description;
+            var retryPrompt = $"RETRY: {originalPrompt}";
+
+            // Build additional instructions with previous completion summary
+            var additionalInstructions = historicTask.AdditionalInstructions ?? "";
+            if (!string.IsNullOrWhiteSpace(historicTask.CompletionSummary))
+            {
+                if (!string.IsNullOrWhiteSpace(additionalInstructions))
+                    additionalInstructions += "\n\n";
+                additionalInstructions += $"Previous attempt summary:\n{historicTask.CompletionSummary}";
+            }
+
             var newTask = _taskFactory.CreateTask(
-                prompt,
+                retryPrompt,
                 historicTask.ProjectPath,
                 historicTask.SkipPermissions,
                 historicTask.RemoteSession,
@@ -522,8 +634,9 @@ namespace HappyEngine
                 model: historicTask.Model);
             newTask.ProjectColor = historicTask.ProjectColor;
             newTask.ProjectDisplayName = historicTask.ProjectDisplayName;
-            newTask.AdditionalInstructions = historicTask.AdditionalInstructions;
-            newTask.Summary = _taskFactory.GenerateLocalSummary(prompt);
+            newTask.AdditionalInstructions = additionalInstructions;
+            newTask.TimeoutMinutes = historicTask.TimeoutMinutes;
+            newTask.Summary = _taskFactory.GenerateLocalSummary(retryPrompt);
 
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);

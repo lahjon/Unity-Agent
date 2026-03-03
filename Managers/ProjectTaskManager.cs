@@ -52,6 +52,11 @@ namespace HappyEngine.Managers
             }
         }
 
+        public async Task SaveTasksAsync()
+        {
+            await Task.Run(() => SaveTasks());
+        }
+
         public ProjectTaskItem AddTask(string text)
         {
             if (string.IsNullOrWhiteSpace(text))

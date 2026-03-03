@@ -64,9 +64,11 @@ namespace HappyEngine
         private ProjectManager _projectManager = null!;
         private TaskExecutionManager _taskExecutionManager = null!;
         private readonly MessageBusManager _messageBusManager;
+        private McpHealthMonitor? _mcpHealthMonitor;
         private TerminalTabManager? _terminalManager;
         private GeminiService _geminiService = null!;
         private ClaudeService _claudeService = null!;
+        private ClaudeUsageManager _claudeUsageManager = null!;
         private ModelConfigManager _modelConfigManager = null!;
         private ProjectTaskManager _projectTaskManager = null!;
         private HelperManager _helperManager = null!;
@@ -84,6 +86,10 @@ namespace HappyEngine
 
         // Disposal guard
         private bool _disposed;
+
+        // Drag-drop state for task reordering
+        private Point _dragStartPoint;
+        private AgentTask? _draggedTask;
 
         // Window-level cancellation — cancelled on close to abort in-flight async work
         private readonly CancellationTokenSource _windowCts = new();
@@ -166,6 +172,9 @@ namespace HappyEngine
             _imageManager = new ImageAttachmentManager(appDataDir, ImageIndicator, ClearImagesBtn);
             _geminiService = new GeminiService(appDataDir);
             _claudeService = new ClaudeService(appDataDir);
+            _claudeUsageManager = new ClaudeUsageManager(appDataDir);
+            _claudeService.SetUsageManager(_claudeUsageManager);
+            _claudeUsageManager.UsageUpdated += OnClaudeUsageUpdated;
             _modelConfigManager = new ModelConfigManager(appDataDir);
             ClaudeService.AvailableModels = _modelConfigManager.ClaudeModels;
             GeminiService.AvailableModels = _modelConfigManager.GeminiModels;
@@ -225,7 +234,7 @@ namespace HappyEngine
             _gitPanelManager = new GitPanelManager(
                 _gitHelper,
                 () => _projectManager.ProjectPath,
-                () => DefaultNoGitWriteToggle.IsChecked == true,
+                () => false, // Always show uncommitted changes in git tab
                 _fileLockManager,
                 _gitOperationGuard,
                 Dispatcher);
@@ -269,6 +278,10 @@ namespace HappyEngine
                 _outputTabManager.UpdateOutputTabWidths();
                 App.TraceUi("StatusTimer.UpdateStatus");
                 UpdateStatus();
+
+                // Check for task timeouts
+                App.TraceUi("StatusTimer.CheckTimeouts");
+                CheckTaskTimeouts();
             };
 
             // Initialize periodic save timer to checkpoint active queue every 5 minutes
@@ -405,6 +418,7 @@ namespace HappyEngine
 
             MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
+            TimeoutMinutesBox.Text = Constants.AppConstants.DefaultTaskTimeoutMinutes.ToString();
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
             AutoRecoverToggle.IsChecked = _settingsManager.AutoRecover;
             AutoCommitToggle.IsChecked = _settingsManager.AutoCommit;
@@ -527,6 +541,9 @@ namespace HappyEngine
             finally
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
+
+                // Initialize Claude usage display
+                ClaudeUsageText.Text = _claudeUsageManager.GetUsageSummary();
             }
         }
 
@@ -969,6 +986,11 @@ namespace HappyEngine
         }
 
         private void IterationsBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+        {
+            e.Handled = !int.TryParse(e.Text, out _);
+        }
+
+        private void TimeoutBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
         {
             e.Handled = !int.TryParse(e.Text, out _);
         }
@@ -1558,6 +1580,24 @@ namespace HappyEngine
 
         private void TaskInput_Drop(object sender, DragEventArgs e) => _imageManager.HandleDrop(e);
 
+        private void TaskInput_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // If we have a loaded prompt and the text is different, mark it as modified
+            if (_currentLoadedPrompt != null)
+            {
+                var currentText = TaskInput.Text?.Trim() ?? "";
+                var originalText = _currentLoadedPrompt.PromptText?.Trim() ?? "";
+                _loadedPromptModified = currentText != originalText;
+
+                // If user cleared the text or changed it completely, clear the loaded prompt reference
+                if (string.IsNullOrEmpty(currentText) || _loadedPromptModified)
+                {
+                    if (string.IsNullOrEmpty(currentText))
+                        _currentLoadedPrompt = null;
+                }
+            }
+        }
+
         private void ClearImages_Click(object sender, RoutedEventArgs e)
         {
             var failures = _imageManager.ClearImages();
@@ -1569,12 +1609,13 @@ namespace HappyEngine
         {
             TaskInput.Clear();
             AdditionalInstructionsInput.Clear();
+            _currentLoadedPrompt = null;
+            _loadedPromptModified = false;
         }
 
         // ── Dependencies ────────────────────────────────────────────
 
         private readonly List<AgentTask> _pendingDependencies = new();
-        private Point? _dragStartPoint;
 
         private void TaskCard_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -1583,17 +1624,16 @@ namespace HappyEngine
 
         private void TaskCard_MouseMove(object sender, MouseEventArgs e)
         {
-            if (e.LeftButton != MouseButtonState.Pressed || _dragStartPoint == null) return;
+            if (e.LeftButton != MouseButtonState.Pressed) return;
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (task.IsFinished) return;
 
             var pos = e.GetPosition(null);
-            var diff = pos - _dragStartPoint.Value;
+            var diff = pos - _dragStartPoint;
             if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
                 Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
                 return;
 
-            _dragStartPoint = null;
             var data = new DataObject("AgentTask", task);
             DragDrop.DoDragDrop(el, data, DragDropEffects.Link | DragDropEffects.Move);
         }
@@ -1958,6 +1998,12 @@ namespace HappyEngine
             newTask.ProjectDisplayName = _projectManager.GetProjectDisplayName(newTask.ProjectPath);
             newTask.Summary = $"Executing stored plan: {task.ShortDescription}";
 
+            // Set timeout from UI
+            if (int.TryParse(TimeoutMinutesBox?.Text, out var timeoutMinutes) && timeoutMinutes > 0)
+                newTask.TimeoutMinutes = timeoutMinutes;
+            else
+                newTask.TimeoutMinutes = Constants.AppConstants.DefaultTaskTimeoutMinutes;
+
             // Remove the stored task from the list after extracting its data
             _storedTasks.Remove(task);
             _historyManager.SaveStoredTasks(_storedTasks);
@@ -2109,6 +2155,128 @@ namespace HappyEngine
         {
             if (ActiveTasksList.SelectedItem is AgentTask task)
                 NodeGraphPanel.FocusOnTask(task.Id);
+        }
+
+        // ── Drag & Drop Task Reordering ──────────────────────────────
+
+        private void ActiveTasksList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragStartPoint = e.GetPosition(null);
+
+            // Find the clicked task item
+            var hitTest = e.OriginalSource as DependencyObject;
+            while (hitTest != null && !(hitTest is ListBoxItem))
+            {
+                hitTest = VisualTreeHelper.GetParent(hitTest);
+            }
+
+            if (hitTest is ListBoxItem item && item.DataContext is AgentTask task)
+            {
+                // Only allow dragging of Queued or InitQueued tasks
+                if (task.Status == AgentTaskStatus.Queued || task.Status == AgentTaskStatus.InitQueued)
+                {
+                    _draggedTask = task;
+                }
+            }
+        }
+
+        private void ActiveTasksList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_draggedTask == null || e.LeftButton != MouseButtonState.Pressed)
+                return;
+
+            var currentPoint = e.GetPosition(null);
+            var diff = _dragStartPoint - currentPoint;
+
+            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+            {
+                var listBox = sender as ListBox;
+                var listBoxItem = FindAncestor<ListBoxItem>((DependencyObject)e.OriginalSource);
+
+                if (listBox != null && listBoxItem != null)
+                {
+                    DragDrop.DoDragDrop(listBoxItem, _draggedTask, DragDropEffects.Move);
+                }
+            }
+        }
+
+        private void ActiveTasksList_DragOver(object sender, DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(typeof(AgentTask)))
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            var draggedTask = e.Data.GetData(typeof(AgentTask)) as AgentTask;
+            if (draggedTask != null &&
+                (draggedTask.Status == AgentTaskStatus.Queued || draggedTask.Status == AgentTaskStatus.InitQueued))
+            {
+                e.Effects = DragDropEffects.Move;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+            e.Handled = true;
+        }
+
+        private void ActiveTasksList_Drop(object sender, DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(typeof(AgentTask)) || _draggedTask == null)
+                return;
+
+            var droppedTask = e.Data.GetData(typeof(AgentTask)) as AgentTask;
+            if (droppedTask == null ||
+                !(droppedTask.Status == AgentTaskStatus.Queued || droppedTask.Status == AgentTaskStatus.InitQueued))
+                return;
+
+            // Find the target position
+            var targetIndex = -1;
+            var hitTest = VisualTreeHelper.HitTest(ActiveTasksList, e.GetPosition(ActiveTasksList))?.VisualHit;
+
+            while (hitTest != null && !(hitTest is ListBoxItem))
+            {
+                hitTest = VisualTreeHelper.GetParent(hitTest);
+            }
+
+            if (hitTest is ListBoxItem targetItem && targetItem.DataContext is AgentTask targetTask)
+            {
+                lock (_activeTasksLock)
+                {
+                    targetIndex = _activeTasks.IndexOf(targetTask);
+                }
+            }
+
+            if (targetIndex >= 0)
+            {
+                lock (_activeTasksLock)
+                {
+                    var oldIndex = _activeTasks.IndexOf(droppedTask);
+                    if (oldIndex >= 0 && oldIndex != targetIndex)
+                    {
+                        _activeTasks.RemoveAt(oldIndex);
+                        _activeTasks.Insert(targetIndex, droppedTask);
+                    }
+                }
+            }
+
+            _draggedTask = null;
+            e.Handled = true;
+        }
+
+        private static T? FindAncestor<T>(DependencyObject current) where T : DependencyObject
+        {
+            do
+            {
+                if (current is T ancestor)
+                    return ancestor;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            while (current != null);
+            return null;
         }
 
         // ── Named handlers for anonymous lambdas (needed for cleanup) ──
@@ -2285,6 +2453,8 @@ namespace HappyEngine
 
             // ── 6. Stop all MCP servers and kill stale port processes ──
             _projectManager.StopAllMcpServers();
+            _mcpHealthMonitor?.Stop();
+            _mcpHealthMonitor?.Dispose();
 
             // ── 7. Cancel CTS, stop feature mode timers, kill & dispose processes ──
             foreach (var task in _activeTasks)
@@ -2310,9 +2480,12 @@ namespace HappyEngine
 
         private void TopMiddleSplitter_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
         {
-            // Snapshot star row to pixel so both rows are pixel-based during drag
+            // Snapshot BOTH star rows to pixel so both rows are pixel-based during drag
             var topRow = RootGrid.RowDefinitions[0];
+            var bottomRow = RootGrid.RowDefinitions[2];
+
             topRow.Height = new GridLength(topRow.ActualHeight);
+            bottomRow.Height = new GridLength(bottomRow.ActualHeight);
         }
 
         private void TopMiddleSplitter_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
@@ -2332,8 +2505,18 @@ namespace HappyEngine
 
         private void TopMiddleSplitter_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
         {
-            // Restore star sizing so Row 0 flexes with window resizes
-            RootGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+            // Restore star sizing based on current proportions so both rows flex with window resizes
+            var topRow = RootGrid.RowDefinitions[0];
+            var bottomRow = RootGrid.RowDefinitions[2];
+
+            // Calculate the total height and proportions
+            double totalHeight = topRow.ActualHeight + bottomRow.ActualHeight;
+            double topProportion = topRow.ActualHeight / totalHeight;
+            double bottomProportion = bottomRow.ActualHeight / totalHeight;
+
+            // Apply the proportions as star values
+            topRow.Height = new GridLength(topProportion, GridUnitType.Star);
+            bottomRow.Height = new GridLength(bottomProportion, GridUnitType.Star);
         }
 
         // ── Right splitter drag (Thumb-based, avoids GridSplitter targeting collapsed Col 4) ──
@@ -2671,6 +2854,8 @@ namespace HappyEngine
                 _activityDashboard.RefreshIfNeeded(ActivityTabContent, _projectManager.ProjectPath);
             else if (StatisticsTabs.SelectedItem == GitTabItem)
                 _gitPanelManager.RefreshIfNeeded(GitTabContent);
+            else if (StatisticsTabs.SelectedItem == TasksTabItem)
+                LoadTasksForDisplay();
         }
 
         private void SetupMainTabsOverflow()
@@ -3109,17 +3294,22 @@ namespace HappyEngine
                 // Use AppDomain.CurrentDomain.BaseDirectory which is more reliable than Assembly.Location
                 var baseDir = AppDomain.CurrentDomain.BaseDirectory ?? Environment.CurrentDirectory;
 
+                // Debug output
+                System.Diagnostics.Debug.WriteLine($"Export Build - Base directory: {baseDir}");
+                System.Diagnostics.Debug.WriteLine($"Export Build - Current directory: {Environment.CurrentDirectory}");
+
                 // Find the project file by navigating up from the base directory
                 var projectFile = FindProjectFile(baseDir);
                 if (projectFile == null)
                 {
-                    ExportStatusText.Text = "Could not find HappyEngine.csproj file.";
+                    ExportStatusText.Text = $"Could not find HappyEngine.csproj file.\nSearched from: {baseDir}";
                     ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
                     ExportStatusText.Visibility = Visibility.Visible;
                     button.IsEnabled = true;
                     return;
                 }
 
+                System.Diagnostics.Debug.WriteLine($"Export Build - Found project file: {projectFile}");
                 var projectDir = System.IO.Path.GetDirectoryName(projectFile)!;
                 var publishDir = System.IO.Path.Combine(projectDir, "publish");
                 var process = new Process
@@ -3200,15 +3390,53 @@ namespace HappyEngine
         {
             // Look for HappyEngine.csproj file by traversing up the directory tree
             var dir = new System.IO.DirectoryInfo(startDirectory);
-            while (dir != null)
+
+            // Try up to 10 levels to avoid infinite loops
+            int levels = 0;
+            while (dir != null && levels < 10)
             {
                 var projectFile = System.IO.Path.Combine(dir.FullName, "HappyEngine.csproj");
                 if (System.IO.File.Exists(projectFile))
                 {
                     return projectFile;
                 }
+
+                // Also check if we're in a bin folder structure and jump to the root
+                if (dir.Name == "bin" && dir.Parent != null)
+                {
+                    var rootProjectFile = System.IO.Path.Combine(dir.Parent.FullName, "HappyEngine.csproj");
+                    if (System.IO.File.Exists(rootProjectFile))
+                    {
+                        return rootProjectFile;
+                    }
+                }
+
                 dir = dir.Parent;
+                levels++;
             }
+
+            // As a fallback, try some common locations relative to the executable
+            string[] fallbackPaths = new[]
+            {
+                System.IO.Path.Combine(startDirectory, "..", "..", "..", "HappyEngine.csproj"),
+                System.IO.Path.Combine(startDirectory, "..", "..", "..", "..", "HappyEngine.csproj"),
+                System.IO.Path.Combine(startDirectory, "..", "HappyEngine.csproj"),
+                System.IO.Path.Combine(Environment.CurrentDirectory, "HappyEngine.csproj")
+            };
+
+            foreach (var path in fallbackPaths)
+            {
+                try
+                {
+                    var fullPath = System.IO.Path.GetFullPath(path);
+                    if (System.IO.File.Exists(fullPath))
+                    {
+                        return fullPath;
+                    }
+                }
+                catch { /* Ignore invalid paths */ }
+            }
+
             return null;
         }
 
@@ -3216,9 +3444,19 @@ namespace HappyEngine
 
         private void InitializeTaskList()
         {
-            if (_projectTaskManager?.Tasks != null)
+            // Defer task list initialization until the tab is actually shown
+            // to prevent UI freeze during startup
+        }
+
+        private void LoadTasksForDisplay()
+        {
+            if (_projectTaskManager?.Tasks != null && TaskListControl.ItemsSource == null)
             {
-                TaskListControl.ItemsSource = new ObservableCollection<ProjectTaskItem>(_projectTaskManager.Tasks);
+                // Use dispatcher to ensure UI updates happen on the UI thread
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+                {
+                    TaskListControl.ItemsSource = new ObservableCollection<ProjectTaskItem>(_projectTaskManager.Tasks);
+                }));
             }
         }
 
@@ -3248,6 +3486,12 @@ namespace HappyEngine
                 var newTask = _projectTaskManager.AddTask(text);
                 TaskInputBox.Clear();
 
+                // Initialize the ItemsSource if it hasn't been loaded yet
+                if (TaskListControl.ItemsSource == null)
+                {
+                    LoadTasksForDisplay();
+                }
+
                 // Add to UI
                 if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
                 {
@@ -3264,42 +3508,72 @@ namespace HappyEngine
         {
             if (sender is Border border && border.DataContext is ProjectTaskItem task)
             {
-                // Find the check mark path
-                var checkMark = FindVisualChild<System.Windows.Shapes.Path>(border, "CheckMark");
-                if (checkMark != null)
+                // Toggle the task completion status
+                task.IsCompleted = !task.IsCompleted;
+
+                if (task.IsCompleted)
                 {
-                    // Show check mark with animation
-                    checkMark.Visibility = Visibility.Visible;
-                    var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
-                    checkMark.BeginAnimation(OpacityProperty, fadeIn);
+                    task.CompletedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    task.CompletedAt = null;
                 }
 
-                // Animate the border background to green
-                var bgAnimation = new ColorAnimation
+                // Save the updated task list
+                await _projectTaskManager.SaveTasksAsync();
+
+                // Ensure UI updates through property change notification
+                if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
                 {
-                    To = Color.FromRgb(78, 201, 105), // Success green
-                    Duration = TimeSpan.FromMilliseconds(300)
-                };
+                    // Force refresh of the item in the collection
+                    var index = tasks.IndexOf(task);
+                    if (index >= 0)
+                    {
+                        tasks[index] = task;
+                    }
+                }
+            }
+        }
 
-                var brush = new SolidColorBrush(((SolidColorBrush)FindResource("BgSurface")).Color);
-                border.Background = brush;
-                brush.BeginAnimation(SolidColorBrush.ColorProperty, bgAnimation);
-
-                // Mark as completed
-                _projectTaskManager.CompleteTask(task);
-
-                // Wait for animation, then remove with fade out
-                await System.Threading.Tasks.Task.Delay(400);
-
-                var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
-                fadeOut.Completed += (s, args) =>
+        private async void RemoveTask_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.DataContext is ProjectTaskItem task)
+            {
+                // Find the parent Border for animation
+                DependencyObject? current = button;
+                while (current != null && current is not Border)
                 {
+                    current = VisualTreeHelper.GetParent(current);
+                }
+
+                if (current is Border border)
+                {
+                    // Animate fade out before removing
+                    var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200));
+                    fadeOut.Completed += async (s, args) =>
+                    {
+                        if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
+                        {
+                            tasks.Remove(task);
+                        }
+                        _projectTaskManager.RemoveTask(task);
+                        await _projectTaskManager.SaveTasksAsync();
+                    };
+                    border.BeginAnimation(OpacityProperty, fadeOut);
+                }
+                else
+                {
+                    // If can't find border for animation, just remove immediately
                     if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
                     {
                         tasks.Remove(task);
                     }
-                };
-                border.BeginAnimation(OpacityProperty, fadeOut);
+                    _projectTaskManager.RemoveTask(task);
+                    await _projectTaskManager.SaveTasksAsync();
+                }
+
+                e.Handled = true; // Prevent the click from bubbling to the task item
             }
         }
 
@@ -3336,6 +3610,60 @@ namespace HappyEngine
             StatusText.Text = $"{projectName}  |  Running: {running}{planningPart}  |  Queued: {queued}{waitingPart}  |  " +
                               $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
                               $"Locks: {locks}  |  {_projectManager.ProjectPath}";
+        }
+
+        private void CheckTaskTimeouts()
+        {
+            var runningTasks = _activeTasks.Where(t => t.Status == AgentTaskStatus.Running || t.Status == AgentTaskStatus.Planning).ToList();
+
+            foreach (var task in runningTasks)
+            {
+                var timeoutMinutes = task.TimeoutMinutes ?? Constants.AppConstants.DefaultTaskTimeoutMinutes;
+                var elapsed = DateTime.UtcNow - task.StartTime.ToUniversalTime();
+                var elapsedMinutes = elapsed.TotalMinutes;
+
+                // Check for warning threshold (80%)
+                var warningThreshold = timeoutMinutes * Constants.AppConstants.TaskTimeoutWarningPercent;
+                if (elapsedMinutes >= warningThreshold && elapsedMinutes < timeoutMinutes && !task.HasTimeoutWarning)
+                {
+                    task.HasTimeoutWarning = true;
+                    var warningMessage = $"\n\n⚠️ Task timeout warning: {Math.Round(elapsedMinutes, 1)}/{timeoutMinutes} minutes elapsed ({Math.Round(elapsedMinutes / timeoutMinutes * 100)}%)\n\n";
+                    _outputTabManager.AppendColoredOutput(task.Id, warningMessage, Brushes.Orange, _activeTasks, _historyTasks);
+                }
+
+                // Check for timeout
+                if (elapsedMinutes >= timeoutMinutes)
+                {
+                    // Kill the process
+                    try
+                    {
+                        task.Process?.Kill();
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Error("MainWindow", $"Failed to kill timed-out process for task {task.Id}: {ex.Message}", ex);
+                    }
+
+                    // Set status to failed
+                    task.Status = AgentTaskStatus.Failed;
+                    task.EndTime = DateTime.Now;
+
+                    // Add timeout message to output
+                    var timeoutMessage = $"\n\n❌ Task timed out after {timeoutMinutes} minutes and was automatically cancelled.\n\n";
+                    _outputTabManager.AppendColoredOutput(task.Id, timeoutMessage, Brushes.Red, _activeTasks, _historyTasks);
+
+                    // Move to history
+                    MoveToHistory(task);
+                }
+            }
+        }
+
+        private void OnClaudeUsageUpdated(object? sender, ClaudeUsageManager.UsageData usage)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                ClaudeUsageText.Text = _claudeUsageManager.GetUsageSummary();
+            });
         }
 
         /// <summary>Updates the queue position for all InitQueued tasks based on their priority ordering.</summary>

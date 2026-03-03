@@ -128,11 +128,27 @@ namespace HappyEngine.Managers
                 return false;
             }
 
+            // Always store relative path for consistent display
+            var relativePath = filePath;
+            if (!string.IsNullOrEmpty(basePath) && Path.IsPathRooted(filePath))
+            {
+                try
+                {
+                    relativePath = Path.GetRelativePath(basePath, filePath);
+                }
+                catch
+                {
+                    // If GetRelativePath fails, fall back to original path
+                    relativePath = filePath;
+                }
+            }
+
             var fileLock = new FileLock
             {
                 NormalizedPath = normalized,
-                OriginalPath = filePath,
+                OriginalPath = relativePath,
                 OwnerTaskId = taskId,
+                OwnerTaskNumber = task?.TaskNumber ?? 0,
                 ToolName = toolName,
                 AcquiredAt = DateTime.Now,
                 IsIgnored = isIgnored
@@ -303,12 +319,29 @@ namespace HappyEngine.Managers
                 BlockedByTaskIds = blockedByIds
             };
 
+            // Always store relative path for consistent display
+            var relativePath = filePath;
+            var basePath = task?.ProjectPath;
+            if (!string.IsNullOrEmpty(basePath) && Path.IsPathRooted(filePath))
+            {
+                try
+                {
+                    relativePath = Path.GetRelativePath(basePath, filePath);
+                }
+                catch
+                {
+                    // If GetRelativePath fails, fall back to original path
+                    relativePath = filePath;
+                }
+            }
+
             // Create a "Waiting" file lock entry for the queued task
             var waitingLock = new FileLock
             {
                 NormalizedPath = normalized,
-                OriginalPath = filePath,
+                OriginalPath = relativePath,
                 OwnerTaskId = taskId,
+                OwnerTaskNumber = task?.TaskNumber ?? 0,
                 ToolName = $"{toolName} (waiting for #{blockerNum})",
                 AcquiredAt = DateTime.Now,
                 IsWaiting = true

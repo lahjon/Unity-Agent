@@ -120,6 +120,8 @@ namespace HappyEngine
         public bool ContainsFeaturePhaseChildId(string id) => Data.ContainsFeaturePhaseChildId(id);
         public int FeaturePhaseChildIdCount => Data.FeaturePhaseChildIdCount;
         public string OriginalFeatureDescription { get => Data.OriginalFeatureDescription; set => Data.OriginalFeatureDescription = value; }
+        public int? TimeoutMinutes { get => Data.TimeoutMinutes; set => Data.TimeoutMinutes = value; }
+        public bool HasTimeoutWarning { get => Data.HasTimeoutWarning; set => Data.HasTimeoutWarning = value; }
 
         // ── Persistent data delegation (with notification) ───────────────
 
@@ -569,6 +571,7 @@ namespace HappyEngine
         public string NormalizedPath { get; set; } = "";
         public string OriginalPath { get; set; } = "";
         public string OwnerTaskId { get; set; } = "";
+        public int OwnerTaskNumber { get; set; }
         public string ToolName { get; set; } = "";
         public DateTime AcquiredAt { get; set; } = DateTime.Now;
         public bool IsIgnored { get; set; }

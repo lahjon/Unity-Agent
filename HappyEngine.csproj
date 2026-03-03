@@ -9,14 +9,18 @@
     <Nullable>enable</Nullable>
     <ApplicationIcon>icon.ico</ApplicationIcon>
 
-    <!-- Single file publish configuration -->
+    <!-- Single file publish configuration (only applies during dotnet publish) -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+
+    <!-- Disable R2R during regular builds (only run during publish) -->
+    <ReadyToRun Condition="'$(PublishProtocol)' == ''">false</ReadyToRun>
 
     <!-- Exclude localization satellite assemblies -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

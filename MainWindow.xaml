@@ -27,6 +27,9 @@
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
                         <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
                         <Separator/>
+                        <MenuItem Header="Clone Task" Click="CloneTask_Click"/>
+                        <MenuItem Header="Retry Task" Click="RetryTask_Click"/>
+                        <Separator/>
                         <MenuItem Header="Priority">
                             <MenuItem Header="Critical" Click="SetPriorityCritical_Click"/>
                             <MenuItem Header="High" Click="SetPriorityHigh_Click"/>
@@ -584,6 +587,8 @@
                         <MenuItem Header="Store Task" Click="StoreHistoryTask_Click"/>
                         <Separator/>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
+                        <MenuItem Header="Export..." Click="ExportTask_Click"/>
+                        <Separator/>
                         <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
                     </ContextMenu>
                 </Border.ContextMenu>
@@ -1333,6 +1338,15 @@
                                     FontSize="9" FontFamily="Segoe UI" Padding="6,2"
                                     VerticalAlignment="Center" Margin="8,0,0,0"
                                     ToolTip="Save current toggle states as a reusable template"/>
+                            <TextBlock Text="TIMEOUT (MIN)" Foreground="{StaticResource TextMuted}" FontWeight="Bold"
+                                       FontSize="9" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                       Margin="20,0,6,0"/>
+                            <TextBox x:Name="TimeoutMinutesBox" Text="120" Width="60" FontSize="11" FontFamily="Segoe UI"
+                                     Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
+                                     CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
+                                     BorderThickness="1" Padding="4,2" VerticalContentAlignment="Center"
+                                     PreviewTextInput="TimeoutBox_PreviewTextInput"
+                                     ToolTip="Task timeout in minutes (default: 120)"/>
                             <Button Content="Clear" Click="ClearPrompt_Click"
                                     Style="{StaticResource GhostBtn}" Foreground="{StaticResource TextMuted}"
                                     FontSize="10" FontFamily="Segoe UI" Padding="6,2"
@@ -1392,6 +1406,7 @@
                                  CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                  FontSize="13" FontFamily="Consolas" Padding="6"
                                  PreviewKeyDown="TaskInput_PreviewKeyDown"
+                                 TextChanged="TaskInput_TextChanged"
                                  AllowDrop="True" PreviewDragOver="TaskInput_DragOver"
                                  Drop="TaskInput_Drop"/>
                     </DockPanel>
@@ -1420,10 +1435,19 @@
                                                   Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
                                         <TextBlock Text="Ignore File Locks" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
                                     </ToggleButton>
-                                    <ToggleButton x:Name="UseMcpToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
-                                        <TextBlock Text="Use MCP" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
+                                    <DockPanel Margin="0,0,0,6">
+                                        <Ellipse x:Name="McpHealthIndicator"
+                                                Width="8" Height="8"
+                                                Fill="{StaticResource TextMuted}"
+                                                DockPanel.Dock="Right"
+                                                Margin="8,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTip="MCP connection status"/>
+                                        <ToggleButton x:Name="UseMcpToggle" IsChecked="False"
+                                                      Style="{StaticResource ToggleSwitch}">
+                                            <TextBlock Text="Use MCP" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
+                                        </ToggleButton>
+                                    </DockPanel>
                                     <ToggleButton x:Name="AutoVerifyToggle" IsChecked="False"
                                                   Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
                                                   Checked="AutoVerifyToggle_Changed" Unchecked="AutoVerifyToggle_Changed">
@@ -1588,10 +1612,15 @@
                                      ItemTemplate="{StaticResource ActiveTaskTemplate}"
                                      SelectionChanged="ActiveTask_Selected"
                                      MouseDoubleClick="ActiveTaskList_MouseDoubleClick"
-                                     PreviewMouseWheel="TaskList_PreviewMouseWheel"/>
+                                     PreviewMouseWheel="TaskList_PreviewMouseWheel"
+                                     AllowDrop="True"
+                                     PreviewMouseLeftButtonDown="ActiveTasksList_PreviewMouseLeftButtonDown"
+                                     PreviewMouseMove="ActiveTasksList_PreviewMouseMove"
+                                     DragOver="ActiveTasksList_DragOver"
+                                     Drop="ActiveTasksList_Drop"/>
                         </Grid>
                     </TabItem>
-                    <TabItem>
+                    <TabItem x:Name="HistoryTabItem">
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="HISTORY" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"/>
@@ -1645,6 +1674,7 @@
                             <ListBox x:Name="HistoryTasksList" Grid.Row="2"
                                      Style="{StaticResource TaskListStyle}"
                                      ItemTemplate="{StaticResource HistoryTaskTemplate}"
+                                     SelectionMode="Extended"
                                      SelectionChanged="HistoryTask_Selected"
                                      PreviewMouseWheel="TaskList_PreviewMouseWheel"/>
                         </Grid>
@@ -1689,7 +1719,7 @@
 
             <!-- Node Graph Panel -->
             <Border Grid.Row="0" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
-                    BorderThickness="1" Margin="0,0,0,1">
+                    BorderThickness="1" Margin="0,0,0,8">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="GraphPanelBorder" Color="#2C2C2C"/>
                 </Border.BorderBrush>
@@ -1854,7 +1884,7 @@
                                                 <GridViewColumn Header="TASK" Width="70">
                                                     <GridViewColumn.CellTemplate>
                                                         <DataTemplate>
-                                                            <TextBlock Text="{Binding OwnerTaskId, StringFormat='#{0}'}"
+                                                            <TextBlock Text="{Binding OwnerTaskNumber, StringFormat='#{0}'}"
                                                                        Foreground="{StaticResource Accent}" FontSize="11" FontFamily="Consolas"/>
                                                         </DataTemplate>
                                                     </GridViewColumn.CellTemplate>
@@ -1897,6 +1927,11 @@
                                     </Button>
                                     <TextBox x:Name="TaskInputBox"
                                              FontSize="12" Padding="8,6"
+                                             Background="{StaticResource BgDeep}"
+                                             Foreground="{StaticResource TextPrimary}"
+                                             CaretBrush="{StaticResource TextPrimary}"
+                                             BorderBrush="{StaticResource BorderSubtle}"
+                                             BorderThickness="1"
                                              KeyDown="TaskInput_KeyDown">
                                         <TextBox.Tag>
                                             <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Add a new task...</sys:String>
@@ -1905,73 +1940,130 @@
                                 </DockPanel>
 
                                 <!-- Task list -->
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <ItemsControl x:Name="TaskListControl">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border x:Name="TaskItemBorder"
-                                                        Background="{StaticResource BgSurface}"
-                                                        CornerRadius="6"
-                                                        Padding="12,8"
-                                                        Margin="0,0,0,4"
-                                                        Cursor="Hand"
-                                                        MouseLeftButtonUp="TaskItem_Click">
-                                                    <Border.Triggers>
-                                                        <EventTrigger RoutedEvent="MouseEnter">
-                                                            <BeginStoryboard>
-                                                                <Storyboard>
-                                                                    <ColorAnimation Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-                                                                                    To="#2A2A2A" Duration="0:0:0.15"/>
-                                                                </Storyboard>
-                                                            </BeginStoryboard>
-                                                        </EventTrigger>
-                                                        <EventTrigger RoutedEvent="MouseLeave">
-                                                            <BeginStoryboard>
-                                                                <Storyboard>
-                                                                    <ColorAnimation Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-                                                                                    To="#1F1F1F" Duration="0:0:0.15"/>
-                                                                </Storyboard>
-                                                            </BeginStoryboard>
-                                                        </EventTrigger>
-                                                    </Border.Triggers>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
+                                <ListBox x:Name="TaskListControl"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.CanContentScroll="True"
+                                         VirtualizingPanel.IsVirtualizing="True"
+                                         VirtualizingPanel.VirtualizationMode="Recycling"
+                                         VirtualizingPanel.ScrollUnit="Pixel"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Padding="0">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <VirtualizingStackPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <ContentPresenter/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="TaskItemBorder"
+                                                    Background="{StaticResource BgSurface}"
+                                                    CornerRadius="6"
+                                                    Padding="12,8"
+                                                    Margin="0,0,0,4"
+                                                    Cursor="Hand"
+                                                    MouseLeftButtonUp="TaskItem_Click">
+                                                <Border.Triggers>
+                                                    <EventTrigger RoutedEvent="MouseEnter">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <ColorAnimation Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                                                To="#2A2A2A" Duration="0:0:0.15"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                    <EventTrigger RoutedEvent="MouseLeave">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <ColorAnimation Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                                                To="#1F1F1F" Duration="0:0:0.15"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Border.Triggers>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
 
-                                                        <!-- Checkbox visual -->
-                                                        <Border Grid.Column="0" Width="16" Height="16"
-                                                                BorderThickness="2" CornerRadius="3"
-                                                                BorderBrush="{StaticResource TextDim}"
-                                                                Background="Transparent"
-                                                                Margin="0,0,10,0">
-                                                            <Path x:Name="CheckMark"
-                                                                  Data="M 2,6 L 6,10 L 14,2"
-                                                                  Stroke="{StaticResource Accent}"
-                                                                  StrokeThickness="2"
-                                                                  Visibility="Collapsed"/>
-                                                        </Border>
+                                                    <!-- Checkbox visual -->
+                                                    <Border Grid.Column="0" Width="16" Height="16"
+                                                            BorderThickness="2" CornerRadius="3"
+                                                            BorderBrush="{StaticResource TextDim}"
+                                                            Background="Transparent"
+                                                            Margin="0,0,10,0">
+                                                        <Path x:Name="CheckMark"
+                                                              Data="M 2,6 L 6,10 L 14,2"
+                                                              Stroke="{StaticResource Accent}"
+                                                              StrokeThickness="2"
+                                                              Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibility}}"/>
+                                                    </Border>
 
-                                                        <!-- Task text -->
-                                                        <TextBlock Grid.Column="1"
-                                                                   Text="{Binding Text}"
-                                                                   Foreground="{StaticResource TextLight}"
-                                                                   FontSize="12"
-                                                                   FontFamily="Segoe UI"
-                                                                   VerticalAlignment="Center"
-                                                                   TextWrapping="Wrap"/>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel/>
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                                    <!-- Task text -->
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Text}"
+                                                               Foreground="{StaticResource TextLight}"
+                                                               FontSize="12"
+                                                               FontFamily="Segoe UI"
+                                                               VerticalAlignment="Center"
+                                                               TextWrapping="Wrap">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                        <Setter Property="TextDecorations" Value="Strikethrough"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+
+                                                    <!-- Remove button -->
+                                                    <Button Grid.Column="2"
+                                                            Content="&#xE711;"
+                                                            Click="RemoveTask_Click"
+                                                            Margin="10,0,0,0"
+                                                            ToolTip="Remove task">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                                                <Setter Property="FontSize" Value="12"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Border}, Path=IsMouseOver}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="Foreground" Value="{StaticResource Error}"/>
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
                             </DockPanel>
                         </TabItem>
                         <!-- Activity tab -->
@@ -2778,8 +2870,16 @@
                     </BeginStoryboard>
                 </EventTrigger>
             </Border.Triggers>
-            <TextBlock x:Name="StatusText" Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Segoe UI"
-                       TextTrimming="CharacterEllipsis"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusText" Grid.Column="0" Foreground="{StaticResource TextSecondary}" FontSize="11" FontFamily="Segoe UI"
+                           TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
+                <TextBlock x:Name="ClaudeUsageText" Grid.Column="1" Foreground="#8899AA" FontSize="11" FontFamily="Segoe UI"
+                           Text="Claude: No usage yet" HorizontalAlignment="Right"/>
+            </Grid>
         </Border>
 
         <!-- Loading overlay shown during async startup -->

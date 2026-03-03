@@ -115,6 +115,12 @@ namespace HappyEngine
             if (task.IsFeatureMode && int.TryParse(FeatureModeIterationsBox?.Text, out var iterations) && iterations > 0)
                 task.MaxIterations = iterations;
 
+            // Set timeout from UI
+            if (int.TryParse(TimeoutMinutesBox?.Text, out var timeoutMinutes) && timeoutMinutes > 0)
+                task.TimeoutMinutes = timeoutMinutes;
+            else
+                task.TimeoutMinutes = Constants.AppConstants.DefaultTaskTimeoutMinutes;
+
             if (model == ModelType.Gemini)
             {
                 ExecuteGeminiTask(task);
@@ -148,6 +154,14 @@ namespace HappyEngine
                 var modelTag = modelItem.Tag?.ToString();
                 if (modelTag == "Gemini") selectedModel = ModelType.Gemini;
                 else if (modelTag == "GeminiGameArt") selectedModel = ModelType.GeminiGameArt;
+            }
+
+            // Check if we should remove an unmodified saved prompt
+            if (_currentLoadedPrompt != null && !_loadedPromptModified)
+            {
+                _savedPrompts.Remove(_currentLoadedPrompt);
+                PersistSavedPrompts();
+                _currentLoadedPrompt = null;
             }
 
             // Capture UI state before clearing
@@ -195,6 +209,12 @@ namespace HappyEngine
                 task.Summary = step.TaskName;
                 task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
                 task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
+
+                // Set timeout from UI
+                if (int.TryParse(TimeoutMinutesBox?.Text, out var timeoutMinutes) && timeoutMinutes > 0)
+                    task.TimeoutMinutes = timeoutMinutes;
+                else
+                    task.TimeoutMinutes = Constants.AppConstants.DefaultTaskTimeoutMinutes;
 
                 // Resolve dependencies from name to task ID
                 var depIds = new List<string>();
@@ -865,6 +885,69 @@ TextureImporter:
             if (!string.IsNullOrEmpty(task.Description))
                 Clipboard.SetText(task.Description);
         }
+
+        private void ExportTask_Click(object sender, RoutedEventArgs e)
+        {
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
+
+            // Check if multiple items are selected in history list
+            var tasksToExport = new List<AgentTask>();
+
+            // If we're in the history tab and have multiple selections
+            if (MainTabs.SelectedItem == HistoryTabItem && HistoryTasksList.SelectedItems.Count > 0)
+            {
+                foreach (AgentTask selectedTask in HistoryTasksList.SelectedItems)
+                {
+                    tasksToExport.Add(selectedTask);
+                }
+            }
+            else
+            {
+                // Single task export
+                tasksToExport.Add(task);
+            }
+
+            var exportDialog = new Dialogs.ExportDialog(tasksToExport);
+            exportDialog.ShowDialog();
+        }
+
+        private void CloneTask_Click(object sender, RoutedEventArgs e)
+        {
+            var sourceTask = GetTaskFromContextMenuItem(sender);
+            if (sourceTask == null) return;
+
+            var newTask = _taskFactory.CreateTask(
+                sourceTask.Description,
+                sourceTask.ProjectPath,
+                sourceTask.SkipPermissions,
+                sourceTask.RemoteSession,
+                sourceTask.Headless,
+                sourceTask.IsFeatureMode,
+                sourceTask.IgnoreFileLocks,
+                sourceTask.UseMcp,
+                sourceTask.SpawnTeam,
+                sourceTask.ExtendedPlanning,
+                sourceTask.NoGitWrite,
+                sourceTask.PlanOnly,
+                sourceTask.UseMessageBus,
+                sourceTask.ImagePaths,
+                sourceTask.Model,
+                autoDecompose: sourceTask.AutoDecompose,
+                applyFix: sourceTask.ApplyFix);
+
+            // Copy additional properties that aren't in CreateTask
+            newTask.AdditionalInstructions = sourceTask.AdditionalInstructions;
+            newTask.ProjectColor = sourceTask.ProjectColor;
+            newTask.ProjectDisplayName = sourceTask.ProjectDisplayName;
+            newTask.MaxIterations = sourceTask.MaxIterations;
+            newTask.TimeoutMinutes = sourceTask.TimeoutMinutes;
+            newTask.Summary = _taskFactory.GenerateLocalSummary(sourceTask.Description);
+
+            AddActiveTask(newTask);
+            DrainInitQueue();
+        }
+
 
         private void SetPriorityCritical_Click(object sender, RoutedEventArgs e) => SetTaskPriority(sender, TaskPriority.Critical);
         private void SetPriorityHigh_Click(object sender, RoutedEventArgs e) => SetTaskPriority(sender, TaskPriority.High);

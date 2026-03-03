@@ -16,6 +16,8 @@ namespace HappyEngine
 
         private readonly ObservableCollection<SavedPromptEntry> _savedPrompts = new();
         private bool _savedPromptsPanelOpen = true;
+        private SavedPromptEntry? _currentLoadedPrompt = null;
+        private bool _loadedPromptModified = false;
 
         private string SavedPromptsFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -78,6 +80,10 @@ namespace HappyEngine
             TaskInput.Text = string.Empty;
             AdditionalInstructionsInput.Clear();
 
+            // Clear tracking fields
+            _currentLoadedPrompt = null;
+            _loadedPromptModified = false;
+
             ResetPerTaskToggles();
         }
 
@@ -106,6 +112,11 @@ namespace HappyEngine
 
             TaskInput.Text = string.Empty;
             AdditionalInstructionsInput.Clear();
+
+            // Clear tracking fields
+            _currentLoadedPrompt = null;
+            _loadedPromptModified = false;
+
             ResetPerTaskToggles();
         }
 
@@ -130,6 +141,11 @@ namespace HappyEngine
             LoadSavedPromptIntoUi(entry);
             _savedPrompts.Remove(entry);
             PersistSavedPrompts();
+
+            // Clear the tracking since we already removed it
+            _currentLoadedPrompt = null;
+            _loadedPromptModified = false;
+
             Execute_Click(this, new RoutedEventArgs());
         }
 
@@ -142,6 +158,10 @@ namespace HappyEngine
         private void LoadSavedPromptIntoUi(SavedPromptEntry entry)
         {
             TaskInput.Text = entry.PromptText;
+
+            // Track the loaded prompt
+            _currentLoadedPrompt = entry;
+            _loadedPromptModified = false;
 
             // Restore model selection
             for (int i = 0; i < ModelCombo.Items.Count; i++)

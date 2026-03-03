@@ -1037,6 +1037,7 @@ namespace HappyEngine.Managers
             child.ParentTaskId = parent.Id;
             child.ProjectColor = parent.ProjectColor;
             child.ProjectDisplayName = parent.ProjectDisplayName;
+            child.TimeoutMinutes = parent.TimeoutMinutes;
 
             parent.SubTaskCounter++;
             parent.ChildTaskIds.Add(child.Id);

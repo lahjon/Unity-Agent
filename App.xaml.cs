@@ -17,6 +17,8 @@ namespace HappyEngine
         private static string LogFile => Path.Combine(LogDir, "crash.log");
         private static string HangLogFile => Path.Combine(LogDir, "hang.log");
 
+        private static System.Windows.Forms.NotifyIcon? _notifyIcon;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             Directory.CreateDirectory(LogDir);
@@ -26,6 +28,30 @@ namespace HappyEngine
             DispatcherUnhandledException += OnDispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+            // Initialize system tray icon
+            try
+            {
+                _notifyIcon = new System.Windows.Forms.NotifyIcon();
+                var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+                if (File.Exists(iconPath))
+                {
+                    _notifyIcon.Icon = new System.Drawing.Icon(iconPath);
+                }
+                else
+                {
+                    // Use a default icon if icon.ico doesn't exist
+                    _notifyIcon.Icon = System.Drawing.SystemIcons.Application;
+                    Managers.AppLogger.Warn("App", "icon.ico not found, using default system icon");
+                }
+                _notifyIcon.Text = "Happy Engine";
+                _notifyIcon.Visible = true;
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Warn("App", $"Failed to initialize system tray icon: {ex.Message}");
+                _notifyIcon = null;
+            }
 
             // Start UI thread hang watchdog
             StartUiWatchdog();
@@ -152,6 +178,28 @@ namespace HappyEngine
             dlg.ShowDialog();
         }
 
+        /// <summary>
+        /// Shows a balloon notification in the system tray.
+        /// </summary>
+        public static void ShowBalloonNotification(string title, string message, System.Windows.Forms.ToolTipIcon icon)
+        {
+            try
+            {
+                if (_notifyIcon != null)
+                {
+                    _notifyIcon.ShowBalloonTip(5000, title, message, icon);
+                }
+                else
+                {
+                    Managers.AppLogger.Debug("App", "Cannot show balloon notification - NotifyIcon not initialized");
+                }
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Debug("App", $"Failed to show balloon notification: {ex.Message}");
+            }
+        }
+
         private static string? _lastUiAction;
         private static long _opStartTicks;
         private static string? _currentOpName;
@@ -273,6 +321,18 @@ namespace HappyEngine
         protected override void OnExit(ExitEventArgs e)
         {
             Managers.AppLogger.Info("App", "OnExit: starting final cleanup");
+
+            // Dispose NotifyIcon
+            try
+            {
+                if (_notifyIcon != null)
+                {
+                    _notifyIcon.Visible = false;
+                    _notifyIcon.Dispose();
+                    _notifyIcon = null;
+                }
+            }
+            catch (Exception ex) { LogCrash("OnExit.DisposeNotifyIcon", ex); }
 
             // Flush buffered log entries to disk before anything else
             try { Managers.AppLogger.Flush(); }

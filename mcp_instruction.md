@@ -10,8 +10,11 @@ This project uses MCP (Model Context Protocol) for Unity-specific operations.
 
 ## Requirements
 
-1. **Unity Editor** must be running with the MCP plugin installed and enabled
-2. **Port 8080** must be available (not used by other applications)
+1. **Unity Editor** must be running BEFORE attempting to connect
+   - Happy Engine will check if Unity is running and show a warning if it's not
+   - Start Unity Editor first, then click "Connect to MCP"
+2. **MCP plugin** must be installed and enabled in the Unity Editor
+3. **Port 8080** must be available (not used by other applications)
 
 ## Start Command
 

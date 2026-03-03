@@ -12,6 +12,7 @@ namespace HappyEngine.Managers
     public class ClaudeService : BaseLlmService
     {
         private const string ApiBaseUrl = "https://api.anthropic.com/v1/messages";
+        private ClaudeUsageManager? _usageManager;
 
         public static string[] AvailableModels { get; set; } =
         {
@@ -26,6 +27,11 @@ namespace HappyEngine.Managers
         protected override string DefaultModelId => "claude-sonnet-4-20250514";
 
         public ClaudeService(string appDataDir) : base(appDataDir, "claude_chat_config.json") { }
+
+        public void SetUsageManager(ClaudeUsageManager usageManager)
+        {
+            _usageManager = usageManager;
+        }
 
         public override async Task<string> SendChatMessageStreamingAsync(
             List<ChatMessage> history,
@@ -115,6 +121,25 @@ namespace HappyEngine.Managers
                                  errObj.TryGetProperty("message", out var errMsg))
                         {
                             return $"[Error] {errMsg.GetString()}";
+                        }
+                        else if (eventType == "message_stop" &&
+                                 root.TryGetProperty("message", out var message) &&
+                                 message.TryGetProperty("usage", out var usage))
+                        {
+                            // Extract usage information
+                            long inputTokens = 0, outputTokens = 0, cacheReadTokens = 0, cacheCreationTokens = 0;
+
+                            if (usage.TryGetProperty("input_tokens", out var inputProp))
+                                inputTokens = inputProp.GetInt64();
+                            if (usage.TryGetProperty("output_tokens", out var outputProp))
+                                outputTokens = outputProp.GetInt64();
+                            if (usage.TryGetProperty("cache_read_input_tokens", out var cacheReadProp))
+                                cacheReadTokens = cacheReadProp.GetInt64();
+                            if (usage.TryGetProperty("cache_creation_input_tokens", out var cacheCreationProp))
+                                cacheCreationTokens = cacheCreationProp.GetInt64();
+
+                            // Report usage to the manager
+                            _usageManager?.AddUsage(_selectedModel, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
                         }
                     }
                     catch (Exception ex) { AppLogger.Debug("ClaudeService", $"Malformed SSE chunk skipped: {ex.Message}"); }

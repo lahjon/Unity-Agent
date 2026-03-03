@@ -678,6 +678,8 @@ namespace HappyEngine.Managers
                 };
 
                 var grid = new Grid();
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -916,13 +918,7 @@ namespace HappyEngine.Managers
 
                 if (proj.IsGame) // Only show MCP for game projects
                 {
-                    var mcpPanel = new StackPanel
-                    {
-                        Orientation = Orientation.Horizontal,
-                        Margin = new Thickness(0, 4, 0, 0)
-                    };
-
-                    // Status indicator
+                    // Add MCP status to info panel
                     var statusColor = proj.McpStatus switch
                     {
                         McpStatus.Connected => BrushCache.Theme("SuccessGreen"),
@@ -933,10 +929,16 @@ namespace HappyEngine.Managers
 
                     var statusText = proj.McpStatus switch
                     {
-                        McpStatus.Connected => "Connected",
-                        McpStatus.Connecting => "Connecting...",
-                        McpStatus.Failed => "Failed",
-                        _ => "Not Connected"
+                        McpStatus.Connected => "MCP Connected",
+                        McpStatus.Connecting => "MCP Connecting...",
+                        McpStatus.Failed => "MCP Failed",
+                        _ => "MCP Not Connected"
+                    };
+
+                    var mcpStatusPanel = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Margin = new Thickness(0, 4, 0, 0)
                     };
 
                     var statusIndicator = new System.Windows.Shapes.Ellipse
@@ -944,9 +946,9 @@ namespace HappyEngine.Managers
                         Width = 8,
                         Height = 8,
                         Fill = statusColor,
-                        Margin = new Thickness(0, 0, 6, 0),
+                        Margin = new Thickness(0, 0, 4, 0),
                         VerticalAlignment = VerticalAlignment.Center,
-                        ToolTip = $"MCP Status: {statusText}"
+                        ToolTip = statusText
                     };
 
                     // Add pulsing animation for Connecting and Connected states
@@ -963,19 +965,25 @@ namespace HappyEngine.Managers
                         statusIndicator.BeginAnimation(UIElement.OpacityProperty, animation);
                     }
 
-                    mcpPanel.Children.Add(statusIndicator);
-
-                    // Status text
-                    mcpPanel.Children.Add(new TextBlock
+                    mcpStatusPanel.Children.Add(statusIndicator);
+                    mcpStatusPanel.Children.Add(new TextBlock
                     {
                         Text = statusText,
                         Foreground = statusColor,
                         FontSize = 10,
                         FontFamily = new FontFamily("Segoe UI"),
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(0, 0, 8, 0)
+                        VerticalAlignment = VerticalAlignment.Center
                     });
 
+                    infoPanel.Children.Add(mcpStatusPanel);
+                }
+
+                Grid.SetRow(infoPanel, 0);
+                Grid.SetColumn(infoPanel, 0);
+                grid.Children.Add(infoPanel);
+
+                if (proj.IsGame) // Only show MCP button for game projects
+                {
                     // Connect/Disconnect button
                     var mcpButton = new Button
                     {
@@ -1015,12 +1023,21 @@ namespace HappyEngine.Managers
                         }
                     };
 
-                    mcpPanel.Children.Add(mcpButton);
-                    infoPanel.Children.Add(mcpPanel);
-                }
+                    // Create a wrapper to position the button at bottom right
+                    var mcpButtonWrapper = new StackPanel
+                    {
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        VerticalAlignment = VerticalAlignment.Bottom,
+                        Margin = new Thickness(0, 4, 0, 0)
+                    };
+                    mcpButtonWrapper.Children.Add(mcpButton);
 
-                Grid.SetColumn(infoPanel, 0);
-                grid.Children.Add(infoPanel);
+                    // Position MCP button in bottom row, spanning both columns
+                    Grid.SetRow(mcpButtonWrapper, 1);
+                    Grid.SetColumn(mcpButtonWrapper, 0);
+                    Grid.SetColumnSpan(mcpButtonWrapper, 2);
+                    grid.Children.Add(mcpButtonWrapper);
+                }
 
                 var btnPanel = new StackPanel
                 {
@@ -1081,6 +1098,7 @@ namespace HappyEngine.Managers
                 };
                 btnPanel.Children.Add(gearBtn);
 
+                Grid.SetRow(btnPanel, 0);
                 Grid.SetColumn(btnPanel, 1);
                 grid.Children.Add(btnPanel);
 
@@ -1130,6 +1148,28 @@ namespace HappyEngine.Managers
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
             if (entry == null) return;
 
+            // Check if Unity is running first
+            if (!IsUnityRunning())
+            {
+                // Show warning to user
+                entry.McpOutput.Clear();
+                entry.McpOutput.AppendLine("❌ Unity Editor is not running!");
+                entry.McpOutput.AppendLine("");
+                entry.McpOutput.AppendLine("MCP connection requires Unity Editor to be running.");
+                entry.McpOutput.AppendLine("Please start Unity Editor and try again.");
+
+                RefreshProjectList(null, null, null);
+
+                // Also show a message dialog
+                System.Windows.MessageBox.Show(
+                    "Unity Editor must be running before connecting to MCP.\n\nPlease start Unity Editor and try again.",
+                    "Unity Not Running",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Warning);
+
+                return;
+            }
+
             // Start the MCP server
             var success = await StartMcpServerAsync(entry);
 
@@ -1163,6 +1203,46 @@ namespace HappyEngine.Managers
 
             StopMcpServer(entry);
             UpdateMcpToggleForProject();
+        }
+
+        private bool IsUnityRunning()
+        {
+            try
+            {
+                // Check for Unity.exe process
+                var unityProcesses = System.Diagnostics.Process.GetProcessesByName("Unity");
+
+                if (unityProcesses.Length > 0)
+                {
+                    AppLogger.Info("ProjectManager", $"Found {unityProcesses.Length} Unity process(es) running");
+                    // Clean up process handles
+                    foreach (var process in unityProcesses)
+                    {
+                        process.Dispose();
+                    }
+                    return true;
+                }
+
+                // Also check for Unity Hub Unity.exe (sometimes named differently)
+                var unityHubProcesses = System.Diagnostics.Process.GetProcessesByName("Unity Hub");
+                if (unityHubProcesses.Length > 0)
+                {
+                    AppLogger.Debug("ProjectManager", "Unity Hub is running, but Unity Editor itself is not");
+                    foreach (var process in unityHubProcesses)
+                    {
+                        process.Dispose();
+                    }
+                }
+
+                AppLogger.Info("ProjectManager", "No Unity processes found");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("ProjectManager", "Error checking if Unity is running", ex);
+                // If we can't check, assume Unity might be running to avoid blocking
+                return true;
+            }
         }
 
         private async System.Threading.Tasks.Task<bool> CheckMcpHealth(string url)
@@ -1453,7 +1533,7 @@ namespace HappyEngine.Managers
             }
         }
 
-        private void StopMcpServer(ProjectEntry entry)
+        public void StopMcpServer(ProjectEntry entry)
         {
             try
             {
@@ -1506,6 +1586,11 @@ namespace HappyEngine.Managers
             {
                 StopMcpServer(entry);
             }
+        }
+
+        public void NotifyMcpOutputChanged(string projectPath)
+        {
+            McpOutputChanged?.Invoke(projectPath);
         }
 
         private async Task RegisterMcpWithClaudeAsync(string serverName)
