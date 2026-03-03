@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -116,6 +117,10 @@ namespace HappyEngine.Managers
 
         // ── Project Description Generation ──────────────────────────
 
+        /// <summary>JSON schema for structured project description output.</summary>
+        private const string DescriptionJsonSchema =
+            """{"type":"object","properties":{"short":{"type":"string"},"long":{"type":"string"}},"required":["short","long"]}""";
+
         public async Task<(string Short, string Long)> GenerateProjectDescriptionAsync(
             string projectPath, CancellationToken cancellationToken = default, bool? isGameProject = null)
         {
@@ -125,10 +130,11 @@ namespace HappyEngine.Managers
             Process? process = null;
             try
             {
+                var maxTurns = isGame ? 5 : 3;
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = isGame ? "-p --max-turns 5 --output-format text" : "-p --max-turns 3 --output-format text",
+                    Arguments = $"-p --max-turns {maxTurns} --output-format json --output-schema '{DescriptionJsonSchema}'",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -164,22 +170,34 @@ namespace HappyEngine.Managers
                     text.Contains("Reached max turns", StringComparison.OrdinalIgnoreCase))
                     return ("", "");
 
-                // Parse <short> and <long> tags
-                var shortMatch = Regex.Match(text, @"<short>\s*(.*?)\s*</short>", RegexOptions.Singleline);
-                var longMatch = Regex.Match(text, @"<long>\s*(.*?)\s*</long>", RegexOptions.Singleline);
+                string shortDesc = "", longDesc = "";
 
-                string shortDesc, longDesc;
-                if (shortMatch.Success)
+                // Try structured JSON parse first (constrained output mode)
+                try
                 {
-                    shortDesc = CleanDescriptionSection(shortMatch.Groups[1].Value);
-                    longDesc = longMatch.Success ? CleanDescriptionSection(longMatch.Groups[1].Value) : shortDesc;
+                    using var doc = JsonDocument.Parse(text);
+                    var root = doc.RootElement;
+                    shortDesc = CleanDescriptionSection(root.GetProperty("short").GetString() ?? "");
+                    longDesc = CleanDescriptionSection(root.GetProperty("long").GetString() ?? "");
                 }
-                else
+                catch (JsonException)
                 {
-                    // Fallback: try old separator format
-                    var parts = text.Split("---SEPARATOR---", 2, StringSplitOptions.TrimEntries);
-                    shortDesc = parts.Length > 0 ? CleanDescriptionSection(parts[0]) : "";
-                    longDesc = parts.Length > 1 ? CleanDescriptionSection(parts[1]) : shortDesc;
+                    // Fallback: parse <short>/<long> tags
+                    var shortMatch = Regex.Match(text, @"<short>\s*(.*?)\s*</short>", RegexOptions.Singleline);
+                    var longMatch = Regex.Match(text, @"<long>\s*(.*?)\s*</long>", RegexOptions.Singleline);
+
+                    if (shortMatch.Success)
+                    {
+                        shortDesc = CleanDescriptionSection(shortMatch.Groups[1].Value);
+                        longDesc = longMatch.Success ? CleanDescriptionSection(longMatch.Groups[1].Value) : shortDesc;
+                    }
+                    else
+                    {
+                        // Fallback: try old separator format
+                        var parts = text.Split("---SEPARATOR---", 2, StringSplitOptions.TrimEntries);
+                        shortDesc = parts.Length > 0 ? CleanDescriptionSection(parts[0]) : "";
+                        longDesc = parts.Length > 1 ? CleanDescriptionSection(parts[1]) : shortDesc;
+                    }
                 }
 
                 if (shortDesc.Length > Constants.AppConstants.MaxShortDescriptionLength)

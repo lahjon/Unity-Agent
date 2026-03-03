@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using HappyEngine.Constants;
@@ -138,6 +139,10 @@ namespace HappyEngine.Managers
 
         // ── Result Verification ─────────────────────────────────────
 
+        /// <summary>JSON schema for structured result verification output.</summary>
+        private const string VerificationJsonSchema =
+            """{"type":"object","properties":{"result":{"type":"string","enum":["PASS","FAIL"]},"summary":{"type":"string"}},"required":["result","summary"]}""";
+
         public async Task<ResultVerification?> VerifyResultAsync(
             string outputTail, string taskDescription, string? completionSummary,
             CancellationToken ct = default)
@@ -156,7 +161,7 @@ namespace HappyEngine.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --output-format text --model {AppConstants.ClaudeHaiku} --max-turns 1 --append-system-prompt \"Respond with exactly one line. No additional text.\"",
+                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 1 --output-schema '{VerificationJsonSchema}'",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -177,24 +182,41 @@ namespace HappyEngine.Managers
 
                 var processedText = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
 
-                foreach (var line in processedText.Split('\n'))
+                // Try structured JSON parse first (constrained output mode)
+                try
                 {
-                    var trimmed = line.Trim();
-                    if (trimmed.StartsWith("PASS|", StringComparison.OrdinalIgnoreCase))
+                    using var doc = JsonDocument.Parse(processedText);
+                    var root = doc.RootElement;
+                    var result = root.GetProperty("result").GetString() ?? "";
+                    var summary = root.GetProperty("summary").GetString() ?? "";
+                    return new ResultVerification
                     {
-                        return new ResultVerification
-                        {
-                            Passed = true,
-                            Summary = trimmed["PASS|".Length..].Trim()
-                        };
-                    }
-                    if (trimmed.StartsWith("FAIL|", StringComparison.OrdinalIgnoreCase))
+                        Passed = result.Equals("PASS", StringComparison.OrdinalIgnoreCase),
+                        Summary = summary
+                    };
+                }
+                catch (JsonException)
+                {
+                    // Fallback: parse legacy PASS|/FAIL| text format
+                    foreach (var line in processedText.Split('\n'))
                     {
-                        return new ResultVerification
+                        var trimmed = line.Trim();
+                        if (trimmed.StartsWith("PASS|", StringComparison.OrdinalIgnoreCase))
                         {
-                            Passed = false,
-                            Summary = trimmed["FAIL|".Length..].Trim()
-                        };
+                            return new ResultVerification
+                            {
+                                Passed = true,
+                                Summary = trimmed["PASS|".Length..].Trim()
+                            };
+                        }
+                        if (trimmed.StartsWith("FAIL|", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return new ResultVerification
+                            {
+                                Passed = false,
+                                Summary = trimmed["FAIL|".Length..].Trim()
+                            };
+                        }
                     }
                 }
 

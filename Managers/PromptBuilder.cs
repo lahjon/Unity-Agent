@@ -82,6 +82,7 @@ namespace HappyEngine.Managers
         public static readonly string ApplyFixBlock = PromptLoader.Load("ApplyFixBlock.md");
         public static readonly string ConfirmBeforeChangesBlock = PromptLoader.Load("ConfirmBeforeChangesBlock.md");
         public static readonly string AutonomousExecutionBlock = PromptLoader.Load("AutonomousExecutionBlock.md");
+        public static readonly string OutputEfficiencyBlock = PromptLoader.Load("OutputEfficiencyBlock.md");
         public static readonly string FailureRecoveryBlock = PromptLoader.Load("FailureRecoveryBlock.md");
         public static readonly string PlanningTeamMemberBlock = PromptLoader.Load("PlanningTeamMemberBlock.md");
         public static readonly string FeatureModeInitialTemplate = PromptLoader.Load("FeatureModeInitialTemplate.md");
@@ -130,16 +131,17 @@ namespace HappyEngine.Managers
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
             bool isGameProject = false, string taskId = "",
-            bool applyFix = true)
+            bool applyFix = true, bool suppressOutputEfficiency = false)
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
                 descBlock = $"# PROJECT CONTEXT\n{projectDescription}\n\n";
 
             var gameBlock = isGameProject ? GameRulesBlock : "";
+            var efficiencyBlock = suppressOutputEfficiency ? "" : OutputEfficiencyBlock;
 
             if (isFeatureMode)
-                return descBlock + projectRulesBlock + gameBlock + FeatureModeInitialTemplate + description;
+                return descBlock + projectRulesBlock + gameBlock + efficiencyBlock + FeatureModeInitialTemplate + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -152,7 +154,7 @@ namespace HappyEngine.Managers
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;
-            return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + applyFixBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
+            return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
                 "# USER PROMPT / TASK\n" + description;
         }
 
@@ -163,7 +165,13 @@ namespace HappyEngine.Managers
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
             if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
                 description += "\n\n# Additional Instructions\n" + task.AdditionalInstructions;
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix);
+
+            // Planning team members and planOnly tasks produce findings/plans as their deliverable —
+            // suppressing their output would lose the actual work product.
+            var isPlanningMember = task.NoGitWrite && task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly;
+            var suppressEfficiency = isPlanningMember || task.PlanOnly;
+
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency);
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
                 basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
@@ -269,17 +277,17 @@ namespace HappyEngine.Managers
         public string BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = "")
         {
             var prompt = string.Format(FeatureModeContinuationTemplate, iteration, maxIterations);
-            return InjectFeatureModeLogFilename(prompt, taskId);
+            return OutputEfficiencyBlock + InjectFeatureModeLogFilename(prompt, taskId);
         }
 
         public string BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription)
         {
-            return string.Format(FeatureModePlanConsolidationTemplate, iteration, maxIterations, teamResults, featureDescription);
+            return OutputEfficiencyBlock + string.Format(FeatureModePlanConsolidationTemplate, iteration, maxIterations, teamResults, featureDescription);
         }
 
         public string BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults)
         {
-            return string.Format(FeatureModeEvaluationTemplate, iteration, maxIterations, featureDescription, implementationResults);
+            return OutputEfficiencyBlock + string.Format(FeatureModeEvaluationTemplate, iteration, maxIterations, featureDescription, implementationResults);
         }
 
         public string BuildDependencyContext(List<string> depIds,

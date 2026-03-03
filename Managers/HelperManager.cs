@@ -142,7 +142,7 @@ namespace HappyEngine.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = "-p --max-turns 15 --output-format text",
+                    Arguments = "-p --max-turns 15 --output-format json --output-schema '{\"type\":\"object\",\"properties\":{\"suggestions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}},\"required\":[\"title\",\"description\"]}}},\"required\":[\"suggestions\"]}'",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -164,22 +164,34 @@ namespace HappyEngine.Managers
 
                 var text = StripAnsi(output).Trim();
 
-                // Try to extract JSON array from the output
-                var jsonStart = text.IndexOf('[');
-                var jsonEnd = text.LastIndexOf(']');
-                if (jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart)
-                {
-                    GenerationFailed?.Invoke("Could not parse suggestions from AI response.");
-                    return;
-                }
+                // Parse suggestions — try structured JSON object first, then legacy array fallback
+                List<SuggestionJson>? items = null;
+                var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
-                var json = text[jsonStart..(jsonEnd + 1)];
-                var items = JsonSerializer.Deserialize<List<SuggestionJson>>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                try
+                {
+                    // Structured output: {"suggestions": [...]}
+                    using var doc = JsonDocument.Parse(text);
+                    if (doc.RootElement.TryGetProperty("suggestions", out var sugArr))
+                    {
+                        items = JsonSerializer.Deserialize<List<SuggestionJson>>(sugArr.GetRawText(), jsonOpts);
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Fallback: extract bare JSON array from text output
+                    var jsonStart = text.IndexOf('[');
+                    var jsonEnd = text.LastIndexOf(']');
+                    if (jsonStart >= 0 && jsonEnd > jsonStart)
+                    {
+                        var json = text[jsonStart..(jsonEnd + 1)];
+                        items = JsonSerializer.Deserialize<List<SuggestionJson>>(json, jsonOpts);
+                    }
+                }
 
                 if (items == null || items.Count == 0)
                 {
-                    GenerationFailed?.Invoke("AI returned no suggestions.");
+                    GenerationFailed?.Invoke("Could not parse suggestions from AI response.");
                     return;
                 }
 

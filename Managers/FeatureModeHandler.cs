@@ -643,8 +643,9 @@ namespace HappyEngine.Managers
                 child.ProjectDisplayName = parent.ProjectDisplayName;
                 child.Summary = _taskFactory.GenerateLocalSummary(step.Description);
                 child.AutoDecompose = false;
-                // Add autonomous execution instructions
+                // Add autonomous execution instructions + output efficiency
                 child.AdditionalInstructions = PromptBuilder.AutonomousExecutionBlock +
+                    PromptBuilder.OutputEfficiencyBlock +
                     (child.AdditionalInstructions ?? "");
                 children.Add(child);
             }
