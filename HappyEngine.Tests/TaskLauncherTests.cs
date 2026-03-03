@@ -138,7 +138,7 @@ namespace HappyEngine.Tests
         {
             var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: true);
             Assert.Contains("NO GIT WRITES", result);
-            Assert.Contains("modify repository state", result);
+            Assert.Contains("Never commit", result);
             Assert.StartsWith("SYS:", result);
             Assert.EndsWith("task", result);
         }

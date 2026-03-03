@@ -25,7 +25,7 @@ namespace HappyEngine.Dialogs
 
     public static class WorkflowComposerDialog
     {
-        private const string SystemPrompt = PromptBuilder.WorkflowDecompositionSystemPrompt;
+        private static readonly string SystemPrompt = PromptBuilder.WorkflowDecompositionSystemPrompt;
 
         public static Task<WorkflowComposerResult?> ShowAsync(
             ClaudeService claudeService,

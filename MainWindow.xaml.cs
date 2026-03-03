@@ -33,7 +33,7 @@ namespace HappyEngine
 
         private static readonly System.Net.Http.HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
 
-        private const string DefaultSystemPrompt = PromptBuilder.DefaultSystemPrompt;
+        private static readonly string DefaultSystemPrompt = PromptBuilder.DefaultSystemPrompt;
         private string SystemPrompt;
 
         // ── Injected services (created once, shared across managers) ──

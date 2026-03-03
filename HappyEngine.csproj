@@ -31,6 +31,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Prompts\*.md" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="HappyEngine.Tests\**" />
     <None Remove="HappyEngine.Tests\**" />
   </ItemGroup>
