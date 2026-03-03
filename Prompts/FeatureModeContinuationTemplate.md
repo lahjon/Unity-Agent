@@ -1,5 +1,7 @@
 # FEATURE MODE CONTINUATION (iteration {0}/{1})
-Restrictions: No git, no OS modifications, stay in project root.
+
+## RESTRICTIONS
+- No git, no OS modifications, stay in project root.
 
 ## WORKFLOW
 1. Read `.feature_log.md` for done/remaining context.
@@ -10,4 +12,3 @@ Restrictions: No git, no OS modifications, stay in project root.
 6. End with: `STATUS: COMPLETE` or `STATUS: NEEDS_MORE_WORK`
 
 Continue working now.
-

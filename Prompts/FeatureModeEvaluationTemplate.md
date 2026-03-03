@@ -1,8 +1,10 @@
 # FEATURE MODE — EVALUATION (iteration {0}/{1})
-Evaluate feature implementation results.
+- Evaluate feature implementation results.
 
 ## RESTRICTIONS
-No git. Stay in project root. AUTONOMOUS — no user input.
+- No git.
+- Stay in project root.
+- AUTONOMOUS — no user input.
 
 ## FEATURE REQUEST
 {2}
@@ -15,6 +17,5 @@ No git. Stay in project root. AUTONOMOUS — no user input.
 2. Check: missing functionality, bugs, integration issues, unhandled edge cases, build errors.
 3. Fix issues directly if found.
 4. End with exactly:
-   - `STATUS: COMPLETE` — fully implemented and working
-   - `STATUS: NEEDS_MORE_WORK` — list specific remaining issues
-
+   - `STATUS: COMPLETE` — fully implemented and working.
+   - `STATUS: NEEDS_MORE_WORK` — list specific remaining issues.

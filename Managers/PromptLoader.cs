@@ -33,10 +33,7 @@ namespace HappyEngine.Managers
                 using var reader = new StreamReader(stream);
                 var text = reader.ReadToEnd();
                 // Normalize to \n line endings for consistent prompt formatting
-                text = text.Replace("\r\n", "\n");
-                // Ensure trailing newline
-                if (!text.EndsWith("\n"))
-                    text += "\n";
+                text = text.Replace("\r\n", "\n").TrimEnd('\n') + "\n\n";
                 return text;
             }, _assembly);
         }
