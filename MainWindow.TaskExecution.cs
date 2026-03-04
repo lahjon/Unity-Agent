@@ -143,6 +143,8 @@ namespace Spritely
 
         private void Execute_Click(object sender, RoutedEventArgs e)
         {
+            if (!_projectManager.HasProjects) return;
+
             var desc = TaskInput.Text?.Trim();
             if (!_taskFactory.ValidateTaskInput(desc)) return;
 
@@ -184,6 +186,8 @@ namespace Spritely
 
         private async void ComposeWorkflow_Click(object sender, RoutedEventArgs e)
         {
+            if (!_projectManager.HasProjects) return;
+
             var result = await WorkflowComposerDialog.ShowAsync(_claudeService, _projectManager.ProjectPath);
             if (result == null || result.Steps.Count == 0)
                 return;

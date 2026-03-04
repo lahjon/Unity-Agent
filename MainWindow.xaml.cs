@@ -527,6 +527,7 @@ namespace Spritely
 
                 _statusTimer.Start();
                 _periodicSaveTimer.Start();
+                UpdateNoProjectState();
                 UpdateStatus();
 
                 // Offer to re-queue recovered tasks from a previous session
@@ -724,6 +725,7 @@ namespace Spritely
 
             UpdateStatus();
             UpdateFileLocks(); // Update file locks display for the new project
+            UpdateNoProjectState();
 
             ct.ThrowIfCancellationRequested();
 
@@ -1970,6 +1972,7 @@ namespace Spritely
 
         private void ExecuteStoredTask_Click(object sender, RoutedEventArgs e)
         {
+            if (!_projectManager.HasProjects) return;
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (string.IsNullOrEmpty(task.StoredPrompt)) return;
 
@@ -2317,6 +2320,9 @@ namespace Spritely
 
             // Update file locks display
             UpdateFileLocks();
+
+            // Update no-project state (e.g. after removing the last project)
+            UpdateNoProjectState();
         }
 
         private void UpdateFileLocks()
@@ -3106,6 +3112,7 @@ namespace Spritely
 
         private async void GenerateSuggestions_Click(object sender, RoutedEventArgs e)
         {
+            if (!_projectManager.HasProjects) return;
             if (_helperManager.IsGenerating) return;
 
             var category = SuggestionCategory.General;
@@ -3613,6 +3620,38 @@ namespace Spritely
 
         // ── Status ─────────────────────────────────────────────────
 
+        /// <summary>
+        /// Updates the UI to reflect whether any projects are loaded.
+        /// Disables prompt input, execute buttons, and project-dependent panels when no projects exist.
+        /// </summary>
+        private void UpdateNoProjectState()
+        {
+            var hasProjects = _projectManager.HasProjects;
+
+            // Prompt area overlay
+            NoProjectOverlay.Visibility = hasProjects ? Visibility.Collapsed : Visibility.Visible;
+
+            // Disable task execution controls
+            ExecuteButton.IsEnabled = hasProjects;
+            TaskInput.IsEnabled = hasProjects;
+            AdditionalInstructionsInput.IsEnabled = hasProjects;
+
+            // Prompt project label
+            if (!hasProjects)
+            {
+                PromptProjectLabel.Text = "";
+                PromptProjectLabel.ToolTip = null;
+            }
+
+            // Disable project-dependent tabs in the right settings panel
+            HelperTabItem.IsEnabled = hasProjects;
+            HelperTabItem.ToolTip = hasProjects ? null : "Add a project to use automation features";
+
+            // Git tab in the project info panel
+            GitTabItem.IsEnabled = hasProjects;
+            GitTabItem.ToolTip = hasProjects ? null : "Add a project to view git information";
+        }
+
         private void UpdateStatus()
         {
             var running = _activeTasks.Count(t => t.Status == AgentTaskStatus.Running);
@@ -3623,9 +3662,17 @@ namespace Spritely
             var cancelled = _historyTasks.Count(t => t.Status == AgentTaskStatus.Cancelled);
             var failed = _historyTasks.Count(t => t.Status == AgentTaskStatus.Failed);
             var locks = _fileLockManager.LockCount;
-            var projectName = Path.GetFileName(_projectManager.ProjectPath);
             var planningPart = planning > 0 ? $"  |  Planning: {planning}" : "";
             var waitingPart = waiting > 0 ? $"  |  Waiting: {waiting}" : "";
+
+            if (!_projectManager.HasProjects)
+            {
+                StatusText.Text = $"No project  |  Add a project to get started  |  " +
+                                  $"Completed: {completed}  |  Failed: {failed}";
+                return;
+            }
+
+            var projectName = Path.GetFileName(_projectManager.ProjectPath);
             StatusText.Text = $"{projectName}  |  Running: {running}{planningPart}  |  Queued: {queued}{waitingPart}  |  " +
                               $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
                               $"Locks: {locks}  |  {_projectManager.ProjectPath}";

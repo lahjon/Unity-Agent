@@ -89,6 +89,7 @@ namespace Spritely
 
         private void StoreTask_Click(object sender, RoutedEventArgs e)
         {
+            if (!_projectManager.HasProjects) return;
             var text = TaskInput.Text?.Trim();
             if (string.IsNullOrEmpty(text)) return;
 

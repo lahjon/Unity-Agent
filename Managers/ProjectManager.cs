@@ -72,6 +72,9 @@ namespace Spritely.Managers
 
         public List<ProjectEntry> SavedProjects => _savedProjects;
 
+        /// <summary>Whether any projects have been added.</summary>
+        public bool HasProjects => _savedProjects.Count > 0;
+
         public ProjectManager(
             string appDataDir,
             string initialProjectPath,

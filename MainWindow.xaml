@@ -1248,6 +1248,7 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Border.Triggers>
+                <Grid>
                 <DockPanel>
                     <!-- Top: Saved Prompts strip (above prompt so panel can collapse further) -->
                     <Border x:Name="SavedPromptsBorder" DockPanel.Dock="Top"
@@ -1546,6 +1547,21 @@
                 </Grid>
 
                 </DockPanel>
+                <!-- No-project overlay: shown when no projects are loaded -->
+                <Border x:Name="NoProjectOverlay" Visibility="Collapsed"
+                        Background="#CC1A1A1A" CornerRadius="6">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="40">
+                        <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="48"
+                                   Foreground="{StaticResource TextDisabled}" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+                        <TextBlock Text="No Project Selected" Foreground="{StaticResource TextLight}"
+                                   FontSize="18" FontWeight="SemiBold" FontFamily="Segoe UI"
+                                   HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock Text="Add a project from the Projects panel to get started."
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" FontFamily="Segoe UI"
+                                   HorizontalAlignment="Center" TextWrapping="Wrap" MaxWidth="320"/>
+                    </StackPanel>
+                </Border>
+                </Grid>
             </Border>
 
         <!-- Horizontal Splitter: Top ↔ Middle (Thumb-based to avoid GridSplitter star-sizing jitter) -->
