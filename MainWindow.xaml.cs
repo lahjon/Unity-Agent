@@ -509,6 +509,7 @@ namespace Spritely
                 RestoreStarRow();
                 RefreshFilterCombos();
                 RefreshActivityDashboard();
+                _projectTaskManager.CurrentProjectPath = _projectManager.ProjectPath;
                 InitializeTaskList();
                 _projectManager.RefreshProjectList(
                     p => _terminalManager?.UpdateWorkingDirectory(p),
@@ -2321,6 +2322,9 @@ namespace Spritely
             // Update file locks display
             UpdateFileLocks();
 
+            // Reload tasks for the new project
+            LoadTasksForDisplay();
+
             // Update no-project state (e.g. after removing the last project)
             UpdateNoProjectState();
         }
@@ -3476,14 +3480,16 @@ namespace Spritely
 
         private void LoadTasksForDisplay()
         {
-            if (_projectTaskManager?.Tasks != null && TaskListControl.ItemsSource == null)
+            if (_projectTaskManager == null) return;
+
+            // Update the project filter
+            _projectTaskManager.CurrentProjectPath = _projectManager.ProjectPath;
+
+            // Always rebuild the list from the filtered Tasks property
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
             {
-                // Use dispatcher to ensure UI updates happen on the UI thread
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
-                {
-                    TaskListControl.ItemsSource = new ObservableCollection<ProjectTaskItem>(_projectTaskManager.Tasks);
-                }));
-            }
+                TaskListControl.ItemsSource = new ObservableCollection<ProjectTaskItem>(_projectTaskManager.Tasks);
+            }));
         }
 
         private void AddTask_Click(object sender, RoutedEventArgs e)
@@ -3506,22 +3512,24 @@ namespace Spritely
             if (string.IsNullOrEmpty(text) || text == TaskInputBox.Tag?.ToString())
                 return;
 
+            if (!_projectManager.HasProjects)
+                return;
+
             try
             {
-                // Fix: Get the returned task instead of accessing the list
+                _projectTaskManager.CurrentProjectPath = _projectManager.ProjectPath;
                 var newTask = _projectTaskManager.AddTask(text);
                 TaskInputBox.Clear();
-
-                // Initialize the ItemsSource if it hasn't been loaded yet
-                if (TaskListControl.ItemsSource == null)
-                {
-                    LoadTasksForDisplay();
-                }
 
                 // Add to UI
                 if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
                 {
                     tasks.Add(newTask);
+                }
+                else
+                {
+                    // ItemsSource not yet initialized — load from scratch
+                    LoadTasksForDisplay();
                 }
             }
             catch (Exception ex)
@@ -3650,6 +3658,12 @@ namespace Spritely
             // Git tab in the project info panel
             GitTabItem.IsEnabled = hasProjects;
             GitTabItem.ToolTip = hasProjects ? null : "Add a project to view git information";
+
+            // Tasks tab — show/hide overlay and content
+            TasksTabItem.IsEnabled = hasProjects;
+            TasksTabItem.ToolTip = hasProjects ? null : "Add a project to manage tasks";
+            NoProjectTasksOverlay.Visibility = hasProjects ? Visibility.Collapsed : Visibility.Visible;
+            TaskContentPanel.Visibility = hasProjects ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void UpdateStatus()

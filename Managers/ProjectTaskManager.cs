@@ -11,9 +11,18 @@ namespace Spritely.Managers
     public class ProjectTaskManager
     {
         private readonly string _tasksFile;
-        private readonly List<ProjectTaskItem> _tasks = new();
+        private readonly List<ProjectTaskItem> _allTasks = new();
+        private string _currentProjectPath = string.Empty;
 
-        public List<ProjectTaskItem> Tasks => _tasks;
+        /// <summary>Returns only the tasks for the current project (excludes completed).</summary>
+        public List<ProjectTaskItem> Tasks =>
+            _allTasks.Where(t => !t.IsCompleted && NormalizePath(t.ProjectPath) == NormalizePath(_currentProjectPath)).ToList();
+
+        public string CurrentProjectPath
+        {
+            get => _currentProjectPath;
+            set => _currentProjectPath = value;
+        }
 
         public ProjectTaskManager(string appDataDir)
         {
@@ -29,8 +38,8 @@ namespace Spritely.Managers
                 var tasks = JsonSerializer.Deserialize<List<ProjectTaskItem>>(json);
                 if (tasks != null)
                 {
-                    _tasks.Clear();
-                    _tasks.AddRange(tasks.Where(t => !t.IsCompleted).OrderBy(t => t.CreatedAt));
+                    _allTasks.Clear();
+                    _allTasks.AddRange(tasks.OrderBy(t => t.CreatedAt));
                 }
             }
             catch (Exception ex)
@@ -43,7 +52,9 @@ namespace Spritely.Managers
         {
             try
             {
-                var json = JsonSerializer.Serialize(_tasks, new JsonSerializerOptions { WriteIndented = true });
+                // Save all tasks (all projects), but exclude completed ones
+                var toSave = _allTasks.Where(t => !t.IsCompleted).ToList();
+                var json = JsonSerializer.Serialize(toSave, new JsonSerializerOptions { WriteIndented = true });
                 SafeFileWriter.WriteInBackground(_tasksFile, json, "ProjectTaskManager");
             }
             catch (Exception ex)
@@ -61,11 +72,17 @@ namespace Spritely.Managers
         {
             if (string.IsNullOrWhiteSpace(text))
                 throw new ArgumentException("Task text cannot be empty", nameof(text));
+            if (string.IsNullOrEmpty(_currentProjectPath))
+                throw new InvalidOperationException("No project selected");
 
-            var task = new ProjectTaskItem { Text = text.Trim() };
-            _tasks.Add(task);
+            var task = new ProjectTaskItem
+            {
+                Text = text.Trim(),
+                ProjectPath = _currentProjectPath
+            };
+            _allTasks.Add(task);
             SaveTasks();
-            return task; // Return the added task to avoid accessing the list directly
+            return task;
         }
 
         public void CompleteTask(ProjectTaskItem task)
@@ -77,8 +94,11 @@ namespace Spritely.Managers
 
         public void RemoveTask(ProjectTaskItem task)
         {
-            _tasks.Remove(task);
+            _allTasks.Remove(task);
             SaveTasks();
         }
+
+        private static string NormalizePath(string path) =>
+            path.Replace('/', '\\').TrimEnd('\\').ToLowerInvariant();
     }
 }

@@ -1964,7 +1964,19 @@
                             <TabItem.Header>
                                 <TextBlock Text="Tasks" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                             </TabItem.Header>
-                            <DockPanel Margin="0,6,0,0">
+                            <Grid>
+                                <!-- No project overlay -->
+                                <StackPanel x:Name="NoProjectTasksOverlay" Visibility="Collapsed"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="32"
+                                               Foreground="{StaticResource TextDim}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                    <TextBlock Text="No project selected" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Add a project to manage tasks" FontSize="12"
+                                               Foreground="{StaticResource TextDim}" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <!-- Task content -->
+                                <DockPanel x:Name="TaskContentPanel" Margin="0,6,0,0">
                                 <!-- Input area -->
                                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                                     <Button x:Name="AddTaskBtn" Content="Add" Click="AddTask_Click"
@@ -2113,7 +2125,8 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
-                            </DockPanel>
+                                </DockPanel>
+                            </Grid>
                         </TabItem>
                         <!-- Activity tab -->
                         <TabItem x:Name="ActivityTabItem">
