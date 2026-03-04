@@ -50,9 +50,13 @@ namespace Spritely.Managers
         private readonly TaskProcessLauncher _processLauncher;
         private readonly FeatureModeHandler _featureModeHandler;
         private readonly TokenLimitHandler _tokenLimitHandler;
+        private readonly EarlyTerminationManager _earlyTerminationManager;
 
         /// <summary>Exposes the streaming tool state dictionary for external consumers.</summary>
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _processLauncher.StreamingToolState;
+
+        /// <summary>Exposes the early termination manager for monitoring/dashboard access.</summary>
+        public EarlyTerminationManager EarlyTerminationManager => _earlyTerminationManager;
 
         /// <summary>Fires when a task's process exits (with the task ID). Used to resume dependency-queued tasks.</summary>
         public event Action<string>? TaskCompleted;
@@ -101,7 +105,8 @@ namespace Spritely.Managers
             // Wire up sub-handlers
             _outputProcessor = new OutputProcessor(outputTabManager, completionAnalyzer, gitHelper, getAutoVerify);
             _processLauncher = new TaskProcessLauncher(scriptDir, fileLockManager, outputTabManager, _outputProcessor, promptBuilder, dispatcher);
-            _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, completionAnalyzer, promptBuilder, taskFactory, retryMinutesFunc);
+            _earlyTerminationManager = new EarlyTerminationManager(new ProgressAnalyzer());
+            _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, completionAnalyzer, promptBuilder, taskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
             _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, completionAnalyzer, retryMinutesFunc);
 
             // Set callback to process queued messages when task becomes ready

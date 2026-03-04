@@ -261,6 +261,9 @@ namespace Spritely
             _fileLockManager.CheckQueuedTasks(_activeTasks);
             _taskOrchestrator.OnTaskCompleted(task.Id);
 
+            // Clean up orchestrator node now that dependents have been unblocked
+            _taskOrchestrator.RemoveTask(task.Id);
+
             // Notify group tracker
             _taskGroupTracker.OnTaskCompleted(task);
 

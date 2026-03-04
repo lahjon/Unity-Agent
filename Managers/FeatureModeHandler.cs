@@ -31,6 +31,7 @@ namespace Spritely.Managers
         private readonly Func<int> _getTokenLimitRetryMinutes;
         private readonly SmartTruncationService _smartTruncationService;
         private readonly ModelComplexityAnalyzer _modelComplexityAnalyzer;
+        private readonly EarlyTerminationManager _earlyTerminationManager;
 
         internal const int FeatureModeMaxRuntimeHours = 12;
         internal const int FeatureModeIterationTimeoutMinutes = 60;
@@ -61,7 +62,8 @@ namespace Spritely.Managers
             ITaskFactory taskFactory,
             Func<int> getTokenLimitRetryMinutes,
             SmartTruncationService? smartTruncationService = null,
-            ModelComplexityAnalyzer? modelComplexityAnalyzer = null)
+            ModelComplexityAnalyzer? modelComplexityAnalyzer = null,
+            EarlyTerminationManager? earlyTerminationManager = null)
         {
             _scriptDir = scriptDir;
             _processLauncher = processLauncher;
@@ -74,6 +76,7 @@ namespace Spritely.Managers
             _getTokenLimitRetryMinutes = getTokenLimitRetryMinutes;
             _smartTruncationService = smartTruncationService ?? new SmartTruncationService();
             _modelComplexityAnalyzer = modelComplexityAnalyzer ?? new ModelComplexityAnalyzer();
+            _earlyTerminationManager = earlyTerminationManager ?? new EarlyTerminationManager(new ProgressAnalyzer());
         }
 
         // ── Main entry point: called when a feature mode task's process exits ──
@@ -152,6 +155,49 @@ namespace Spritely.Managers
             {
                 // Only reset consecutive failures when exitCode is 0
                 task.ConsecutiveFailures = 0;
+            }
+
+            // ── Early termination check ──────────────────────────────────
+            // Evaluate whether the task should be stopped early based on
+            // progress velocity, stall detection, token budget, and error patterns.
+            var terminationDecision = _earlyTerminationManager.EvaluateTermination(task, iterationOutput);
+            if (terminationDecision.ShouldTerminate)
+            {
+                var reason = terminationDecision.Reason switch
+                {
+                    TerminationReason.CriticalFailure => "critical failure detected",
+                    TerminationReason.PersistentStall => "persistent stall detected",
+                    TerminationReason.BudgetExceeded => "token budget exceeded",
+                    _ => "early termination triggered"
+                };
+                _outputProcessor.AppendOutput(task.Id,
+                    $"\n[Feature Mode] Early termination: {reason} (confidence: {terminationDecision.Confidence:P0})\n" +
+                    $"[Feature Mode] Detail: {terminationDecision.Explanation}\n",
+                    activeTasks, historyTasks);
+
+                // Log evidence from each check
+                foreach (var check in terminationDecision.Checks)
+                {
+                    if (check.Severity >= CheckSeverity.Warning)
+                    {
+                        _outputProcessor.AppendOutput(task.Id,
+                            $"[Feature Mode]   • {check.Type}: {check.Description}\n",
+                            activeTasks, historyTasks);
+                    }
+                }
+
+                FinishFeatureModeTask(task,
+                    terminationDecision.Reason == TerminationReason.CriticalFailure
+                        ? AgentTaskStatus.Failed
+                        : AgentTaskStatus.Completed,
+                    activeTasks, historyTasks, moveToHistory);
+                return;
+            }
+            else if (!string.IsNullOrEmpty(terminationDecision.RecommendedAction))
+            {
+                _outputProcessor.AppendOutput(task.Id,
+                    $"[Feature Mode] Progress monitor: {terminationDecision.Explanation} — {terminationDecision.RecommendedAction}\n",
+                    activeTasks, historyTasks);
             }
 
             // Route based on current phase
@@ -1065,6 +1111,9 @@ namespace Spritely.Managers
             // Directly set final status without verifying step
             task.Status = status;
             task.EndTime = DateTime.Now;
+
+            // Clean up early termination tracking for this task
+            _earlyTerminationManager.ClearTaskState(task.Id);
 
             if (task.UseMessageBus)
                 _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
