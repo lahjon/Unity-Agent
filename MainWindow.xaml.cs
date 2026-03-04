@@ -1989,7 +1989,7 @@ namespace Spritely
                 UseMcpToggle.IsChecked == true,
                 SpawnTeamToggle.IsChecked == true,
                 ExtendedPlanningToggle.IsChecked == true,
-                DefaultNoGitWriteToggle.IsChecked == true,
+                true, // NoGitWrite always on — the commit system handles git writes
                 PlanOnlyToggle.IsChecked == true,
                 imagePaths: _imageManager.DetachImages(),
                 model: selectedModel,

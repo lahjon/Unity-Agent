@@ -126,7 +126,7 @@ namespace Spritely.Managers
         // ── Prompt Assembly ─────────────────────────────────────────
 
         public string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
-            bool isFeatureMode, bool extendedPlanning = false, bool noGitWrite = false,
+            bool isFeatureMode, bool extendedPlanning = false, bool noGitWrite = false /* deprecated: always treated as true */,
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
@@ -148,9 +148,9 @@ namespace Spritely.Managers
             var planOnlyBlock = planOnly ? PlanOnlyBlock : "";
             // Skip git blocks when planOnly is active — PlanOnlyBlock already
             // prohibits all file operations which subsumes git-write restrictions.
-            // When noGitWrite is true: fully read-only git (no commit, no push, nothing).
-            // When noGitWrite is false: allow commits but never push (push only via git panel).
-            var gitBlock = planOnly ? "" : (noGitWrite ? NoGitWriteBlock : NoPushBlock);
+            // NoGitWrite is always true for standard tasks — the app's commit system
+            // handles all git writes, so Claude should never commit/push directly.
+            var gitBlock = planOnly ? "" : NoGitWriteBlock;
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;

@@ -6,7 +6,7 @@ namespace Spritely.Managers
     public interface IPromptBuilder
     {
         string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
-            bool isFeatureMode, bool extendedPlanning = false, bool noGitWrite = false,
+            bool isFeatureMode, bool extendedPlanning = false, bool noGitWrite = false /* deprecated: always treated as true */,
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,

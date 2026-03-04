@@ -42,7 +42,7 @@ namespace Spritely
             target.PlanOnly = PlanOnlyToggle.IsChecked == true;
             target.IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true;
             target.UseMcp = UseMcpToggle.IsChecked == true;
-            target.NoGitWrite = DefaultNoGitWriteToggle.IsChecked == true;
+            target.NoGitWrite = true; // Always on — the commit system handles git writes
             target.AutoDecompose = AutoDecomposeToggle.IsChecked == true;
             target.ApplyFix = ApplyFixToggle.IsChecked == true;
             if (int.TryParse(FeatureModeIterationsBox?.Text, out var iter) && iter > 0)
@@ -59,7 +59,6 @@ namespace Spritely
             PlanOnlyToggle.IsChecked = source.PlanOnly;
             IgnoreFileLocksToggle.IsChecked = source.IgnoreFileLocks;
             UseMcpToggle.IsChecked = source.UseMcp;
-            DefaultNoGitWriteToggle.IsChecked = source.NoGitWrite;
             AutoDecomposeToggle.IsChecked = source.AutoDecompose;
             ApplyFixToggle.IsChecked = source.ApplyFix;
             if (FeatureModeIterationsPanel != null)
@@ -100,8 +99,7 @@ namespace Spritely
                 useMcp: UseMcpToggle.IsChecked == true,
                 spawnTeam: SpawnTeamToggle.IsChecked == true,
                 extendedPlanning: ExtendedPlanningToggle.IsChecked == true,
-                noGitWrite: DefaultNoGitWriteToggle.IsChecked == true,
-                planOnly: planOnly,
+                noGitWrite: true, // Always on — the commit system handles git writes                planOnly: planOnly,
                 imagePaths: imagePaths,
                 model: model,
                 autoDecompose: AutoDecomposeToggle.IsChecked == true,
@@ -204,7 +202,7 @@ namespace Spritely
                     isFeatureMode: false,
                     ignoreFileLocks: IgnoreFileLocksToggle.IsChecked == true,
                     useMcp: UseMcpToggle.IsChecked == true,
-                    noGitWrite: DefaultNoGitWriteToggle.IsChecked == true);
+                    noGitWrite: true); // Always on — the commit system handles git writes
 
                 task.Summary = step.TaskName;
                 task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);

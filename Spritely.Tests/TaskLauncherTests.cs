@@ -145,12 +145,12 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void BuildBasePrompt_WithoutNoGitWrite_IncludesNoPushBlock()
+        public void BuildBasePrompt_WithoutNoGitWrite_StillIncludesNoGitWriteBlock()
         {
+            // NoGitWrite is always enforced — the commit system handles all git writes
             var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: false);
-            Assert.DoesNotContain("NO GIT WRITES", result);
-            Assert.Contains("NO GIT PUSH", result);
-            Assert.Contains("git push", result);
+            Assert.Contains("NO GIT WRITES", result);
+            Assert.Contains("Never commit", result);
         }
 
         [Fact]
