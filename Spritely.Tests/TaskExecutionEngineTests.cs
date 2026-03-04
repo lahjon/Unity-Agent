@@ -915,10 +915,12 @@ namespace Spritely.Tests
         [InlineData(AgentTaskStatus.Completed, true)]
         [InlineData(AgentTaskStatus.Cancelled, true)]
         [InlineData(AgentTaskStatus.Failed, true)]
+        [InlineData(AgentTaskStatus.Recommendation, true)]
         [InlineData(AgentTaskStatus.Running, false)]
         [InlineData(AgentTaskStatus.Paused, false)]
         [InlineData(AgentTaskStatus.Queued, false)]
         [InlineData(AgentTaskStatus.InitQueued, false)]
+        [InlineData(AgentTaskStatus.Committing, false)]
         public void Lifecycle_IsFinished_CorrectForAllStatuses(AgentTaskStatus status, bool expected)
         {
             var task = new AgentTask { Status = status };
@@ -938,6 +940,46 @@ namespace Spritely.Tests
             Assert.Contains("StatusText", changed);
             Assert.Contains("StatusColor", changed);
             Assert.Contains("IsRunning", changed);
+            Assert.Contains("IsFinished", changed);
+        }
+
+        [Fact]
+        public void Lifecycle_CommittingStatus_IsNotFinished()
+        {
+            var task = MakeTask();
+            task.Status = AgentTaskStatus.Committing;
+
+            Assert.True(task.IsCommitting);
+            Assert.False(task.IsFinished);
+            Assert.False(task.IsRunning);
+            Assert.Equal("Committing", task.StatusText);
+            Assert.Equal("#4DD0E1", task.StatusColor);
+        }
+
+        [Fact]
+        public void Lifecycle_CommittingToCompleted()
+        {
+            var task = MakeTask();
+            task.Status = AgentTaskStatus.Committing;
+            Assert.True(task.IsCommitting);
+            Assert.False(task.IsFinished);
+
+            task.Status = AgentTaskStatus.Completed;
+            Assert.False(task.IsCommitting);
+            Assert.True(task.IsFinished);
+            Assert.Equal("Finished", task.StatusText);
+        }
+
+        [Fact]
+        public void Lifecycle_CommittingFiresIsCommittingPropertyChanged()
+        {
+            var task = MakeTask();
+            var changed = new List<string>();
+            task.PropertyChanged += (_, e) => changed.Add(e.PropertyName!);
+
+            task.Status = AgentTaskStatus.Committing;
+
+            Assert.Contains("IsCommitting", changed);
             Assert.Contains("IsFinished", changed);
         }
 

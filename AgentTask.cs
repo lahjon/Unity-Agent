@@ -20,7 +20,8 @@ namespace Spritely
         InitQueued,
         Planning,
         Verifying,
-        Recommendation
+        Recommendation,
+        Committing
     }
 
     public enum TaskPriority
@@ -213,7 +214,7 @@ namespace Spritely
                 Data.Status = value;
                 NotifyAll(nameof(Status), nameof(StatusText), nameof(StatusColor),
                     nameof(IsRunning), nameof(IsPlanning), nameof(IsQueued), nameof(IsPaused),
-                    nameof(IsInitQueued), nameof(IsFinished), nameof(IsRetryable), nameof(IsContinuable),
+                    nameof(IsInitQueued), nameof(IsFinished), nameof(IsCommitting), nameof(IsRetryable), nameof(IsContinuable),
                     nameof(TimeInfo), nameof(HasPriorityBadge), nameof(IsCompletedUncommitted));
             }
         }
@@ -353,6 +354,7 @@ namespace Spritely
         public bool IsQueued => Status == AgentTaskStatus.Queued;
         public bool IsPaused => Status == AgentTaskStatus.Paused;
         public bool IsInitQueued => Status == AgentTaskStatus.InitQueued;
+        public bool IsCommitting => Status == AgentTaskStatus.Committing;
         public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed or AgentTaskStatus.Recommendation;
         public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
         public bool IsContinuable => Status == AgentTaskStatus.Recommendation;
@@ -401,6 +403,7 @@ namespace Spritely
             AgentTaskStatus.Planning => "Planning",
             AgentTaskStatus.Verifying => "Verifying",
             AgentTaskStatus.Recommendation => "Has Recommendations",
+            AgentTaskStatus.Committing => "Committing",
             _ => "?"
         };
 
@@ -427,6 +430,7 @@ namespace Spritely
             AgentTaskStatus.Planning => "#B39DDB",
             AgentTaskStatus.Verifying => "#80CBC4",
             AgentTaskStatus.Recommendation => "#FFB74D",
+            AgentTaskStatus.Committing => "#4DD0E1",
             _ => "#555555"
         };
 
@@ -549,6 +553,8 @@ namespace Spritely
                     return $"{started} | Paused at {(int)running.TotalMinutes}m {running.Seconds}s";
                 if (Status == AgentTaskStatus.Planning)
                     return $"{started} | Planning {(int)running.TotalMinutes}m {running.Seconds}s";
+                if (Status == AgentTaskStatus.Committing)
+                    return $"{started} | Committing...";
                 return $"{started} | Running {(int)running.TotalMinutes}m {running.Seconds}s";
             }
         }

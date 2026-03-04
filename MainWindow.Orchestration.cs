@@ -136,85 +136,93 @@ namespace Spritely
             if (task.PlanOnly && task.Status == AgentTaskStatus.Completed)
                 CreateStoredTaskFromPlan(task);
 
-            // Check if we should defer file lock release for Auto-Commit
-            var shouldDeferLockRelease = _settingsManager.AutoCommit &&
-                                        task.Status == AgentTaskStatus.Completed &&
-                                        !task.IsCommitted &&
-                                        !task.NoGitWrite;
+            // Check if we should enter the Committing phase for Auto-Commit
+            var shouldAutoCommit = _settingsManager.AutoCommit &&
+                                   task.Status == AgentTaskStatus.Completed &&
+                                   !task.IsCommitted &&
+                                   !task.NoGitWrite;
 
-            if (shouldDeferLockRelease)
+            if (shouldAutoCommit)
             {
-                // Capture the locked files before moving to history
+                // Capture the locked files before any cleanup
                 var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
                 if (lockedFiles.Count > 0)
                 {
-                    // Store locked files in task runtime state for later release after commit
+                    // Store locked files in task runtime state for the commit
                     task.Runtime.LockedFilesForCommit = lockedFiles;
 
-                    // Remove from queued info but keep file locks active
+                    // Transition to Committing — task stays in _activeTasks with locks held
+                    task.Status = AgentTaskStatus.Committing;
                     _fileLockManager.RemoveQueuedInfo(task.Id);
                     _taskExecutionManager.RemoveStreamingState(task.Id);
+                    _outputTabManager.UpdateTabHeader(task);
+                    RefreshActivityDashboard();
 
-                    // Track pending commit task instead of fire-and-forget
+                    // Run commit on background thread
                     task.Runtime.PendingCommitTask = Task.Run(async () =>
                     {
                         try
                         {
-                            // Notify UI that commit is starting
+                            var (success, errorMessage) = await CommitTaskAsync(task);
                             await Dispatcher.InvokeAsync(() =>
                             {
-                                task.OnPropertyChanged(nameof(task.IsPendingCommit));
-                                RefreshActivityDashboard(); // Update UI to show committing badge
-                            });
-
-                            var (success, errorMessage) = await CommitTaskAsync(task);
-                            if (!success)
-                            {
-                                // If commit failed, set error and release locks
-                                await Dispatcher.InvokeAsync(() =>
+                                if (!success)
                                 {
                                     task.CommitError = errorMessage ?? "Failed to commit changes";
-                                    _fileLockManager.ReleaseTaskLocks(task.Id);
-                                    task.Runtime.LockedFilesForCommit = null;
-                                    _fileLockManager.CheckQueuedTasks(_activeTasks);
-                                    task.Runtime.PendingCommitTask = null;
-                                    task.OnPropertyChanged(nameof(task.IsPendingCommit));
-                                    RefreshActivityDashboard(); // Update UI to remove committing badge
-                                });
-                            }
+                                }
+                                // Whether commit succeeded or failed, finish the task
+                                FinishTaskAfterCommit(task, closeTab);
+                            });
                         }
                         catch (Exception ex)
                         {
                             Debug.WriteLine($"Auto-commit failed for task {task.Id}: {ex.Message}");
-                            // Set error and release locks on exception
                             await Dispatcher.InvokeAsync(() =>
                             {
                                 task.CommitError = $"Commit error: {ex.Message}";
-                                _fileLockManager.ReleaseTaskLocks(task.Id);
-                                task.Runtime.LockedFilesForCommit = null;
-                                _fileLockManager.CheckQueuedTasks(_activeTasks);
-                                task.Runtime.PendingCommitTask = null;
-                                task.OnPropertyChanged(nameof(task.IsPendingCommit));
-                                RefreshActivityDashboard(); // Update UI to remove committing badge
+                                FinishTaskAfterCommit(task, closeTab);
                             });
                         }
                     });
+                    return; // Don't proceed to teardown yet — FinishTaskAfterCommit will handle it
                 }
-                else
-                {
-                    // No files were modified, release locks normally
-                    _fileLockManager.ReleaseTaskLocks(task.Id);
-                    _fileLockManager.RemoveQueuedInfo(task.Id);
-                    _taskExecutionManager.RemoveStreamingState(task.Id);
-                }
+                // else: No files were modified, fall through to normal teardown
             }
-            else
-            {
-                // Release all resources associated with this task normally
-                _fileLockManager.ReleaseTaskLocks(task.Id);
-                _fileLockManager.RemoveQueuedInfo(task.Id);
-                _taskExecutionManager.RemoveStreamingState(task.Id);
-            }
+
+            // Normal teardown: release locks and move to history
+            PerformTaskTeardown(task, closeTab);
+        }
+
+        /// <summary>
+        /// Called after auto-commit completes (success or failure) to release file locks,
+        /// transition from Committing to Completed, and perform the standard teardown.
+        /// </summary>
+        private void FinishTaskAfterCommit(AgentTask task, bool closeTab = true)
+        {
+            // Release all file locks now that commit is done (or failed)
+            _fileLockManager.ReleaseTaskLocks(task.Id);
+            task.Runtime.LockedFilesForCommit = null;
+            task.Runtime.PendingCommitTask = null;
+
+            // Transition from Committing to Completed
+            task.Status = AgentTaskStatus.Completed;
+            task.EndTime ??= DateTime.Now;
+            _outputTabManager.UpdateTabHeader(task);
+
+            // Perform the standard teardown (move to history, resume queued tasks, etc.)
+            PerformTaskTeardown(task, closeTab);
+        }
+
+        /// <summary>
+        /// Shared teardown logic: releases remaining resources, moves task from active to history,
+        /// fires notifications, and resumes queued/dependency-blocked tasks.
+        /// </summary>
+        private void PerformTaskTeardown(AgentTask task, bool closeTab = true)
+        {
+            // Release all resources associated with this task
+            _fileLockManager.ReleaseTaskLocks(task.Id);
+            _fileLockManager.RemoveQueuedInfo(task.Id);
+            _taskExecutionManager.RemoveStreamingState(task.Id);
 
             // Move from active to history
             _activeTasks.Remove(task);
@@ -277,9 +285,14 @@ namespace Spritely
         /// <summary>
         /// Releases file locks that were deferred for Auto-Commit.
         /// Called after git commit is complete to finally release the locks.
+        /// Only used for manual commits on history tasks (not the Committing flow).
         /// </summary>
         public void ReleaseTaskLocksAfterCommit(AgentTask task)
         {
+            // If task is in Committing status, FinishTaskAfterCommit handles lock release
+            if (task.Status == AgentTaskStatus.Committing)
+                return;
+
             if (task.Runtime.LockedFilesForCommit != null && task.Runtime.LockedFilesForCommit.Count > 0)
             {
                 _fileLockManager.ReleaseTaskLocks(task.Id);
@@ -292,7 +305,7 @@ namespace Spritely
             // Clear pending commit task
             task.Runtime.PendingCommitTask = null;
             task.OnPropertyChanged(nameof(task.IsPendingCommit));
-            RefreshActivityDashboard(); // Update UI to remove committing badge
+            RefreshActivityDashboard();
         }
 
         /// <summary>

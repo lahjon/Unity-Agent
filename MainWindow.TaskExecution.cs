@@ -1315,18 +1315,29 @@ TextureImporter:
         /// <returns>Tuple of (success, errorMessage) - success is true if commit was successful, errorMessage contains details if failed</returns>
         public async Task<(bool success, string? errorMessage)> CommitTaskAsync(AgentTask task)
         {
-            if (task == null || !task.IsFinished || task.IsCommitted || task.NoGitWrite)
+            if (task == null || task.IsCommitted || task.NoGitWrite)
             {
                 if (task == null) return (false, "Task is null");
-                if (!task.IsFinished) return (false, "Task is not finished");
                 if (task.IsCommitted) return (false, "Task is already committed");
                 if (task.NoGitWrite) return (false, "Task has NoGitWrite flag set");
                 return (false, "Unknown pre-condition failure");
             }
 
+            // Allow commit from Committing status (auto-commit flow) or any finished status (manual commit)
+            if (!task.IsFinished && !task.IsCommitting)
+            {
+                return (false, "Task is not in a committable state");
+            }
+
             try
             {
-                var summary = !string.IsNullOrWhiteSpace(task.Summary) ? task.Summary : task.Description;
+                // Use CompletionSummary (the task's AI-generated summary) as commit message when available,
+                // falling back to Summary, then Description
+                var summary = !string.IsNullOrWhiteSpace(task.CompletionSummary)
+                    ? task.CompletionSummary
+                    : !string.IsNullOrWhiteSpace(task.Summary)
+                        ? task.Summary
+                        : task.Description;
                 var commitMessage = $"Task #{task.TaskNumber}: {summary}";
 
                 // Get the files locked by this task for scoped commit

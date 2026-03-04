@@ -371,14 +371,11 @@ namespace Spritely.Managers
                     }
 
                     // Regular tasks go through verification
-                    // Capture locked files BEFORE releasing so we can scope the auto-commit
-                    var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
-                    // NOTE: Lock release moved to CompleteWithVerificationAsync to prevent race condition
-                    // where another task could modify files before commit completes
+                    // File locks are held until FinalizeTask handles the Committing → Completed flow
                     // Set to Verifying while summary runs; final status is set afterwards
                     task.Status = AgentTaskStatus.Verifying;
                     _outputTabManager.UpdateTabHeader(task);
-                    _ = CompleteWithVerificationAsync(task, exitCode, activeTasks, historyTasks, lockedFiles);
+                    _ = CompleteWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
                     return;
                 }
             });
@@ -423,29 +420,21 @@ namespace Spritely.Managers
         /// Verifying and fires TaskCompleted, even if summary/verification throws.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteWithVerificationAsync(AgentTask task, int exitCode,
-            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
-            IReadOnlyCollection<string>? lockedFiles = null)
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            try
+            // Only release locks for failed tasks here.
+            // For successful tasks, FinalizeTask handles the Committing → Completed flow
+            // which ensures file locks are held until after git commit succeeds.
+            if (exitCode != 0)
             {
-                // Auto-commit only the files this task locked (not all local changes)
-                if (exitCode == 0 && !task.NoGitWrite && lockedFiles is { Count: > 0 })
-                {
-                    await CommitTaskLockedFilesAsync(task, lockedFiles, activeTasks, historyTasks);
-                }
-            }
-            finally
-            {
-                // Release locks AFTER commit to prevent race condition where another task
-                // could modify files before commit completes
                 _fileLockManager.ReleaseTaskLocks(task.Id);
-
-                // Also handle message bus cleanup
-                if (task.UseMessageBus)
-                    _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
             }
+
+            // Always handle message bus cleanup
+            if (task.UseMessageBus)
+                _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
 
             try
             {
@@ -501,27 +490,16 @@ namespace Spritely.Managers
         {
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            // Capture locked files before releasing so we can scope the auto-commit
-            var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
-
-            try
+            // Only release locks for failed tasks here.
+            // For successful tasks, FinalizeTask handles the Committing → Completed flow.
+            if (exitCode != 0)
             {
-                // Auto-commit only the files this task locked (not all local changes)
-                if (exitCode == 0 && !task.NoGitWrite && lockedFiles.Count > 0)
-                {
-                    await CommitTaskLockedFilesAsync(task, lockedFiles, activeTasks, historyTasks);
-                }
-            }
-            finally
-            {
-                // Release locks AFTER commit to prevent race condition where another task
-                // could modify files before commit completes
                 _fileLockManager.ReleaseTaskLocks(task.Id);
-
-                // Also handle message bus cleanup
-                if (task.UseMessageBus)
-                    _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
             }
+
+            // Always handle message bus cleanup
+            if (task.UseMessageBus)
+                _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
 
             try
             {
@@ -553,95 +531,6 @@ namespace Spritely.Managers
             TaskCompleted?.Invoke(task.Id);
         }
 
-        /// <summary>
-        /// Commits only the files that were locked by this task, not all local changes.
-        /// Uses <c>git commit -- &lt;files&gt;</c> to scope the commit to exactly those paths,
-        /// preventing concurrent tasks' changes from being included.
-        /// </summary>
-        private async System.Threading.Tasks.Task CommitTaskLockedFilesAsync(AgentTask task,
-            IReadOnlyCollection<string> lockedFiles,
-            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
-        {
-            if (string.IsNullOrEmpty(task.ProjectPath) || lockedFiles.Count == 0)
-                return;
-
-            try
-            {
-                // Build relative paths from the project root for the git commands
-                var projectRoot = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
-                var relativePaths = new List<string>();
-                foreach (var absPath in lockedFiles)
-                {
-                    var rel = absPath.StartsWith(projectRoot)
-                        ? absPath[projectRoot.Length..]
-                        : absPath;
-
-                    // Validate against path traversal attacks
-                    if (rel.Contains("..") || Path.IsPathRooted(rel))
-                    {
-                        AppLogger.Warn("TaskExecutionManager", $"Rejected suspicious path during git operation: {rel}");
-                        continue;
-                    }
-
-                    relativePaths.Add(rel.Replace('\\', '/'));
-                }
-
-                // Use GitOperationGuard to serialize git operations
-                await _gitOperationGuard.ExecuteGitOperationAsync(async () =>
-                {
-                    // Stage only the locked files (handles new/untracked files)
-                    var escapedPaths = relativePaths.Select(GitHelper.EscapeGitPath).ToList();
-                    var pathArgs = string.Join(" ", escapedPaths);
-                    var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
-
-                    // Check if git add failed
-                    if (!addResult.IsSuccess)
-                    {
-                        _outputProcessor.AppendOutput(task.Id,
-                            $"[Spritely] Failed to stage files for auto-commit: {addResult.GetErrorMessage()}\n",
-                            activeTasks, historyTasks);
-                        return;
-                    }
-
-                    // Commit only these specific files — using the secure method to prevent shell injection
-                    var desc = task.Description?.Length > 70
-                        ? task.Description[..70] + "..."
-                        : task.Description ?? "task changes";
-                    var commitMsg = $"Task #{task.TaskNumber}: {desc}";
-                    var result = await _gitHelper.CommitSecureAsync(task.ProjectPath, commitMsg, pathArgs);
-
-                    if (result.IsSuccess)
-                    {
-                        // Get the commit hash after successful commit
-                        var commitHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts?.Token ?? CancellationToken.None);
-                        if (commitHash != null)
-                        {
-                            task.IsCommitted = true;
-                            task.CommitHash = commitHash;
-                            _outputProcessor.AppendOutput(task.Id,
-                                $"\n[Spritely] Auto-committed {relativePaths.Count} locked file(s). Commit: {commitHash[..8]}\n",
-                                activeTasks, historyTasks);
-                        }
-                        else
-                        {
-                            _outputProcessor.AppendOutput(task.Id,
-                                $"\n[Spritely] Auto-committed {relativePaths.Count} locked file(s) but failed to capture commit hash.\n",
-                                activeTasks, historyTasks);
-                        }
-                    }
-                    else
-                    {
-                        _outputProcessor.AppendOutput(task.Id,
-                            $"[Spritely] Commit failed: {result.GetErrorMessage()}\n",
-                            activeTasks, historyTasks);
-                    }
-                }, $"auto-commit for task #{task.TaskNumber}");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("TaskExecution", $"Auto-commit failed for task {task.Id}", ex);
-            }
-        }
 
         public void LaunchHeadless(AgentTask task)
         {
