@@ -295,7 +295,7 @@ namespace Spritely.Managers
         {
             var sb = new StringBuilder();
             sb.AppendLine("# DEPENDENCY CONTEXT");
-            sb.AppendLine("Completed prerequisite tasks:\n");
+            sb.AppendLine("Completed prerequisite tasks — use these cached results directly instead of re-reading the files:\n");
 
             var depIndex = 0;
             foreach (var depId in depIds)
@@ -312,6 +312,26 @@ namespace Spritely.Managers
 
                 if (!string.IsNullOrWhiteSpace(dep.CompletionSummary))
                     sb.AppendLine($"**Changes:**\n{dep.CompletionSummary}");
+
+                if (!string.IsNullOrWhiteSpace(dep.Recommendations))
+                    sb.AppendLine($"**Recommendations:**\n{dep.Recommendations}");
+
+                // Inject the tail of the dependency's output so the downstream task
+                // can see what was actually done without re-reading modified files.
+                var depOutput = dep.OutputBuilder?.ToString();
+                if (!string.IsNullOrWhiteSpace(depOutput))
+                {
+                    const int maxTailChars = 3_000;
+                    var tail = depOutput.Length > maxTailChars
+                        ? depOutput[^maxTailChars..]
+                        : depOutput;
+                    tail = Helpers.FormatHelpers.StripAnsiCodes(tail).Trim();
+                    if (tail.Length > 0)
+                    {
+                        sb.AppendLine($"**Result output (tail):**");
+                        sb.AppendLine($"```\n{tail}\n```");
+                    }
+                }
 
                 sb.AppendLine();
             }

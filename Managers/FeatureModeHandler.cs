@@ -32,6 +32,7 @@ namespace Spritely.Managers
         private readonly SmartTruncationService _smartTruncationService;
         private readonly ModelComplexityAnalyzer _modelComplexityAnalyzer;
         private readonly EarlyTerminationManager _earlyTerminationManager;
+        private readonly IterationMemoryManager _iterationMemoryManager;
 
         internal const int FeatureModeMaxRuntimeHours = 12;
         internal const int FeatureModeIterationTimeoutMinutes = 60;
@@ -63,7 +64,8 @@ namespace Spritely.Managers
             Func<int> getTokenLimitRetryMinutes,
             SmartTruncationService? smartTruncationService = null,
             ModelComplexityAnalyzer? modelComplexityAnalyzer = null,
-            EarlyTerminationManager? earlyTerminationManager = null)
+            EarlyTerminationManager? earlyTerminationManager = null,
+            IterationMemoryManager? iterationMemoryManager = null)
         {
             _scriptDir = scriptDir;
             _processLauncher = processLauncher;
@@ -77,6 +79,7 @@ namespace Spritely.Managers
             _smartTruncationService = smartTruncationService ?? new SmartTruncationService();
             _modelComplexityAnalyzer = modelComplexityAnalyzer ?? new ModelComplexityAnalyzer();
             _earlyTerminationManager = earlyTerminationManager ?? new EarlyTerminationManager(new ProgressAnalyzer());
+            _iterationMemoryManager = iterationMemoryManager ?? new IterationMemoryManager();
         }
 
         // ── Main entry point: called when a feature mode task's process exits ──
@@ -484,6 +487,18 @@ namespace Spritely.Managers
             // Collect execution results
             var executionResults = CollectChildResults(task, activeTasks, historyTasks);
 
+            // Cache execution child results as iteration memory so subsequent iterations
+            // can reference what was done without re-reading all modified files.
+            try
+            {
+                var memory = _iterationMemoryManager.ExtractMemoryFromOutput(executionResults, task.CurrentIteration);
+                _iterationMemoryManager.RecordIteration(task.Id, task.CurrentIteration, memory);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("FeatureMode", $"[{task.Id}] Failed to record execution memory", ex);
+            }
+
             task.FeatureModePhase = FeatureModePhase.Evaluation;
             task.ClearFeaturePhaseChildIds();
 
@@ -524,6 +539,21 @@ namespace Spritely.Managers
             task.ClearFeaturePhaseChildIds();
             task.LastIterationOutputStart = task.OutputBuilder.Length;
 
+            // Record structured memory from this iteration for cross-iteration context caching.
+            // The next iteration's planning prompt will inject discoveries, failures, and file
+            // references so the agent doesn't re-read files or repeat failed approaches.
+            try
+            {
+                var memory = _iterationMemoryManager.ExtractMemoryFromOutput(output, task.CurrentIteration - 1);
+                _iterationMemoryManager.RecordIteration(task.Id, task.CurrentIteration - 1, memory);
+                AppLogger.Debug("FeatureMode", $"[{task.Id}] Recorded iteration {task.CurrentIteration - 1} memory: " +
+                    $"{memory.KeyDiscoveries.Count} discoveries, {memory.FailedApproaches.Count} failures, {memory.ImportantFiles.Count} files");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("FeatureMode", $"[{task.Id}] Failed to record iteration memory", ex);
+            }
+
             var iterRuntime = DateTime.Now - task.StartTime;
             var iterTokenInfo = task.HasTokenData
                 ? $" | Tokens: {Helpers.FormatHelpers.FormatTokenCount(task.InputTokens + task.OutputTokens)}"
@@ -547,8 +577,26 @@ namespace Spritely.Managers
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
+            // Build structured iteration memory context from previous iterations.
+            // This injects cached discoveries, failed approaches, and key file references
+            // so the agent doesn't waste tokens re-reading files or repeating mistakes.
+            var iterationContext = "";
+            try
+            {
+                iterationContext = _iterationMemoryManager.BuildIterationContext(task.Id, task.CurrentIteration);
+                if (!string.IsNullOrEmpty(iterationContext))
+                {
+                    AppLogger.Debug("FeatureMode", $"[{task.Id}] Injecting iteration memory context ({iterationContext.Length} chars) into iteration {task.CurrentIteration}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("FeatureMode", $"[{task.Id}] Failed to build iteration context", ex);
+            }
+
             var prompt = PromptBuilder.FeatureModeInitialTemplate +
                 task.OriginalFeatureDescription +
+                iterationContext +
                 "\n\n" + PromptBuilder.FeatureModeIterationPlanningTemplate +
                 previousEvaluation;
 
@@ -1114,6 +1162,10 @@ namespace Spritely.Managers
 
             // Clean up early termination tracking for this task
             _earlyTerminationManager.ClearTaskState(task.Id);
+
+            // Clean up iteration memory files for this task (data already consumed)
+            try { _iterationMemoryManager.CleanupOldMemories(TimeSpan.FromDays(7)); }
+            catch (Exception ex) { AppLogger.Debug("FeatureMode", $"Iteration memory cleanup: {ex.Message}"); }
 
             if (task.UseMessageBus)
                 _messageBusManager.LeaveBus(task.ProjectPath, task.Id);

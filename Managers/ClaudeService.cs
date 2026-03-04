@@ -61,7 +61,20 @@ namespace Spritely.Managers
                     ["messages"] = messages,
                 };
                 if (!string.IsNullOrEmpty(systemInstruction))
-                    requestObj["system"] = systemInstruction;
+                {
+                    // Use cache_control to enable prompt caching on the static system instruction.
+                    // This is GA — no beta header required. Cached tokens are ~90% cheaper on
+                    // subsequent calls within the 5-minute TTL window.
+                    requestObj["system"] = new[]
+                    {
+                        new
+                        {
+                            type = "text",
+                            text = systemInstruction,
+                            cache_control = new { type = "ephemeral" }
+                        }
+                    };
+                }
 
                 var jsonContent = JsonSerializer.Serialize(requestObj);
 
