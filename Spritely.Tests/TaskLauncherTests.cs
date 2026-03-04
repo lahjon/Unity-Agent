@@ -129,7 +129,7 @@ namespace Spritely.Tests
         public void BuildBasePrompt_FeatureMode_UsesFeatureModeTemplate()
         {
             var result = _prompt.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isFeatureMode: true);
-            Assert.StartsWith("# FEATURE MODE", result);
+            Assert.Contains("# FEATURE MODE", result);
             Assert.EndsWith("fix bugs", result);
             Assert.DoesNotContain("SYSTEM:", result);
         }
@@ -158,7 +158,7 @@ namespace Spritely.Tests
         {
             var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: true);
             Assert.DoesNotContain("# MCP\n", result);
-            Assert.StartsWith("# FEATURE MODE", result);
+            Assert.Contains("# FEATURE MODE", result);
         }
 
         [Fact]

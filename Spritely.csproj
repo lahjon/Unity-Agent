@@ -41,6 +41,5 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Spritely.Tests" />
-    <InternalsVisibleTo Include="HappyEngine.Tests" />
   </ItemGroup>
 </Project>

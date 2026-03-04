@@ -788,7 +788,7 @@ namespace Spritely.Tests
         [InlineData(@"{""command"": ""echo 'test' >> append.log""}", "append.log")]
         [InlineData(@"{""command"": ""sed -i 's/old/new/g' config.yaml""}", "config.yaml")]
         [InlineData(@"{""command"": ""printf 'data' > 'file with spaces.txt'""}", "file with spaces.txt")]
-        [InlineData(@"{""command"": ""echo test > ""quoted file.txt""""}", "quoted file.txt")]
+        [InlineData("{\"command\": \"echo test > \\\"quoted file.txt\\\"\"}", "quoted file.txt")]
         public void FileLock_ExtractFilePath_ExtractsFromBashCommand(string json, string expected)
         {
             using var doc = JsonDocument.Parse(json);

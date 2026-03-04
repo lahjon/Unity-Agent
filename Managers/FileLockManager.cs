@@ -420,6 +420,9 @@ namespace Spritely.Managers
                     }
                 }
 
+                task.Status = AgentTaskStatus.Running;
+                task.QueuedReason = null;
+                task.BlockedByTaskId = null;
                 QueuedTaskResumed?.Invoke(taskId);
             }
         }
@@ -445,6 +448,9 @@ namespace Spritely.Managers
             if (task.Status != AgentTaskStatus.Queued)
                 return;
 
+            task.Status = AgentTaskStatus.Running;
+            task.QueuedReason = null;
+            task.BlockedByTaskId = null;
             QueuedTaskResumed?.Invoke(task.Id);
         }
 
@@ -587,9 +593,14 @@ namespace Spritely.Managers
                 {
                     // Match common patterns for file output redirection
                     // Handles: echo > file.txt, cat > file.txt, command >> file.txt
-                    var redirectMatch = Regex.Match(command, @">\s*([^\s;|&]+)");
+                    // Also handles quoted paths: > "file with spaces.txt", > 'file with spaces.txt'
+                    var redirectMatch = Regex.Match(command, @">{1,2}\s*""([^""]+)""");
+                    if (!redirectMatch.Success)
+                        redirectMatch = Regex.Match(command, @">{1,2}\s*'([^']+)'");
+                    if (!redirectMatch.Success)
+                        redirectMatch = Regex.Match(command, @">{1,2}\s*([^\s;|&]+)");
                     if (redirectMatch.Success)
-                        return redirectMatch.Groups[1].Value.Trim('"', '\'');
+                        return redirectMatch.Groups[1].Value;
 
                     // Match sed -i (in-place edit)
                     var sedMatch = Regex.Match(command, @"sed\s+.*-i[^\s]*\s+.*?['""]?([^\s'""]+)['""]?\s*$");
