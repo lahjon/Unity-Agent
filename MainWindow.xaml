@@ -568,6 +568,22 @@
                                     </Style>
                                 </Button.Style>
                             </Button>
+                            <Button Content="Continue" Click="ContinueTask_Click"
+                                    Background="#FFB74D"
+                                    Foreground="#1A1A1A"
+                                    Margin="4,0,0,0"
+                                    ToolTip="Continue task with recommended next steps">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsContinuable}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -583,6 +599,7 @@
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Resume" Click="Resume_Click"/>
+                        <MenuItem Header="Continue Recommendations" Click="ContinueTask_Click"/>
                         <MenuItem Header="Re-run Task" Click="RerunTask_Click"/>
                         <MenuItem Header="Store Task" Click="StoreHistoryTask_Click"/>
                         <Separator/>
@@ -944,6 +961,22 @@
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsRetryable}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Content="Continue" Click="ContinueTask_Click"
+                                    Background="#FFB74D"
+                                    Foreground="#1A1A1A"
+                                    Margin="0,0,4,0"
+                                    ToolTip="Continue task with recommended next steps">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource SmallBtn}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsContinuable}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                         </Style.Triggers>

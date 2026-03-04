@@ -82,8 +82,27 @@ namespace Spritely.Managers
                 }
 
                 // Run result verification if auto-verify is enabled
+                // This now also extracts next steps via Haiku (cheap, no extra LLM call)
                 if (_getAutoVerify())
                     await RunResultVerificationAsync(task, outputText, activeTasks, historyTasks);
+
+                // Fallback: extract recommendations from agent output text if verification
+                // didn't run or didn't return next steps
+                if (!task.HasRecommendations)
+                {
+                    try
+                    {
+                        var recommendations = _completionAnalyzer.ExtractRecommendations(outputText);
+                        if (!string.IsNullOrWhiteSpace(recommendations))
+                        {
+                            task.Recommendations = recommendations;
+                        }
+                    }
+                    catch (Exception recEx)
+                    {
+                        AppLogger.Debug("OutputProcessor", $"Failed to extract recommendations for task {task.Id}", recEx);
+                    }
+                }
 
                 CompletionSummaryGenerated?.Invoke(task.Id);
             }
@@ -126,6 +145,15 @@ namespace Spritely.Managers
                         activeTasks, historyTasks);
                     AppLogger.Debug("TaskExecution",
                         $"Task {task.Id}: Result verification {label} — {result.Summary}");
+
+                    // Store next steps from verification as recommendations
+                    if (!string.IsNullOrWhiteSpace(result.NextSteps))
+                    {
+                        task.Recommendations = result.NextSteps;
+                        AppendOutput(task.Id,
+                            $"[Spritely] Next Steps: {result.NextSteps}\n",
+                            activeTasks, historyTasks);
+                    }
                 }
                 else
                 {

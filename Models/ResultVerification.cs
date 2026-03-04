@@ -7,5 +7,6 @@ namespace Spritely
     {
         public bool Passed { get; set; }
         public string Summary { get; set; } = "";
+        public string NextSteps { get; set; } = "";
     }
 }

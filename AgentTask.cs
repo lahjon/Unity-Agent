@@ -19,7 +19,8 @@ namespace Spritely
         Paused,
         InitQueued,
         Planning,
-        Verifying
+        Verifying,
+        Recommendation
     }
 
     public enum TaskPriority
@@ -212,7 +213,7 @@ namespace Spritely
                 Data.Status = value;
                 NotifyAll(nameof(Status), nameof(StatusText), nameof(StatusColor),
                     nameof(IsRunning), nameof(IsPlanning), nameof(IsQueued), nameof(IsPaused),
-                    nameof(IsInitQueued), nameof(IsFinished), nameof(IsRetryable),
+                    nameof(IsInitQueued), nameof(IsFinished), nameof(IsRetryable), nameof(IsContinuable),
                     nameof(TimeInfo), nameof(HasPriorityBadge), nameof(IsCompletedUncommitted));
             }
         }
@@ -352,8 +353,9 @@ namespace Spritely
         public bool IsQueued => Status == AgentTaskStatus.Queued;
         public bool IsPaused => Status == AgentTaskStatus.Paused;
         public bool IsInitQueued => Status == AgentTaskStatus.InitQueued;
-        public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed;
+        public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed or AgentTaskStatus.Recommendation;
         public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
+        public bool IsContinuable => Status == AgentTaskStatus.Recommendation;
         public bool HasPriorityBadge => PriorityLevel != TaskPriority.Normal || (Priority > 0 && (IsQueued || IsInitQueued));
         public bool HasActiveToggles => !string.IsNullOrEmpty(ActiveTogglesText);
         public bool HasCommitError => !string.IsNullOrWhiteSpace(CommitError);
@@ -398,6 +400,7 @@ namespace Spritely
             AgentTaskStatus.InitQueued => "Waiting",
             AgentTaskStatus.Planning => "Planning",
             AgentTaskStatus.Verifying => "Verifying",
+            AgentTaskStatus.Recommendation => "Has Recommendations",
             _ => "?"
         };
 
@@ -423,6 +426,7 @@ namespace Spritely
             AgentTaskStatus.InitQueued => "#FF9800",
             AgentTaskStatus.Planning => "#B39DDB",
             AgentTaskStatus.Verifying => "#80CBC4",
+            AgentTaskStatus.Recommendation => "#FFB74D",
             _ => "#555555"
         };
 

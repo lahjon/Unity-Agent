@@ -464,7 +464,11 @@ namespace Spritely.Managers
             if (task.Status == AgentTaskStatus.Verifying)
             {
                 // Now set the final status after summary is complete
-                task.Status = expectedStatus;
+                // If the task completed successfully and has recommendations, use the Recommendation status
+                var finalStatus = expectedStatus;
+                if (finalStatus == AgentTaskStatus.Completed && task.HasRecommendations)
+                    finalStatus = AgentTaskStatus.Recommendation;
+                task.Status = finalStatus;
                 task.EndTime = DateTime.Now;
                 try
                 {
@@ -533,7 +537,11 @@ namespace Spritely.Managers
             // have changed from Verifying to Running — don't overwrite it.
             if (task.Status == AgentTaskStatus.Verifying)
             {
-                task.Status = expectedStatus;
+                // If the task completed successfully and has recommendations, use the Recommendation status
+                var finalStatus = expectedStatus;
+                if (finalStatus == AgentTaskStatus.Completed && task.HasRecommendations)
+                    finalStatus = AgentTaskStatus.Recommendation;
+                task.Status = finalStatus;
                 task.EndTime = DateTime.Now;
                 _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Follow-up complete.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);

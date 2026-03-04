@@ -141,7 +141,7 @@ namespace Spritely.Managers
 
         /// <summary>JSON schema for structured result verification output.</summary>
         private const string VerificationJsonSchema =
-            """{"type":"object","properties":{"result":{"type":"string","enum":["PASS","FAIL"]},"summary":{"type":"string"}},"required":["result","summary"]}""";
+            """{"type":"object","properties":{"result":{"type":"string","enum":["PASS","FAIL"]},"summary":{"type":"string"},"next_steps":{"type":"string"}},"required":["result","summary","next_steps"]}""";
 
         public async Task<ResultVerification?> VerifyResultAsync(
             string outputTail, string taskDescription, string? completionSummary,
@@ -189,10 +189,16 @@ namespace Spritely.Managers
                     var root = doc.RootElement;
                     var result = root.GetProperty("result").GetString() ?? "";
                     var summary = root.GetProperty("summary").GetString() ?? "";
+                    var nextSteps = root.TryGetProperty("next_steps", out var ns) ? ns.GetString() ?? "" : "";
+                    // Normalize "none" to empty
+                    if (nextSteps.Equals("none", StringComparison.OrdinalIgnoreCase) ||
+                        nextSteps.Equals("n/a", StringComparison.OrdinalIgnoreCase))
+                        nextSteps = "";
                     return new ResultVerification
                     {
                         Passed = result.Equals("PASS", StringComparison.OrdinalIgnoreCase),
-                        Summary = summary
+                        Summary = summary,
+                        NextSteps = nextSteps
                     };
                 }
                 catch (JsonException)
@@ -203,18 +209,28 @@ namespace Spritely.Managers
                         var trimmed = line.Trim();
                         if (trimmed.StartsWith("PASS|", StringComparison.OrdinalIgnoreCase))
                         {
+                            var parts = trimmed["PASS|".Length..].Split('|', 2);
+                            var nextStepsFallback = parts.Length > 1 ? parts[1].Trim() : "";
+                            if (nextStepsFallback.Equals("none", StringComparison.OrdinalIgnoreCase))
+                                nextStepsFallback = "";
                             return new ResultVerification
                             {
                                 Passed = true,
-                                Summary = trimmed["PASS|".Length..].Trim()
+                                Summary = parts[0].Trim(),
+                                NextSteps = nextStepsFallback
                             };
                         }
                         if (trimmed.StartsWith("FAIL|", StringComparison.OrdinalIgnoreCase))
                         {
+                            var parts = trimmed["FAIL|".Length..].Split('|', 2);
+                            var nextStepsFallback = parts.Length > 1 ? parts[1].Trim() : "";
+                            if (nextStepsFallback.Equals("none", StringComparison.OrdinalIgnoreCase))
+                                nextStepsFallback = "";
                             return new ResultVerification
                             {
                                 Passed = false,
-                                Summary = trimmed["FAIL|".Length..].Trim()
+                                Summary = parts[0].Trim(),
+                                NextSteps = nextStepsFallback
                             };
                         }
                     }

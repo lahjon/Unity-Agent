@@ -1211,6 +1211,47 @@ TextureImporter:
             RetryTask(task);
         }
 
+        private void ContinueTask_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            if (!task.IsContinuable || string.IsNullOrWhiteSpace(task.Recommendations)) return;
+
+            var recommendations = task.Recommendations;
+
+            // Build the follow-up prompt from the recommendations
+            var followUpPrompt = $"Please execute these recommended next steps:\n{recommendations}";
+
+            // Clear recommendations so the button disappears
+            task.Recommendations = "";
+
+            // Ensure the output tab exists and is selected
+            if (!_outputTabManager.HasTab(task.Id))
+            {
+                _outputTabManager.CreateTab(task);
+                _outputTabManager.AppendOutput(task.Id, $"[Spritely] Continuing task with recommendations\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, $"[Spritely] Original task: {task.Description}\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, $"[Spritely] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
+                if (!string.IsNullOrEmpty(task.ConversationId))
+                    _outputTabManager.AppendOutput(task.Id, $"[Spritely] Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
+            }
+            OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
+
+            // Move from history to active if needed
+            if (_historyTasks.Contains(task))
+            {
+                _historyTasks.Remove(task);
+                var topRow = RootGrid.RowDefinitions[0];
+                if (topRow.ActualHeight > 0)
+                    topRow.Height = new GridLength(topRow.ActualHeight);
+                _activeTasks.Insert(0, task);
+                RestoreStarRow();
+            }
+
+            // Send the follow-up with recommendations
+            _taskExecutionManager.SendFollowUp(task, followUpPrompt, _activeTasks, _historyTasks);
+            UpdateStatus();
+        }
+
         private void RerunTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement { DataContext: AgentTask task }) return;
