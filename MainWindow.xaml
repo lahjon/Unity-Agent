@@ -1202,15 +1202,13 @@
                     <Border Grid.Row="2" Background="{StaticResource BgSection}" CornerRadius="6"
                             BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" Margin="0,6,0,0" Padding="8">
                         <StackPanel>
-                            <Border Background="{StaticResource BgDeep}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                    CornerRadius="2" Cursor="Hand"
-                                    MouseLeftButtonDown="AddProjectPath_Click">
-                                <TextBlock x:Name="AddProjectPath"
-                                           Foreground="{StaticResource TextMuted}" FontSize="11"
-                                           FontFamily="Segoe UI" Padding="6,4"
-                                           Text="Click to add project folder..."
-                                           VerticalAlignment="Center"/>
-                            </Border>
+                            <Button Content="&#xE8B7;  Add Existing Project" Click="AddProjectBtn_Click"
+                                    Style="{StaticResource SmallBtn}"
+                                    HorizontalAlignment="Stretch" Padding="10,4">
+                                <Button.Background>
+                                    <SolidColorBrush Color="#4A7A6F"/>
+                                </Button.Background>
+                            </Button>
                             <Button Content="Create New Project" Click="CreateProject_Click"
                                     Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
                                     HorizontalAlignment="Stretch" Margin="0,6,0,0" Padding="10,4"/>

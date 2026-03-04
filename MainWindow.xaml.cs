@@ -109,7 +109,6 @@ namespace Spritely
 
         // IProjectPanelView — expose named XAML controls to ProjectManager
         TextBlock IProjectPanelView.PromptProjectLabel => PromptProjectLabel;
-        TextBlock IProjectPanelView.AddProjectPath => AddProjectPath;
         StackPanel IProjectPanelView.ProjectListPanel => ProjectListPanel;
         ToggleButton IProjectPanelView.UseMcpToggle => UseMcpToggle;
         TextBox IProjectPanelView.ShortDescBox => ShortDescBox;
@@ -1520,7 +1519,7 @@ namespace Spritely
 
         // ── Project Events ─────────────────────────────────────────
 
-        private void AddProjectPath_Click(object sender, MouseButtonEventArgs e) =>
+        private void AddProjectBtn_Click(object sender, RoutedEventArgs e) =>
             _projectManager.HandleAddProjectPathClick(
                 p => _terminalManager?.UpdateWorkingDirectory(p),
                 () => _settingsManager.SaveSettings(_projectManager.ProjectPath),

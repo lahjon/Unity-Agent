@@ -319,8 +319,6 @@ namespace Spritely.Managers
             {
                 DarkDialog.ShowAlert("The selected path does not exist or is invalid.", "Invalid Path");
                 _addProjectSelectedPath = "";
-                _view.AddProjectPath.Text = "Click to add project folder...";
-                _view.AddProjectPath.Foreground = (Brush)Application.Current.FindResource("TextMuted");
                 return;
             }
             if (_savedProjects.Any(p => p.Path == path))
@@ -348,8 +346,6 @@ namespace Spritely.Managers
             syncSettings();
 
             _addProjectSelectedPath = "";
-            _view.AddProjectPath.Text = "Click to add project folder...";
-            _view.AddProjectPath.Foreground = (Brush)Application.Current.FindResource("TextMuted");
 
             _ = GenerateProjectDescriptionInBackground(entry);
         }

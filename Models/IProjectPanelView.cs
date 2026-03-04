@@ -15,7 +15,6 @@ namespace Spritely.Models
     public interface IProjectPanelView
     {
         TextBlock PromptProjectLabel { get; }
-        TextBlock AddProjectPath { get; }
         StackPanel ProjectListPanel { get; }
         ToggleButton UseMcpToggle { get; }
         TextBox ShortDescBox { get; }
