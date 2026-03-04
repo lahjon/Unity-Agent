@@ -7,9 +7,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Threading;
-using HappyEngine.Constants;
+using Spritely.Constants;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class BusMessage
     {
@@ -56,7 +56,7 @@ namespace HappyEngine.Managers
 
         public static readonly string AppDataBusRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "HappyEngine", "agent-bus");
+            "Spritely", "agent-bus");
 
         public event Action<string, BusMessage>? MessageReceived;
 

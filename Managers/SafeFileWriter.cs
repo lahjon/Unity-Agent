@@ -4,7 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Serializes file writes per-path and tracks pending operations so they can be

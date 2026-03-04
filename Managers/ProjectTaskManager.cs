@@ -4,9 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using HappyEngine.Models;
+using Spritely.Models;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class ProjectTaskManager
     {

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public interface IPromptBuilder
     {

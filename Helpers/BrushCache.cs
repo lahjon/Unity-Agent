@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Windows;
 using System.Windows.Media;
 
-namespace HappyEngine.Helpers
+namespace Spritely.Helpers
 {
     public static class BrushCache
     {

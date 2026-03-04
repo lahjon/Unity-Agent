@@ -1,7 +1,7 @@
-using HappyEngine;
-using HappyEngine.Managers;
+using Spritely;
+using Spritely.Managers;
 
-namespace HappyEngine.Tests
+namespace Spritely.Tests
 {
     public class TaskOrchestratorTests
     {

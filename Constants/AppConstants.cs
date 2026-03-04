@@ -1,4 +1,4 @@
-namespace HappyEngine.Constants
+namespace Spritely.Constants
 {
     /// <summary>
     /// Centralised magic-number constants used across the application.

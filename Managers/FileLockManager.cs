@@ -9,9 +9,9 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
+using Spritely.Helpers;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class FileLockManager
     {
@@ -296,8 +296,8 @@ namespace HappyEngine.Managers
             ReleaseTaskLocksInternal(taskId);
 
             // Queue immediately when file is locked
-            appendOutput(taskId, $"\n[HappyEngine] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum} ({toolName})\n");
-            appendOutput(taskId, $"[HappyEngine] Pausing and queuing task #{task.TaskNumber} for auto-resume...\n");
+            appendOutput(taskId, $"\n[Spritely] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum} ({toolName})\n");
+            appendOutput(taskId, $"[Spritely] Pausing and queuing task #{task.TaskNumber} for auto-resume...\n");
 
             // First pause the task if it has a running process
             if (task.Process is { HasExited: false })

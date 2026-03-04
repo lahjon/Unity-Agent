@@ -9,7 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace HappyEngine
+namespace Spritely
 {
     public partial class App : Application
     {
@@ -44,7 +44,7 @@ namespace HappyEngine
                     _notifyIcon.Icon = System.Drawing.SystemIcons.Application;
                     Managers.AppLogger.Warn("App", "icon.ico not found, using default system icon");
                 }
-                _notifyIcon.Text = "Happy Engine";
+                _notifyIcon.Text = "Spritely";
                 _notifyIcon.Visible = true;
             }
             catch (Exception ex)
@@ -71,7 +71,7 @@ namespace HappyEngine
             // Show the error so the user can see what's going wrong
             var msg = e.Exception.InnerException?.Message ?? e.Exception.Message;
             var detail = e.Exception.InnerException?.GetType().Name ?? e.Exception.GetType().Name;
-            ShowDarkError($"[{detail}] {msg}\n\nFull details logged to:\n{LogFile}", "HappyEngine Error");
+            ShowDarkError($"[{detail}] {msg}\n\nFull details logged to:\n{LogFile}", "Spritely Error");
 
             e.Handled = true;
         }

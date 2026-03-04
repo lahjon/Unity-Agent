@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     public enum McpStatus
     {

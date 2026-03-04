@@ -2,7 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Text;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Detects failed tasks and spawns diagnostic child tasks to attempt automatic recovery.
@@ -64,7 +64,7 @@ namespace HappyEngine.Managers
                 child.Summary = $"[Recovery] Fix: {failedTask.Summary ?? _taskFactory.GenerateLocalSummary(failedTask.Description)}";
 
                 _outputTabManager.AppendOutput(failedTask.Id,
-                    $"\n[HappyEngine] Auto-Recovery: Spawning diagnostic task #{child.TaskNumber} to fix failure.\n",
+                    $"\n[Spritely] Auto-Recovery: Spawning diagnostic task #{child.TaskNumber} to fix failure.\n",
                     activeTasks, historyTasks);
 
                 AppLogger.Info("FailureRecovery",

@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HappyEngine.csproj" />
+    <ProjectReference Include="..\Spritely.csproj" />
   </ItemGroup>
 
 </Project>

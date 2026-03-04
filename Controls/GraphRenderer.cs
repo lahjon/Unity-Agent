@@ -6,10 +6,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
+using Spritely.Helpers;
+using Spritely.Managers;
 
-namespace HappyEngine.Controls
+namespace Spritely.Controls
 {
     internal class GraphRenderer
     {

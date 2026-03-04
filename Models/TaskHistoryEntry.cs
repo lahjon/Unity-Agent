@@ -1,6 +1,6 @@
 using System;
 
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     internal class TaskHistoryEntry : TaskRecordBase
     {

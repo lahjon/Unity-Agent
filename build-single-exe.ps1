@@ -1,5 +1,5 @@
-# Build Happy Engine as single executable
-Write-Host "Building Happy Engine as single executable..." -ForegroundColor Green
+# Build Spritely as single executable
+Write-Host "Building Spritely as single executable..." -ForegroundColor Green
 Write-Host ""
 
 # Clean previous builds
@@ -19,7 +19,7 @@ dotnet publish -c Release -r win-x64 --self-contained true `
     -p:IncludeAllContentForSelfExtract=true
 
 Write-Host ""
-$exePath = Join-Path $publishDir "HappyEngine.exe"
+$exePath = Join-Path $publishDir "Spritely.exe"
 if (Test-Path $exePath) {
     Write-Host "Build successful!" -ForegroundColor Green
     Write-Host "Single executable location: $exePath" -ForegroundColor Cyan

@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 
-namespace HappyEngine
+namespace Spritely
 {
     /// <summary>
     /// Test for the configurable task timeout feature

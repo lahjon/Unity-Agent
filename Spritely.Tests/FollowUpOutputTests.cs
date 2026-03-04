@@ -5,12 +5,12 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using System.Windows.Media;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
-using HappyEngine.Models;
+using Spritely.Helpers;
+using Spritely.Managers;
+using Spritely.Models;
 using Xunit;
 
-namespace HappyEngine.Tests
+namespace Spritely.Tests
 {
     public class FollowUpOutputTests
     {

@@ -1,4 +1,4 @@
-namespace HappyEngine
+namespace Spritely
 {
     /// <summary>
     /// Verification result from the LLM-based result quality analysis.

@@ -6,11 +6,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
+using Spritely.Helpers;
+using Spritely.Managers;
 using Xunit;
 
-namespace HappyEngine.Tests
+namespace Spritely.Tests
 {
     /// <summary>
     /// Tests verifying that session-specific data is properly cleaned up between sessions
@@ -30,7 +30,7 @@ namespace HappyEngine.Tests
         public SessionDataCleanupTests()
         {
             // Create test directories
-            _testAppDataDir = Path.Combine(Path.GetTempPath(), $"HappyEngine_Test_{Guid.NewGuid()}");
+            _testAppDataDir = Path.Combine(Path.GetTempPath(), $"Spritely_Test_{Guid.NewGuid()}");
             _testProjectPath = Path.Combine(Path.GetTempPath(), $"TestProject_{Guid.NewGuid()}");
             Directory.CreateDirectory(_testAppDataDir);
             Directory.CreateDirectory(_testProjectPath);
@@ -191,7 +191,7 @@ namespace HappyEngine.Tests
             // Assert - Agent bus root should be in LocalAppData
             var expectedRoot = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "HappyEngine", "agent-bus");
+                "Spritely", "agent-bus");
             Assert.Equal(expectedRoot, MessageBusManager.AppDataBusRoot);
         }
 

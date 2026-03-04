@@ -4,8 +4,8 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>HappyEngine</AssemblyName>
-    <RootNamespace>HappyEngine</RootNamespace>
+    <AssemblyName>Spritely</AssemblyName>
+    <RootNamespace>Spritely</RootNamespace>
     <Nullable>enable</Nullable>
     <ApplicationIcon>icon.ico</ApplicationIcon>
 
@@ -35,11 +35,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="HappyEngine.Tests\**" />
-    <None Remove="HappyEngine.Tests\**" />
+    <Compile Remove="Spritely.Tests\**" />
+    <None Remove="Spritely.Tests\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="HappyEngine.Tests" />
+    <InternalsVisibleTo Include="Spritely.Tests" />
   </ItemGroup>
 </Project>

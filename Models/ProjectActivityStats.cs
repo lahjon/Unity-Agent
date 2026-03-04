@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     public class ProjectActivityStats
     {

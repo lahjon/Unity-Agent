@@ -10,12 +10,12 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using HappyEngine.Dialogs;
-using HappyEngine.Helpers;
-using HappyEngine.Models;
-using HappyEngine.Services;
+using Spritely.Dialogs;
+using Spritely.Helpers;
+using Spritely.Models;
+using Spritely.Services;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Manages the Git tab in the Statistics panel.

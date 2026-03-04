@@ -3,9 +3,9 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
-using HappyEngine.Helpers;
+using Spritely.Helpers;
 
-namespace HappyEngine.Converters
+namespace Spritely.Converters
 {
     public class StringToBrushConverter : IValueConverter
     {

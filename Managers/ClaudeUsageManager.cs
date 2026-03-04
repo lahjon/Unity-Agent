@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Tracks cumulative Claude API usage across all API calls.

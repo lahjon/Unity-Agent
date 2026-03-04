@@ -6,9 +6,9 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using HappyEngine.Models;
+using Spritely.Models;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class HistoryManager
     {

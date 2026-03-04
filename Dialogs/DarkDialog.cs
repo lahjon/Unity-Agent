@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace HappyEngine.Dialogs
+namespace Spritely.Dialogs
 {
     public static class DarkDialog
     {

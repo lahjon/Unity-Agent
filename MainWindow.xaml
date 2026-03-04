@@ -1,9 +1,9 @@
-<Window x:Class="HappyEngine.MainWindow"
+<Window x:Class="Spritely.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:HappyEngine"
-        xmlns:controls="clr-namespace:HappyEngine.Controls"
-        Title="Happy Engine" Width="1280" Height="820"
+        xmlns:local="clr-namespace:Spritely"
+        xmlns:controls="clr-namespace:Spritely.Controls"
+        Title="Spritely" Width="1280" Height="820"
         Background="{StaticResource BgDeep}" WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded"
         PreviewKeyDown="Window_PreviewKeyDown">
@@ -2546,7 +2546,7 @@
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,20"/>
 
                                 <TextBlock Text="About" Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"/>
-                                <TextBlock Text="Happy Engine - Claude Code Task Manager" Foreground="{StaticResource TextDisabled}"
+                                <TextBlock Text="Spritely - Claude Code Task Manager" Foreground="{StaticResource TextDisabled}"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,4,0,0"/>
                             </StackPanel>
                         </ScrollViewer>
@@ -2652,7 +2652,7 @@
 
                                 <TextBlock Text="Image Storage" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"
                                            Margin="0,0,0,6"/>
-                                <TextBlock Text="%LOCALAPPDATA%\HappyEngine\gemini_images\" Foreground="{StaticResource TextSubdued}"
+                                <TextBlock Text="%LOCALAPPDATA%\Spritely\gemini_images\" Foreground="{StaticResource TextSubdued}"
                                            FontSize="11" FontFamily="Consolas" Margin="0,0,0,6"/>
                                 <Button x:Name="OpenGeminiImagesBtn" Content="Open Images Folder"
                                         Click="OpenGeminiImages_Click"

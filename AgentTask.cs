@@ -7,7 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace HappyEngine
+namespace Spritely
 {
     public enum AgentTaskStatus
     {

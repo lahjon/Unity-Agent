@@ -3,9 +3,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
-using HappyEngine.Constants;
+using Spritely.Constants;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class PromptBuilder : IPromptBuilder
     {
@@ -238,13 +238,13 @@ namespace HappyEngine.Managers
             var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
-                   $"Write-Host '[HappyEngine] Project: {projectPath}' -ForegroundColor DarkGray\n" +
-                   $"Write-Host '[HappyEngine] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
-                   "Write-Host '[HappyEngine] Starting Claude...' -ForegroundColor Cyan\n" +
+                   $"Write-Host '[Spritely] Project: {projectPath}' -ForegroundColor DarkGray\n" +
+                   $"Write-Host '[Spritely] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
+                   "Write-Host '[Spritely] Starting Claude...' -ForegroundColor Cyan\n" +
                    "Write-Host ''\n" +
                    $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{remoteFlag}{modelFlag} --verbose\n" +
-                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[HappyEngine] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
-                   "Write-Host \"`n[HappyEngine] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
+                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[Spritely] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
+                   "Write-Host \"`n[Spritely] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
                    "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n";
         }
 

@@ -1,6 +1,6 @@
 using System;
 
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     public class TaskConfigBase : ITaskFlags
     {

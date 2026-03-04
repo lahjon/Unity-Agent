@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using Xunit;
 
-namespace HappyEngine.Tests
+namespace Spritely.Tests
 {
     public class AgentTaskTests
     {

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using HappyEngine.Constants;
+using Spritely.Constants;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Handles progressive context reduction for tasks that hit token limits.

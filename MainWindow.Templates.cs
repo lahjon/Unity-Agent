@@ -5,9 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using HappyEngine.Models;
+using Spritely.Models;
 
-namespace HappyEngine
+namespace Spritely
 {
     public partial class MainWindow
     {

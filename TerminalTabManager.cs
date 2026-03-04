@@ -7,9 +7,9 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
+using Spritely.Helpers;
 
-namespace HappyEngine
+namespace Spritely
 {
     public class TerminalTabManager : IDisposable
     {

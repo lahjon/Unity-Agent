@@ -3,10 +3,10 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
+using Spritely.Helpers;
+using Spritely.Managers;
 
-namespace HappyEngine.Dialogs
+namespace Spritely.Dialogs
 {
     public static class GroupSummaryDialog
     {

@@ -1,11 +1,11 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
+using Spritely.Helpers;
+using Spritely.Managers;
 using Xunit;
 
-namespace HappyEngine.Tests
+namespace Spritely.Tests
 {
     /// <summary>
     /// Tests verifying that project swapping behaves correctly when tasks are
@@ -1089,7 +1089,7 @@ namespace HappyEngine.Tests
         [Fact]
         public async Task HistoryRoundTrip_PreservesSummary()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"SpritelyTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1114,7 +1114,7 @@ namespace HappyEngine.Tests
         [Fact]
         public async Task HistoryRoundTrip_PreservesStoredPrompt()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"SpritelyTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1139,7 +1139,7 @@ namespace HappyEngine.Tests
         [Fact]
         public async Task HistoryRoundTrip_EmptyStoredPrompt_LoadsAsNull()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"SpritelyTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1164,7 +1164,7 @@ namespace HappyEngine.Tests
         [Fact]
         public async Task HistoryRoundTrip_PreservesAllFields()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"SpritelyTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {
@@ -1197,7 +1197,7 @@ namespace HappyEngine.Tests
         [Fact]
         public async Task StoredTaskRoundTrip_PreservesSummaryAndPrompt()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"SpritelyTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             try
             {

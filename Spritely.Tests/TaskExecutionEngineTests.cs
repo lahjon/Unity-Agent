@@ -7,15 +7,15 @@ using System.Text.Json;
 using System.Threading;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
-using HappyEngine.Services;
+using Spritely.Helpers;
+using Spritely.Managers;
+using Spritely.Services;
 using Xunit;
 
-using FeatureModeAction = HappyEngine.Managers.FeatureModeHandler.FeatureModeAction;
-using FeatureModeDecision = HappyEngine.Managers.FeatureModeHandler.FeatureModeDecision;
+using FeatureModeAction = Spritely.Managers.FeatureModeHandler.FeatureModeAction;
+using FeatureModeDecision = Spritely.Managers.FeatureModeHandler.FeatureModeDecision;
 
-namespace HappyEngine.Tests
+namespace Spritely.Tests
 {
     /// <summary>
     /// Integration tests for the task execution engine covering:
@@ -73,7 +73,7 @@ namespace HappyEngine.Tests
         /// </summary>
         private static (TaskExecutionManager mgr, FileLockManager flm, string tempDir) CreateManagers()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), $"HappyEngineTest_{Guid.NewGuid():N}");
+            var tempDir = Path.Combine(Path.GetTempPath(), $"SpritelyTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
 
             var textBlock = new TextBlock();

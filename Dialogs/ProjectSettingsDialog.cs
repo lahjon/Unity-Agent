@@ -6,10 +6,10 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using HappyEngine.Managers;
-using HappyEngine.Models;
+using Spritely.Managers;
+using Spritely.Models;
 
-namespace HappyEngine.Dialogs
+namespace Spritely.Dialogs
 {
     public static class ProjectSettingsDialog
     {

@@ -8,9 +8,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
+using Spritely.Helpers;
 
-namespace HappyEngine.Controls
+namespace Spritely.Controls
 {
     internal class GraphInteractionHandler
     {

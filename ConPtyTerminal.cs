@@ -4,10 +4,10 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using HappyEngine.Models;
+using Spritely.Models;
 using Microsoft.Win32.SafeHandles;
 
-namespace HappyEngine
+namespace Spritely
 {
     public sealed class ConPtyTerminal : IDisposable
     {

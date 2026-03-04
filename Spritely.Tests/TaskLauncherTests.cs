@@ -1,10 +1,10 @@
 using System.Diagnostics;
-using HappyEngine.Constants;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
+using Spritely.Constants;
+using Spritely.Helpers;
+using Spritely.Managers;
 using Xunit;
 
-namespace HappyEngine.Tests
+namespace Spritely.Tests
 {
     public class TaskLauncherTests
     {

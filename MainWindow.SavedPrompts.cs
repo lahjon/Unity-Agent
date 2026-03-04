@@ -6,9 +6,9 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using HappyEngine.Models;
+using Spritely.Models;
 
-namespace HappyEngine
+namespace Spritely
 {
     public partial class MainWindow
     {
@@ -21,7 +21,7 @@ namespace HappyEngine
 
         private string SavedPromptsFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "HappyEngine", "saved_prompts.json");
+            "Spritely", "saved_prompts.json");
 
         private async System.Threading.Tasks.Task LoadSavedPromptsAsync(System.Threading.CancellationToken ct = default)
         {

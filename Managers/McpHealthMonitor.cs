@@ -7,10 +7,10 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
-using HappyEngine.Models;
+using Spritely.Helpers;
+using Spritely.Models;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public enum McpHealthStatus
     {

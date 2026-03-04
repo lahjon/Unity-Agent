@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Windows.Media;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Handles output trimming, completion summary extraction, recommendation parsing,
@@ -122,7 +122,7 @@ namespace HappyEngine.Managers
                     task.VerificationResult = result.Summary;
                     var label = result.Passed ? "PASSED" : "FAILED";
                     AppendOutput(task.Id,
-                        $"\n[HappyEngine] Result Verification: {label} — {result.Summary}\n",
+                        $"\n[Spritely] Result Verification: {label} — {result.Summary}\n",
                         activeTasks, historyTasks);
                     AppLogger.Debug("TaskExecution",
                         $"Task {task.Id}: Result verification {label} — {result.Summary}");

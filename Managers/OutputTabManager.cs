@@ -11,7 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class OutputTabManager
     {

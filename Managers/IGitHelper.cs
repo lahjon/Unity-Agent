@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using HappyEngine.Models;
+using Spritely.Models;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public interface IGitHelper
     {

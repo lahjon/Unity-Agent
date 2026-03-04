@@ -55,7 +55,7 @@ The message queue system ensures that messages sent while a Claude task is busy 
 ## Unit Tests
 Run the unit tests to verify the implementation:
 ```bash
-dotnet test HappyEngine.Tests\MessageQueueTests.cs
+dotnet test Spritely.Tests\MessageQueueTests.cs
 ```
 
 Tests verify:

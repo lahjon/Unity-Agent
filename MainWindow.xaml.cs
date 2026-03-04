@@ -18,13 +18,13 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using HappyEngine.Dialogs;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
-using HappyEngine.Models;
-using HappyEngine.Services;
+using Spritely.Dialogs;
+using Spritely.Helpers;
+using Spritely.Managers;
+using Spritely.Models;
+using Spritely.Services;
 
-namespace HappyEngine
+namespace Spritely
 {
     public partial class MainWindow : Window, IDisposable, IProjectPanelView
     {
@@ -134,7 +134,7 @@ namespace HappyEngine
 
             var appDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "HappyEngine");
+                "Spritely");
             Directory.CreateDirectory(appDataDir);
 
             var scriptDir = Path.Combine(appDataDir, "scripts");
@@ -615,7 +615,7 @@ namespace HappyEngine
 
         private string SystemPromptFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "HappyEngine", "system_prompt.txt");
+            "Spritely", "system_prompt.txt");
 
         private async System.Threading.Tasks.Task LoadSystemPromptAsync(CancellationToken ct = default)
         {
@@ -902,7 +902,7 @@ namespace HappyEngine
                         },
                         clientInfo = new
                         {
-                            name = "HappyEngine",
+                            name = "Spritely",
                             version = "1.0.0"
                         }
                     },
@@ -1141,7 +1141,7 @@ namespace HappyEngine
                 else if (task.IsRunning)
                 {
                     _taskExecutionManager.PauseTask(task);
-                    _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task paused.\n", _activeTasks, _historyTasks);
+                    _outputTabManager.AppendOutput(task.Id, "\n[Spritely] Task paused.\n", _activeTasks, _historyTasks);
                 }
             };
             NodeGraphPanel.CopyPromptRequested += task =>
@@ -1158,7 +1158,7 @@ namespace HappyEngine
                     task.QueuedReason = null;
                     task.StartTime = DateTime.Now;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n",
+                        $"\n[Spritely] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
@@ -1179,7 +1179,7 @@ namespace HappyEngine
                         {
                             _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[HappyEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
+                                $"\n[Spritely] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
                                 _activeTasks, _historyTasks);
                         }
                         else
@@ -1187,7 +1187,7 @@ namespace HappyEngine
                             task.Status = AgentTaskStatus.Running;
                             task.StartTime = DateTime.Now;
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
+                                $"\n[Spritely] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
                                 _activeTasks, _historyTasks);
                             _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                         }
@@ -1235,7 +1235,7 @@ namespace HappyEngine
                 }
 
                 _outputTabManager.AppendOutput(dependent.Id,
-                    $"\n[HappyEngine] Task #{dependent.TaskNumber} queued — waiting for #{prerequisite.TaskNumber} to complete.\n",
+                    $"\n[Spritely] Task #{dependent.TaskNumber} queued — waiting for #{prerequisite.TaskNumber} to complete.\n",
                     _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(dependent);
                 UpdateStatus();
@@ -1258,7 +1258,7 @@ namespace HappyEngine
                         {
                             _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[HappyEngine] Dependencies removed — resuming task #{task.TaskNumber}.\n",
+                                $"\n[Spritely] Dependencies removed — resuming task #{task.TaskNumber}.\n",
                                 _activeTasks, _historyTasks);
                         }
                         else
@@ -1266,7 +1266,7 @@ namespace HappyEngine
                             task.Status = AgentTaskStatus.Running;
                             task.StartTime = DateTime.Now;
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[HappyEngine] Dependencies removed — starting task #{task.TaskNumber}...\n",
+                                $"\n[Spritely] Dependencies removed — starting task #{task.TaskNumber}...\n",
                                 _activeTasks, _historyTasks);
                             _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                         }
@@ -1331,7 +1331,7 @@ namespace HappyEngine
                 if (result != null)
                 {
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[HappyEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
+                        $"\n[Spritely] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
                     Dialogs.DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
                 }
                 else
@@ -1820,7 +1820,7 @@ namespace HappyEngine
             // If already Queued, dependency was added above — status stays Queued
 
             _outputTabManager.AppendOutput(dragged.Id,
-                $"\n[HappyEngine] Task #{dragged.TaskNumber} queued — waiting for #{target.TaskNumber} to complete.\n",
+                $"\n[Spritely] Task #{dragged.TaskNumber} queued — waiting for #{target.TaskNumber} to complete.\n",
                 _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(dragged);
             UpdateStatus();
@@ -2028,7 +2028,7 @@ namespace HappyEngine
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
             _outputTabManager.AppendOutput(newTask.Id,
-                $"[HappyEngine] Executing stored plan from task #{task.TaskNumber}\n",
+                $"[Spritely] Executing stored plan from task #{task.TaskNumber}\n",
                 _activeTasks, _historyTasks);
             _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
             RefreshFilterCombos();
@@ -3302,7 +3302,7 @@ namespace HappyEngine
                 var projectFile = FindProjectFile(baseDir);
                 if (projectFile == null)
                 {
-                    ExportStatusText.Text = $"Could not find HappyEngine.csproj file.\nSearched from: {baseDir}";
+                    ExportStatusText.Text = $"Could not find Spritely.csproj file.\nSearched from: {baseDir}";
                     ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
                     ExportStatusText.Visibility = Visibility.Visible;
                     button.IsEnabled = true;
@@ -3388,14 +3388,14 @@ namespace HappyEngine
 
         private string? FindProjectFile(string startDirectory)
         {
-            // Look for HappyEngine.csproj file by traversing up the directory tree
+            // Look for Spritely.csproj file by traversing up the directory tree
             var dir = new System.IO.DirectoryInfo(startDirectory);
 
             // Try up to 10 levels to avoid infinite loops
             int levels = 0;
             while (dir != null && levels < 10)
             {
-                var projectFile = System.IO.Path.Combine(dir.FullName, "HappyEngine.csproj");
+                var projectFile = System.IO.Path.Combine(dir.FullName, "Spritely.csproj");
                 if (System.IO.File.Exists(projectFile))
                 {
                     return projectFile;
@@ -3404,7 +3404,7 @@ namespace HappyEngine
                 // Also check if we're in a bin folder structure and jump to the root
                 if (dir.Name == "bin" && dir.Parent != null)
                 {
-                    var rootProjectFile = System.IO.Path.Combine(dir.Parent.FullName, "HappyEngine.csproj");
+                    var rootProjectFile = System.IO.Path.Combine(dir.Parent.FullName, "Spritely.csproj");
                     if (System.IO.File.Exists(rootProjectFile))
                     {
                         return rootProjectFile;
@@ -3418,10 +3418,10 @@ namespace HappyEngine
             // As a fallback, try some common locations relative to the executable
             string[] fallbackPaths = new[]
             {
-                System.IO.Path.Combine(startDirectory, "..", "..", "..", "HappyEngine.csproj"),
-                System.IO.Path.Combine(startDirectory, "..", "..", "..", "..", "HappyEngine.csproj"),
-                System.IO.Path.Combine(startDirectory, "..", "HappyEngine.csproj"),
-                System.IO.Path.Combine(Environment.CurrentDirectory, "HappyEngine.csproj")
+                System.IO.Path.Combine(startDirectory, "..", "..", "..", "Spritely.csproj"),
+                System.IO.Path.Combine(startDirectory, "..", "..", "..", "..", "Spritely.csproj"),
+                System.IO.Path.Combine(startDirectory, "..", "Spritely.csproj"),
+                System.IO.Path.Combine(Environment.CurrentDirectory, "Spritely.csproj")
             };
 
             foreach (var path in fallbackPaths)

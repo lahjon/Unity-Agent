@@ -8,10 +8,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
+using Spritely.Helpers;
+using Spritely.Managers;
 
-namespace HappyEngine.Controls
+namespace Spritely.Controls
 {
     public class TaskNodeGraphPanel : Border
     {

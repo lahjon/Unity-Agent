@@ -13,11 +13,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
-using HappyEngine.Services;
-using HappyEngine.Models;
+using Spritely.Helpers;
+using Spritely.Services;
+using Spritely.Models;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Thin coordinator that delegates to focused single-responsibility classes:
@@ -178,35 +178,35 @@ namespace HappyEngine.Managers
                 _promptBuilder.BuildPowerShellScript(projectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
-            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Task #{task.TaskNumber} starting...\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Task #{task.TaskNumber} starting...\n", activeTasks, historyTasks);
             if (!string.IsNullOrWhiteSpace(task.Summary))
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Summary: {task.Summary}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Project: {projectPath}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Model: {PromptBuilder.GetFriendlyModelName(cliModel)} ({cliModel})\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Summary: {task.Summary}\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Project: {projectPath}\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Model: {PromptBuilder.GetFriendlyModelName(cliModel)} ({cliModel})\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
             if (task.UseMessageBus)
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Message Bus: ON\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Message Bus: ON\n", activeTasks, historyTasks);
             if (task.ExtendedPlanning)
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Extended planning: ON\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Extended planning: ON\n", activeTasks, historyTasks);
             if (task.AutoDecompose)
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Auto-decompose: ON (will spawn subtasks)\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Auto-decompose: ON (will spawn subtasks)\n", activeTasks, historyTasks);
             if (task.SpawnTeam)
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Spawn Team: ON (will decompose into team roles with message bus)\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Spawn Team: ON (will decompose into team roles with message bus)\n", activeTasks, historyTasks);
             if (task.IsFeatureMode)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Feature mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Safety: skip-permissions forced, git blocked, 30min iteration timeout\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Feature mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Safety: skip-permissions forced, git blocked, 30min iteration timeout\n", activeTasks, historyTasks);
             }
             // Show the full prompt that Claude will receive
             try
             {
                 var promptContent = File.ReadAllText(promptFile, Encoding.UTF8);
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] ── Full Prompt ──────────────────────────────\n{promptContent}\n[HappyEngine] ── End Prompt ───────────────────────────────\n\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] ── Full Prompt ──────────────────────────────\n{promptContent}\n[Spritely] ── End Prompt ───────────────────────────────\n\n", activeTasks, historyTasks);
             }
             catch { /* non-critical */ }
 
-            _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Connecting to Claude...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Connecting to Claude...\n\n", activeTasks, historyTasks);
 
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
@@ -219,7 +219,7 @@ namespace HappyEngine.Managers
                     task.IsPlanningBeforeQueue = true;
                     task.Status = AgentTaskStatus.Planning;
                     task.StartTime = DateTime.Now;
-                    _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Restarting in plan mode...\n\n", activeTasks, historyTasks);
+                    _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Restarting in plan mode...\n\n", activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
                     return;
@@ -341,7 +341,7 @@ namespace HappyEngine.Managers
                                 ? (Brush)Application.Current.FindResource("Success")
                                 : (Brush)Application.Current.FindResource("DangerBright");
                             _outputProcessor.AppendColoredOutput(task.Id,
-                                $"\n[HappyEngine] Feature mode child task completed (exit code: {exitCode}).\n",
+                                $"\n[Spritely] Feature mode child task completed (exit code: {exitCode}).\n",
                                 statusColor, activeTasks, historyTasks);
                         }
                         catch (Exception ex)
@@ -404,7 +404,7 @@ namespace HappyEngine.Managers
             }
             catch (Exception ex)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);
@@ -467,7 +467,7 @@ namespace HappyEngine.Managers
                         ? (Brush)Application.Current.FindResource("Success")
                         : (Brush)Application.Current.FindResource("DangerBright");
                     _outputProcessor.AppendColoredOutput(task.Id,
-                        $"\n[HappyEngine] Process finished (exit code: {exitCode}).\n",
+                        $"\n[Spritely] Process finished (exit code: {exitCode}).\n",
                         statusColor, activeTasks, historyTasks);
                 }
                 catch (Exception ex)
@@ -530,7 +530,7 @@ namespace HappyEngine.Managers
             {
                 task.Status = expectedStatus;
                 task.EndTime = DateTime.Now;
-                _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Follow-up complete.\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Follow-up complete.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             }
 
@@ -585,7 +585,7 @@ namespace HappyEngine.Managers
                     if (!addResult.IsSuccess)
                     {
                         _outputProcessor.AppendOutput(task.Id,
-                            $"[HappyEngine] Failed to stage files for auto-commit: {addResult.GetErrorMessage()}\n",
+                            $"[Spritely] Failed to stage files for auto-commit: {addResult.GetErrorMessage()}\n",
                             activeTasks, historyTasks);
                         return;
                     }
@@ -606,20 +606,20 @@ namespace HappyEngine.Managers
                             task.IsCommitted = true;
                             task.CommitHash = commitHash;
                             _outputProcessor.AppendOutput(task.Id,
-                                $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s). Commit: {commitHash[..8]}\n",
+                                $"\n[Spritely] Auto-committed {relativePaths.Count} locked file(s). Commit: {commitHash[..8]}\n",
                                 activeTasks, historyTasks);
                         }
                         else
                         {
                             _outputProcessor.AppendOutput(task.Id,
-                                $"\n[HappyEngine] Auto-committed {relativePaths.Count} locked file(s) but failed to capture commit hash.\n",
+                                $"\n[Spritely] Auto-committed {relativePaths.Count} locked file(s) but failed to capture commit hash.\n",
                                 activeTasks, historyTasks);
                         }
                     }
                     else
                     {
                         _outputProcessor.AppendOutput(task.Id,
-                            $"[HappyEngine] Commit failed: {result.GetErrorMessage()}\n",
+                            $"[Spritely] Commit failed: {result.GetErrorMessage()}\n",
                             activeTasks, historyTasks);
                     }
                 }, $"auto-commit for task #{task.TaskNumber}");
@@ -705,7 +705,7 @@ namespace HappyEngine.Managers
             {
                 AppLogger.Warn("FollowUp", $"[{task.Id}] Blocked: feature mode coordinator in phase {task.FeatureModePhase}");
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[HappyEngine] This task is coordinating subtasks and waiting for them to complete. Follow-up input is not available during this phase.\n",
+                    "\n[Spritely] This task is coordinating subtasks and waiting for them to complete. Follow-up input is not available during this phase.\n",
                     activeTasks, historyTasks);
                 return;
             }
@@ -821,7 +821,7 @@ namespace HappyEngine.Managers
                 : "--continue";
 
             var followUpModel = PromptBuilder.GetCliModelForTask(task);
-            _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n[HappyEngine] Sending follow-up with {resumeLabel} (Model: {PromptBuilder.GetFriendlyModelName(followUpModel)})...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n[Spritely] Sending follow-up with {resumeLabel} (Model: {PromptBuilder.GetFriendlyModelName(followUpModel)})...\n\n", activeTasks, historyTasks);
 
             // Append follow-up prompt to task description for git commit tracking
             if (!string.IsNullOrEmpty(task.Description))
@@ -858,7 +858,7 @@ namespace HappyEngine.Managers
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
                 AppLogger.Info("FollowUp", $"[{task.Id}] Follow-up process exited with code {exitCode}");
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Follow-up process exited (code={exitCode})\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Follow-up process exited (code={exitCode})\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Verifying;
                 _outputTabManager.UpdateTabHeader(task);
                 _ = CompleteFollowUpWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
@@ -869,12 +869,12 @@ namespace HappyEngine.Managers
             {
                 _processLauncher.StartManagedProcess(task, process);
                 AppLogger.Info("FollowUp", $"[{task.Id}] Process started successfully. PID={task.Process?.Id}");
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Follow-up process started (PID={task.Process?.Id})\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Follow-up process started (PID={task.Process?.Id})\n", activeTasks, historyTasks);
             }
             catch (Exception ex)
             {
                 AppLogger.Error("FollowUp", $"[{task.Id}] Failed to start follow-up process", ex);
-                _outputProcessor.AppendOutput(task.Id, $"[HappyEngine] Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
             }
         }
 
@@ -975,7 +975,7 @@ namespace HappyEngine.Managers
                     task.BlockedByTaskId = blocker?.Id;
                     task.BlockedByTaskNumber = blocker?.TaskNumber;
                     _outputProcessor.AppendOutput(task.Id,
-                        $"\n[HappyEngine] Planning complete. Queued — waiting for dependencies: " +
+                        $"\n[Spritely] Planning complete. Queued — waiting for dependencies: " +
                         $"{string.Join(", ", task.DependencyTaskNumbers.Select(n => $"#{n}"))}\n",
                         activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
@@ -995,7 +995,7 @@ namespace HappyEngine.Managers
             // No more blockers — start execution
             task.Status = AgentTaskStatus.Running;
             task.StartTime = DateTime.Now;
-            _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
             _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
         }
@@ -1191,7 +1191,7 @@ namespace HappyEngine.Managers
             if (children == null || children.Count == 0)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[HappyEngine] Decomposition produced no valid subtasks — completing parent task.\n",
+                    "\n[Spritely] Decomposition produced no valid subtasks — completing parent task.\n",
                     activeTasks, historyTasks);
                 task.AutoDecompose = false;
                 task.Status = AgentTaskStatus.Failed;
@@ -1206,7 +1206,7 @@ namespace HappyEngine.Managers
             task.EndTime = DateTime.Now;
             task.CompletionSummary = $"Decomposed into {children.Count} subtask(s)";
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[HappyEngine] Task decomposed into {children.Count} subtask(s). Parent is now a coordinator.\n",
+                $"\n[Spritely] Task decomposed into {children.Count} subtask(s). Parent is now a coordinator.\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
@@ -1341,7 +1341,7 @@ namespace HappyEngine.Managers
             if (children == null || children.Count == 0)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[HappyEngine] Team decomposition produced no valid team members — completing parent task.\n",
+                    "\n[Spritely] Team decomposition produced no valid team members — completing parent task.\n",
                     activeTasks, historyTasks);
                 task.SpawnTeam = false;
                 task.Status = AgentTaskStatus.Failed;
@@ -1356,7 +1356,7 @@ namespace HappyEngine.Managers
             task.EndTime = DateTime.Now;
             task.CompletionSummary = $"Spawned team of {children.Count} agent(s): {string.Join(", ", children.Select(c => c.Summary))}";
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[HappyEngine] Team spawned with {children.Count} member(s). Parent is now a coordinator.\n",
+                $"\n[Spritely] Team spawned with {children.Count} member(s). Parent is now a coordinator.\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 

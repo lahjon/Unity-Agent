@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace HappyEngine.Helpers
+namespace Spritely.Helpers
 {
     public static class FormatHelpers
     {

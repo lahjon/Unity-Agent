@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using HappyEngine.Dialogs;
-using HappyEngine.Managers;
-using HappyEngine.Models;
+using Spritely.Dialogs;
+using Spritely.Managers;
+using Spritely.Models;
 
-namespace HappyEngine
+namespace Spritely
 {
     public partial class MainWindow
     {
@@ -244,7 +244,7 @@ namespace HappyEngine
                     task.PlanOnly = true;
                     task.Status = AgentTaskStatus.Planning;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[HappyEngine] Workflow task \"{step.TaskName}\" — waiting for dependencies: {string.Join(", ", step.DependsOn)}\n",
+                        $"[Spritely] Workflow task \"{step.TaskName}\" — waiting for dependencies: {string.Join(", ", step.DependsOn)}\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
@@ -255,7 +255,7 @@ namespace HappyEngine
                     task.Status = AgentTaskStatus.InitQueued;
                     task.QueuedReason = "Max concurrent tasks reached";
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[HappyEngine] Workflow task \"{step.TaskName}\" — queued (max concurrent tasks reached)\n",
+                        $"[Spritely] Workflow task \"{step.TaskName}\" — queued (max concurrent tasks reached)\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                 }
@@ -263,7 +263,7 @@ namespace HappyEngine
                 {
                     _taskOrchestrator.AddTask(task, depIds);
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[HappyEngine] Workflow task \"{step.TaskName}\" — starting...\n",
+                        $"[Spritely] Workflow task \"{step.TaskName}\" — starting...\n",
                         _activeTasks, _historyTasks);
                     _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                 }
@@ -655,7 +655,7 @@ TextureImporter:
                 task.Cts?.Dispose();
                 task.Cts = null;
                 _outputTabManager.AppendOutput(task.Id,
-                    "\n[HappyEngine] Task cancelled and stored.\n", _activeTasks, _historyTasks);
+                    "\n[Spritely] Task cancelled and stored.\n", _activeTasks, _historyTasks);
             }
 
             // Create the stored task entry
@@ -698,7 +698,7 @@ TextureImporter:
 
             var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
             _outputTabManager.AppendOutput(task.Id,
-                $"\n[HappyEngine] Resumed session — type a follow-up message below. It will be sent with {resumeMethod}.\n",
+                $"\n[Spritely] Resumed session — type a follow-up message below. It will be sent with {resumeMethod}.\n",
                 _activeTasks, _historyTasks);
 
             OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
@@ -728,7 +728,7 @@ TextureImporter:
             else if (task.IsRunning)
             {
                 _taskExecutionManager.PauseTask(task);
-                _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task paused.\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, "\n[Spritely] Task paused.\n", _activeTasks, _historyTasks);
             }
         }
 
@@ -747,7 +747,7 @@ TextureImporter:
             if (task.Status == AgentTaskStatus.InitQueued)
             {
                 task.QueuedReason = null;
-                LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
+                LaunchTaskProcess(task, $"\n[Spritely] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
                 UpdateQueuePositions();
                 UpdateStatus();
                 return;
@@ -767,12 +767,12 @@ TextureImporter:
                 {
                     _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[HappyEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
+                        $"\n[Spritely] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
                         _activeTasks, _historyTasks);
                 }
                 else
                 {
-                    LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n");
+                    LaunchTaskProcess(task, $"\n[Spritely] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n");
                 }
             }
             else
@@ -830,7 +830,7 @@ TextureImporter:
             {
                 // Force-start an init-queued task (bypass max concurrent limit)
                 task.QueuedReason = null;
-                LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
+                LaunchTaskProcess(task, $"\n[Spritely] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
                 UpdateQueuePositions();
                 UpdateStatus();
                 return;
@@ -853,12 +853,12 @@ TextureImporter:
                         // Resume suspended process (was queued via drag-drop)
                         _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                         _outputTabManager.AppendOutput(task.Id,
-                            $"\n[HappyEngine] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
+                            $"\n[Spritely] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
                             _activeTasks, _historyTasks);
                     }
                     else
                     {
-                        LaunchTaskProcess(task, $"\n[HappyEngine] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n");
+                        LaunchTaskProcess(task, $"\n[Spritely] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n");
                     }
 
                     _outputTabManager.UpdateTabHeader(task);
@@ -1027,7 +1027,7 @@ TextureImporter:
                 if (result != null)
                 {
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[HappyEngine] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
+                        $"\n[Spritely] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
                     DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
                 }
                 else
@@ -1069,7 +1069,7 @@ TextureImporter:
                 _outputTabManager.UpdateTabHeader(task);
                 if (sender != null)
                 {
-                    _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task removed.\n", _activeTasks, _historyTasks);
+                    _outputTabManager.AppendOutput(task.Id, "\n[Spritely] Task removed.\n", _activeTasks, _historyTasks);
                     AnimateRemoval(sender, () => MoveToHistory(task));
                 }
                 else
@@ -1125,7 +1125,7 @@ TextureImporter:
                 System.Threading.Tasks.Task.Run(() => { try { proc.Kill(true); } catch { /* best-effort */ } });
             task.Cts?.Dispose();
             task.Cts = null;
-            _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task cancelled.\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, "\n[Spritely] Task cancelled.\n", _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(task);
             FinalizeTask(task);
         }
@@ -1133,7 +1133,7 @@ TextureImporter:
         private void RemoveHistoryTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            _outputTabManager.AppendOutput(task.Id, "\n[HappyEngine] Task removed.\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, "\n[Spritely] Task removed.\n", _activeTasks, _historyTasks);
             AnimateRemoval(el, () =>
             {
                 _outputTabManager.CloseTab(task);
@@ -1182,18 +1182,18 @@ TextureImporter:
             }
 
             _outputTabManager.CreateTab(task);
-            _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Resumed session\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Original task: {task.Description}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Status: {task.StatusText}\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[Spritely] Resumed session\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[Spritely] Original task: {task.Description}\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[Spritely] Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"[Spritely] Status: {task.StatusText}\n", _activeTasks, _historyTasks);
             if (!string.IsNullOrEmpty(task.ConversationId))
-                _outputTabManager.AppendOutput(task.Id, $"[HappyEngine] Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, $"[Spritely] Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
             if (!string.IsNullOrWhiteSpace(task.CompletionSummary))
                 _outputTabManager.AppendOutput(task.Id, $"\n{task.CompletionSummary}\n", _activeTasks, _historyTasks);
             if (!string.IsNullOrWhiteSpace(task.Recommendations))
                 _outputTabManager.AppendOutput(task.Id, $"\n[Recommendations]\n{task.Recommendations}\n", _activeTasks, _historyTasks);
             var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
-            _outputTabManager.AppendOutput(task.Id, $"\n[HappyEngine] Type a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(task.Id, $"\n[Spritely] Type a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
 
             _historyTasks.Remove(task);
             var topRow = RootGrid.RowDefinitions[0];
@@ -1390,7 +1390,7 @@ TextureImporter:
                 _outputTabManager.CreateTab(task);
 
             _outputTabManager.AppendOutput(task.Id,
-                "\n[HappyEngine] Running result verification...\n", _activeTasks, _historyTasks);
+                "\n[Spritely] Running result verification...\n", _activeTasks, _historyTasks);
 
             OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
 

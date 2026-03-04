@@ -7,9 +7,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Threading;
-using HappyEngine.Constants;
+using Spritely.Constants;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Manages feature mode multi-phase orchestration:
@@ -527,7 +527,7 @@ namespace HappyEngine.Managers
             var phaseModel = DetermineOptimalModel(task, activeTasks, historyTasks);
 
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[HappyEngine] Phase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
+                $"\n[Spritely] Phase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
                 activeTasks, historyTasks);
             var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, phaseModel);
 

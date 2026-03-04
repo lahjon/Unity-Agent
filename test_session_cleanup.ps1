@@ -1,7 +1,7 @@
-# Test script to verify session data cleanup in HappyEngine
+# Test script to verify session data cleanup in Spritely
 
-$appDataPath = "$env:LOCALAPPDATA\HappyEngine"
-Write-Host "`n=== HappyEngine Session Data Verification ===" -ForegroundColor Cyan
+$appDataPath = "$env:LOCALAPPDATA\Spritely"
+Write-Host "`n=== Spritely Session Data Verification ===" -ForegroundColor Cyan
 
 # Function to display directory structure
 function Show-SessionData {
@@ -54,10 +54,10 @@ Show-SessionData "CURRENT STATE"
 
 # Monitor for changes
 Write-Host "`n`nMonitoring Instructions:" -ForegroundColor Magenta
-Write-Host "1. Start HappyEngine and create a task with 'Enable message bus' checked"
+Write-Host "1. Start Spritely and create a task with 'Enable message bus' checked"
 Write-Host "2. While the task is running, press Enter here to see the agent bus data"
 Write-Host "3. After all tasks complete, press Enter again to verify cleanup"
-Write-Host "4. Close and restart HappyEngine, then press Enter to verify persistence"
+Write-Host "4. Close and restart Spritely, then press Enter to verify persistence"
 
 $step = 1
 while ($true) {

@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class ImageAttachmentManager
     {

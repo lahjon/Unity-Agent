@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace HappyEngine
+namespace Spritely
 {
     /// <summary>
     /// Transient runtime state for an active agent task. Holds the OS process,

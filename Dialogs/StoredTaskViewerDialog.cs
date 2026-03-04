@@ -1,9 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using HappyEngine.Helpers;
+using Spritely.Helpers;
 
-namespace HappyEngine.Dialogs
+namespace Spritely.Dialogs
 {
     public static class StoredTaskViewerDialog
     {

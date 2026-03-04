@@ -1,4 +1,4 @@
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     /// <summary>
     /// Represents the result of a git command execution with structured output, error, and exit code.

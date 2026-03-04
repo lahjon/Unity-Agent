@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using HappyEngine.Models;
+using Spritely.Models;
 
-namespace HappyEngine
+namespace Spritely
 {
     /// <summary>
     /// Pure persistent data for an agent task. Safe to serialize and pass across

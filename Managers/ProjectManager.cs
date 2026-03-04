@@ -14,11 +14,11 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
-using HappyEngine.Dialogs;
-using HappyEngine.Models;
+using Spritely.Helpers;
+using Spritely.Dialogs;
+using Spritely.Models;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class ProjectManager
     {
@@ -1263,7 +1263,7 @@ namespace HappyEngine.Managers
                         },
                         clientInfo = new
                         {
-                            name = "HappyEngine",
+                            name = "Spritely",
                             version = "1.0.0"
                         }
                     },

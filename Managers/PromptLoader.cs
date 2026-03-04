@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Reflection;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Loads prompt templates from embedded resource .md files under the Prompts/ folder.
@@ -13,7 +13,7 @@ namespace HappyEngine.Managers
     {
         private static readonly Assembly _assembly = typeof(PromptLoader).Assembly;
         private static readonly ConcurrentDictionary<string, string> _cache = new();
-        private const string Prefix = "HappyEngine.Prompts.";
+        private const string Prefix = "Spritely.Prompts.";
 
         /// <summary>
         /// Returns the contents of an embedded .md resource by filename (without path prefix).

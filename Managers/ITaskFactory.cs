@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public interface ITaskFactory
     {

@@ -1,10 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using HappyEngine.Helpers;
-using HappyEngine.Managers;
+using Spritely.Helpers;
+using Spritely.Managers;
 
-namespace HappyEngine.Services
+namespace Spritely.Services
 {
     /// <summary>
     /// Provides global synchronization for git operations across the application.

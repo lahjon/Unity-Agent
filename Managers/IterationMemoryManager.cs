@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Manages structured memory across feature mode iterations to prevent repeated failures
@@ -21,7 +21,7 @@ namespace HappyEngine.Managers
         {
             _memoryBasePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "HappyEngine", "iteration_history");
+                "Spritely", "iteration_history");
             Directory.CreateDirectory(_memoryBasePath);
         }
 

@@ -4,10 +4,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using HappyEngine.Managers;
-using HappyEngine.Models;
+using Spritely.Managers;
+using Spritely.Models;
 
-namespace HappyEngine.Dialogs
+namespace Spritely.Dialogs
 {
     public class CommitResult
     {

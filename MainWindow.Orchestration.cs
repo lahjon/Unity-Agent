@@ -8,11 +8,11 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using HappyEngine.Dialogs;
-using HappyEngine.Managers;
-using HappyEngine.Models;
+using Spritely.Dialogs;
+using Spritely.Managers;
+using Spritely.Models;
 
-namespace HappyEngine
+namespace Spritely
 {
     public partial class MainWindow
     {
@@ -333,7 +333,7 @@ namespace HappyEngine
             foreach (var task in toStart)
             {
                 task.QueuedReason = null;
-                LaunchTaskProcess(task, $"[HappyEngine] Slot available — starting task #{task.TaskNumber}...\n\n");
+                LaunchTaskProcess(task, $"[Spritely] Slot available — starting task #{task.TaskNumber}...\n\n");
             }
 
             // Update queue positions for remaining InitQueued tasks
@@ -371,12 +371,12 @@ namespace HappyEngine
                     // Task was suspended via drag-drop — resume its process
                     _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[HappyEngine] All dependencies resolved — resuming task #{task.TaskNumber}.\n\n",
+                        $"\n[Spritely] All dependencies resolved — resuming task #{task.TaskNumber}.\n\n",
                         _activeTasks, _historyTasks);
                 }
                 else
                 {
-                    LaunchTaskProcess(task, $"\n[HappyEngine] All dependencies resolved — starting task #{task.TaskNumber}...\n\n");
+                    LaunchTaskProcess(task, $"\n[Spritely] All dependencies resolved — starting task #{task.TaskNumber}...\n\n");
                 }
 
                 _outputTabManager.UpdateTabHeader(task);
@@ -392,7 +392,7 @@ namespace HappyEngine
             // Debug logging
             AppLogger.Debug("OnQueuedTaskResumed", $"Task #{task.TaskNumber} - ConversationId: {task.ConversationId}, Process: {task.Process?.Id}, HasExited: {task.Process?.HasExited}");
 
-            _outputTabManager.AppendOutput(taskId, $"\n[HappyEngine] Resuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(taskId, $"\n[Spritely] Resuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
 
             // Check if we have an existing process that was paused
             if (task.Process is { HasExited: false })
@@ -477,11 +477,11 @@ namespace HappyEngine
                 _outputTabManager.CreateTab(child);
 
                 _outputTabManager.AppendOutput(parent.Id,
-                    $"\n[HappyEngine] Spawned subtask #{child.TaskNumber}: {child.Description}\n",
+                    $"\n[Spritely] Spawned subtask #{child.TaskNumber}: {child.Description}\n",
                     _activeTasks, _historyTasks);
 
                 _outputTabManager.AppendOutput(child.Id,
-                    $"[HappyEngine] Subtask of #{parent.TaskNumber}: {parent.Description}\n",
+                    $"[Spritely] Subtask of #{parent.TaskNumber}: {parent.Description}\n",
                     _activeTasks, _historyTasks);
 
                 _outputTabManager.UpdateTabHeader(child);
@@ -641,7 +641,7 @@ namespace HappyEngine
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
             _outputTabManager.AppendOutput(newTask.Id,
-                $"[HappyEngine] Re-running task #{historicTask.TaskNumber}\n", _activeTasks, _historyTasks);
+                $"[Spritely] Re-running task #{historicTask.TaskNumber}\n", _activeTasks, _historyTasks);
 
             _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
             UpdateStatus();
@@ -676,7 +676,7 @@ namespace HappyEngine
                     task.PlanOnly = true;
                     task.Status = AgentTaskStatus.Planning;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[HappyEngine] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
+                        $"[Spritely] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
@@ -689,7 +689,7 @@ namespace HappyEngine
                     task.BlockedByTaskId = activeDeps[0].Id;
                     task.BlockedByTaskNumber = activeDeps[0].TaskNumber;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[HappyEngine] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
+                        $"[Spritely] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                 }
@@ -700,7 +700,7 @@ namespace HappyEngine
                 task.Status = AgentTaskStatus.InitQueued;
                 task.QueuedReason = "Max concurrent tasks reached";
                 _outputTabManager.AppendOutput(task.Id,
-                    $"[HappyEngine] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
+                    $"[Spritely] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
                     _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             }

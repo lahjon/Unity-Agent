@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel;
 
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     public class ProjectTaskItem : INotifyPropertyChanged
     {

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 
-namespace HappyEngine.Controls
+namespace Spritely.Controls
 {
     internal class GraphLayoutEngine
     {

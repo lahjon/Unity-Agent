@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     /// <summary>
     /// Configuration for token budget management and optimization levels.

@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace HappyEngine.Converters
+namespace Spritely.Converters
 {
     public class NestingDepthToMarginConverter : IValueConverter
     {

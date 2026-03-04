@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Windows.Data;
 
-namespace HappyEngine.Converters
+namespace Spritely.Converters
 {
     public class WrapTooltipTextConverter : IValueConverter
     {

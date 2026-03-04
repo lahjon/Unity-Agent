@@ -8,10 +8,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using HappyEngine.Helpers;
-using HappyEngine.Models;
+using Spritely.Helpers;
+using Spritely.Models;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class ActivityDashboardManager
     {

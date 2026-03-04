@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     /// <summary>
     /// Minimal VT100 screen buffer that processes raw ConPty output.

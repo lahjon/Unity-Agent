@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     public class GeminiService : BaseLlmService
     {

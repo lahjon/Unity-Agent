@@ -1,4 +1,4 @@
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     internal class TaskRecordBase
     {

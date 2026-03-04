@@ -3,9 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using HappyEngine.Managers;
+using Spritely.Managers;
 
-namespace HappyEngine.Dialogs
+namespace Spritely.Dialogs
 {
     public static class LogViewerDialog
     {

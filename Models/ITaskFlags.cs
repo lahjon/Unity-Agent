@@ -1,4 +1,4 @@
-namespace HappyEngine.Models
+namespace Spritely.Models
 {
     /// <summary>
     /// Common toggle flags shared between <see cref="TaskConfigBase"/> and

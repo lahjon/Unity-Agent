@@ -10,9 +10,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Threading;
-using HappyEngine.Helpers;
+using Spritely.Helpers;
 
-namespace HappyEngine.Managers
+namespace Spritely.Managers
 {
     /// <summary>
     /// Manages subprocess creation, process lifecycle (start/stop/pause/resume),
@@ -334,7 +334,7 @@ namespace HappyEngine.Managers
                 task.Process = null;
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
-                _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] ERROR: Process terminated unexpectedly during resume.\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "\n[Spritely] ERROR: Process terminated unexpectedly during resume.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
                 // Caller (TaskExecutionManager) will handle finalization when it sees the Failed status
                 return;
@@ -347,7 +347,7 @@ namespace HappyEngine.Managers
                 task.Process = null;
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
-                _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] ERROR: Process terminated immediately after resume.\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "\n[Spritely] ERROR: Process terminated immediately after resume.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
                 // Caller (TaskExecutionManager) will handle finalization when it sees the Failed status
                 return;
@@ -363,7 +363,7 @@ namespace HappyEngine.Managers
             }
 
             _outputTabManager.UpdateTabHeader(task);
-            _outputProcessor.AppendOutput(task.Id, "\n[HappyEngine] Task resumed.\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Task resumed.\n", activeTasks, historyTasks);
             ProcessResumed?.Invoke(task.Id);
         }
 

@@ -1,6 +1,6 @@
-# Building Happy Engine as a Single Executable
+# Building Spritely as a Single Executable
 
-Happy Engine can be built as a single executable file that includes the .NET runtime and all dependencies. This creates a self-contained application that can run on Windows without requiring .NET to be installed separately.
+Spritely can be built as a single executable file that includes the .NET runtime and all dependencies. This creates a self-contained application that can run on Windows without requiring .NET to be installed separately.
 
 ## Build Methods
 
@@ -24,7 +24,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 ### Method 3: Using Visual Studio
 
-1. Right-click the HappyEngine project
+1. Right-click the Spritely project
 2. Select "Publish..."
 3. Choose the "SingleExe" profile
 4. Click "Publish"
@@ -33,7 +33,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 The single executable will be created at:
 ```
-bin\Release\net9.0-windows\win-x64\publish\HappyEngine.exe
+bin\Release\net9.0-windows\win-x64\publish\Spritely.exe
 ```
 
 ## Executable Details
@@ -46,7 +46,7 @@ bin\Release\net9.0-windows\win-x64\publish\HappyEngine.exe
 
 ## Configuration
 
-The single-file publish is configured in `HappyEngine.csproj` with these settings:
+The single-file publish is configured in `Spritely.csproj` with these settings:
 
 - `PublishSingleFile`: Creates a single executable
 - `SelfContained`: Includes .NET runtime
@@ -57,7 +57,7 @@ The single-file publish is configured in `HappyEngine.csproj` with these setting
 
 ## Distribution
 
-The resulting `HappyEngine.exe` can be distributed as a standalone file. Users can run it directly without any installation process or dependencies.
+The resulting `Spritely.exe` can be distributed as a standalone file. Users can run it directly without any installation process or dependencies.
 
 ## Notes
 
