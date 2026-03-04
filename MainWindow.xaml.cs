@@ -2147,8 +2147,27 @@ namespace Spritely
 
         private void HistoryTask_Selected(object sender, SelectionChangedEventArgs e)
         {
-            if (HistoryTasksList.SelectedItem is AgentTask task && _outputTabManager.HasTab(task.Id))
+            if (HistoryTasksList.SelectedItem is not AgentTask task) return;
+
+            if (_outputTabManager.HasTab(task.Id))
+            {
                 OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
+                return;
+            }
+
+            // Recreate the output tab so the user can view the finished task's output
+            _outputTabManager.CreateTab(task);
+
+            // Populate with the task's buffered output (still in memory) or persisted FullOutput
+            var existingOutput = task.OutputBuilder.Length > 0
+                ? task.OutputBuilder.ToString()
+                : task.FullOutput;
+
+            if (!string.IsNullOrEmpty(existingOutput))
+                _outputTabManager.AppendOutput(task.Id, existingOutput, _activeTasks, _historyTasks);
+
+            _outputTabManager.UpdateTabHeader(task);
+            OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
         }
 
         private void ActiveTaskList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
