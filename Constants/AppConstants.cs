@@ -11,13 +11,13 @@ namespace Spritely.Constants
         // Change these when upgrading to newer model versions.
 
         /// <summary>Claude Opus — highest capability, used for planning and execution tasks.</summary>
-        public const string ClaudeOpus = "claude-opus-4-latest";
+        public const string ClaudeOpus = "claude-opus-4-6";
 
         /// <summary>Claude Sonnet — balanced, used for exploration tasks (codebase analysis, decomposition).</summary>
-        public const string ClaudeSonnet = "claude-sonnet-4-latest";
+        public const string ClaudeSonnet = "claude-sonnet-4-6";
 
         /// <summary>Claude Haiku — fastest/cheapest, used for lightweight classification tasks.</summary>
-        public const string ClaudeHaiku = "claude-haiku-4-5-latest";
+        public const string ClaudeHaiku = "claude-haiku-4-5";
 
         /// <summary>Default model for the Claude chat panel (API-based conversations).</summary>
         public const string ClaudeDefaultChatModel = ClaudeSonnet;
