@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Spritely.Models
 {
@@ -21,6 +22,9 @@ namespace Spritely.Models
         public int FeatureModeIterations { get; set; } = 2;
         public string AdditionalInstructions { get; set; } = "";
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        /// <summary>Skill IDs that were active when this config was saved.</summary>
+        public List<string> ActiveSkillIds { get; set; } = new();
 
         // ITaskFlags.Iterations maps to FeatureModeIterations
         int ITaskFlags.Iterations

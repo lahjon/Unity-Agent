@@ -35,6 +35,7 @@ namespace Spritely.Managers
         private readonly Func<AgentTask, string> _getProjectDescription;
         private readonly Func<string, string> _getProjectRulesBlock;
         private readonly Func<string, bool> _isGameProject;
+        private readonly Func<string> _getSkillsBlock;
         private readonly MessageBusManager _messageBusManager;
         private readonly Dispatcher _dispatcher;
 
@@ -83,7 +84,8 @@ namespace Spritely.Managers
             MessageBusManager messageBusManager,
             Dispatcher dispatcher,
             Func<int>? getTokenLimitRetryMinutes = null,
-            Func<bool>? getAutoVerify = null)
+            Func<bool>? getAutoVerify = null,
+            Func<string>? getSkillsBlock = null)
         {
             _scriptDir = scriptDir;
             _fileLockManager = fileLockManager;
@@ -97,6 +99,7 @@ namespace Spritely.Managers
             _getProjectDescription = getProjectDescription;
             _getProjectRulesBlock = getProjectRulesBlock;
             _isGameProject = isGameProject;
+            _getSkillsBlock = getSkillsBlock ?? (() => "");
             _messageBusManager = messageBusManager;
             _dispatcher = dispatcher;
 
@@ -134,7 +137,8 @@ namespace Spritely.Managers
                 _getSystemPrompt(), task,
                 _getProjectDescription(task),
                 _getProjectRulesBlock(task.ProjectPath),
-                _isGameProject(task.ProjectPath));
+                _isGameProject(task.ProjectPath),
+                _getSkillsBlock());
 
             if (activeTasks != null)
             {

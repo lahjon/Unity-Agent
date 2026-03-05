@@ -131,7 +131,8 @@ namespace Spritely.Managers
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
             bool isGameProject = false, string taskId = "",
-            bool applyFix = true, bool suppressOutputEfficiency = false)
+            bool applyFix = true, bool suppressOutputEfficiency = false,
+            string skillsBlock = "")
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
@@ -141,7 +142,7 @@ namespace Spritely.Managers
             var efficiencyBlock = suppressOutputEfficiency ? "" : OutputEfficiencyBlock;
 
             if (isFeatureMode)
-                return descBlock + projectRulesBlock + gameBlock + efficiencyBlock + FeatureModeInitialTemplate + description;
+                return descBlock + projectRulesBlock + skillsBlock + gameBlock + efficiencyBlock + FeatureModeInitialTemplate + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -154,13 +155,13 @@ namespace Spritely.Managers
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;
-            return descBlock + systemPrompt + gitBlock + projectRulesBlock + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
+            return descBlock + systemPrompt + gitBlock + projectRulesBlock + skillsBlock + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
                 "# USER PROMPT / TASK\n" + description;
         }
 
         public string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
-            bool isGameProject = false)
+            bool isGameProject = false, string skillsBlock = "")
         {
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
             if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
@@ -171,7 +172,7 @@ namespace Spritely.Managers
             var isPlanningMember = task.NoGitWrite && task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly;
             var suppressEfficiency = isPlanningMember || task.PlanOnly;
 
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency, skillsBlock);
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
                 basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);

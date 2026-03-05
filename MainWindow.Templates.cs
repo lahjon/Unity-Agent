@@ -28,6 +28,7 @@ namespace Spritely
                 Description = name,
                 AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
                 Model = modelTag,
+                ActiveSkillIds = _skillManager.GetEnabledSkillIds(),
             };
             ReadUiFlagsInto(template);
 
@@ -117,6 +118,10 @@ namespace Spritely
 
             AdditionalInstructionsInput.Text = template.AdditionalInstructions ?? "";
 
+            // Restore skill selections
+            _skillManager.SetEnabledSkills(template.ActiveSkillIds ?? new());
+            RefreshSkillsPanel();
+
             for (int i = 0; i < ModelCombo.Items.Count; i++)
             {
                 if (ModelCombo.Items[i] is ComboBoxItem item && item.Tag?.ToString() == template.Model)
@@ -136,6 +141,10 @@ namespace Spritely
 
             AdditionalInstructionsInput.Text = "";
             ModelCombo.SelectedIndex = 0;
+
+            // Clear skill selections
+            _skillManager.ClearEnabledSkills();
+            RefreshSkillsPanel();
 
             UpdateExecuteButtonText();
         }

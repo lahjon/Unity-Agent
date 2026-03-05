@@ -72,6 +72,7 @@ namespace Spritely
                 DisplayName = text.Length > 40 ? text.Substring(0, 40) + "..." : text,
                 Model = modelTag,
                 AdditionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "",
+                ActiveSkillIds = _skillManager.GetEnabledSkillIds(),
             };
             ReadUiFlagsInto(entry);
 
@@ -177,6 +178,10 @@ namespace Spritely
             // Restore toggles
             ApplyFlagsToUi(entry);
             AdditionalInstructionsInput.Text = entry.AdditionalInstructions ?? "";
+
+            // Restore skill selections
+            _skillManager.SetEnabledSkills(entry.ActiveSkillIds ?? new());
+            RefreshSkillsPanel();
         }
 
         private void DeleteSavedPrompt_Click(object sender, RoutedEventArgs e)

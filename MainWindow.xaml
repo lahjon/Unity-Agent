@@ -1278,6 +1278,34 @@
                         </DockPanel>
                     </Border>
 
+                    <!-- Top: Skills strip -->
+                    <Border x:Name="SkillsBorder" DockPanel.Dock="Top"
+                            Background="{StaticResource BgSurface}" CornerRadius="4"
+                            BorderBrush="{StaticResource BgElevated}" BorderThickness="1"
+                            Margin="0,0,0,6" Padding="6,4">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Left" Click="SkillsToggle_Click"
+                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                    Padding="0" Margin="0,0,6,0" VerticalAlignment="Top">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="SkillsArrow" Text="&#x25BE;" Foreground="#E8A86C"
+                                               FontSize="11" FontWeight="Bold" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="SKILLS" Foreground="#E8A86C" FontWeight="Bold"
+                                               FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button DockPanel.Dock="Right" Content="Manage" Click="ManageSkills_Click"
+                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                    Foreground="{StaticResource TextMuted}" FontSize="10"
+                                    FontFamily="Segoe UI" Padding="6,2" VerticalAlignment="Top"
+                                    ToolTip="Create, edit, and delete skills"/>
+                            <ScrollViewer x:Name="SkillsScrollViewer" VerticalScrollBarVisibility="Disabled"
+                                          HorizontalScrollBarVisibility="Auto" MaxHeight="62">
+                                <WrapPanel x:Name="SkillsPanel" Orientation="Horizontal"/>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
                     <!-- Prompt input area + collapsible Advanced side panel -->
                 <Grid>
                     <Grid.ColumnDefinitions>

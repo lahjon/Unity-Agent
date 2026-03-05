@@ -11,11 +11,12 @@ namespace Spritely.Managers
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
             bool isGameProject = false, string taskId = "",
-            bool applyFix = true, bool suppressOutputEfficiency = false);
+            bool applyFix = true, bool suppressOutputEfficiency = false,
+            string skillsBlock = "");
 
         string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
-            bool isGameProject = false);
+            bool isGameProject = false, string skillsBlock = "");
 
         string BuildPromptWithImages(string basePrompt, List<string> imagePaths);
 

@@ -30,6 +30,10 @@ namespace Spritely
                 FeatureModeIterationsPanel.Visibility = Visibility.Collapsed;
             if (FeatureModeIterationsBox != null)
                 FeatureModeIterationsBox.Text = "2";
+
+            // Clear skill selections
+            _skillManager.ClearEnabledSkills();
+            RefreshSkillsPanel();
         }
 
         /// <summary>Reads the main-window toggle controls into a <see cref="TaskConfigBase"/>.</summary>

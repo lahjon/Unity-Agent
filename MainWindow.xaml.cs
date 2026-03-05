@@ -78,6 +78,7 @@ namespace Spritely
         private readonly TaskGroupTracker _taskGroupTracker;
         private readonly TaskOrchestrator _taskOrchestrator;
         private FailureRecoveryManager _failureRecoveryManager = null!;
+        private SkillManager _skillManager = null!;
         private DispatcherTimer? _helperAnimTimer;
         private int _helperAnimTick;
 
@@ -178,6 +179,7 @@ namespace Spritely
             ClaudeService.AvailableModels = _modelConfigManager.ClaudeModels;
             GeminiService.AvailableModels = _modelConfigManager.GeminiModels;
             _projectTaskManager = new ProjectTaskManager(appDataDir);
+            _skillManager = new SkillManager(appDataDir);
             _chatManager = new ChatManager(
                 ChatMessagesPanel, ChatScrollViewer, ChatInput, ChatSendBtn,
                 ChatModelCombo, _claudeService, _geminiService,
@@ -212,7 +214,8 @@ namespace Spritely
                 _messageBusManager,
                 Dispatcher,
                 () => _settingsManager.TokenLimitRetryMinutes,
-                () => _settingsManager.AutoVerify);
+                () => _settingsManager.AutoVerify,
+                () => GetActiveSkillsBlock());
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
 
@@ -402,6 +405,8 @@ namespace Spritely
             await LoadStartupDataAsync(ct);
             ct.ThrowIfCancellationRequested();
             await LoadSavedPromptsAsync(ct);
+            ct.ThrowIfCancellationRequested();
+            await LoadSkillsAsync();
             ct.ThrowIfCancellationRequested();
             await _settingsManager.LoadTemplatesAsync();
             RenderTemplateCombo();
@@ -2326,6 +2331,9 @@ namespace Spritely
 
             // Update no-project state (e.g. after removing the last project)
             UpdateNoProjectState();
+
+            // Reload skills for the new project (global + project-scoped)
+            _ = LoadSkillsAsync();
         }
 
         private void UpdateFileLocks()
