@@ -216,6 +216,8 @@ namespace Spritely.Dialogs
                 Text = skill.IsGlobal ? "🌐" : "📁",
                 FontSize = 14, VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0),
+                Foreground = (Brush)Application.Current.FindResource(
+                    skill.IsGlobal ? "TextLight" : "TextMuted"),
                 ToolTip = skill.IsGlobal ? "Global skill" : "Project skill"
             };
             btnPanel.Children.Add(scopeLabel);

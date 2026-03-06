@@ -1,11 +1,11 @@
 [
   {
-    "Id": "eb9edaac-0e9f-4a24-92bc-38fb6ce67011",
-    "Name": "Test",
+    "Id": "b49115f0-9bb3-4601-a2e9-1ad163026ea9",
+    "Name": "test",
     "Description": "",
     "Category": "",
     "IsGlobal": false,
-    "CreatedAt": "2026-03-05T13:55:33.8587434+01:00",
-    "UpdatedAt": "2026-03-05T13:55:33.8587753+01:00"
+    "CreatedAt": "2026-03-06T20:28:36.7154216+01:00",
+    "UpdatedAt": "2026-03-06T20:28:36.7154495+01:00"
   }
 ]

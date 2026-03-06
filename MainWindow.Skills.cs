@@ -91,7 +91,10 @@ namespace Spritely
                 Text = skill.IsGlobal ? "🌐" : "📁",
                 FontSize = 9,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 4, 0)
+                Margin = new Thickness(0, 0, 4, 0),
+                Foreground = skill.IsGlobal
+                    ? (Brush)FindResource("TextLight")
+                    : (Brush)FindResource("TextMuted")
             };
             stack.Children.Add(scopeIcon);
 

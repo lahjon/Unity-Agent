@@ -1003,6 +1003,7 @@ namespace Spritely.Managers
             {
                 Content = "Select All",
                 Style = Application.Current.TryFindResource("SmallBtn") as Style,
+                Background = (Brush)Application.Current.FindResource("BgHover"),
                 MinWidth = 80,
                 Height = 26,
                 Margin = new Thickness(0, 0, 8, 0)
@@ -1022,6 +1023,7 @@ namespace Spritely.Managers
             {
                 Content = "Select None",
                 Style = Application.Current.TryFindResource("SmallBtn") as Style,
+                Background = (Brush)Application.Current.FindResource("BgHover"),
                 MinWidth = 80,
                 Height = 26
             };
