@@ -51,7 +51,7 @@
         </Setter>
     </Style>
     <Style x:Key="HorizontalSplitterThumb" TargetType="Thumb">
-        <Setter Property="Height" Value="10"/>
+        <Setter Property="Height" Value="6"/>
         <Setter Property="Cursor" Value="SizeNS"/>
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="Template">

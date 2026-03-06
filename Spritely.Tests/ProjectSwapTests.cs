@@ -896,9 +896,7 @@ namespace Spritely.Tests
             var summary = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.FromMinutes(10), null);
 
-            Assert.Contains("TASK COMPLETION SUMMARY", summary);
-            Assert.Contains("Completed", summary);
-            Assert.Contains("10m", summary);
+            Assert.Contains("Status: Completed", summary);
         }
 
         // ── GeneratedImagePaths during swap ──────────────────────────

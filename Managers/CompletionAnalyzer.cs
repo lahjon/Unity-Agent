@@ -102,6 +102,9 @@ namespace Spritely.Managers
                 var lower = lines[i].ToLowerInvariant().Trim();
                 if (string.IsNullOrEmpty(lower)) continue;
 
+                // Skip STATUS marker lines - they aren't recommendation headers
+                if (lower.StartsWith("status:")) continue;
+
                 foreach (var header in RecommendationHeaders)
                 {
                     if (lower.Contains(header))
@@ -115,7 +118,18 @@ namespace Spritely.Managers
 
             if (startLine < 0) return null;
 
-            if (IsTaskOutputComplete(lines, startLine))
+            // If the task explicitly declared COMPLETE WITH RECOMMENDATIONS, always extract
+            bool hasExplicitRecommendationStatus = false;
+            for (int i = lines.Length - 1; i >= Math.Max(0, lines.Length - AppConstants.MaxOutputTailLines); i--)
+            {
+                if (lines[i].Trim() == "STATUS: COMPLETE WITH RECOMMENDATIONS")
+                {
+                    hasExplicitRecommendationStatus = true;
+                    break;
+                }
+            }
+
+            if (!hasExplicitRecommendationStatus && IsTaskOutputComplete(lines, startLine))
                 return null;
 
             var endLine = Math.Min(startLine + 10, lines.Length);
@@ -258,22 +272,7 @@ namespace Spritely.Managers
         {
             var sb = new StringBuilder();
             sb.AppendLine();
-            sb.AppendLine("═══════════════════════════════════════════");
-            sb.AppendLine(" TASK COMPLETION SUMMARY");
-            sb.AppendLine("───────────────────────────────────────────");
-            sb.AppendLine($" Status: {status}");
-            sb.AppendLine($" Duration: {(int)duration.TotalMinutes}m {duration.Seconds}s");
-            if (inputTokens > 0 || outputTokens > 0)
-            {
-                var totalAll = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
-                var cost = Helpers.FormatHelpers.EstimateCost(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
-                var costStr = Helpers.FormatHelpers.FormatCost(cost);
-                sb.AppendLine($" Tokens: {Helpers.FormatHelpers.FormatTokenCount(totalAll)} total (~{costStr})");
-                sb.AppendLine($"         {Helpers.FormatHelpers.FormatTokenCount(inputTokens)} in / {Helpers.FormatHelpers.FormatTokenCount(outputTokens)} out");
-                if (cacheReadTokens > 0 || cacheCreationTokens > 0)
-                    sb.AppendLine($"         {Helpers.FormatHelpers.FormatTokenCount(cacheReadTokens)} cache read / {Helpers.FormatHelpers.FormatTokenCount(cacheCreationTokens)} cache created");
-            }
-            sb.AppendLine("═══════════════════════════════════════════");
+            sb.AppendLine($"Status: {status}");
             return sb.ToString();
         }
 
@@ -308,7 +307,7 @@ namespace Spritely.Managers
             for (var i = lines.Length - 1; i >= start; i--)
             {
                 var trimmed = lines[i].Trim();
-                if (trimmed == "STATUS: COMPLETE") return true;
+                if (trimmed == "STATUS: COMPLETE" || trimmed == "STATUS: COMPLETE WITH RECOMMENDATIONS") return true;
                 if (trimmed == "STATUS: NEEDS_MORE_WORK") return false;
             }
             return false;

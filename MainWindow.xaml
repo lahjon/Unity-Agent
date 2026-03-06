@@ -1218,14 +1218,19 @@
                     <!-- Add / Create Project form -->
                     <Border Grid.Row="2" Background="{StaticResource BgSection}" CornerRadius="6"
                             BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" Margin="0,6,0,0" Padding="8">
-                        <StackPanel>
-                            <Button Content="Add Existing Project" Click="AddProjectBtn_Click"
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="6"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="Add Existing" Click="AddProjectBtn_Click"
                                     Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
-                                    HorizontalAlignment="Stretch" Padding="10,4" Height="28"/>
-                            <Button Content="Create New Project" Click="CreateProject_Click"
+                                    HorizontalAlignment="Stretch" Padding="6,3" Height="24" FontSize="11"/>
+                            <Button Grid.Column="2" Content="Create New" Click="CreateProject_Click"
                                     Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
-                                    HorizontalAlignment="Stretch" Margin="0,6,0,0" Padding="10,4" Height="28"/>
-                        </StackPanel>
+                                    HorizontalAlignment="Stretch" Padding="6,3" Height="24" FontSize="11"/>
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>

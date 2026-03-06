@@ -424,60 +424,8 @@ namespace Spritely.Managers
                 switch (type)
                 {
                     case "assistant":
-                        if (root.TryGetProperty("message", out var msg) &&
-                            msg.TryGetProperty("content", out var content) &&
-                            content.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var block in content.EnumerateArray())
-                            {
-                                var blockType = block.TryGetProperty("type", out var bt) ? bt.GetString() : null;
-                                if (blockType == "text" && block.TryGetProperty("text", out var text))
-                                {
-                                    _outputProcessor.AppendOutput(taskId, text.GetString() + "\n", activeTasks, historyTasks);
-                                }
-                                else if (blockType == "tool_use")
-                                {
-                                    var toolName = block.TryGetProperty("name", out var tn) ? tn.GetString() : "unknown";
-                                    JsonElement? toolInput = block.TryGetProperty("input", out var inp) ? inp : null;
-                                    var actionText = FormatToolAction(toolName ?? "unknown", toolInput);
-                                    _outputProcessor.AppendOutput(taskId, $"\n{actionText}\n", activeTasks, historyTasks);
-                                    var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
-                                    actionTask?.AddToolActivity(actionText);
-
-                                    // Handle ExitPlanMode - mark task as ready to complete planning phase
-                                    if (toolName == "ExitPlanMode" && actionTask != null && actionTask.IsPlanningBeforeQueue)
-                                    {
-                                        AppLogger.Info("TaskExecution", $"[{taskId}] ExitPlanMode detected, marking plan phase as ready to complete");
-                                        actionTask.Runtime.PlanPhaseReady = true;
-
-                                        // Close stdin to signal process completion after current response
-                                        try
-                                        {
-                                            if (actionTask.Process?.StandardInput != null && !actionTask.Process.HasExited)
-                                            {
-                                                AppLogger.Info("TaskExecution", $"[{taskId}] Closing stdin to complete plan phase");
-                                                actionTask.Process.StandardInput.Close();
-                                            }
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            AppLogger.Warn("TaskExecution", $"[{taskId}] Failed to close stdin: {ex.Message}");
-                                        }
-                                    }
-
-                                    if (FormatHelpers.IsFileModifyTool(toolName) && toolInput != null)
-                                    {
-                                        var fp = FileLockManager.ExtractFilePath(toolInput.Value);
-                                        if (!string.IsNullOrEmpty(fp) && !_fileLockManager.TryAcquireOrConflict(taskId, fp, toolName!, activeTasks,
-                                            (tid, txt) => _outputProcessor.AppendOutput(tid, txt, activeTasks, historyTasks)))
-                                        {
-                                            _outputTabManager.UpdateTabHeader(activeTasks.FirstOrDefault(t => t.Id == taskId)!);
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        // All content (text + tool_use) is already handled by the streaming
+                        // content_block_start/delta/stop events. Skip to avoid duplicate output.
                         break;
 
                     case "content_block_start":
@@ -592,14 +540,13 @@ namespace Spritely.Managers
                         break;
 
                     case "result":
-                        if (root.TryGetProperty("result", out var result) &&
-                            result.ValueKind == JsonValueKind.String)
+                        // Skip result text output — already streamed via content_block_delta events.
+                        // Only log non-text result subtypes for diagnostics.
+                        if (!(root.TryGetProperty("result", out var result) &&
+                              result.ValueKind == JsonValueKind.String))
                         {
-                            _outputProcessor.AppendOutput(taskId, $"\n{result.GetString()}\n", activeTasks, historyTasks);
-                        }
-                        else if (root.TryGetProperty("subtype", out var subtype))
-                        {
-                            _outputProcessor.AppendOutput(taskId, $"\n[Result: {subtype.GetString()}]\n", activeTasks, historyTasks);
+                            if (root.TryGetProperty("subtype", out var subtype))
+                                _outputProcessor.AppendOutput(taskId, $"\n[Result: {subtype.GetString()}]\n", activeTasks, historyTasks);
                         }
                         // Extract token usage from Claude Code CLI result event
                         if (root.TryGetProperty("usage", out var resultUsage))

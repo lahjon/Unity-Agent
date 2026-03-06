@@ -17,5 +17,6 @@
 2. Check: missing functionality, bugs, integration issues, unhandled edge cases, build errors.
 3. Fix issues directly if found.
 4. End with exactly:
-   - `STATUS: COMPLETE` — fully implemented and working.
+   - `STATUS: COMPLETE` — fully implemented and working, no suggestions.
+   - `STATUS: COMPLETE WITH RECOMMENDATIONS` — fully implemented and working, but has minor improvement suggestions.
    - `STATUS: NEEDS_MORE_WORK` — list specific remaining issues.

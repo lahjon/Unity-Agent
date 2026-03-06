@@ -588,6 +588,36 @@ namespace Spritely.Tests
             Assert.False(_completion.CheckFeatureModeComplete(output));
         }
 
+        [Fact]
+        public void CheckFeatureModeComplete_CompleteWithRecommendations_ReturnsTrue()
+        {
+            Assert.True(_completion.CheckFeatureModeComplete("some output\nSTATUS: COMPLETE WITH RECOMMENDATIONS\n"));
+        }
+
+        [Fact]
+        public void CheckFeatureModeComplete_CompleteWithRecommendations_Whitespace_ReturnsTrue()
+        {
+            Assert.True(_completion.CheckFeatureModeComplete("output\n  STATUS: COMPLETE WITH RECOMMENDATIONS  \n"));
+        }
+
+        [Fact]
+        public void ExtractRecommendations_WithCompleteWithRecommendations_ExtractsText()
+        {
+            var output = "Some work done.\n\n## Suggestions\n1. Add caching\n2. Improve error handling\n\nSTATUS: COMPLETE WITH RECOMMENDATIONS\n";
+            var result = _completion.ExtractRecommendations(output);
+            Assert.NotNull(result);
+            Assert.Contains("Add caching", result);
+        }
+
+        [Fact]
+        public void ExtractRecommendations_WithPlainComplete_ReturnsNull_WhenTaskComplete()
+        {
+            var output = "Implementation is complete.\n\n## Next Steps\n1. Add caching\n\nSTATUS: COMPLETE\n";
+            var result = _completion.ExtractRecommendations(output);
+            // Plain COMPLETE with completion indicators should suppress recommendations
+            Assert.Null(result);
+        }
+
         // ── StripAnsi ───────────────────────────────────────────────
 
         [Fact]
@@ -828,7 +858,7 @@ namespace Spritely.Tests
         {
             var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.Zero, null);
-            Assert.Contains("TASK COMPLETION SUMMARY", result);
+            Assert.Contains("Status: Completed", result);
         }
 
         [Fact]
@@ -841,7 +871,6 @@ namespace Spritely.Tests
             var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.Zero, files);
             Assert.DoesNotContain("test.cs", result);
-            Assert.DoesNotContain("Modified files:", result);
         }
 
         [Fact]
@@ -872,8 +901,7 @@ namespace Spritely.Tests
         {
             var result = await _completion.GenerateCompletionSummaryAsync(
                 @"C:\nonexistent_path_12345", null, AgentTaskStatus.Completed, TimeSpan.FromMinutes(1));
-            Assert.Contains("TASK COMPLETION SUMMARY", result);
-            Assert.Contains("Completed", result);
+            Assert.Contains("Status: Completed", result);
         }
     }
 }

@@ -196,7 +196,7 @@ namespace Spritely.Managers
             if (task.SpawnTeam) flags.Add("Team");
             if (task.IsFeatureMode) flags.Add($"Feature(max {task.MaxIterations})");
             _outputProcessor.AppendOutput(task.Id,
-                $"[Spritely] Task #{task.TaskNumber} starting — {string.Join(" | ", flags)}\n\n",
+                $"Task #{task.TaskNumber}: Starting {string.Join(" | ", flags)}\n\n",
                 activeTasks, historyTasks);
 
             // Store full boot details + prompt in OutputBuilder only (not displayed)

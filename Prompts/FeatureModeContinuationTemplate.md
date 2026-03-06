@@ -9,6 +9,6 @@
 3. Fix: bugs first → remaining checklist → robustness (within scope).
 4. Add **Suggestions** section to `.feature_log.md` with actionable improvements.
 5. Verify all checklist items and exit criteria. Update `.feature_log.md`.
-6. End with: `STATUS: COMPLETE` or `STATUS: NEEDS_MORE_WORK`
+6. End with: `STATUS: COMPLETE`, `STATUS: COMPLETE WITH RECOMMENDATIONS`, or `STATUS: NEEDS_MORE_WORK`
 
 Continue working now.
