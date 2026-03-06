@@ -3030,7 +3030,7 @@ namespace Spritely
                 SettingsExpandedPanel.Visibility = Visibility.Collapsed;
                 RightSplitter.Visibility = Visibility.Collapsed;
                 SettingsCollapsedStrip.Visibility = Visibility.Visible;
-                RightPanelCol.Width = new GridLength(0, GridUnitType.Auto);
+                RightPanelCol.Width = new GridLength(0);
                 RightPanelCol.MinWidth = 0;
             }
             else
@@ -3040,6 +3040,34 @@ namespace Spritely
                 RightSplitter.Visibility = Visibility.Visible;
                 RightPanelCol.Width = new GridLength(285);
                 RightPanelCol.MinWidth = 150;
+            }
+        }
+
+        // ── Projects Panel Collapse ───────────────────────────────
+
+        private void ToggleProjectsPanel_Click(object sender, RoutedEventArgs e)
+        {
+            bool collapse = ProjectsPanelBorder.Visibility == Visibility.Visible;
+            ApplyProjectsPanelCollapsed(collapse);
+        }
+
+        private void ApplyProjectsPanelCollapsed(bool collapsed)
+        {
+            if (collapsed)
+            {
+                ProjectsPanelBorder.Visibility = Visibility.Collapsed;
+                LeftSplitter.Visibility = Visibility.Collapsed;
+                ProjectsCollapsedStrip.Visibility = Visibility.Visible;
+                LeftPanelCol.Width = new GridLength(0);
+                LeftPanelCol.MinWidth = 0;
+            }
+            else
+            {
+                ProjectsCollapsedStrip.Visibility = Visibility.Collapsed;
+                ProjectsPanelBorder.Visibility = Visibility.Visible;
+                LeftSplitter.Visibility = Visibility.Visible;
+                LeftPanelCol.Width = new GridLength(285);
+                LeftPanelCol.MinWidth = 150;
             }
         }
 

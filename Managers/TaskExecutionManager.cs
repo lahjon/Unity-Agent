@@ -187,35 +187,35 @@ namespace Spritely.Managers
                 _promptBuilder.BuildPowerShellScript(projectPath, promptFile, claudeCmd),
                 Encoding.UTF8);
 
-            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Task #{task.TaskNumber} starting...\n", activeTasks, historyTasks);
+            // Build compact startup line for visible output
+            var flags = new List<string>();
+            flags.Add(PromptBuilder.GetFriendlyModelName(cliModel));
+            if (task.UseMessageBus) flags.Add("Bus");
+            if (task.ExtendedPlanning) flags.Add("Planning");
+            if (task.AutoDecompose) flags.Add("Auto-decompose");
+            if (task.SpawnTeam) flags.Add("Team");
+            if (task.IsFeatureMode) flags.Add($"Feature(max {task.MaxIterations})");
+            _outputProcessor.AppendOutput(task.Id,
+                $"[Spritely] Task #{task.TaskNumber} starting — {string.Join(" | ", flags)}\n\n",
+                activeTasks, historyTasks);
+
+            // Store full boot details + prompt in OutputBuilder only (not displayed)
+            var bootLog = new System.Text.StringBuilder();
             if (!string.IsNullOrWhiteSpace(task.Summary))
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Summary: {task.Summary}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Project: {projectPath}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Model: {PromptBuilder.GetFriendlyModelName(cliModel)} ({cliModel})\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Skip permissions: {task.SkipPermissions}\n", activeTasks, historyTasks);
-            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Remote session: {task.RemoteSession}\n", activeTasks, historyTasks);
-            if (task.UseMessageBus)
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Message Bus: ON\n", activeTasks, historyTasks);
-            if (task.ExtendedPlanning)
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Extended planning: ON\n", activeTasks, historyTasks);
-            if (task.AutoDecompose)
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Auto-decompose: ON (will spawn subtasks)\n", activeTasks, historyTasks);
-            if (task.SpawnTeam)
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Spawn Team: ON (will decompose into team roles with message bus)\n", activeTasks, historyTasks);
-            if (task.IsFeatureMode)
-            {
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Feature mode: ON (max {task.MaxIterations} iterations, 12h cap)\n", activeTasks, historyTasks);
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Safety: skip-permissions forced, git blocked, 30min iteration timeout\n", activeTasks, historyTasks);
-            }
-            // Show the full prompt that Claude will receive
+                bootLog.AppendLine($"[Spritely] Summary: {task.Summary}");
+            bootLog.AppendLine($"[Spritely] Project: {projectPath}");
+            bootLog.AppendLine($"[Spritely] Model: {PromptBuilder.GetFriendlyModelName(cliModel)} ({cliModel})");
+            bootLog.AppendLine($"[Spritely] Skip permissions: {task.SkipPermissions}");
+            bootLog.AppendLine($"[Spritely] Remote session: {task.RemoteSession}");
             try
             {
                 var promptContent = File.ReadAllText(promptFile, Encoding.UTF8);
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] ── Full Prompt ──────────────────────────────\n{promptContent}\n[Spritely] ── End Prompt ───────────────────────────────\n\n", activeTasks, historyTasks);
+                bootLog.AppendLine($"[Spritely] ── Full Prompt ──────────────────────────────");
+                bootLog.AppendLine(promptContent);
+                bootLog.AppendLine($"[Spritely] ── End Prompt ───────────────────────────────");
             }
             catch { /* non-critical */ }
-
-            _outputProcessor.AppendOutput(task.Id, $"[Spritely] Connecting to Claude...\n\n", activeTasks, historyTasks);
+            task.OutputBuilder.Append(bootLog);
 
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
@@ -519,11 +519,10 @@ namespace Spritely.Managers
             // have changed from Verifying to Running — don't overwrite it.
             if (task.Status == AgentTaskStatus.Verifying)
             {
-                // If the task completed successfully and has recommendations, use the Recommendation status
-                var finalStatus = expectedStatus;
-                if (finalStatus == AgentTaskStatus.Completed && task.HasRecommendations)
-                    finalStatus = AgentTaskStatus.Recommendation;
-                task.Status = finalStatus;
+                // Follow-ups complete as Completed/Failed — don't re-enter Recommendation
+                // status, which would create an infinite continue loop.
+                task.Recommendations = "";
+                task.Status = expectedStatus;
                 task.EndTime = DateTime.Now;
                 _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Follow-up complete.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);

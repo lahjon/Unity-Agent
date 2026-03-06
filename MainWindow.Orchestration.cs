@@ -224,9 +224,10 @@ namespace Spritely
             _fileLockManager.RemoveQueuedInfo(task.Id);
             _taskExecutionManager.RemoveStreamingState(task.Id);
 
-            // Move from active to history
+            // Move from active to history (skip if already present to avoid duplicates)
             _activeTasks.Remove(task);
-            _historyTasks.Insert(0, task);
+            if (!_historyTasks.Contains(task))
+                _historyTasks.Insert(0, task);
 
             if (closeTab)
                 _outputTabManager.CloseTab(task);

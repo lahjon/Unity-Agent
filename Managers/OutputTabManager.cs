@@ -461,12 +461,18 @@ namespace Spritely.Managers
                     return;
                 }
             }
-            var run = new Run(text) { Foreground = (Brush)Application.Current.FindResource("TextBody") };
+
+            // Create the text run using the standard body color
+            var baseBrush = (Brush)Application.Current.FindResource("TextBody");
+            var run = new Run(text) { Foreground = baseBrush };
             if (box.Document.Blocks.LastBlock is Paragraph lastPara)
                 lastPara.Inlines.Add(run);
             else
                 box.Document.Blocks.Add(new Paragraph(run));
             box.ScrollToEnd();
+
+            // Apply a subtle "lightning" fade-in so new output feels dynamic
+            ApplyLightningTextAnimation(run, baseBrush);
 
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
                     ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
@@ -503,6 +509,7 @@ namespace Spritely.Managers
                     return;
                 }
             }
+
             var run = new Run(text) { Foreground = foreground };
             if (box.Document.Blocks.LastBlock is Paragraph lastPara)
                 lastPara.Inlines.Add(run);
@@ -515,6 +522,50 @@ namespace Spritely.Managers
             if (task == null) return;
             task.OutputBuilder.Append(text);
             TrimOutputIfNeeded(task);
+        }
+
+        /// <summary>
+        /// Animates newly appended text with a quick lightning-like fade:
+        /// starts bright and semi-transparent, then settles into the final brush.
+        /// </summary>
+        private static void ApplyLightningTextAnimation(Run run, Brush finalBrush)
+        {
+            try
+            {
+                // Clone the final color so we don't animate shared resource brushes
+                var finalColor = (finalBrush as SolidColorBrush)?.Color ?? Colors.LightGray;
+                var lightningColor = ((SolidColorBrush)Application.Current.FindResource("WarningYellow")).Color;
+
+                var animatedBrush = new SolidColorBrush(Color.FromArgb(0, lightningColor.R, lightningColor.G, lightningColor.B));
+                run.Foreground = animatedBrush;
+
+                var duration = TimeSpan.FromSeconds(0.45);
+
+                // Opacity fade-in via brush opacity
+                var opacityAnim = new DoubleAnimation
+                {
+                    From = 0.0,
+                    To = 1.0,
+                    Duration = new Duration(duration),
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                };
+                animatedBrush.BeginAnimation(Brush.OpacityProperty, opacityAnim);
+
+                // Color flash from bright yellow back to the final text color
+                var colorAnim = new ColorAnimation
+                {
+                    From = lightningColor,
+                    To = finalColor,
+                    Duration = new Duration(duration),
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
+                };
+                animatedBrush.BeginAnimation(SolidColorBrush.ColorProperty, colorAnim);
+            }
+            catch
+            {
+                // If anything goes wrong with animation, fall back to normal rendering
+                run.Foreground = finalBrush;
+            }
         }
 
         /// <summary>Keeps the last <see cref="OutputCapChars"/> characters when a task's buffer grows too large.</summary>

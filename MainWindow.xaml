@@ -1133,7 +1133,7 @@
 
     </Window.Resources>
 
-    <Grid x:Name="RootGrid" Margin="12">
+    <Grid x:Name="RootGrid" Margin="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" MinHeight="120"/>
             <RowDefinition Height="Auto"/>
@@ -1143,14 +1143,31 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="285" MinWidth="150"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*" MinWidth="200"/>
+            <ColumnDefinition x:Name="LeftPanelCol" Width="285" MinWidth="150"/>
+            <ColumnDefinition x:Name="LeftSplitterCol" Width="Auto"/>
+            <ColumnDefinition Width="*" MinWidth="220"/>
             <ColumnDefinition x:Name="ChatSplitterCol" Width="0"/>
             <ColumnDefinition x:Name="ChatPanelCol" Width="0" MinWidth="0"/>
             <ColumnDefinition x:Name="RightSplitterCol" Width="Auto"/>
             <ColumnDefinition x:Name="RightPanelCol" Width="285" MinWidth="150"/>
         </Grid.ColumnDefinitions>
+
+        <!-- Collapsed strip for Projects (shown when left panel is collapsed). Lives in the left splitter column. -->
+        <Border x:Name="ProjectsCollapsedStrip" Grid.Row="2" Grid.Column="1"
+                Background="{StaticResource BgSurface}" CornerRadius="8" Padding="0" Visibility="Collapsed"
+                BorderThickness="1" BorderBrush="{StaticResource BgElevated}" Width="32">
+            <Button x:Name="ExpandProjectsBtn" Click="ToggleProjectsPanel_Click"
+                    ToolTip="Expand Projects" VerticalAlignment="Top" HorizontalAlignment="Center"
+                    Margin="0,6,0,0">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                        <Setter Property="Content" Value="&#xE76B;"/>
+                        <Setter Property="FontSize" Value="12"/>
+                        <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Border>
 
         <!-- ═══ PROJECTS (1) ═══ -->
         <Border x:Name="ProjectsPanelBorder" Grid.Row="2" Grid.Column="0" Grid.RowSpan="3" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="10"
@@ -1202,23 +1219,19 @@
                     <Border Grid.Row="2" Background="{StaticResource BgSection}" CornerRadius="6"
                             BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" Margin="0,6,0,0" Padding="8">
                         <StackPanel>
-                            <Button Content="&#xE8B7;  Add Existing Project" Click="AddProjectBtn_Click"
-                                    Style="{StaticResource SmallBtn}"
-                                    HorizontalAlignment="Stretch" Padding="10,4">
-                                <Button.Background>
-                                    <SolidColorBrush Color="#4A7A6F"/>
-                                </Button.Background>
-                            </Button>
+                            <Button Content="Add Existing Project" Click="AddProjectBtn_Click"
+                                    Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
+                                    HorizontalAlignment="Stretch" Padding="10,4" Height="28"/>
                             <Button Content="Create New Project" Click="CreateProject_Click"
                                     Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
-                                    HorizontalAlignment="Stretch" Margin="0,6,0,0" Padding="10,4"/>
+                                    HorizontalAlignment="Stretch" Margin="0,6,0,0" Padding="10,4" Height="28"/>
                         </StackPanel>
                     </Border>
                 </Grid>
             </Border>
 
         <!-- Vertical Splitter: Left ↔ Center/Right -->
-        <GridSplitter Grid.Column="1" Grid.RowSpan="5" Style="{StaticResource VerticalSplitter}"/>
+        <GridSplitter x:Name="LeftSplitter" Grid.Column="1" Grid.RowSpan="5" Style="{StaticResource VerticalSplitter}"/>
 
         <!-- ═══ PROMPTS (2) ═══ -->
         <Border Grid.Row="2" Grid.Column="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="10"
@@ -2197,8 +2210,8 @@
                DragDelta="RightSplitter_DragDelta"/>
 
         <!-- ═══ SETTINGS (5) ═══ -->
-        <!-- Collapsed strip (shown when panel is collapsed) -->
-        <Border x:Name="SettingsCollapsedStrip" Grid.Row="0" Grid.Column="6"
+        <!-- Collapsed strip (shown when panel is collapsed). Lives in the splitter column so the right panel column can fully collapse. -->
+        <Border x:Name="SettingsCollapsedStrip" Grid.Row="0" Grid.Column="5"
                 Background="{StaticResource BgSurface}" CornerRadius="8" Padding="0" Visibility="Collapsed"
                 BorderThickness="1" BorderBrush="{StaticResource BgElevated}" Width="32">
             <Button x:Name="ExpandSettingsBtn" Click="ToggleSettingsPanel_Click"
