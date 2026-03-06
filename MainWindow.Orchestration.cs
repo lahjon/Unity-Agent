@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -151,6 +152,9 @@ namespace Spritely
                     // Store locked files in task runtime state for the commit
                     task.Runtime.LockedFilesForCommit = lockedFiles;
 
+                    // Persist changed file paths on the task so they survive across sessions
+                    PersistChangedFiles(task, lockedFiles);
+
                     // Transition to Committing — task stays in _activeTasks with locks held
                     task.Status = AgentTaskStatus.Committing;
                     _fileLockManager.RemoveQueuedInfo(task.Id);
@@ -191,6 +195,25 @@ namespace Spritely
 
             // Normal teardown: release locks and move to history
             PerformTaskTeardown(task, closeTab);
+        }
+
+        /// <summary>
+        /// Persists the file lock paths as relative ChangedFiles on the task data
+        /// so they survive across sessions even if the commit fails.
+        /// </summary>
+        private void PersistChangedFiles(AgentTask task, HashSet<string> lockedFiles)
+        {
+            var projectRoot = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
+            var relativePaths = new List<string>();
+            foreach (var absPath in lockedFiles)
+            {
+                var rel = absPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
+                    ? absPath.Substring(projectRoot.Length)
+                    : absPath;
+                if (!rel.Contains("..") && !Path.IsPathRooted(rel))
+                    relativePaths.Add(rel.Replace('\\', '/'));
+            }
+            task.ChangedFiles = relativePaths;
         }
 
         /// <summary>

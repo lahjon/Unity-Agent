@@ -23,7 +23,7 @@ namespace Spritely.Managers
         string BuildMessageBusBlock(string taskId, string projectPath,
             List<(string id, string summary)> siblings);
 
-        string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null);
+        string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null, bool planMode = false);
 
         string BuildPowerShellScript(string projectPath, string promptFilePath,
             string claudeCmd);

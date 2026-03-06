@@ -84,6 +84,12 @@ namespace Spritely
         public string? CommitHash { get; set; }
         public string? CommitError { get; set; }
 
+        /// <summary>Relative paths of files changed by this task (persisted from file locks at completion).</summary>
+        public List<string> ChangedFiles { get; set; } = new();
+
+        /// <summary>Git diff summary captured before commit (--stat output).</summary>
+        public string? CommitDiff { get; set; }
+
         // Failure recovery
         public bool IsRecoveryTask { get; set; }
 

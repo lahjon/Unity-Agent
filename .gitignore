@@ -11,3 +11,4 @@ logs/
 *.bak
 .agent-bus/
 runtime/
+*.lnk

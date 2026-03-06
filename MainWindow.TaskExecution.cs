@@ -702,7 +702,7 @@ TextureImporter:
                 RestoreStarRow();
             }
 
-            var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
+            var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "fresh session (no session ID)";
             _outputTabManager.AppendOutput(task.Id,
                 $"\nResumed session — type a follow-up message below. It will be sent with {resumeMethod}.\n",
                 _activeTasks, _historyTasks);
@@ -1198,7 +1198,7 @@ TextureImporter:
                 _outputTabManager.AppendOutput(task.Id, $"\n{task.CompletionSummary}\n", _activeTasks, _historyTasks);
             if (!string.IsNullOrWhiteSpace(task.Recommendations))
                 _outputTabManager.AppendOutput(task.Id, $"\n[Recommendations]\n{task.Recommendations}\n", _activeTasks, _historyTasks);
-            var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "--continue (no session ID)";
+            var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "fresh session (no session ID)";
             _outputTabManager.AppendOutput(task.Id, $"\nType a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
 
             _historyTasks.Remove(task);
@@ -1354,8 +1354,16 @@ TextureImporter:
                     lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
                     if (lockedFiles == null || lockedFiles.Count == 0)
                     {
-                        // No files locked by this task, nothing to commit
-                        return (false, "No files were modified by this task to commit");
+                        // Fall back to persisted ChangedFiles if locks were already released
+                        if (task.ChangedFiles.Count > 0)
+                        {
+                            lockedFiles = new HashSet<string>(task.ChangedFiles.Select(f =>
+                                Path.IsPathRooted(f) ? f : Path.Combine(task.ProjectPath, f)));
+                        }
+                        else
+                        {
+                            return (false, "No files were modified by this task to commit");
+                        }
                     }
                     // Store for later use
                     task.Runtime.LockedFilesForCommit = lockedFiles;
@@ -1380,6 +1388,10 @@ TextureImporter:
                     relativePaths.Add(rel.Replace('\\', '/'));
                 }
 
+                // Persist changed files on the task if not already set (manual commit path)
+                if (task.ChangedFiles.Count == 0 && relativePaths.Count > 0)
+                    task.ChangedFiles = new List<string>(relativePaths);
+
                 // Use GitOperationGuard to serialize git operations
                 var (success, errorMessage) = await _gitOperationGuard.ExecuteGitOperationAsync(async () =>
                 {
@@ -1394,6 +1406,12 @@ TextureImporter:
                         return (false, $"Failed to stage files for commit. Git add command failed for paths: {pathArgs}");
                     }
 
+                    // Capture diff summary before committing so the task has a record of what changed
+                    var diffResult = await _gitHelper.RunGitCommandAsync(
+                        task.ProjectPath, $"diff --cached --stat -- {pathArgs}");
+                    if (diffResult.IsSuccess && !string.IsNullOrWhiteSpace(diffResult.Output))
+                        task.CommitDiff = diffResult.Output.Trim();
+
                     // Commit only these specific files — the pathspec ensures no other
                     // staged changes from concurrent tasks leak into this commit
                     var result = await _gitHelper.CommitSecureAsync(
@@ -1403,7 +1421,7 @@ TextureImporter:
 
                     if (result != null)
                     {
-                        // Get the commit hash
+                        // Get the commit hash to verify commit succeeded
                         var hash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath);
                         if (hash != null)
                         {
@@ -1414,7 +1432,7 @@ TextureImporter:
                             // Mark git panel as dirty to refresh
                             _gitPanelManager?.MarkDirty();
 
-                            // Release deferred file locks if any
+                            // Release deferred file locks if any (no-op during auto-commit Committing status)
                             ReleaseTaskLocksAfterCommit(task);
 
                             return (true, (string?)null);

@@ -45,8 +45,8 @@ namespace Spritely.Managers
         public bool TryAcquireOrConflict(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, Action<string, string> appendOutput)
         {
-            // Validate file path - reject null, empty, or "null" string
-            if (string.IsNullOrWhiteSpace(filePath) || filePath.Equals("null", StringComparison.OrdinalIgnoreCase))
+            // Validate file path - reject null, empty, "null" string, and /dev/null
+            if (IsInvalidLockPath(filePath))
             {
                 AppLogger.Warn("FileLockManager", $"Invalid file path in TryAcquireOrConflict: '{filePath}' for task {taskId}");
                 return true; // Return true to not block the operation, just skip the lock
@@ -81,8 +81,8 @@ namespace Spritely.Managers
         private bool TryAcquireFileLockInternal(string taskId, string filePath, string toolName,
             ObservableCollection<AgentTask> activeTasks, bool isIgnored = false)
         {
-            // Validate file path - reject null, empty, or "null" string
-            if (string.IsNullOrWhiteSpace(filePath) || filePath.Equals("null", StringComparison.OrdinalIgnoreCase))
+            // Validate file path - reject null, empty, "null" string, and /dev/null
+            if (IsInvalidLockPath(filePath))
             {
                 AppLogger.Warn("FileLockManager", $"Invalid file path for lock acquisition: '{filePath}'");
                 return false;
@@ -276,7 +276,7 @@ namespace Spritely.Managers
             if (task == null) return;
 
             // Validate file path - don't handle conflicts for invalid paths
-            if (string.IsNullOrWhiteSpace(filePath) || filePath.Equals("null", StringComparison.OrdinalIgnoreCase))
+            if (IsInvalidLockPath(filePath))
             {
                 AppLogger.Warn("FileLockManager", $"Invalid file path in HandleFileLockConflictInternal: '{filePath}'");
                 return;
@@ -550,6 +550,21 @@ namespace Spritely.Managers
             catch (Exception ex) { AppLogger.Warn("FileLockManager", $"Failed to kill process for task {task.Id}", ex); }
         }
 
+        private static bool IsInvalidLockPath(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+                return true;
+            if (filePath.Equals("null", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (filePath.Contains("/dev/null", StringComparison.OrdinalIgnoreCase))
+                return true;
+            // Catch Windows-normalized forms like \dev\null
+            if (filePath.EndsWith("\\dev\\null", StringComparison.OrdinalIgnoreCase) ||
+                filePath.Equals("dev\\null", StringComparison.OrdinalIgnoreCase))
+                return true;
+            return false;
+        }
+
         public static string? TryExtractFilePathFromPartial(string partialJson)
         {
             var match = Regex.Match(partialJson, @"""file_path""\s*:\s*""([^""]+)""");
@@ -598,7 +613,11 @@ namespace Spritely.Managers
                     if (!redirectMatch.Success)
                         redirectMatch = Regex.Match(command, @">{1,2}\s*([^\s;|&]+)");
                     if (redirectMatch.Success)
-                        return redirectMatch.Groups[1].Value;
+                    {
+                        var redirectPath = redirectMatch.Groups[1].Value;
+                        if (!redirectPath.Equals("/dev/null", StringComparison.OrdinalIgnoreCase))
+                            return redirectPath;
+                    }
 
                     // Match sed -i (in-place edit)
                     var sedMatch = Regex.Match(command, @"sed\s+.*-i[^\s]*\s+.*?['""]?([^\s'""]+)['""]?\s*$");

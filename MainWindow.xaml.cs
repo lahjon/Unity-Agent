@@ -3038,7 +3038,6 @@ namespace Spritely
             if (collapsed)
             {
                 TaskListPanelBorder.Visibility = Visibility.Collapsed;
-                ProjectsPanelBorder.Visibility = Visibility.Collapsed;
                 LeftSplitter.Visibility = Visibility.Collapsed;
                 LeftPanelCollapsedStrip.Visibility = Visibility.Visible;
                 LeftPanelCol.Width = new GridLength(0);
@@ -3048,7 +3047,6 @@ namespace Spritely
             {
                 LeftPanelCollapsedStrip.Visibility = Visibility.Collapsed;
                 TaskListPanelBorder.Visibility = Visibility.Visible;
-                ProjectsPanelBorder.Visibility = Visibility.Visible;
                 LeftSplitter.Visibility = Visibility.Visible;
                 LeftPanelCol.Width = new GridLength(285);
                 LeftPanelCol.MinWidth = 150;

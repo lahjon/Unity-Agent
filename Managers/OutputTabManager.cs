@@ -335,6 +335,19 @@ namespace Spritely.Managers
             panel.Children.Add(label);
             panel.Children.Add(closeBtn);
             panel.ContextMenu = ctx;
+            panel.ToolTip = new ToolTip
+            {
+                Content = new TextBlock
+                {
+                    Text = task.Description,
+                    MaxWidth = 500,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontFamily = new FontFamily("Segoe UI"),
+                    FontSize = 12
+                },
+                MaxWidth = 520
+            };
+            ToolTipService.SetInitialShowDelay(panel, 400);
             return panel;
         }
 

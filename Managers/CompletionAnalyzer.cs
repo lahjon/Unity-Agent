@@ -102,8 +102,10 @@ namespace Spritely.Managers
                 var lower = lines[i].ToLowerInvariant().Trim();
                 if (string.IsNullOrEmpty(lower)) continue;
 
-                // Skip STATUS marker lines - they aren't recommendation headers
+                // Skip STATUS marker lines and prompt-echo boilerplate - they aren't recommendation headers
                 if (lower.StartsWith("status:")) continue;
+                if (lower.Contains("status:") && lower.Contains("complete")) continue;
+                if (lower.Contains("message bus") || lower.Contains("feature log") || lower.Contains("machine-parsed")) continue;
 
                 foreach (var header in RecommendationHeaders)
                 {

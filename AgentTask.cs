@@ -199,6 +199,18 @@ namespace Spritely
             set { if (Data.CommitError == value) return; Data.CommitError = value; NotifyAll(nameof(CommitError), nameof(HasCommitError)); }
         }
 
+        public List<string> ChangedFiles
+        {
+            get => Data.ChangedFiles;
+            set { Data.ChangedFiles = value; OnPropertyChanged(); }
+        }
+
+        public string? CommitDiff
+        {
+            get => Data.CommitDiff;
+            set { if (Data.CommitDiff == value) return; Data.CommitDiff = value; OnPropertyChanged(); }
+        }
+
         public string Summary
         {
             get => Data.Summary;

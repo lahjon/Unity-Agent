@@ -180,7 +180,7 @@ namespace Spritely.Managers
             var projectPath = task.ProjectPath;
 
             var cliModel = PromptBuilder.GetCliModelForTask(task);
-            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, cliModel);
+            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, cliModel, task.PlanOnly);
 
             var ps1File = Path.Combine(_scriptDir, $"task_{task.Id}.ps1");
             File.WriteAllText(ps1File,
@@ -193,7 +193,6 @@ namespace Spritely.Managers
             if (string.IsNullOrWhiteSpace(promptPreview))
                 promptPreview = "No prompt";
             var flags = new List<string>();
-            if (task.UseMessageBus) flags.Add("Bus");
             if (task.ExtendedPlanning) flags.Add("Planning");
             if (task.AutoDecompose) flags.Add("Auto-decompose");
             if (task.SpawnTeam) flags.Add("Team");
@@ -703,6 +702,7 @@ namespace Spritely.Managers
 
             task.Status = AgentTaskStatus.Running;
             task.EndTime = null;
+            task.Recommendations = "";
             task.Cts?.Dispose();
             task.Cts = new System.Threading.CancellationTokenSource();
             _outputTabManager.UpdateTabHeader(task);
@@ -710,14 +710,17 @@ namespace Spritely.Managers
             // Process any queued messages before starting the follow-up
             ProcessQueuedMessages(task, activeTasks, historyTasks);
 
-            // Use --resume with session ID when available, fall back to --continue
+            // Use --resume with session ID when available.
+            // Never fall back to --continue — it resumes the most recent session in the
+            // project directory, which may belong to a completely different task.
             var hasSessionId = !string.IsNullOrEmpty(task.ConversationId);
             var resumeFlag = hasSessionId
                 ? $" --resume {task.ConversationId}"
-                : " --continue";
-            var resumeLabel = hasSessionId
-                ? $"--resume {task.ConversationId}"
-                : "--continue";
+                : "";
+            if (!hasSessionId)
+            {
+                AppLogger.Warn("FollowUp", $"[{task.Id}] No ConversationId available — starting fresh session instead of --continue to avoid cross-task context bleed");
+            }
 
             var followUpModel = PromptBuilder.GetCliModelForTask(task);
             _outputProcessor.AppendOutput(task.Id, $"\nUser Input > {text}\n\n", activeTasks, historyTasks);

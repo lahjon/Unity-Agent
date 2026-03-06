@@ -206,4 +206,13 @@
         <Setter Property="Background" Value="{StaticResource BgHover}"/>
         <Setter Property="Foreground" Value="#A8A8A8"/>
     </Style>
+
+    <!-- Accent icon button (send, execute — icon-only with accent background) -->
+    <Style x:Key="AccentIconBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+        <Setter Property="Background" Value="{StaticResource Accent}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="8,6"/>
+    </Style>
 </ResourceDictionary>

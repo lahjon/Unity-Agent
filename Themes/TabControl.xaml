@@ -60,9 +60,9 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <ColorAnimation Storyboard.TargetName="TabBg" Storyboard.TargetProperty="Color"
-                                                        To="#00000000" Duration="0:0:0.15"/>
+                                                        To="#00000000" Duration="0:0:0.15" FillBehavior="Stop"/>
                                         <ColorAnimation Storyboard.TargetName="TabBorder" Storyboard.TargetProperty="Color"
-                                                        To="#00000000" Duration="0:0:0.15"/>
+                                                        To="#00000000" Duration="0:0:0.15" FillBehavior="Stop"/>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </MultiTrigger.ExitActions>

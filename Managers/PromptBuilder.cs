@@ -215,12 +215,13 @@ namespace Spritely.Managers
 
         // ── Command & Script Building ────────────────────────────────
 
-        public string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null)
+        public string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null, bool planMode = false)
         {
             var skipFlag = skipPermissions ? " --dangerously-skip-permissions" : "";
             var remoteFlag = remoteSession ? " --remote" : "";
             var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
-            return $"claude -p{skipFlag}{remoteFlag}{modelFlag} --verbose --output-format stream-json";
+            var planFlag = planMode ? " --plan" : "";
+            return $"claude -p{skipFlag}{remoteFlag}{modelFlag}{planFlag} --verbose --output-format stream-json";
         }
 
         public string BuildPowerShellScript(string projectPath, string promptFilePath,
