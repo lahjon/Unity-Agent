@@ -621,7 +621,7 @@ namespace Spritely.Managers
             var phaseModel = DetermineOptimalModel(task, activeTasks, historyTasks);
 
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Spritely] Phase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
+                $"\nPhase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
                 activeTasks, historyTasks);
             var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, phaseModel);
 

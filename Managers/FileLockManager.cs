@@ -296,8 +296,8 @@ namespace Spritely.Managers
             ReleaseTaskLocksInternal(taskId);
 
             // Queue immediately when file is locked
-            appendOutput(taskId, $"\n[Spritely] FILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum} ({toolName})\n");
-            appendOutput(taskId, $"[Spritely] Pausing and queuing task #{task.TaskNumber} for auto-resume...\n");
+            appendOutput(taskId, $"\nFILE LOCK CONFLICT: {Path.GetFileName(filePath)} is locked by task #{blockerNum} ({toolName})\n");
+            appendOutput(taskId, $"Pausing and queuing task #{task.TaskNumber} for auto-resume...\n");
 
             // First pause the task if it has a running process
             if (task.Process is { HasExited: false })
@@ -420,7 +420,6 @@ namespace Spritely.Managers
                     }
                 }
 
-                task.Status = AgentTaskStatus.Running;
                 task.QueuedReason = null;
                 task.BlockedByTaskId = null;
                 QueuedTaskResumed?.Invoke(taskId);
@@ -448,7 +447,6 @@ namespace Spritely.Managers
             if (task.Status != AgentTaskStatus.Queued)
                 return;
 
-            task.Status = AgentTaskStatus.Running;
             task.QueuedReason = null;
             task.BlockedByTaskId = null;
             QueuedTaskResumed?.Invoke(task.Id);

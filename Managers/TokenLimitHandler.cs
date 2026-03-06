@@ -74,7 +74,7 @@ namespace Spritely.Managers
             if (task.Runtime.TokenLimitRetryCount > AppConstants.MaxTokenLimitRetries)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    $"\n[Spritely] Token limit retry count exceeded (max: {AppConstants.MaxTokenLimitRetries}). Task failed.\n",
+                    $"\nToken limit retry count exceeded (max: {AppConstants.MaxTokenLimitRetries}). Task failed.\n",
                     activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
@@ -84,7 +84,7 @@ namespace Spritely.Managers
 
             var retryMinutes = _getTokenLimitRetryMinutes();
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Spritely] Token/rate limit detected. Retry {task.Runtime.TokenLimitRetryCount}/{AppConstants.MaxTokenLimitRetries} in {retryMinutes} minutes...\n",
+                $"\nToken/rate limit detected. Retry {task.Runtime.TokenLimitRetryCount}/{AppConstants.MaxTokenLimitRetries} in {retryMinutes} minutes...\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
@@ -103,7 +103,7 @@ namespace Spritely.Managers
                     _outputTabManager.UpdateTabHeader(task);
                     return;
                 }
-                _outputProcessor.AppendOutput(task.Id, "[Spritely] Retrying after token limit...\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "Retrying after token limit...\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
                 RetryStarted?.Invoke(task.Id);
 
@@ -148,7 +148,7 @@ namespace Spritely.Managers
                     task.Runtime.LastPromptTokenEstimate);
 
                 _outputProcessor.AppendOutput(task.Id,
-                    $"[Spritely] Applying context reduction (retry {task.Runtime.TokenLimitRetryCount}, reduction factor: {AppConstants.TokenRetryReductionFactors[Math.Min(task.Runtime.TokenLimitRetryCount - 1, AppConstants.TokenRetryReductionFactors.Length - 1)]:P0})\n",
+                    $"Applying context reduction (retry {task.Runtime.TokenLimitRetryCount}, reduction factor: {AppConstants.TokenRetryReductionFactors[Math.Min(task.Runtime.TokenLimitRetryCount - 1, AppConstants.TokenRetryReductionFactors.Length - 1)]:P0})\n",
                     activeTasks, historyTasks);
             }
             else
@@ -156,7 +156,7 @@ namespace Spritely.Managers
                 continuePrompt = PromptBuilder.TokenLimitRetryContinuationPrompt;
             }
 
-            _outputProcessor.AppendOutput(task.Id, $"\n[Spritely] Sending retry with {resumeLabel}...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"\nSending retry with {resumeLabel}...\n\n", activeTasks, historyTasks);
 
             var skipFlag = task.SkipPermissions ? " --dangerously-skip-permissions" : "";
             var followUpFile = Path.Combine(_scriptDir, $"retry_{task.Id}_{DateTime.Now.Ticks}.txt");
@@ -200,7 +200,7 @@ namespace Spritely.Managers
             }
             catch (Exception ex)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Retry error: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"Retry error: {ex.Message}\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);
@@ -244,12 +244,6 @@ namespace Spritely.Managers
             {
                 task.Status = expectedStatus;
                 task.EndTime = DateTime.Now;
-                var statusColor = exitCode == 0
-                    ? Application.Current?.TryFindResource("Success") as Brush ?? Brushes.Green
-                    : Application.Current?.TryFindResource("DangerBright") as Brush ?? Brushes.Red;
-                _outputProcessor.AppendColoredOutput(task.Id,
-                    $"\n[Spritely] Process finished (exit code: {exitCode}).\n",
-                    statusColor, activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             }
 

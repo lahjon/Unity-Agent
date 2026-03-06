@@ -612,7 +612,13 @@ namespace Spritely.Tests
                 taskA.Status = AgentTaskStatus.Completed;
 
                 string? resumedId = null;
-                flm.QueuedTaskResumed += id => resumedId = id;
+                flm.QueuedTaskResumed += id =>
+                {
+                    resumedId = id;
+                    // Simulate what OnQueuedTaskResumed does: set status to Running
+                    var t = activeTasks.FirstOrDefault(t => t.Id == id);
+                    if (t != null) t.Status = AgentTaskStatus.Running;
+                };
                 flm.CheckQueuedTasks(activeTasks);
 
                 Assert.Equal(AgentTaskStatus.Running, taskB.Status);
@@ -682,7 +688,11 @@ namespace Spritely.Tests
                 task.BlockedByTaskId = "abc12345";
 
                 string? resumedId = null;
-                flm.QueuedTaskResumed += id => resumedId = id;
+                flm.QueuedTaskResumed += id =>
+                {
+                    resumedId = id;
+                    task.Status = AgentTaskStatus.Running;
+                };
                 flm.ForceStartQueuedTask(task);
 
                 Assert.Equal(AgentTaskStatus.Running, task.Status);
@@ -1384,6 +1394,11 @@ namespace Spritely.Tests
                 flm.ReleaseTaskLocks(taskA.Id);
 
                 // Step 4: check queued → taskB resumes
+                flm.QueuedTaskResumed += id =>
+                {
+                    var t = activeTasks.FirstOrDefault(t => t.Id == id);
+                    if (t != null) t.Status = AgentTaskStatus.Running;
+                };
                 flm.CheckQueuedTasks(activeTasks);
                 Assert.Equal(AgentTaskStatus.Running, taskB.Status);
                 Assert.True(taskB.IsRunning);
@@ -1415,6 +1430,11 @@ namespace Spritely.Tests
                 // Release taskA's locks
                 taskA.Status = AgentTaskStatus.Completed;
                 flm.ReleaseTaskLocks(taskA.Id);
+                flm.QueuedTaskResumed += id =>
+                {
+                    var t = activeTasks.FirstOrDefault(t => t.Id == id);
+                    if (t != null) t.Status = AgentTaskStatus.Running;
+                };
                 flm.CheckQueuedTasks(activeTasks);
 
                 // Both should resume since blocker is done and file is unlocked

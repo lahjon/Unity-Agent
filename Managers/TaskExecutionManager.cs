@@ -188,31 +188,35 @@ namespace Spritely.Managers
                 Encoding.UTF8);
 
             // Build compact startup line for visible output
+            var friendlyModel = PromptBuilder.GetFriendlyModelName(cliModel);
+            var promptPreview = task.ShortDescription;
+            if (string.IsNullOrWhiteSpace(promptPreview))
+                promptPreview = "No prompt";
             var flags = new List<string>();
-            flags.Add(PromptBuilder.GetFriendlyModelName(cliModel));
             if (task.UseMessageBus) flags.Add("Bus");
             if (task.ExtendedPlanning) flags.Add("Planning");
             if (task.AutoDecompose) flags.Add("Auto-decompose");
             if (task.SpawnTeam) flags.Add("Team");
             if (task.IsFeatureMode) flags.Add($"Feature(max {task.MaxIterations})");
+            var flagsSuffix = flags.Count > 0 ? $" | {string.Join(" | ", flags)}" : "";
             _outputProcessor.AppendOutput(task.Id,
-                $"Task #{task.TaskNumber}: Starting {string.Join(" | ", flags)}\n\n",
+                $"Task #{task.TaskNumber}: {promptPreview}\nModel: {friendlyModel}{flagsSuffix}\n\n",
                 activeTasks, historyTasks);
 
             // Store full boot details + prompt in OutputBuilder only (not displayed)
             var bootLog = new System.Text.StringBuilder();
             if (!string.IsNullOrWhiteSpace(task.Summary))
-                bootLog.AppendLine($"[Spritely] Summary: {task.Summary}");
-            bootLog.AppendLine($"[Spritely] Project: {projectPath}");
-            bootLog.AppendLine($"[Spritely] Model: {PromptBuilder.GetFriendlyModelName(cliModel)} ({cliModel})");
-            bootLog.AppendLine($"[Spritely] Skip permissions: {task.SkipPermissions}");
-            bootLog.AppendLine($"[Spritely] Remote session: {task.RemoteSession}");
+                bootLog.AppendLine($"Summary: {task.Summary}");
+            bootLog.AppendLine($"Project: {projectPath}");
+            bootLog.AppendLine($"Model: {PromptBuilder.GetFriendlyModelName(cliModel)} ({cliModel})");
+            bootLog.AppendLine($"Skip permissions: {task.SkipPermissions}");
+            bootLog.AppendLine($"Remote session: {task.RemoteSession}");
             try
             {
                 var promptContent = File.ReadAllText(promptFile, Encoding.UTF8);
-                bootLog.AppendLine($"[Spritely] ── Full Prompt ──────────────────────────────");
+                bootLog.AppendLine($"── Full Prompt ──────────────────────────────");
                 bootLog.AppendLine(promptContent);
-                bootLog.AppendLine($"[Spritely] ── End Prompt ───────────────────────────────");
+                bootLog.AppendLine($"── End Prompt ───────────────────────────────");
             }
             catch { /* non-critical */ }
             task.OutputBuilder.Append(bootLog);
@@ -228,7 +232,7 @@ namespace Spritely.Managers
                     task.IsPlanningBeforeQueue = true;
                     task.Status = AgentTaskStatus.Planning;
                     task.StartTime = DateTime.Now;
-                    _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Restarting in plan mode...\n\n", activeTasks, historyTasks);
+                    _outputProcessor.AppendOutput(task.Id, "\nRestarting in plan mode...\n\n", activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
                     return;
@@ -325,11 +329,14 @@ namespace Spritely.Managers
                                 task.CompletionSummary = $"Task completed with status: {expectedStatus}";
                             }
 
-                            // Extract recommendations if any
-                            var recommendations = _completionAnalyzer.ExtractRecommendations(outputText);
-                            if (!string.IsNullOrWhiteSpace(recommendations))
+                            // Only extract recommendations when the AI explicitly outputs the status marker as a standalone line
+                            if (HasExplicitRecommendationStatus(outputText))
                             {
-                                task.Recommendations = recommendations;
+                                var recommendations = _completionAnalyzer.ExtractRecommendations(outputText);
+                                if (!string.IsNullOrWhiteSpace(recommendations))
+                                {
+                                    task.Recommendations = recommendations;
+                                }
                             }
                         }
                         catch (Exception ex)
@@ -350,7 +357,7 @@ namespace Spritely.Managers
                                 ? (Brush)Application.Current.FindResource("Success")
                                 : (Brush)Application.Current.FindResource("DangerBright");
                             _outputProcessor.AppendColoredOutput(task.Id,
-                                $"\n[Spritely] Feature mode child task completed (exit code: {exitCode}).\n",
+                                $"\nFeature mode child task completed (exit code: {exitCode}).\n",
                                 statusColor, activeTasks, historyTasks);
                         }
                         catch (Exception ex)
@@ -410,7 +417,7 @@ namespace Spritely.Managers
             }
             catch (Exception ex)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);
@@ -463,19 +470,6 @@ namespace Spritely.Managers
                     finalStatus = AgentTaskStatus.Recommendation;
                 task.Status = finalStatus;
                 task.EndTime = DateTime.Now;
-                try
-                {
-                    var statusColor = exitCode == 0
-                        ? (Brush)Application.Current.FindResource("Success")
-                        : (Brush)Application.Current.FindResource("DangerBright");
-                    _outputProcessor.AppendColoredOutput(task.Id,
-                        $"\n[Spritely] Process finished (exit code: {exitCode}).\n",
-                        statusColor, activeTasks, historyTasks);
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Error("TaskExecution", $"Failed to append completion output for task {task.Id}", ex);
-                }
                 _outputTabManager.UpdateTabHeader(task);
             }
 
@@ -524,7 +518,7 @@ namespace Spritely.Managers
                 task.Recommendations = "";
                 task.Status = expectedStatus;
                 task.EndTime = DateTime.Now;
-                _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Follow-up complete.\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "\nFollow-up complete.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             }
 
@@ -610,7 +604,7 @@ namespace Spritely.Managers
             {
                 AppLogger.Warn("FollowUp", $"[{task.Id}] Blocked: feature mode coordinator in phase {task.FeatureModePhase}");
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Spritely] This task is coordinating subtasks and waiting for them to complete. Follow-up input is not available during this phase.\n",
+                    "\nThis task is coordinating subtasks and waiting for them to complete. Follow-up input is not available during this phase.\n",
                     activeTasks, historyTasks);
                 return;
             }
@@ -726,7 +720,7 @@ namespace Spritely.Managers
                 : "--continue";
 
             var followUpModel = PromptBuilder.GetCliModelForTask(task);
-            _outputProcessor.AppendOutput(task.Id, $"\n> {text}\n[Spritely] Sending follow-up with {resumeLabel} (Model: {PromptBuilder.GetFriendlyModelName(followUpModel)})...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"\nUser Input > {text}\n\n", activeTasks, historyTasks);
 
             // Append follow-up prompt to task description for git commit tracking
             if (!string.IsNullOrEmpty(task.Description))
@@ -763,7 +757,6 @@ namespace Spritely.Managers
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
                 AppLogger.Info("FollowUp", $"[{task.Id}] Follow-up process exited with code {exitCode}");
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Follow-up process exited (code={exitCode})\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Verifying;
                 _outputTabManager.UpdateTabHeader(task);
                 _ = CompleteFollowUpWithVerificationAsync(task, exitCode, activeTasks, historyTasks);
@@ -774,12 +767,12 @@ namespace Spritely.Managers
             {
                 _processLauncher.StartManagedProcess(task, process);
                 AppLogger.Info("FollowUp", $"[{task.Id}] Process started successfully. PID={task.Process?.Id}");
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Follow-up process started (PID={task.Process?.Id})\n", activeTasks, historyTasks);
+                // Process started - no user-facing output needed
             }
             catch (Exception ex)
             {
                 AppLogger.Error("FollowUp", $"[{task.Id}] Failed to start follow-up process", ex);
-                _outputProcessor.AppendOutput(task.Id, $"[Spritely] Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"Follow-up error: {ex.Message}\n", activeTasks, historyTasks);
             }
         }
 
@@ -880,7 +873,7 @@ namespace Spritely.Managers
                     task.BlockedByTaskId = blocker?.Id;
                     task.BlockedByTaskNumber = blocker?.TaskNumber;
                     _outputProcessor.AppendOutput(task.Id,
-                        $"\n[Spritely] Planning complete. Queued — waiting for dependencies: " +
+                        $"\nPlanning complete. Queued — waiting for dependencies: " +
                         $"{string.Join(", ", task.DependencyTaskNumbers.Select(n => $"#{n}"))}\n",
                         activeTasks, historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
@@ -900,7 +893,7 @@ namespace Spritely.Managers
             // No more blockers — start execution
             task.Status = AgentTaskStatus.Running;
             task.StartTime = DateTime.Now;
-            _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Planning complete. Starting execution...\n\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, "\nPlanning complete. Starting execution...\n\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
             _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
         }
@@ -1096,7 +1089,7 @@ namespace Spritely.Managers
             if (children == null || children.Count == 0)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Spritely] Decomposition produced no valid subtasks — completing parent task.\n",
+                    "\nDecomposition produced no valid subtasks — completing parent task.\n",
                     activeTasks, historyTasks);
                 task.AutoDecompose = false;
                 task.Status = AgentTaskStatus.Failed;
@@ -1111,7 +1104,7 @@ namespace Spritely.Managers
             task.EndTime = DateTime.Now;
             task.CompletionSummary = $"Decomposed into {children.Count} subtask(s)";
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Spritely] Task decomposed into {children.Count} subtask(s). Parent is now a coordinator.\n",
+                $"\nTask decomposed into {children.Count} subtask(s). Parent is now a coordinator.\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
@@ -1246,7 +1239,7 @@ namespace Spritely.Managers
             if (children == null || children.Count == 0)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Spritely] Team decomposition produced no valid team members — completing parent task.\n",
+                    "\nTeam decomposition produced no valid team members — completing parent task.\n",
                     activeTasks, historyTasks);
                 task.SpawnTeam = false;
                 task.Status = AgentTaskStatus.Failed;
@@ -1261,7 +1254,7 @@ namespace Spritely.Managers
             task.EndTime = DateTime.Now;
             task.CompletionSummary = $"Spawned team of {children.Count} agent(s): {string.Join(", ", children.Select(c => c.Summary))}";
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Spritely] Team spawned with {children.Count} member(s). Parent is now a coordinator.\n",
+                $"\nTeam spawned with {children.Count} member(s). Parent is now a coordinator.\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
@@ -1487,6 +1480,22 @@ namespace Spritely.Managers
             }
 
             _featureModeHandler.OnFeatureModePhaseComplete(featureParent, activeTasks, historyTasks, moveToHistory);
+        }
+
+        /// <summary>
+        /// Checks whether the output contains "STATUS: COMPLETE WITH RECOMMENDATIONS" as a
+        /// standalone line in the tail (not echoed prompt instructions).
+        /// </summary>
+        private static bool HasExplicitRecommendationStatus(string outputText)
+        {
+            var tail = outputText.Length > 2000 ? outputText[^2000..] : outputText;
+            var lines = tail.Split('\n');
+            for (int i = lines.Length - 1; i >= 0; i--)
+            {
+                if (lines[i].Trim() == "STATUS: COMPLETE WITH RECOMMENDATIONS")
+                    return true;
+            }
+            return false;
         }
     }
 }

@@ -432,6 +432,8 @@ namespace Spritely
 
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
+            if (_settingsManager.LeftPanelCollapsed)
+                ApplyLeftPanelCollapsed(true);
 
             SetupMainTabsOverflow();
 
@@ -1148,7 +1150,7 @@ namespace Spritely
                 else if (task.IsRunning)
                 {
                     _taskExecutionManager.PauseTask(task);
-                    _outputTabManager.AppendOutput(task.Id, "\n[Spritely] Task paused.\n", _activeTasks, _historyTasks);
+                    _outputTabManager.AppendOutput(task.Id, "\nTask paused.\n", _activeTasks, _historyTasks);
                 }
             };
             NodeGraphPanel.CopyPromptRequested += task =>
@@ -1165,7 +1167,7 @@ namespace Spritely
                     task.QueuedReason = null;
                     task.StartTime = DateTime.Now;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[Spritely] Force-starting task #{task.TaskNumber} (limit bypassed)...\n\n",
+                        $"\nForce-starting task #{task.TaskNumber} (limit bypassed)...\n\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
@@ -1186,7 +1188,7 @@ namespace Spritely
                         {
                             _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[Spritely] Force-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
+                                $"\nForce-resuming task #{task.TaskNumber} (dependencies skipped).\n\n",
                                 _activeTasks, _historyTasks);
                         }
                         else
@@ -1194,7 +1196,7 @@ namespace Spritely
                             task.Status = AgentTaskStatus.Running;
                             task.StartTime = DateTime.Now;
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[Spritely] Force-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
+                                $"\nForce-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
                                 _activeTasks, _historyTasks);
                             _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                         }
@@ -1242,7 +1244,7 @@ namespace Spritely
                 }
 
                 _outputTabManager.AppendOutput(dependent.Id,
-                    $"\n[Spritely] Task #{dependent.TaskNumber} queued — waiting for #{prerequisite.TaskNumber} to complete.\n",
+                    $"\nTask #{dependent.TaskNumber} queued — waiting for #{prerequisite.TaskNumber} to complete.\n",
                     _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(dependent);
                 UpdateStatus();
@@ -1265,7 +1267,7 @@ namespace Spritely
                         {
                             _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[Spritely] Dependencies removed — resuming task #{task.TaskNumber}.\n",
+                                $"\nDependencies removed — resuming task #{task.TaskNumber}.\n",
                                 _activeTasks, _historyTasks);
                         }
                         else
@@ -1273,7 +1275,7 @@ namespace Spritely
                             task.Status = AgentTaskStatus.Running;
                             task.StartTime = DateTime.Now;
                             _outputTabManager.AppendOutput(task.Id,
-                                $"\n[Spritely] Dependencies removed — starting task #{task.TaskNumber}...\n",
+                                $"\nDependencies removed — starting task #{task.TaskNumber}...\n",
                                 _activeTasks, _historyTasks);
                             _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                         }
@@ -1338,7 +1340,7 @@ namespace Spritely
                 if (result != null)
                 {
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[Spritely] Reverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
+                        $"\nReverted to commit {shortHash}.\n", _activeTasks, _historyTasks);
                     Dialogs.DarkDialog.ShowAlert($"Successfully reverted to commit {shortHash}.", "Revert Complete");
                 }
                 else
@@ -1827,7 +1829,7 @@ namespace Spritely
             // If already Queued, dependency was added above — status stays Queued
 
             _outputTabManager.AppendOutput(dragged.Id,
-                $"\n[Spritely] Task #{dragged.TaskNumber} queued — waiting for #{target.TaskNumber} to complete.\n",
+                $"\nTask #{dragged.TaskNumber} queued — waiting for #{target.TaskNumber} to complete.\n",
                 _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(dragged);
             UpdateStatus();
@@ -2036,7 +2038,7 @@ namespace Spritely
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
             _outputTabManager.AppendOutput(newTask.Id,
-                $"[Spritely] Executing stored plan from task #{task.TaskNumber}\n",
+                $"Executing stored plan from task #{task.TaskNumber}\n",
                 _activeTasks, _historyTasks);
             _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
             RefreshFilterCombos();
@@ -2532,6 +2534,18 @@ namespace Spritely
             double newTop = topRow.Height.Value + e.VerticalChange;
             double newBottom = bottomRow.Height.Value - e.VerticalChange;
 
+            // Clamp to MinHeight instead of returning, so Thumb position stays in sync with rows
+            if (newTop < topRow.MinHeight)
+            {
+                newBottom += newTop - topRow.MinHeight;
+                newTop = topRow.MinHeight;
+            }
+            if (newBottom < bottomRow.MinHeight)
+            {
+                newTop += newBottom - bottomRow.MinHeight;
+                newBottom = bottomRow.MinHeight;
+            }
+
             if (newTop < topRow.MinHeight || newBottom < bottomRow.MinHeight)
                 return;
 
@@ -2734,35 +2748,6 @@ namespace Spritely
                 StoredFilterCombo.SelectionChanged += StoredFilter_Changed;
             }
 
-            // Group filter combo
-            if (HistoryGroupFilterCombo != null)
-            {
-                var groupTag = (HistoryGroupFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
-
-                HistoryGroupFilterCombo.SelectionChanged -= HistoryGroupFilter_Changed;
-                HistoryGroupFilterCombo.Items.Clear();
-                HistoryGroupFilterCombo.Items.Add(new ComboBoxItem { Content = "All Groups", Tag = "" });
-
-                var groups = _historyTasks.Concat(_activeTasks)
-                    .Where(t => !string.IsNullOrEmpty(t.GroupId))
-                    .Select(t => new { Id = t.GroupId!, Name = t.GroupName ?? t.GroupId! })
-                    .DistinctBy(g => g.Id)
-                    .OrderBy(g => g.Name)
-                    .ToList();
-                foreach (var g in groups)
-                    HistoryGroupFilterCombo.Items.Add(new ComboBoxItem { Content = g.Name, Tag = g.Id });
-
-                found = false;
-                if (!string.IsNullOrEmpty(groupTag))
-                {
-                    foreach (ComboBoxItem item in HistoryGroupFilterCombo.Items)
-                    {
-                        if (item.Tag as string == groupTag) { HistoryGroupFilterCombo.SelectedItem = item; found = true; break; }
-                    }
-                }
-                if (!found) HistoryGroupFilterCombo.SelectedIndex = 0;
-                HistoryGroupFilterCombo.SelectionChanged += HistoryGroupFilter_Changed;
-            }
 
             RefreshStatusFilterCombos();
         }
@@ -2843,14 +2828,12 @@ namespace Spritely
             if (_historyView == null) return;
             var projectTag = (HistoryFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string;
             var statusTag = (HistoryStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
-            var groupTag = (HistoryGroupFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
             var hasProject = !string.IsNullOrEmpty(projectTag);
             var hasStatus = !string.IsNullOrEmpty(statusTag);
-            var hasGroup = !string.IsNullOrEmpty(groupTag);
             var searchText = HistorySearchBox?.Text?.Trim() ?? "";
             var hasSearch = searchText.Length > 0;
 
-            if (!hasProject && !hasStatus && !hasGroup && !hasSearch)
+            if (!hasProject && !hasStatus && !hasSearch)
                 _historyView.Filter = null;
             else
                 _historyView.Filter = obj =>
@@ -2858,7 +2841,6 @@ namespace Spritely
                     if (obj is not AgentTask t) return false;
                     if (hasProject && t.ProjectPath != projectTag) return false;
                     if (hasStatus && t.Status.ToString() != statusTag) return false;
-                    if (hasGroup && t.GroupId != groupTag) return false;
                     if (hasSearch && !TaskMatchesSearch(t, searchText)) return false;
                     return true;
                 };
@@ -2871,8 +2853,6 @@ namespace Spritely
         private void ActiveStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyActiveFilters();
 
         private void HistoryStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
-
-        private void HistoryGroupFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
 
         private void ActiveSearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyActiveFilters();
 
@@ -3043,27 +3023,31 @@ namespace Spritely
             }
         }
 
-        // ── Projects Panel Collapse ───────────────────────────────
+        // ── Left Panel Collapse ───────────────────────────────
 
-        private void ToggleProjectsPanel_Click(object sender, RoutedEventArgs e)
+        private void ToggleLeftPanel_Click(object sender, RoutedEventArgs e)
         {
-            bool collapse = ProjectsPanelBorder.Visibility == Visibility.Visible;
-            ApplyProjectsPanelCollapsed(collapse);
+            bool collapse = TaskListPanelBorder.Visibility == Visibility.Visible;
+            ApplyLeftPanelCollapsed(collapse);
+            _settingsManager.LeftPanelCollapsed = collapse;
+            _settingsManager.SaveSettings(_projectManager.ProjectPath);
         }
 
-        private void ApplyProjectsPanelCollapsed(bool collapsed)
+        private void ApplyLeftPanelCollapsed(bool collapsed)
         {
             if (collapsed)
             {
+                TaskListPanelBorder.Visibility = Visibility.Collapsed;
                 ProjectsPanelBorder.Visibility = Visibility.Collapsed;
                 LeftSplitter.Visibility = Visibility.Collapsed;
-                ProjectsCollapsedStrip.Visibility = Visibility.Visible;
+                LeftPanelCollapsedStrip.Visibility = Visibility.Visible;
                 LeftPanelCol.Width = new GridLength(0);
                 LeftPanelCol.MinWidth = 0;
             }
             else
             {
-                ProjectsCollapsedStrip.Visibility = Visibility.Collapsed;
+                LeftPanelCollapsedStrip.Visibility = Visibility.Collapsed;
+                TaskListPanelBorder.Visibility = Visibility.Visible;
                 ProjectsPanelBorder.Visibility = Visibility.Visible;
                 LeftSplitter.Visibility = Visibility.Visible;
                 LeftPanelCol.Width = new GridLength(285);

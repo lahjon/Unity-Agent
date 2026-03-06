@@ -71,14 +71,16 @@ namespace Spritely.Managers
                         task.ProjectPath, task.GitStartHash, summaryStatus, duration,
                         task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens, ct);
                     task.CompletionSummary = summary;
-                    AppendOutput(task.Id, summary, activeTasks, historyTasks);
+                    if (!string.IsNullOrEmpty(summary))
+                        AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
                 catch (OperationCanceledException)
                 {
                     var summary = _completionAnalyzer.FormatCompletionSummary(summaryStatus, duration, null,
                         task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens);
                     task.CompletionSummary = summary;
-                    AppendOutput(task.Id, summary, activeTasks, historyTasks);
+                    if (!string.IsNullOrEmpty(summary))
+                        AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
 
                 // Run result verification if auto-verify is enabled
@@ -86,9 +88,10 @@ namespace Spritely.Managers
                 if (_getAutoVerify())
                     await RunResultVerificationAsync(task, outputText, activeTasks, historyTasks);
 
-                // Fallback: extract recommendations from agent output text if verification
-                // didn't run or didn't return next steps
-                if (!task.HasRecommendations)
+                // Only extract recommendations when the AI's actual output contains
+                // "STATUS: COMPLETE WITH RECOMMENDATIONS" as a standalone line (not as
+                // part of prompt instructions that get echoed in the output).
+                if (!task.HasRecommendations && HasExplicitRecommendationStatus(outputText))
                 {
                     try
                     {
@@ -96,6 +99,9 @@ namespace Spritely.Managers
                         if (!string.IsNullOrWhiteSpace(recommendations))
                         {
                             task.Recommendations = recommendations;
+                            AppendOutput(task.Id,
+                                $"\nRecommendations:\n{recommendations}\n",
+                                activeTasks, historyTasks);
                         }
                     }
                     catch (Exception recEx)
@@ -141,17 +147,16 @@ namespace Spritely.Managers
                     task.VerificationResult = result.Summary;
                     var label = result.Passed ? "PASSED" : "FAILED";
                     AppendOutput(task.Id,
-                        $"\n[Spritely] Result Verification: {label} — {result.Summary}\n",
+                        $"\nResult Verification: {label} — {result.Summary}\n",
                         activeTasks, historyTasks);
                     AppLogger.Debug("TaskExecution",
                         $"Task {task.Id}: Result verification {label} — {result.Summary}");
 
-                    // Store next steps from verification as recommendations
+                    // Display next steps (informational only — does not trigger Recommendation status)
                     if (!string.IsNullOrWhiteSpace(result.NextSteps))
                     {
-                        task.Recommendations = result.NextSteps;
                         AppendOutput(task.Id,
-                            $"[Spritely] Next Steps: {result.NextSteps}\n",
+                            $"Next Steps: {result.NextSteps}\n",
                             activeTasks, historyTasks);
                     }
                 }
@@ -270,5 +275,27 @@ namespace Spritely.Managers
         /// </summary>
         public void InjectSubtaskResult(AgentTask parent, AgentTask child)
             => _ = InjectSubtaskResultAsync(parent, child);
+
+        /// <summary>
+        /// Checks whether the output contains "STATUS: COMPLETE WITH RECOMMENDATIONS" as a
+        /// standalone line produced by the AI, not as part of echoed prompt instructions.
+        /// Only looks at the last portion of the output where the AI's status marker would be.
+        /// </summary>
+        private static bool HasExplicitRecommendationStatus(string outputText)
+        {
+            // Only check the tail of the output (last ~2000 chars) where the AI's
+            // actual status marker would appear, not in echoed prompt instructions
+            var tail = outputText.Length > 2000 ? outputText[^2000..] : outputText;
+            var lines = tail.Split('\n');
+
+            // Look for the marker as a standalone trimmed line (not inside a bullet, quote, or backtick)
+            for (int i = lines.Length - 1; i >= 0; i--)
+            {
+                var trimmed = lines[i].Trim();
+                if (trimmed == "STATUS: COMPLETE WITH RECOMMENDATIONS")
+                    return true;
+            }
+            return false;
+        }
     }
 }

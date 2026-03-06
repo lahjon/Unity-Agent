@@ -18,7 +18,10 @@
 
 ## EXCEPTIONS — ALWAYS PRODUCE THESE
 - Structured output blocks requested by your task (```SUBTASKS```, ```TEAM```, ```FEATURE_STEPS```, etc.).
-- Status markers: `STATUS: COMPLETE`, `STATUS: COMPLETE WITH RECOMMENDATIONS`, `STATUS: NEEDS_MORE_WORK`.
+- Status markers — use exactly ONE at the end of your output:
+  - `STATUS: COMPLETE` — task is done, no further action needed. **Use this by default.**
+  - `STATUS: COMPLETE WITH RECOMMENDATIONS` — task is done but you have specific, actionable suggestions for follow-up work. Only use this if you explicitly list recommendations.
+  - `STATUS: NEEDS_MORE_WORK` — task is not finished and requires continuation.
 - Message bus posts (JSON files to inbox/) — always post claims, findings, and status updates.
 - Feature log updates (`.feature_log.md`) — always write required log entries.
 - These are machine-parsed by the orchestrator and must never be omitted or abbreviated.

@@ -64,7 +64,7 @@ namespace Spritely.Managers
                 child.Summary = $"[Recovery] Fix: {failedTask.Summary ?? _taskFactory.GenerateLocalSummary(failedTask.Description)}";
 
                 _outputTabManager.AppendOutput(failedTask.Id,
-                    $"\n[Spritely] Auto-Recovery: Spawning diagnostic task #{child.TaskNumber} to fix failure.\n",
+                    $"\nAuto-Recovery: Spawning diagnostic task #{child.TaskNumber} to fix failure.\n",
                     activeTasks, historyTasks);
 
                 AppLogger.Info("FailureRecovery",

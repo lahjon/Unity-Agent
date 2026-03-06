@@ -154,7 +154,7 @@ namespace Spritely
         public int CurrentIteration
         {
             get => Data.CurrentIteration;
-            set { if (Data.CurrentIteration == value) return; Data.CurrentIteration = value; NotifyAll(nameof(CurrentIteration), nameof(StatusText)); }
+            set { if (Data.CurrentIteration == value) return; Data.CurrentIteration = value; NotifyAll(nameof(CurrentIteration), nameof(StatusText), nameof(QueueStatusText)); }
         }
 
         public string CompletionSummary
@@ -212,7 +212,7 @@ namespace Spritely
             {
                 if (Data.Status == value) return;
                 Data.Status = value;
-                NotifyAll(nameof(Status), nameof(StatusText), nameof(StatusColor),
+                NotifyAll(nameof(Status), nameof(StatusText), nameof(QueueStatusText), nameof(StatusColor),
                     nameof(IsRunning), nameof(IsPlanning), nameof(IsQueued), nameof(IsPaused),
                     nameof(IsInitQueued), nameof(IsFinished), nameof(IsCommitting), nameof(IsRetryable), nameof(IsContinuable),
                     nameof(TimeInfo), nameof(HasPriorityBadge), nameof(IsCompletedUncommitted));
@@ -228,7 +228,7 @@ namespace Spritely
         public FeatureModePhase FeatureModePhase
         {
             get => Data.FeatureModePhase;
-            set { if (Data.FeatureModePhase == value) return; Data.FeatureModePhase = value; NotifyAll(nameof(FeatureModePhase), nameof(StatusText)); }
+            set { if (Data.FeatureModePhase == value) return; Data.FeatureModePhase = value; NotifyAll(nameof(FeatureModePhase), nameof(StatusText), nameof(QueueStatusText)); }
         }
 
         // ── Token tracking ─────────────────────────────────────────────

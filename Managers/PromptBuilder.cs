@@ -239,13 +239,13 @@ namespace Spritely.Managers
             var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
-                   $"Write-Host '[Spritely] Project: {projectPath}' -ForegroundColor DarkGray\n" +
-                   $"Write-Host '[Spritely] Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
-                   "Write-Host '[Spritely] Starting Claude...' -ForegroundColor Cyan\n" +
+                   $"Write-Host 'Project: {projectPath}' -ForegroundColor DarkGray\n" +
+                   $"Write-Host 'Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
+                   "Write-Host 'Starting Claude...' -ForegroundColor Cyan\n" +
                    "Write-Host ''\n" +
                    $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{remoteFlag}{modelFlag} --verbose\n" +
-                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`n[Spritely] Claude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
-                   "Write-Host \"`n[Spritely] Process finished. Press any key to close...\" -ForegroundColor Cyan\n" +
+                   "if ($LASTEXITCODE -ne 0) { Write-Host \"`nClaude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
+                   "Write-Host \"`nProcess finished. Press any key to close...\" -ForegroundColor Cyan\n" +
                    "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n";
         }
 

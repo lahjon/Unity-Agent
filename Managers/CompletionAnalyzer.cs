@@ -147,7 +147,12 @@ namespace Spritely.Managers
 
             if (captured.Count == 0) return null;
             var result = string.Join("\n", captured).Trim();
-            return result.Length > 0 ? result : null;
+            if (result.Length == 0) return null;
+
+            // Reject if only the header line was captured with no actual recommendation items
+            if (captured.Count <= 1) return null;
+
+            return result;
         }
 
 
@@ -270,10 +275,8 @@ namespace Spritely.Managers
             long inputTokens = 0, long outputTokens = 0,
             long cacheReadTokens = 0, long cacheCreationTokens = 0)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine();
-            sb.AppendLine($"Status: {status}");
-            return sb.ToString();
+            // Status is already shown in the task tab header — don't duplicate it in the output
+            return "";
         }
 
         public async Task<string> GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash,

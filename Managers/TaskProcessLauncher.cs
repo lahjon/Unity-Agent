@@ -320,8 +320,16 @@ namespace Spritely.Managers
         public void ResumeTask(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
-            if (task.Status is not (AgentTaskStatus.Paused or AgentTaskStatus.Queued)) return;
-            if (task.Process is not { HasExited: false }) return;
+            if (task.Status is not (AgentTaskStatus.Paused or AgentTaskStatus.Queued))
+            {
+                AppLogger.Debug("TaskExecution", $"ResumeTask skipped for task #{task.TaskNumber}: status is {task.Status}");
+                return;
+            }
+            if (task.Process is not { HasExited: false })
+            {
+                AppLogger.Warn("TaskExecution", $"ResumeTask skipped for task #{task.TaskNumber}: process is {(task.Process == null ? "null" : $"exited (HasExited={task.Process.HasExited})")}");
+                return;
+            }
 
             try
             {
@@ -334,7 +342,7 @@ namespace Spritely.Managers
                 task.Process = null;
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
-                _outputProcessor.AppendOutput(task.Id, "\n[Spritely] ERROR: Process terminated unexpectedly during resume.\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "\nERROR: Process terminated unexpectedly during resume.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
                 // Caller (TaskExecutionManager) will handle finalization when it sees the Failed status
                 return;
@@ -347,7 +355,7 @@ namespace Spritely.Managers
                 task.Process = null;
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
-                _outputProcessor.AppendOutput(task.Id, "\n[Spritely] ERROR: Process terminated immediately after resume.\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "\nERROR: Process terminated immediately after resume.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
                 // Caller (TaskExecutionManager) will handle finalization when it sees the Failed status
                 return;
@@ -363,7 +371,7 @@ namespace Spritely.Managers
             }
 
             _outputTabManager.UpdateTabHeader(task);
-            _outputProcessor.AppendOutput(task.Id, "\n[Spritely] Task resumed.\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, "\nTask resumed.\n", activeTasks, historyTasks);
             ProcessResumed?.Invoke(task.Id);
         }
 
@@ -424,8 +432,58 @@ namespace Spritely.Managers
                 switch (type)
                 {
                     case "assistant":
-                        // All content (text + tool_use) is already handled by the streaming
-                        // content_block_start/delta/stop events. Skip to avoid duplicate output.
+                        if (root.TryGetProperty("message", out var msg) &&
+                            msg.TryGetProperty("content", out var content) &&
+                            content.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var block in content.EnumerateArray())
+                            {
+                                var blockType = block.TryGetProperty("type", out var bt) ? bt.GetString() : null;
+                                if (blockType == "text" && block.TryGetProperty("text", out var text))
+                                {
+                                    _outputProcessor.AppendOutput(taskId, text.GetString() + "\n", activeTasks, historyTasks);
+                                }
+                                else if (blockType == "tool_use")
+                                {
+                                    var toolName = block.TryGetProperty("name", out var tn) ? tn.GetString() : "unknown";
+                                    JsonElement? toolInput = block.TryGetProperty("input", out var inp) ? inp : null;
+                                    var actionText = FormatToolAction(toolName ?? "unknown", toolInput);
+                                    _outputProcessor.AppendOutput(taskId, $"\n{actionText}\n", activeTasks, historyTasks);
+                                    var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
+                                    actionTask?.AddToolActivity(actionText);
+
+                                    if (toolName == "ExitPlanMode" && actionTask != null && actionTask.IsPlanningBeforeQueue)
+                                    {
+                                        AppLogger.Info("TaskExecution", $"[{taskId}] ExitPlanMode detected, marking plan phase as ready to complete");
+                                        actionTask.Runtime.PlanPhaseReady = true;
+
+                                        try
+                                        {
+                                            if (actionTask.Process?.StandardInput != null && !actionTask.Process.HasExited)
+                                            {
+                                                AppLogger.Info("TaskExecution", $"[{taskId}] Closing stdin to complete plan phase");
+                                                actionTask.Process.StandardInput.Close();
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            AppLogger.Warn("TaskExecution", $"[{taskId}] Failed to close stdin: {ex.Message}");
+                                        }
+                                    }
+
+                                    if (FormatHelpers.IsFileModifyTool(toolName) && toolInput != null)
+                                    {
+                                        var fp = FileLockManager.ExtractFilePath(toolInput.Value);
+                                        if (!string.IsNullOrEmpty(fp) && !_fileLockManager.TryAcquireOrConflict(taskId, fp, toolName!, activeTasks,
+                                            (tid, txt) => _outputProcessor.AppendOutput(tid, txt, activeTasks, historyTasks)))
+                                        {
+                                            _outputTabManager.UpdateTabHeader(activeTasks.FirstOrDefault(t => t.Id == taskId)!);
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         break;
 
                     case "content_block_start":
@@ -540,14 +598,8 @@ namespace Spritely.Managers
                         break;
 
                     case "result":
-                        // Skip result text output — already streamed via content_block_delta events.
-                        // Only log non-text result subtypes for diagnostics.
-                        if (!(root.TryGetProperty("result", out var result) &&
-                              result.ValueKind == JsonValueKind.String))
-                        {
-                            if (root.TryGetProperty("subtype", out var subtype))
-                                _outputProcessor.AppendOutput(taskId, $"\n[Result: {subtype.GetString()}]\n", activeTasks, historyTasks);
-                        }
+                        // Don't output result text — it was already streamed via content_block_delta events.
+                        // Only process token usage below.
                         // Extract token usage from Claude Code CLI result event
                         if (root.TryGetProperty("usage", out var resultUsage))
                         {
@@ -656,7 +708,7 @@ namespace Spritely.Managers
                         break;
 
                     default:
-                        if (type != null && type != "ping" && type != "user")
+                        if (type != null && type != "ping" && type != "user" && type != "rate_limit_event")
                             _outputProcessor.AppendOutput(taskId, $"[{type}]\n", activeTasks, historyTasks);
                         break;
                 }

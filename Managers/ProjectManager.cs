@@ -668,7 +668,7 @@ namespace Spritely.Managers
                     CornerRadius = new CornerRadius(8),
                     Padding = new Thickness(12, 10, 12, 10),
                     Margin = new Thickness(0, 0, 0, 6),
-                    BorderThickness = new Thickness(isActive ? 3 : 1, 1, 1, 1),
+                    BorderThickness = new Thickness(isActive ? 2 : 1),
                     BorderBrush = isActive
                         ? (Brush)Application.Current.FindResource("Accent")
                         : (Brush)Application.Current.FindResource("BorderMedium"),

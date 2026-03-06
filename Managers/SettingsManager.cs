@@ -14,6 +14,7 @@ namespace Spritely.Managers
         private int _historyRetentionHours = 24;
         private string? _lastSelectedProject;
         private bool _settingsPanelCollapsed;
+        private bool _leftPanelCollapsed;
         private int _maxConcurrentTasks = 10;
         private int _tokenLimitRetryMinutes = 30;
         private bool _autoVerify;
@@ -41,6 +42,12 @@ namespace Spritely.Managers
         {
             get => _settingsPanelCollapsed;
             set => _settingsPanelCollapsed = value;
+        }
+
+        public bool LeftPanelCollapsed
+        {
+            get => _leftPanelCollapsed;
+            set => _leftPanelCollapsed = value;
         }
 
         public int MaxConcurrentTasks
@@ -112,6 +119,8 @@ namespace Spritely.Managers
                     _lastSelectedProject = sp.GetString();
                 if (dict.TryGetValue("settingsPanelCollapsed", out var spc))
                     _settingsPanelCollapsed = spc.GetBoolean();
+                if (dict.TryGetValue("leftPanelCollapsed", out var lpc))
+                    _leftPanelCollapsed = lpc.GetBoolean();
                 if (dict.TryGetValue("maxConcurrentTasks", out var mct))
                     _maxConcurrentTasks = Math.Max(1, mct.GetInt32());
                 if (dict.TryGetValue("tokenLimitRetryMinutes", out var tlr))
@@ -141,6 +150,7 @@ namespace Spritely.Managers
                     ["historyRetentionHours"] = _historyRetentionHours,
                     ["selectedProject"] = projectPath ?? "",
                     ["settingsPanelCollapsed"] = _settingsPanelCollapsed,
+                    ["leftPanelCollapsed"] = _leftPanelCollapsed,
                     ["maxConcurrentTasks"] = _maxConcurrentTasks,
                     ["tokenLimitRetryMinutes"] = _tokenLimitRetryMinutes,
                     ["autoVerify"] = _autoVerify,

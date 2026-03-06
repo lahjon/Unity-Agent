@@ -350,7 +350,7 @@ namespace Spritely
             foreach (var task in toStart)
             {
                 task.QueuedReason = null;
-                LaunchTaskProcess(task, $"[Spritely] Slot available — starting task #{task.TaskNumber}...\n\n");
+                LaunchTaskProcess(task, $"Slot available — starting task #{task.TaskNumber}...\n\n");
             }
 
             // Update queue positions for remaining InitQueued tasks
@@ -388,12 +388,12 @@ namespace Spritely
                     // Task was suspended via drag-drop — resume its process
                     _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
                     _outputTabManager.AppendOutput(task.Id,
-                        $"\n[Spritely] All dependencies resolved — resuming task #{task.TaskNumber}.\n\n",
+                        $"\nAll dependencies resolved — resuming task #{task.TaskNumber}.\n\n",
                         _activeTasks, _historyTasks);
                 }
                 else
                 {
-                    LaunchTaskProcess(task, $"\n[Spritely] All dependencies resolved — starting task #{task.TaskNumber}...\n\n");
+                    LaunchTaskProcess(task, $"\nAll dependencies resolved — starting task #{task.TaskNumber}...\n\n");
                 }
 
                 _outputTabManager.UpdateTabHeader(task);
@@ -406,32 +406,40 @@ namespace Spritely
             var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
             if (task == null) return;
 
-            // Debug logging
             AppLogger.Debug("OnQueuedTaskResumed", $"Task #{task.TaskNumber} - ConversationId: {task.ConversationId}, Process: {task.Process?.Id}, HasExited: {task.Process?.HasExited}");
 
-            _outputTabManager.AppendOutput(taskId, $"\n[Spritely] Resuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
+            _outputTabManager.AppendOutput(taskId, $"\nResuming task #{task.TaskNumber} (blocking task finished)...\n\n", _activeTasks, _historyTasks);
 
-            // Check if we have an existing process that was paused
+            var resumed = false;
+
+            // Try to resume existing suspended process
             if (task.Process is { HasExited: false })
             {
-                // Resume the existing process - ResumeTask will handle status change
                 AppLogger.Info("OnQueuedTaskResumed", $"Resuming existing process for task #{task.TaskNumber}");
                 _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
 
-                // Clear queued properties after successful resume
-                task.QueuedReason = null;
-                task.BlockedByTaskId = null;
-                task.BlockedByTaskNumber = null;
-                if (task.StartTime == DateTime.MinValue)
-                    task.StartTime = DateTime.Now;
-                _outputTabManager.UpdateTabHeader(task);
+                // ResumeTask may fail if process exited between our check and the resume attempt.
+                // If status changed away from Queued, the resume succeeded.
+                resumed = task.Status != AgentTaskStatus.Queued;
+                if (resumed)
+                {
+                    task.QueuedReason = null;
+                    task.BlockedByTaskId = null;
+                    task.BlockedByTaskNumber = null;
+                    if (task.StartTime == DateTime.MinValue)
+                        task.StartTime = DateTime.Now;
+                    _outputTabManager.UpdateTabHeader(task);
+                }
+                else
+                {
+                    AppLogger.Warn("OnQueuedTaskResumed", $"ResumeTask did not change status for task #{task.TaskNumber} — falling through to new process");
+                }
             }
-            else
-            {
-                // No existing process, start a new one
-                AppLogger.Info("OnQueuedTaskResumed", $"Starting new process for task #{task.TaskNumber} (no existing process)");
 
-                // For new process, we need to reset the status and properties before starting
+            // Start a new process if resume didn't work or no process existed
+            if (!resumed)
+            {
+                AppLogger.Info("OnQueuedTaskResumed", $"Starting new process for task #{task.TaskNumber}");
                 task.Status = AgentTaskStatus.Running;
                 task.QueuedReason = null;
                 task.BlockedByTaskId = null;
@@ -494,11 +502,11 @@ namespace Spritely
                 _outputTabManager.CreateTab(child);
 
                 _outputTabManager.AppendOutput(parent.Id,
-                    $"\n[Spritely] Spawned subtask #{child.TaskNumber}: {child.Description}\n",
+                    $"\nSpawned subtask #{child.TaskNumber}: {child.Description}\n",
                     _activeTasks, _historyTasks);
 
                 _outputTabManager.AppendOutput(child.Id,
-                    $"[Spritely] Subtask of #{parent.TaskNumber}: {parent.Description}\n",
+                    $"Subtask of #{parent.TaskNumber}: {parent.Description}\n",
                     _activeTasks, _historyTasks);
 
                 _outputTabManager.UpdateTabHeader(child);
@@ -658,7 +666,7 @@ namespace Spritely
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
             _outputTabManager.AppendOutput(newTask.Id,
-                $"[Spritely] Re-running task #{historicTask.TaskNumber}\n", _activeTasks, _historyTasks);
+                $"Re-running task #{historicTask.TaskNumber}\n", _activeTasks, _historyTasks);
 
             _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
             UpdateStatus();
@@ -693,7 +701,7 @@ namespace Spritely
                     task.PlanOnly = true;
                     task.Status = AgentTaskStatus.Planning;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[Spritely] Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
+                        $"Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                     _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
@@ -706,7 +714,7 @@ namespace Spritely
                     task.BlockedByTaskId = activeDeps[0].Id;
                     task.BlockedByTaskNumber = activeDeps[0].TaskNumber;
                     _outputTabManager.AppendOutput(task.Id,
-                        $"[Spritely] Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
+                        $"Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
                 }
@@ -717,7 +725,7 @@ namespace Spritely
                 task.Status = AgentTaskStatus.InitQueued;
                 task.QueuedReason = "Max concurrent tasks reached";
                 _outputTabManager.AppendOutput(task.Id,
-                    $"[Spritely] Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
+                    $"Max concurrent tasks ({_settingsManager.MaxConcurrentTasks}) reached — task #{task.TaskNumber} waiting for a slot...\n",
                     _activeTasks, _historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
             }

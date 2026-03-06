@@ -289,8 +289,6 @@ namespace Spritely.Managers
                 UpdateStatusMessage();
             }
 
-            _cachedRoot.Children.Add(MakeSeparator());
-
             bool noGitWrite = _getNoGitWrite();
 
             if (noGitWrite && _uncommittedChanges.Count > 0)
@@ -306,7 +304,6 @@ namespace Spritely.Managers
 
             if (!noGitWrite && _uncommittedChanges.Count > 0)
             {
-                _cachedRoot.Children.Add(MakeSeparator());
                 // Uncommitted changes section - cache container
                 _cachedUncommittedSection = new StackPanel();
                 _cachedRoot.Children.Add(_cachedUncommittedSection);
