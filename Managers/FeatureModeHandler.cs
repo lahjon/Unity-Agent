@@ -620,6 +620,13 @@ namespace Spritely.Managers
             // Dynamic model selection based on complexity
             var phaseModel = DetermineOptimalModel(task, activeTasks, historyTasks);
 
+            if (task.Runtime.LastCliModel != null && task.Runtime.LastCliModel != phaseModel)
+            {
+                _outputProcessor.AppendOutput(task.Id,
+                    $"\nSwitching Model to: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
+                    activeTasks, historyTasks);
+            }
+            task.Runtime.LastCliModel = phaseModel;
             _outputProcessor.AppendOutput(task.Id,
                 $"\nPhase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
                 activeTasks, historyTasks);

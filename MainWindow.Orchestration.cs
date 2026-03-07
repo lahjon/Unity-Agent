@@ -249,6 +249,10 @@ namespace Spritely
                     PersistChangedFiles(task, lockedFiles);
             }
 
+            // Snapshot output so it survives restart (OutputBuilder is in-memory only)
+            if (string.IsNullOrEmpty(task.FullOutput) && task.OutputBuilder.Length > 0)
+                task.FullOutput = task.OutputBuilder.ToString();
+
             // Release all resources associated with this task
             _fileLockManager.ReleaseTaskLocks(task.Id);
             _fileLockManager.RemoveQueuedInfo(task.Id);
@@ -502,10 +506,6 @@ namespace Spritely
                 if (idx > 0)
                     _activeTasks.Move(idx, 0);
             }
-
-            // Auto-recovery: spawn a diagnostic child task for failed tasks
-            if (task is { Status: AgentTaskStatus.Failed })
-                _failureRecoveryManager.TrySpawnRecoveryTask(task, _activeTasks, _historyTasks);
 
             // Auto-finalize when auto-commit is on: trigger git commit and release file locks.
             // Without this, FinalizeTask only runs when the user manually dismisses the card,

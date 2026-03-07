@@ -90,9 +90,6 @@ namespace Spritely
         /// <summary>Git diff summary captured before commit (--stat output).</summary>
         public string? CommitDiff { get; set; }
 
-        // Failure recovery
-        public bool IsRecoveryTask { get; set; }
-
         // Token usage tracking
         public long InputTokens { get; set; }
         public long OutputTokens { get; set; }

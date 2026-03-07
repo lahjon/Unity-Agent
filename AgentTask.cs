@@ -112,7 +112,6 @@ namespace Spritely
         public string ProjectPath { get => Data.ProjectPath; set => Data.ProjectPath = value; }
         public string ProjectColor { get => Data.ProjectColor; set => Data.ProjectColor = value; }
         public string? GitStartHash { get => Data.GitStartHash; set => Data.GitStartHash = value; }
-        public bool IsRecoveryTask { get => Data.IsRecoveryTask; set => Data.IsRecoveryTask = value; }
         public string? DependencyContext { get => Data.DependencyContext; set => Data.DependencyContext = value; }
         public string? ParentTaskId { get => Data.ParentTaskId; set => Data.ParentTaskId = value; }
         public List<string> ChildTaskIds { get => Data.ChildTaskIds; set => Data.ChildTaskIds = value; }

@@ -180,6 +180,7 @@ namespace Spritely.Managers
             var projectPath = task.ProjectPath;
 
             var cliModel = PromptBuilder.GetCliModelForTask(task);
+            task.Runtime.LastCliModel = cliModel;
             var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, cliModel, task.PlanOnly);
 
             var ps1File = Path.Combine(_scriptDir, $"task_{task.Id}.ps1");
@@ -533,6 +534,7 @@ namespace Spritely.Managers
             var promptFile = BuildAndWritePromptFile(task);
             var projectPath = task.ProjectPath;
             var cliModel = PromptBuilder.GetCliModelForTask(task);
+            task.Runtime.LastCliModel = cliModel;
 
             var ps1File = Path.Combine(_scriptDir, $"headless_{task.Id}.ps1");
             File.WriteAllText(ps1File,
@@ -723,6 +725,13 @@ namespace Spritely.Managers
             }
 
             var followUpModel = PromptBuilder.GetCliModelForTask(task);
+            if (task.Runtime.LastCliModel != null && task.Runtime.LastCliModel != followUpModel)
+            {
+                _outputProcessor.AppendOutput(task.Id,
+                    $"\nSwitching Model to: {PromptBuilder.GetFriendlyModelName(followUpModel)} ({followUpModel})\n",
+                    activeTasks, historyTasks);
+            }
+            task.Runtime.LastCliModel = followUpModel;
             _outputProcessor.AppendOutput(task.Id, $"\nUser Input > {text}\n\n", activeTasks, historyTasks);
 
             // Append follow-up prompt to task description for git commit tracking

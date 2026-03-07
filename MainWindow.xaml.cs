@@ -77,7 +77,6 @@ namespace Spritely
         private GitOperationGuard _gitOperationGuard = null!;
         private readonly TaskGroupTracker _taskGroupTracker;
         private readonly TaskOrchestrator _taskOrchestrator;
-        private FailureRecoveryManager _failureRecoveryManager = null!;
         private SkillManager _skillManager = null!;
         private DispatcherTimer? _helperAnimTimer;
         private int _helperAnimTick;
@@ -218,10 +217,6 @@ namespace Spritely
                 () => GetActiveSkillsBlock());
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
-
-            _failureRecoveryManager = new FailureRecoveryManager(
-                _taskExecutionManager, _outputTabManager, _taskFactory,
-                () => _settingsManager.AutoRecover);
 
             _taskOrchestrator = new TaskOrchestrator();
             _taskOrchestrator.TaskReady += OnOrchestratorTaskReady;
@@ -424,7 +419,6 @@ namespace Spritely
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
             TimeoutMinutesBox.Text = Constants.AppConstants.DefaultTaskTimeoutMinutes.ToString();
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
-            AutoRecoverToggle.IsChecked = _settingsManager.AutoRecover;
             AutoCommitToggle.IsChecked = _settingsManager.AutoCommit;
             DefaultMcpServerNameBox.Text = _settingsManager.DefaultMcpServerName;
             DefaultMcpAddressBox.Text = _settingsManager.DefaultMcpAddress;
@@ -1007,11 +1001,6 @@ namespace Spritely
         private void AutoVerifyToggle_Changed(object sender, RoutedEventArgs e)
         {
             _settingsManager.AutoVerify = AutoVerifyToggle.IsChecked == true;
-        }
-
-        private void AutoRecoverToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            _settingsManager.AutoRecover = AutoRecoverToggle.IsChecked == true;
         }
 
         private void AutoCommitToggle_Changed(object sender, RoutedEventArgs e)

@@ -62,7 +62,8 @@ namespace Spritely.Managers
                         InputTokens = t.InputTokens,
                         OutputTokens = t.OutputTokens,
                         CacheReadTokens = t.CacheReadTokens,
-                        CacheCreationTokens = t.CacheCreationTokens
+                        CacheCreationTokens = t.CacheCreationTokens,
+                        FullOutput = t.FullOutput ?? ""
                     }).ToList();
                 }
 
@@ -110,6 +111,7 @@ namespace Spritely.Managers
                         CacheCreationTokens = entry.CacheCreationTokens
                     };
                     task.Summary = entry.Summary ?? "";
+                    task.FullOutput = string.IsNullOrEmpty(entry.FullOutput) ? null : entry.FullOutput;
                     task.Status = Enum.TryParse<AgentTaskStatus>(entry.Status, out var s)
                         ? s : AgentTaskStatus.Completed;
 

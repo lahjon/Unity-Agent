@@ -83,7 +83,6 @@ namespace Spritely.Managers
         public static readonly string ConfirmBeforeChangesBlock = PromptLoader.Load("ConfirmBeforeChangesBlock.md");
         public static readonly string AutonomousExecutionBlock = PromptLoader.Load("AutonomousExecutionBlock.md");
         public static readonly string OutputEfficiencyBlock = PromptLoader.Load("OutputEfficiencyBlock.md");
-        public static readonly string FailureRecoveryBlock = PromptLoader.Load("FailureRecoveryBlock.md");
         public static readonly string PlanningTeamMemberBlock = PromptLoader.Load("PlanningTeamMemberBlock.md");
         public static readonly string FeatureModeInitialTemplate = PromptLoader.Load("FeatureModeInitialTemplate.md");
         public static readonly string FeatureModePlanConsolidationTemplate = PromptLoader.Load("FeatureModePlanConsolidationTemplate.md");

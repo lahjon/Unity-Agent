@@ -32,6 +32,9 @@ namespace Spritely
         public int TokenLimitRetryCount { get; set; }
         public long LastPromptTokenEstimate { get; set; }
 
+        // Model tracking
+        public string? LastCliModel { get; set; }
+
         // Queue / dependency tracking
         public string? QueuedReason { get; set; }
         public string? BlockedByTaskId { get; set; }

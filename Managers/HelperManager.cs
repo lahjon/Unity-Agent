@@ -142,7 +142,7 @@ namespace Spritely.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = "-p --max-turns 15 --output-format json --output-schema '{\"type\":\"object\",\"properties\":{\"suggestions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}},\"required\":[\"title\",\"description\"]}}},\"required\":[\"suggestions\"]}'",
+                    Arguments = "-p --max-turns 15 --output-format json --output-schema {\"type\":\"object\",\"properties\":{\"suggestions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}},\"required\":[\"title\",\"description\"]}}},\"required\":[\"suggestions\"]}",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -159,10 +159,21 @@ namespace Spritely.Managers
                 await process.StandardInput.WriteAsync(prompt);
                 process.StandardInput.Close();
 
+                // Drain stderr concurrently to prevent deadlock (max-turns 15 can produce large stderr)
+                var stderrTask = process.StandardError.ReadToEndAsync(ct);
                 var output = await process.StandardOutput.ReadToEndAsync(ct);
+                var stderr = await stderrTask;
                 await process.WaitForExitAsync(ct);
 
                 var text = StripAnsi(output).Trim();
+
+                if (string.IsNullOrWhiteSpace(text) && process.ExitCode != 0)
+                {
+                    var errPreview = stderr.Length > 200 ? stderr[..200] + "..." : stderr;
+                    AppLogger.Warn("HelperManager", $"Claude process exited with code {process.ExitCode}. stderr: {errPreview}");
+                    GenerationFailed?.Invoke("Suggestion generation failed — see logs for details.");
+                    return;
+                }
 
                 // Parse suggestions — handle CLI JSON envelope, structured output, and legacy formats
                 List<SuggestionJson>? items = null;

@@ -18,7 +18,6 @@ namespace Spritely.Managers
         private int _maxConcurrentTasks = 10;
         private int _tokenLimitRetryMinutes = 30;
         private bool _autoVerify;
-        private bool _autoRecover;
         private bool _autoCommit;
         private string _defaultMcpServerName = "mcp-for-unity-server";
         private string _defaultMcpAddress = "http://127.0.0.1:8080/mcp";
@@ -66,12 +65,6 @@ namespace Spritely.Managers
         {
             get => _autoVerify;
             set => _autoVerify = value;
-        }
-
-        public bool AutoRecover
-        {
-            get => _autoRecover;
-            set => _autoRecover = value;
         }
 
         public bool AutoCommit
@@ -127,8 +120,6 @@ namespace Spritely.Managers
                     _tokenLimitRetryMinutes = Math.Max(1, tlr.GetInt32());
                 if (dict.TryGetValue("autoVerify", out var av))
                     _autoVerify = av.GetBoolean();
-                if (dict.TryGetValue("autoRecover", out var ar))
-                    _autoRecover = ar.GetBoolean();
                 if (dict.TryGetValue("autoCommit", out var ac))
                     _autoCommit = ac.GetBoolean();
                 if (dict.TryGetValue("defaultMcpServerName", out var dmsn))
@@ -154,7 +145,6 @@ namespace Spritely.Managers
                     ["maxConcurrentTasks"] = _maxConcurrentTasks,
                     ["tokenLimitRetryMinutes"] = _tokenLimitRetryMinutes,
                     ["autoVerify"] = _autoVerify,
-                    ["autoRecover"] = _autoRecover,
                     ["autoCommit"] = _autoCommit,
                     ["defaultMcpServerName"] = _defaultMcpServerName,
                     ["defaultMcpAddress"] = _defaultMcpAddress,
