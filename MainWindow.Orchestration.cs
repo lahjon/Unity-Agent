@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -255,63 +254,6 @@ namespace Spritely
         }
 
         /// <summary>
-        /// Persists the file lock paths as relative ChangedFiles on the task data
-        /// so they survive across sessions even if the commit fails.
-        /// </summary>
-        private void PersistChangedFiles(AgentTask task, HashSet<string> lockedFiles)
-        {
-            var projectRoot = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
-            var relativePaths = new List<string>();
-            foreach (var absPath in lockedFiles)
-            {
-                var rel = absPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
-                    ? absPath.Substring(projectRoot.Length)
-                    : absPath;
-                if (!rel.Contains("..") && !Path.IsPathRooted(rel))
-                    relativePaths.Add(rel.Replace('\\', '/'));
-            }
-            task.ChangedFiles = relativePaths;
-        }
-
-        /// <summary>
-        /// Falls back to git diff to discover changed files when file locks are empty.
-        /// Fire-and-forget — best effort to populate ChangedFiles for later manual commit.
-        /// </summary>
-        private async Task PersistChangedFilesFromGitAsync(AgentTask task)
-        {
-            try
-            {
-                var gitFiles = await _gitHelper.GetChangedFileNamesAsync(task.ProjectPath, task.GitStartHash);
-                if (gitFiles != null && gitFiles.Count > 0 && task.ChangedFiles.Count == 0)
-                    task.ChangedFiles = gitFiles;
-            }
-            catch (Exception ex)
-            {
-                Managers.AppLogger.Debug("Orchestration", $"Failed to persist changed files from git for task {task.Id}", ex);
-            }
-        }
-
-        /// <summary>
-        /// Called after auto-commit completes (success or failure) to release file locks,
-        /// transition from Committing to Completed, and perform the standard teardown.
-        /// </summary>
-        private void FinishTaskAfterCommit(AgentTask task, bool closeTab = true)
-        {
-            // Release all file locks now that commit is done (or failed)
-            _fileLockManager.ReleaseTaskLocks(task.Id);
-            task.Runtime.LockedFilesForCommit = null;
-            task.Runtime.PendingCommitTask = null;
-
-            // Transition from Committing to Completed
-            task.Status = AgentTaskStatus.Completed;
-            task.EndTime ??= DateTime.Now;
-            _outputTabManager.UpdateTabHeader(task);
-
-            // Perform the standard teardown (move to history, resume queued tasks, etc.)
-            PerformTaskTeardown(task, closeTab);
-        }
-
-        /// <summary>
         /// Shared teardown logic: releases remaining resources, moves task from active to history,
         /// fires notifications, and resumes queued/dependency-blocked tasks.
         /// </summary>
@@ -399,32 +341,6 @@ namespace Spritely
 
         // Keep MoveToHistory as a thin alias for callers that pass it as a delegate
         private void MoveToHistory(AgentTask task) => FinalizeTask(task);
-
-        /// <summary>
-        /// Releases file locks that were deferred for Auto-Commit.
-        /// Called after git commit is complete to finally release the locks.
-        /// Only used for manual commits on history tasks (not the Committing flow).
-        /// </summary>
-        public void ReleaseTaskLocksAfterCommit(AgentTask task)
-        {
-            // If task is in Committing status, FinishTaskAfterCommit handles lock release
-            if (task.Status == AgentTaskStatus.Committing)
-                return;
-
-            if (task.Runtime.LockedFilesForCommit != null && task.Runtime.LockedFilesForCommit.Count > 0)
-            {
-                _fileLockManager.ReleaseTaskLocks(task.Id);
-                task.Runtime.LockedFilesForCommit = null;
-
-                // Check if any queued tasks can now proceed
-                _fileLockManager.CheckQueuedTasks(_activeTasks);
-            }
-
-            // Clear pending commit task
-            task.Runtime.PendingCommitTask = null;
-            task.OnPropertyChanged(nameof(task.IsPendingCommit));
-            RefreshActivityDashboard();
-        }
 
         /// <summary>
         /// Transitions a task from a queued/waiting state to Running and starts its process.
