@@ -16,12 +16,17 @@
   "primaryFiles": [],
   "secondaryFiles": [],
   "relatedFeatureIds": [],
+  "dependsOn": [],
   "context": {
     "signatures": {},
     "keyTypes": [],
     "patterns": [],
     "dependencies": []
   },
+  "parentModuleId": "task-execution",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T20:04:45.2186967Z"
 }

@@ -1,34 +1,76 @@
 {
   "id": "mcp-integration",
   "name": "MCP-for-Unity Integration",
-  "description": "Monitors MCP server health for Unity Editor integration, manages connection state, and injects MCP configuration into task prompts when enabled. Handles automatic reconnection on failure.",
+  "description": "Monitors MCP-for-Unity server health, handles connect/disconnect/restart logic, and surfaces MCP status in the UI. Enables in-editor Unity automation via the MCP protocol.",
   "category": "integration",
   "keywords": [
     "MCP",
-    "MCP config",
-    "MCP prompt",
+    "MCP restart",
     "MCP server",
-    "MCP status",
+    "McpAddress",
     "McpHealthMonitor",
+    "McpStartCommand",
     "McpStatus",
     "Unity",
-    "Unity Editor",
-    "game project"
+    "health monitor"
   ],
   "primaryFiles": [
+    "MainWindow.Features.cs",
     "Managers/McpHealthMonitor.cs"
   ],
   "secondaryFiles": [
-    "Managers/ProjectManager.cs",
-    "Managers/PromptBuilder.cs",
     "Models/ProjectEntry.cs"
   ],
   "relatedFeatureIds": [
     "project-management",
     "prompt-building"
   ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
+  ],
   "context": {
     "signatures": {
+      "MainWindow.Features.cs": {
+        "hash": "a6930da65471",
+        "content": "class MainWindow"
+      },
       "Managers/McpHealthMonitor.cs": {
         "hash": "b2a089f49986",
         "content": "enum McpHealthStatus\n    Connected, Disconnected\nclass McpHealthMonitor\n  Start() -\u003E void\n  Stop() -\u003E void\n  Dispose() -\u003E void"
@@ -36,18 +78,28 @@
     },
     "keyTypes": [
       "class McpHealthMonitor",
-      "enum McpHealthStatus",
       "enum McpStatus"
     ],
     "patterns": [
-      "MCP prompt block injected conditionally",
-      "Periodic health polling with reconnection"
+      "McpStatus reflected on ProjectEntry",
+      "Polling health check with exponential backoff restart"
     ],
     "dependencies": [
-      "ProjectEntry.McpAddress and McpStartCommand for configuration",
-      "PromptBuilder for MCP block injection"
+      "Connects to MCP server at ProjectEntry.McpAddress",
+      "MCP prompt block injected via PromptBuilder when enabled"
     ]
   },
+  "parentModuleId": "external-integrations",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Dispose",
+    "MainWindow",
+    "McpHealthMonitor",
+    "McpHealthStatus",
+    "Start",
+    "Stop"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.4606454Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.5850872Z"
 }

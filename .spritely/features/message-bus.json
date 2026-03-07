@@ -1,29 +1,34 @@
 {
   "id": "message-bus",
-  "name": "Inter-Task Message Bus",
-  "description": "Provides a file-system-based message bus enabling AI tasks to communicate with each other during feature mode team execution. Messages are routed via inbox directories under %LOCALAPPDATA%\\Spritely\\agent-bus\\.",
-  "category": "infrastructure",
+  "name": "Agent Message Bus",
+  "description": "File-based message bus enabling multiple agent tasks to communicate with each other. Supports broadcast, directed mentions, topic filtering, and TTL-based expiry.",
+  "category": "integration",
   "keywords": [
     "BusMessage",
-    "FileSystemWatcher",
+    "BusParticipant",
     "MessageBusManager",
+    "UseMessageBus",
     "agent bus",
+    "broadcast",
     "inbox",
-    "inter-task",
-    "mentions",
-    "message bus",
-    "topic"
+    "inter-task communication",
+    "message bus"
   ],
   "primaryFiles": [
     "Managers/MessageBusManager.cs"
   ],
   "secondaryFiles": [
-    "Models/AgentTaskData.cs",
-    "Spritely.Tests/SessionDataCleanupTests.cs"
+    "Models/AgentTaskData.cs"
   ],
   "relatedFeatureIds": [
-    "feature-mode",
-    "task-execution"
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "feature-registry",
+    "logging-diagnostics",
+    "task-orchestration"
   ],
   "context": {
     "signatures": {
@@ -39,14 +44,39 @@
       "class MessageBusManager"
     ],
     "patterns": [
-      "Bus cleanup on all tasks complete",
-      "FileSystemWatcher \u002B DispatcherTimer polling hybrid"
+      "File-system watcher per bus inbox directory",
+      "TTL expiry enforced on message read"
     ],
     "dependencies": [
-      "%LOCALAPPDATA%\\Spritely\\agent-bus\\ for message storage",
-      "AgentTask for participant registration"
+      "Enabled per-task via UseMessageBus flag",
+      "Persists messages to %LOCALAPPDATA%\\Spritely\\agent-bus\\"
     ]
   },
+  "parentModuleId": "external-integrations",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Body",
+    "BusContext",
+    "BusDir",
+    "BusMessage",
+    "BusParticipant",
+    "ExpiresAt",
+    "From",
+    "FromSummary",
+    "InboxDir",
+    "IsExpired",
+    "Mentions",
+    "ParticipantTaskIds",
+    "PollTimer",
+    "SourceFile",
+    "Summary",
+    "TaskId",
+    "Timestamp",
+    "Topic",
+    "Type",
+    "Watcher"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.5540448Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.5906538Z"
 }

@@ -1,53 +1,158 @@
 {
   "id": "task-orchestration",
-  "name": "Task Orchestration",
-  "description": "Manages the dependency graph between tasks, determines which tasks are runnable, and fires events when tasks become unblocked. Enforces ordering, priority, and cycle detection across the full task queue.",
+  "name": "Task Orchestration \u0026 Lifecycle",
+  "description": "Manages the full lifecycle of AI agent tasks including creation, queuing, dependency resolution, file lock coordination, pause/unpause, and cancellation. Ensures tasks run safely without conflicting file access.",
   "category": "core",
   "keywords": [
+    "AgentTask",
+    "FileLockManager",
+    "RunningTask",
+    "TaskExecutionManager",
     "TaskOrchestrator",
-    "cycle",
+    "cancel",
     "dependency",
-    "graph",
-    "orchestration",
-    "priority",
-    "queue",
-    "runnable",
-    "task ordering",
-    "unblock"
+    "lifecycle",
+    "pause",
+    "queue"
   ],
   "primaryFiles": [
-    "Managers/TaskOrchestrator.cs"
+    "Managers/FileLockManager.cs",
+    "Managers/TaskExecutionManager.cs",
+    "Managers/TaskOrchestrator.cs",
+    "Managers/TaskProcessLauncher.cs"
   ],
   "secondaryFiles": [
+    "Models/AgentTask.cs",
     "Models/AgentTaskData.cs",
     "Models/RuntimeTaskContext.cs",
+    "Spritely.Tests/ProjectSwapTests.cs",
+    "Spritely.Tests/SessionDataCleanupTests.cs",
+    "Spritely.Tests/TaskLauncherTests.cs",
     "Spritely.Tests/TaskOrchestratorTests.cs"
   ],
   "relatedFeatureIds": [
+    "feature-mode-execution",
+    "prompt-building",
+    "task-history",
+    "task-preprocessing",
+    "task-ui"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup",
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
     "file-lock-management",
-    "task-execution"
+    "git-operations",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "prompt-building",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-preprocessing",
+    "task-templates",
+    "task-ui",
+    "theming-ui-shared"
   ],
   "context": {
     "signatures": {
+      "Managers/FileLockManager.cs": {
+        "hash": "be0d3833678d",
+        "content": "class FileLockManager\n  LockCount: int\n  ReleaseTaskLocks(string taskId) -\u003E void\n  IsFileLocked(string normalizedPath) -\u003E bool\n  GetTaskLockedFiles(string taskId) -\u003E HashSet\u003Cstring\u003E\n  CheckQueuedTasks(ObservableCollection\u003CAgentTask\u003E activeTasks) -\u003E void\n  ForceStartQueuedTask(AgentTask task) -\u003E void\n  AddQueuedTaskInfo(string taskId, QueuedTaskInfo info) -\u003E void\n  RemoveQueuedInfo(string taskId) -\u003E void\n  ClearAll() -\u003E void\n  SetGitOperationInProgress(bool inProgress) -\u003E void\n  TryExtractFilePathFromPartial(string partialJson) -\u003E string?\n  ExtractFilePath(JsonElement input) -\u003E string?"
+      },
+      "Managers/TaskExecutionManager.cs": {
+        "hash": "f941328ee742",
+        "content": "class TaskExecutionManager\n  LaunchHeadless(AgentTask task) -\u003E void\n  CancelTaskImmediate(AgentTask task) -\u003E void\n  KillProcess(AgentTask task) -\u003E void\n  RemoveStreamingState(string taskId) -\u003E void\n  PauseTask(AgentTask task) -\u003E void\n  SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask\n  SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask\n  ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?\n  InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void\n  ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?"
+      },
       "Managers/TaskOrchestrator.cs": {
         "hash": "2fe41d9b5ea4",
         "content": "class TaskOrchestrator\n  AddTask(AgentTask task, List\u003Cstring\u003E dependsOn) -\u003E void\n  GetNextRunnableTasks(int maxCount) -\u003E List\u003CAgentTask\u003E\n  OnTaskCompleted(string taskId) -\u003E void\n  DetectCycle(string fromId, string toId) -\u003E bool\n  ReevaluateAll() -\u003E void\n  RemoveTask(string taskId) -\u003E void\n  ContainsTask(string taskId) -\u003E bool\n  MarkResolved(string taskId) -\u003E void\n  Id: string\n  Task: AgentTask?\n  IsResolved: bool\n  UnresolvedDependencies: HashSet\u003Cstring\u003E\n  Dependents: HashSet\u003Cstring\u003E"
+      },
+      "Managers/TaskProcessLauncher.cs": {
+        "hash": "03feab20187f",
+        "content": "class TaskProcessLauncher\n  ProcessQueuedMessagesCallback: Action\u003CAgentTask, ObservableCollection\u003CAgentTask\u003E, ObservableCollection\u003CAgentTask\u003E\u003E?\n  StartManagedProcess(AgentTask task, Process process) -\u003E void\n  KillProcess(AgentTask task) -\u003E void\n  RemoveStreamingState(string taskId) -\u003E void\n  CleanupScripts(string taskId) -\u003E void\n  PauseTask(AgentTask task) -\u003E void"
       }
     },
     "keyTypes": [
-      "class TaskNode",
-      "class TaskOrchestrator"
+      "class AgentTask",
+      "class FileLockManager",
+      "class RuntimeTaskContext",
+      "class TaskExecutionManager",
+      "class TaskOrchestrator",
+      "class TaskProcessLauncher",
+      "enum AgentTaskStatus"
     ],
     "patterns": [
-      "Dependency graph with cycle detection",
-      "Event-driven unblocking via TaskReady event",
-      "Manager pattern"
+      "Dependency graph with topological unblocking",
+      "File lock guard before Git operations",
+      "Manager pattern with async lifecycle",
+      "Preserve process/conversation on pause"
     ],
     "dependencies": [
-      "AgentTask model for task state",
-      "FileLockManager for queue coordination"
+      "Calls Claude CLI via Process through PromptBuilder",
+      "Publishes task events to TaskGroupTracker",
+      "Reads project config from ProjectManager"
     ]
   },
+  "parentModuleId": "task-execution",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AddQueuedTaskInfo",
+    "AddTask",
+    "CancelTaskImmediate",
+    "CheckQueuedTasks",
+    "CleanupScripts",
+    "ClearAll",
+    "ContainsTask",
+    "Dependents",
+    "DependsOn",
+    "Description",
+    "DetectCycle",
+    "ExtractAndSpawnSubtasks",
+    "ExtractAndSpawnTeam",
+    "ExtractFilePath",
+    "FileLockManager",
+    "ForceStartQueuedTask",
+    "GetNextRunnableTasks",
+    "GetTaskLockedFiles",
+    "Id",
+    "InjectSubtaskResult",
+    "IsFileLocked",
+    "IsResolved",
+    "KillProcess",
+    "LaunchHeadless",
+    "LockCount",
+    "MarkResolved",
+    "OnTaskCompleted",
+    "PauseTask",
+    "ProcessQueuedMessagesCallback",
+    "ReevaluateAll",
+    "ReleaseTaskLocks",
+    "RemoveQueuedInfo",
+    "RemoveStreamingState",
+    "RemoveTask",
+    "Role",
+    "SetGitOperationInProgress",
+    "SpawnSubtask",
+    "SpawnSubtaskAndQueue",
+    "StartManagedProcess",
+    "Task",
+    "TaskExecutionManager",
+    "TaskOrchestrator",
+    "TaskProcessLauncher",
+    "TryExtractFilePathFromPartial",
+    "UnresolvedDependencies"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.270905Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.2475543Z"
 }

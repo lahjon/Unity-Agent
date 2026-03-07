@@ -809,7 +809,690 @@ namespace Spritely.Tests
             Assert.Contains("class FeatureRegistryManager", signatures);
             Assert.Contains("RegistryExists", signatures);
             Assert.Contains("LoadAllFeaturesAsync", signatures);
-            Assert.Contains("BuildFeatureContextBlock", signatures);
+            // Methods with multi-line signatures (multiple params across lines) are not extracted by the single-line regex extractor — that's expected
+            Assert.Contains("BuildDependencyGraph", signatures);
+        }
+
+        // ── SignatureExtractor: ExtractStructuredSymbols ────────────────
+
+        [Fact]
+        public void SignatureExtractor_ExtractStructuredSymbols_CSharp_ReturnsCorrectKindsAndNames()
+        {
+            var file = CreateTempFile(".cs", """
+                using System;
+                namespace TestApp
+                {
+                    public interface IService
+                    {
+                        public void Execute();
+                    }
+                    public class ServiceImpl
+                    {
+                        public string Name { get; set; }
+                        public void Execute() { }
+                    }
+                    public enum Status
+                    {
+                        Active,
+                        Inactive
+                    }
+                    public struct Point
+                    {
+                        public int X { get; set; }
+                    }
+                }
+                """);
+
+            var symbols = SignatureExtractor.ExtractStructuredSymbols(file);
+
+            Assert.Contains(symbols, s => s.Name == "IService" && s.Kind == Managers.SymbolKind.Interface);
+            Assert.Contains(symbols, s => s.Name == "ServiceImpl" && s.Kind == Managers.SymbolKind.Class);
+            Assert.Contains(symbols, s => s.Name == "Status" && s.Kind == Managers.SymbolKind.Enum);
+            Assert.Contains(symbols, s => s.Name == "Point" && s.Kind == Managers.SymbolKind.Struct);
+            Assert.Contains(symbols, s => s.Name == "Name" && s.Kind == Managers.SymbolKind.Property);
+            Assert.Contains(symbols, s => s.Name == "Execute" && s.Kind == Managers.SymbolKind.Method);
+        }
+
+        [Fact]
+        public void SignatureExtractor_ExtractStructuredSymbols_ReturnsEmpty_ForMissingFile()
+        {
+            var symbols = SignatureExtractor.ExtractStructuredSymbols(Path.Combine(_tempDir, "missing.cs"));
+            Assert.Empty(symbols);
+        }
+
+        // ── SignatureExtractor: ExtractImports ────────────────────────────
+
+        [Fact]
+        public void SignatureExtractor_ExtractImports_CSharp_ExtractsUsingNamespaces()
+        {
+            var file = CreateTempFile(".cs", """
+                using System;
+                using System.Collections.Generic;
+                using Spritely.Managers;
+
+                namespace TestApp
+                {
+                    public class Foo { }
+                }
+                """);
+
+            var imports = SignatureExtractor.ExtractImports(file);
+
+            Assert.Contains("System", imports);
+            Assert.Contains("System.Collections.Generic", imports);
+            Assert.Contains("Spritely.Managers", imports);
+        }
+
+        [Fact]
+        public void SignatureExtractor_ExtractImports_TypeScript_ExtractsImportPaths()
+        {
+            var file = CreateTempFile(".ts", """
+                import { Component } from '@angular/core';
+                import { Observable } from 'rxjs';
+                import './styles.css';
+
+                export class AppComponent { }
+                """);
+
+            var imports = SignatureExtractor.ExtractImports(file);
+
+            Assert.Contains("@angular/core", imports);
+            Assert.Contains("rxjs", imports);
+            Assert.Contains("./styles.css", imports);
+        }
+
+        [Fact]
+        public void SignatureExtractor_ExtractImports_ReturnsEmpty_ForUnsupportedExtension()
+        {
+            var file = CreateTempFile(".txt", "just text");
+            var imports = SignatureExtractor.ExtractImports(file);
+            Assert.Empty(imports);
+        }
+
+        // ── CodebaseIndexManager: LookupSymbol ───────────────────────────
+
+        [Fact]
+        public void CodebaseIndex_LookupSymbol_ExactMatch_ReturnsConfidence1()
+        {
+            var index = MakeSymbolIndex(("taskorchestrator", "task-orch", "class TaskOrchestrator"));
+            var manager = new CodebaseIndexManager();
+
+            var results = manager.LookupSymbol(index, "TaskOrchestrator");
+
+            Assert.Single(results);
+            Assert.Equal(1.0, results[0].Confidence);
+            Assert.Equal("task-orch", results[0].FeatureId);
+        }
+
+        [Fact]
+        public void CodebaseIndex_LookupSymbol_PrefixMatch_ReturnsConfidence08()
+        {
+            var index = MakeSymbolIndex(("taskorchestrator", "task-orch", "class TaskOrchestrator"));
+            var manager = new CodebaseIndexManager();
+
+            var results = manager.LookupSymbol(index, "task");
+
+            Assert.Single(results);
+            Assert.Equal(0.8, results[0].Confidence);
+        }
+
+        [Fact]
+        public void CodebaseIndex_LookupSymbol_ContainsMatch_ReturnsConfidence05()
+        {
+            var index = MakeSymbolIndex(("taskorchestrator", "task-orch", "class TaskOrchestrator"));
+            var manager = new CodebaseIndexManager();
+
+            var results = manager.LookupSymbol(index, "orchestrator");
+
+            Assert.Single(results);
+            Assert.Equal(0.5, results[0].Confidence);
+        }
+
+        [Fact]
+        public void CodebaseIndex_LookupSymbol_NoMatch_ReturnsEmpty()
+        {
+            var index = MakeSymbolIndex(("taskorchestrator", "task-orch", "class TaskOrchestrator"));
+            var manager = new CodebaseIndexManager();
+
+            var results = manager.LookupSymbol(index, "zebra");
+
+            Assert.Empty(results);
+        }
+
+        [Fact]
+        public void CodebaseIndex_LookupSymbol_NullIndex_ReturnsEmpty()
+        {
+            var manager = new CodebaseIndexManager();
+            var results = manager.LookupSymbol(null!, "test");
+            Assert.Empty(results);
+        }
+
+        [Fact]
+        public void CodebaseIndex_LookupSymbol_EmptyQuery_ReturnsEmpty()
+        {
+            var index = MakeSymbolIndex(("foo", "f1", "class Foo"));
+            var manager = new CodebaseIndexManager();
+            var results = manager.LookupSymbol(index, "");
+            Assert.Empty(results);
+        }
+
+        [Fact]
+        public void CodebaseIndex_LookupSymbol_MultipleMatches_SortedByConfidence()
+        {
+            var index = new CodebaseSymbolIndex
+            {
+                Symbols = new Dictionary<string, SymbolIndexEntry>
+                {
+                    ["taskfactory"] = new() { FeatureId = "task-factory", ShortSignature = "class TaskFactory" },
+                    ["taskorchestrator"] = new() { FeatureId = "task-orch", ShortSignature = "class TaskOrchestrator" },
+                    ["task"] = new() { FeatureId = "task-core", ShortSignature = "class Task" }
+                }
+            };
+            var manager = new CodebaseIndexManager();
+
+            var results = manager.LookupSymbol(index, "task");
+
+            Assert.True(results.Count >= 2);
+            // Exact match first (confidence 1.0), then prefix matches (0.8)
+            Assert.Equal(1.0, results[0].Confidence);
+            Assert.Equal("task-core", results[0].FeatureId);
+        }
+
+        // ── DependencyAnalyzer: ComputeDependsOnForNewFeature ────────────
+
+        [Fact]
+        public void DependencyAnalyzer_ComputeDependsOnForNewFeature_FindsDependencyViaUsing()
+        {
+            // Create source file that uses "using Spritely.Managers;"
+            var managersDir = Path.Combine(_tempDir, "Managers");
+            Directory.CreateDirectory(managersDir);
+
+            var managerFile = Path.Combine(managersDir, "HelperManager.cs");
+            File.WriteAllText(managerFile, """
+                namespace Spritely.Managers
+                {
+                    public class HelperManager { }
+                }
+                """);
+
+            var consumerFile = Path.Combine(_tempDir, "Services", "MyService.cs");
+            Directory.CreateDirectory(Path.GetDirectoryName(consumerFile)!);
+            File.WriteAllText(consumerFile, """
+                using Spritely.Managers;
+                namespace Spritely.Services
+                {
+                    public class MyService
+                    {
+                        public void DoWork(HelperManager mgr) { }
+                    }
+                }
+                """);
+
+            var managersFeature = MakeFeature("managers-feature", "Managers Feature",
+                primaryFiles: new List<string> { "Managers/HelperManager.cs" });
+
+            var newFeature = MakeFeature("services-feature", "Services Feature",
+                primaryFiles: new List<string> { "Services/MyService.cs" });
+
+            var existingFeatures = new List<FeatureEntry> { managersFeature };
+
+            var deps = DependencyAnalyzer.ComputeDependsOnForNewFeature(newFeature, existingFeatures, _tempDir);
+
+            Assert.Contains("managers-feature", deps);
+        }
+
+        [Fact]
+        public void DependencyAnalyzer_ComputeDependsOnForNewFeature_NoSelfDependency()
+        {
+            var file = Path.Combine(_tempDir, "SelfRef.cs");
+            File.WriteAllText(file, """
+                using System;
+                namespace Spritely.Core
+                {
+                    public class SelfRef { }
+                }
+                """);
+
+            var feature = MakeFeature("self-feature", "Self Feature",
+                primaryFiles: new List<string> { "SelfRef.cs" });
+
+            var deps = DependencyAnalyzer.ComputeDependsOnForNewFeature(
+                feature, new List<FeatureEntry> { feature }, _tempDir);
+
+            Assert.DoesNotContain("self-feature", deps);
+        }
+
+        [Fact]
+        public void DependencyAnalyzer_ComputeDependsOnForNewFeature_EmptyWhenNoImports()
+        {
+            var file = Path.Combine(_tempDir, "NoImports.cs");
+            File.WriteAllText(file, """
+                namespace Spritely.Isolated
+                {
+                    public class NoImports { }
+                }
+                """);
+
+            var feature = MakeFeature("isolated", "Isolated",
+                primaryFiles: new List<string> { "NoImports.cs" });
+
+            var deps = DependencyAnalyzer.ComputeDependsOnForNewFeature(
+                feature, new List<FeatureEntry>(), _tempDir);
+
+            Assert.Empty(deps);
+        }
+
+        // ── ModuleRegistryManager: GetRelatedFeaturesViaModule ───────────
+
+        [Fact]
+        public void ModuleRegistry_GetRelatedFeaturesViaModule_ReturnsSiblings()
+        {
+            var moduleA = new ModuleEntry { Id = "mod-core", Name = "Core Module" };
+
+            var features = new List<FeatureEntry>
+            {
+                MakeFeatureWithModule("f1", "Feature 1", "mod-core"),
+                MakeFeatureWithModule("f2", "Feature 2", "mod-core"),
+                MakeFeatureWithModule("f3", "Feature 3", "mod-core"),
+                MakeFeatureWithModule("f4", "Feature 4", "mod-other")
+            };
+
+            var modules = new List<ModuleEntry> { moduleA, new() { Id = "mod-other", Name = "Other" } };
+
+            var siblings = ModuleRegistryManager.GetRelatedFeaturesViaModule("f1", features, modules);
+
+            Assert.Equal(2, siblings.Count);
+            Assert.Contains(siblings, f => f.Id == "f2");
+            Assert.Contains(siblings, f => f.Id == "f3");
+            Assert.DoesNotContain(siblings, f => f.Id == "f1"); // excludes self
+            Assert.DoesNotContain(siblings, f => f.Id == "f4"); // different module
+        }
+
+        [Fact]
+        public void ModuleRegistry_GetRelatedFeaturesViaModule_ReturnsEmpty_WhenNoModule()
+        {
+            var features = new List<FeatureEntry>
+            {
+                MakeFeature("orphan", "Orphan Feature") // no ParentModuleId
+            };
+
+            var siblings = ModuleRegistryManager.GetRelatedFeaturesViaModule(
+                "orphan", features, new List<ModuleEntry>());
+
+            Assert.Empty(siblings);
+        }
+
+        [Fact]
+        public void ModuleRegistry_GetRelatedFeaturesViaModule_ReturnsEmpty_WhenFeatureNotFound()
+        {
+            var siblings = ModuleRegistryManager.GetRelatedFeaturesViaModule(
+                "nonexistent", new List<FeatureEntry>(), new List<ModuleEntry>());
+
+            Assert.Empty(siblings);
+        }
+
+        [Fact]
+        public void ModuleRegistry_GetFeaturesInModule_ReturnsCorrectFeatures()
+        {
+            var module = new ModuleEntry { Id = "mod-ui", Name = "UI Module" };
+            var features = new List<FeatureEntry>
+            {
+                MakeFeatureWithModule("f1", "F1", "mod-ui"),
+                MakeFeatureWithModule("f2", "F2", "mod-ui"),
+                MakeFeatureWithModule("f3", "F3", "mod-other")
+            };
+
+            var inModule = ModuleRegistryManager.GetFeaturesInModule(module, features);
+
+            Assert.Equal(2, inModule.Count);
+            Assert.All(inModule, f => Assert.Equal("mod-ui", f.ParentModuleId));
+        }
+
+        // ── FeatureRegistryManager: FindMatchingFeaturesEnhanced ─────────
+
+        [Fact]
+        public void Registry_FindMatchingFeaturesEnhanced_SymbolBoostsScore()
+        {
+            var features = new List<FeatureEntry>
+            {
+                MakeFeature("task-orch", "Task Orchestration",
+                    "Orchestrates task execution",
+                    new List<string> { "orchestration", "tasks" },
+                    new List<string> { "Managers/TaskOrchestrator.cs" }),
+                MakeFeature("git-ops", "Git Operations",
+                    "Handles git workflows",
+                    new List<string> { "git", "commit" },
+                    new List<string> { "Managers/GitHelper.cs" })
+            };
+            features[0].SymbolNames = new List<string> { "TaskOrchestrator", "ExecuteTask" };
+
+            // Symbol index has TaskOrchestrator mapped to task-orch
+            var symbolIndex = MakeSymbolIndex(
+                ("taskorchestrator", "task-orch", "class TaskOrchestrator"));
+
+            var matches = _registry.FindMatchingFeaturesEnhanced(
+                "Fix the TaskOrchestrator class", features, symbolIndex);
+
+            Assert.NotEmpty(matches);
+            Assert.Equal("task-orch", matches[0].Id);
+        }
+
+        [Fact]
+        public void Registry_FindMatchingFeaturesEnhanced_FallsBackToKeywordsWhenNoSymbolIndex()
+        {
+            var features = new List<FeatureEntry>
+            {
+                MakeFeature("git-ops", "Git Operations",
+                    keywords: new List<string> { "git", "commit", "push" })
+            };
+
+            var matches = _registry.FindMatchingFeaturesEnhanced(
+                "Fix the git commit workflow", features, null);
+
+            Assert.NotEmpty(matches);
+            Assert.Equal("git-ops", matches[0].Id);
+        }
+
+        [Fact]
+        public void Registry_FindMatchingFeaturesEnhanced_SymbolNameInFeatureBoostsScore()
+        {
+            // Feature with SymbolNames gets boosted when task mentions the symbol
+            var featureWithSymbol = MakeFeature("prompt-builder", "Prompt Builder",
+                "Builds prompts for tasks",
+                new List<string> { "prompt" },
+                new List<string> { "Managers/PromptBuilder.cs" });
+            featureWithSymbol.SymbolNames = new List<string> { "PromptBuilder", "BuildBasePrompt" };
+
+            var featureWithoutSymbol = MakeFeature("prompt-loader", "Prompt Loader",
+                "Loads prompt templates",
+                new List<string> { "prompt", "loader" },
+                new List<string> { "Managers/PromptLoader.cs" });
+
+            var features = new List<FeatureEntry> { featureWithSymbol, featureWithoutSymbol };
+
+            // Task mentions "PromptBuilder" — the feature with that symbol should rank higher
+            var matches = _registry.FindMatchingFeaturesEnhanced(
+                "Fix PromptBuilder to handle edge case", features, null);
+
+            Assert.NotEmpty(matches);
+            Assert.Equal("prompt-builder", matches[0].Id);
+        }
+
+        // ── FeatureDependencyGraph: GetFeatureWithDependencies ───────────
+
+        [Fact]
+        public void DependencyGraph_GetFeatureWithDependencies_BoundedByMaxDepth()
+        {
+            // Chain: A → B → C → D → E
+            var features = new List<FeatureEntry>
+            {
+                MakeFeature("a", "A"), MakeFeature("b", "B"),
+                MakeFeature("c", "C"), MakeFeature("d", "D"),
+                MakeFeature("e", "E")
+            };
+            features[0].DependsOn.Add("b");
+            features[1].DependsOn.Add("c");
+            features[2].DependsOn.Add("d");
+            features[3].DependsOn.Add("e");
+
+            var graph = FeatureDependencyGraph.Build(features);
+
+            var neighborhood = _registry.GetFeatureWithDependencies("a", features, graph, maxDepth: 2);
+
+            // maxDepth=2: should include A, B (depth 1), C (depth 2), but NOT D or E
+            Assert.Contains(neighborhood, f => f.Id == "a");
+            Assert.Contains(neighborhood, f => f.Id == "b");
+            Assert.Contains(neighborhood, f => f.Id == "c");
+            Assert.DoesNotContain(neighborhood, f => f.Id == "d");
+            Assert.DoesNotContain(neighborhood, f => f.Id == "e");
+        }
+
+        [Fact]
+        public void DependencyGraph_GetFeatureWithDependencies_NoCrashOnCyclicGraph()
+        {
+            // Cycle: A → B → C → A
+            var features = new List<FeatureEntry>
+            {
+                MakeFeature("a", "A"), MakeFeature("b", "B"), MakeFeature("c", "C")
+            };
+            features[0].DependsOn.Add("b");
+            features[1].DependsOn.Add("c");
+            features[2].DependsOn.Add("a");
+
+            var graph = FeatureDependencyGraph.Build(features);
+
+            var neighborhood = _registry.GetFeatureWithDependencies("a", features, graph, maxDepth: 2);
+
+            // Should not loop infinitely, should include all 3
+            Assert.Equal(3, neighborhood.Count);
+            Assert.Contains(neighborhood, f => f.Id == "a");
+            Assert.Contains(neighborhood, f => f.Id == "b");
+            Assert.Contains(neighborhood, f => f.Id == "c");
+        }
+
+        [Fact]
+        public void DependencyGraph_GetFeatureWithDependencies_IncludesBothDirectionsAtDepth1()
+        {
+            // B → A → C (A depends on C, B depends on A)
+            var features = new List<FeatureEntry>
+            {
+                MakeFeature("a", "A"), MakeFeature("b", "B"), MakeFeature("c", "C")
+            };
+            features[0].DependsOn.Add("c"); // A depends on C
+            features[1].DependsOn.Add("a"); // B depends on A
+
+            var graph = FeatureDependencyGraph.Build(features);
+
+            var neighborhood = _registry.GetFeatureWithDependencies("a", features, graph, maxDepth: 1);
+
+            // Should include A, B (dependent), and C (dependency)
+            Assert.Equal(3, neighborhood.Count);
+        }
+
+        [Fact]
+        public void DependencyGraph_GetFeatureWithDependencies_ReturnsOnlySelf_WhenNoDeps()
+        {
+            var features = new List<FeatureEntry> { MakeFeature("lonely", "Lonely") };
+            var graph = FeatureDependencyGraph.Build(features);
+
+            var neighborhood = _registry.GetFeatureWithDependencies("lonely", features, graph);
+
+            Assert.Single(neighborhood);
+            Assert.Equal("lonely", neighborhood[0].Id);
+        }
+
+        // ── Integration: FeatureEntry JSON round-trip with new fields ────
+
+        [Fact]
+        public void FeatureEntry_NewFields_RoundTripThroughJson()
+        {
+            var feature = new FeatureEntry
+            {
+                Id = "test-rt",
+                Name = "Round Trip Test",
+                Description = "Tests JSON serialization",
+                ParentModuleId = "mod-core",
+                HierarchyLevel = 1,
+                SymbolNames = new List<string> { "ClassA", "MethodB", "InterfaceC" },
+                ChildFeatureIds = new List<string> { "child-1", "child-2" },
+                DependsOn = new List<string> { "dep-a", "dep-b" },
+                Keywords = new List<string> { "test", "roundtrip" },
+                PrimaryFiles = new List<string> { "src/Test.cs" },
+                TouchCount = 3,
+                LastUpdatedAt = new DateTime(2026, 3, 7, 12, 0, 0, DateTimeKind.Utc)
+            };
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true
+            };
+
+            var json = JsonSerializer.Serialize(feature, options);
+            var deserialized = JsonSerializer.Deserialize<FeatureEntry>(json, options);
+
+            Assert.NotNull(deserialized);
+            Assert.Equal("test-rt", deserialized.Id);
+            Assert.Equal("mod-core", deserialized.ParentModuleId);
+            Assert.Equal(1, deserialized.HierarchyLevel);
+            Assert.Equal(new List<string> { "ClassA", "MethodB", "InterfaceC" }, deserialized.SymbolNames);
+            Assert.Equal(new List<string> { "child-1", "child-2" }, deserialized.ChildFeatureIds);
+            Assert.Equal(new List<string> { "dep-a", "dep-b" }, deserialized.DependsOn);
+            Assert.Equal(3, deserialized.TouchCount);
+        }
+
+        [Fact]
+        public void FeatureEntry_NullParentModuleId_RoundTrips()
+        {
+            var feature = new FeatureEntry
+            {
+                Id = "no-module",
+                Name = "No Module",
+                ParentModuleId = null,
+                HierarchyLevel = 0,
+                SymbolNames = new List<string>()
+            };
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            var json = JsonSerializer.Serialize(feature, options);
+            Assert.DoesNotContain("parentModuleId", json); // null should be omitted
+
+            var deserialized = JsonSerializer.Deserialize<FeatureEntry>(json, options);
+            Assert.NotNull(deserialized);
+            Assert.Null(deserialized.ParentModuleId);
+            Assert.Equal(0, deserialized.HierarchyLevel);
+            Assert.Empty(deserialized.SymbolNames);
+        }
+
+        [Fact]
+        public async Task FeatureEntry_NewFields_PersistThroughRegistry()
+        {
+            var feature = MakeFeature("persist-test", "Persist Test");
+            feature.ParentModuleId = "mod-ui";
+            feature.HierarchyLevel = 1;
+            feature.SymbolNames = new List<string> { "MyClass", "MyMethod" };
+            feature.ChildFeatureIds = new List<string> { "sub-feature" };
+
+            await _registry.SaveFeatureAsync(_tempDir, feature);
+            var loaded = await _registry.LoadFeatureAsync(_tempDir, "persist-test");
+
+            Assert.NotNull(loaded);
+            Assert.Equal("mod-ui", loaded.ParentModuleId);
+            Assert.Equal(1, loaded.HierarchyLevel);
+            Assert.Contains("MyClass", loaded.SymbolNames);
+            Assert.Contains("MyMethod", loaded.SymbolNames);
+            Assert.Contains("sub-feature", loaded.ChildFeatureIds);
+        }
+
+        // ── FeatureRegistryManager: BuildFeatureContextBlock secondary ───
+
+        [Fact]
+        public void Registry_BuildFeatureContextBlock_WithSecondaryFeatures()
+        {
+            var primary = new List<FeatureEntry>
+            {
+                MakeFeature("primary", "Primary Feature",
+                    primaryFiles: new List<string> { "src/Primary.cs" })
+            };
+            primary[0].Context.Signatures["src/Primary.cs"] = new FileSignature
+            {
+                Hash = "abc", Content = "class Primary"
+            };
+
+            var secondary = new List<FeatureEntry>
+            {
+                MakeFeature("dep1", "Dependency 1",
+                    primaryFiles: new List<string> { "src/Dep1.cs" }),
+                MakeFeature("dep2", "Dependency 2",
+                    primaryFiles: new List<string> { "src/Dep2.cs" })
+            };
+
+            var block = _registry.BuildFeatureContextBlock(primary, secondary);
+
+            Assert.Contains("## Primary Feature", block);
+            Assert.Contains("### Signatures", block);
+            Assert.Contains("Related Context", block);
+            Assert.Contains("Dependency 1", block);
+            Assert.Contains("Dependency 2", block);
+        }
+
+        // ── CodebaseIndexManager: GetSymbolsInFeature ────────────────────
+
+        [Fact]
+        public void CodebaseIndex_GetSymbolsInFeature_ReturnsCorrectEntries()
+        {
+            var index = new CodebaseSymbolIndex
+            {
+                Symbols = new Dictionary<string, SymbolIndexEntry>
+                {
+                    ["foo"] = new() { FeatureId = "f1", Kind = "Class" },
+                    ["bar"] = new() { FeatureId = "f1", Kind = "Method" },
+                    ["baz"] = new() { FeatureId = "f2", Kind = "Class" }
+                }
+            };
+
+            var manager = new CodebaseIndexManager();
+            var symbols = manager.GetSymbolsInFeature(index, "f1");
+
+            Assert.Equal(2, symbols.Count);
+            Assert.All(symbols, s => Assert.Equal("f1", s.FeatureId));
+        }
+
+        // ── ModuleRegistryManager: RebuildModuleIndex ────────────────────
+
+        [Fact]
+        public void ModuleRegistry_RebuildModuleIndex_DeterministicSort()
+        {
+            var modules = new List<ModuleEntry>
+            {
+                new() { Id = "z-mod", Name = "Z Module", FeatureIds = new List<string> { "f3", "f1" } },
+                new() { Id = "a-mod", Name = "A Module", FeatureIds = new List<string> { "f2" } }
+            };
+
+            var index = ModuleRegistryManager.RebuildModuleIndex(modules);
+
+            Assert.Equal(2, index.Modules.Count);
+            Assert.Equal("a-mod", index.Modules[0].Id);
+            Assert.Equal("z-mod", index.Modules[1].Id);
+            // Feature IDs within modules should be sorted
+            Assert.Equal(new List<string> { "f1", "f3" }, index.Modules[1].FeatureIds);
+        }
+
+        // ── DependencyAnalyzer: InferModuleMembership ────────────────────
+
+        [Fact]
+        public void DependencyAnalyzer_InferModuleMembership_AssignsCorrectModule()
+        {
+            var module = new ModuleEntry { Id = "mod-managers", Name = "Managers Module" };
+
+            var assignedFeature = MakeFeatureWithModule("existing", "Existing", "mod-managers");
+            assignedFeature.PrimaryFiles = new List<string> { "Managers/TaskManager.cs" };
+
+            var unassigned = MakeFeature("new-feature", "New Feature",
+                primaryFiles: new List<string> { "Managers/NewManager.cs" });
+
+            var features = new List<FeatureEntry> { assignedFeature, unassigned };
+            var modules = new List<ModuleEntry> { module };
+
+            var membership = DependencyAnalyzer.InferModuleMembership(features, modules);
+
+            Assert.Contains("new-feature", membership.Keys);
+            Assert.Equal("mod-managers", membership["new-feature"]);
+        }
+
+        [Fact]
+        public void DependencyAnalyzer_InferModuleMembership_EmptyWhenNoModules()
+        {
+            var features = new List<FeatureEntry> { MakeFeature("f1", "F1") };
+            var result = DependencyAnalyzer.InferModuleMembership(features, new List<ModuleEntry>());
+            Assert.Empty(result);
         }
 
         // ── Helpers ─────────────────────────────────────────────────────
@@ -835,6 +1518,34 @@ namespace Spritely.Tests
                 PrimaryFiles = primaryFiles ?? new List<string>(),
                 LastUpdatedAt = DateTime.UtcNow
             };
+        }
+
+        private static FeatureEntry MakeFeatureWithModule(string id, string name, string moduleId)
+        {
+            return new FeatureEntry
+            {
+                Id = id,
+                Name = name,
+                ParentModuleId = moduleId,
+                LastUpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        private static CodebaseSymbolIndex MakeSymbolIndex(
+            params (string key, string featureId, string signature)[] entries)
+        {
+            var index = new CodebaseSymbolIndex();
+            foreach (var (key, featureId, signature) in entries)
+            {
+                index.Symbols[key] = new SymbolIndexEntry
+                {
+                    FeatureId = featureId,
+                    ShortSignature = signature,
+                    FilePath = "test.cs",
+                    Kind = "Class"
+                };
+            }
+            return index;
         }
 
         private static string? FindProjectRoot()

@@ -1241,14 +1241,16 @@ TextureImporter:
 
         private void RetryTask_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
             if (!task.IsRetryable) return;
             RetryTask(task);
         }
 
         private void ContinueTask_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
             if (!task.IsContinuable || string.IsNullOrWhiteSpace(task.Recommendations)) return;
 
             var recommendations = task.Recommendations;
@@ -1287,13 +1289,15 @@ TextureImporter:
 
         private void RerunTask_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement { DataContext: AgentTask task }) return;
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
             RetryTask(task);
         }
 
         private void StoreHistoryTask_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement { DataContext: AgentTask task }) return;
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
             if (!task.IsFinished) return;
 
             var output = task.OutputBuilder.ToString();

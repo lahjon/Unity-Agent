@@ -1,80 +1,148 @@
 {
   "id": "feature-registry",
-  "name": "Feature Registry System",
-  "description": "Maintains a per-project registry of code features stored in \u0060.spritely/features/\u0060. Resolves relevant features for a task prompt via Haiku, injects a FEATURE CONTEXT block, and updates the registry after task completion.",
-  "category": "core",
+  "name": "Feature Registry",
+  "description": "Persists and manages the per-project feature registry stored under \u0060.spritely/features/\u0060. Handles load/save of FeatureEntry and FeatureIndex, dependency graph construction, and signature staleness refresh.",
+  "category": "data",
   "keywords": [
-    "FeatureContextResolver",
-    "FeatureInitializer",
+    "FeatureDependencyGraph",
+    "FeatureEntry",
+    "FeatureIndex",
     "FeatureRegistryManager",
-    "FeatureUpdateAgent",
-    "SignatureExtractor",
-    "code signatures",
-    "feature context",
-    "feature index",
-    "feature registry"
+    "LoadFeature",
+    "SaveFeature",
+    "feature registry",
+    "features json",
+    "registry"
   ],
   "primaryFiles": [
-    "Managers/FeatureContextResolver.cs",
-    "Managers/FeatureInitializer.cs",
-    "Managers/FeatureRegistryManager.cs",
-    "Managers/FeatureUpdateAgent.cs",
-    "Managers/SignatureExtractor.cs"
-  ],
-  "secondaryFiles": [
     "Constants/FeatureConstants.cs",
-    "Models/FeatureContextResult.cs",
+    "Managers/FeatureRegistryManager.cs",
+    "Models/FeatureDependencyGraph.cs",
     "Models/FeatureEntry.cs",
     "Models/FeatureIndex.cs"
   ],
+  "secondaryFiles": [
+    "Managers/DependencyAnalyzer.cs",
+    "Spritely.Tests/FeatureSystemTests.cs"
+  ],
   "relatedFeatureIds": [
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-update-agent",
+    "module-registry"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-initialization",
+    "git-operations",
+    "git-ui",
+    "logging-diagnostics",
+    "module-registry",
     "project-management",
     "prompt-building",
-    "task-preprocessing"
+    "task-factory",
+    "task-orchestration"
   ],
   "context": {
     "signatures": {
-      "Managers/FeatureContextResolver.cs": {
-        "hash": "de1942fa1551",
-        "content": "class FeatureContextResolver"
-      },
-      "Managers/FeatureInitializer.cs": {
-        "hash": "c92e6ba60cd4",
-        "content": "class FeatureInitializer\n  Features: List\u003CSonnetFeature\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  Keywords: List\u003Cstring\u003E\n  PrimaryFiles: List\u003Cstring\u003E\n  SecondaryFiles: List\u003Cstring\u003E\n  RelatedFeatureIds: List\u003Cstring\u003E\n  KeyTypes: List\u003Cstring\u003E\n  Patterns: List\u003Cstring\u003E\n  Dependencies: List\u003Cstring\u003E\n  DependsOnFeatures: List\u003Cstring\u003E\n  InitializeAsync(string projectPath, CancellationToken ct = default) -\u003E Task\u003CFeatureIndex?\u003E\n  ScanSourceFiles(string projectPath) -\u003E List\u003Cstring\u003E\n  BuildDirectoryTree(string projectPath, List\u003Cstring\u003E relativeFiles) -\u003E string\n  DetectProjectType(string projectPath) -\u003E string"
+      "Constants/FeatureConstants.cs": {
+        "hash": "24c4f51ea285",
+        "content": "class FeatureConstants"
       },
       "Managers/FeatureRegistryManager.cs": {
-        "hash": "ee149b3cad28",
-        "content": "class FeatureRegistryManager\n  RegistryExists(string projectPath) -\u003E bool\n  GetFeaturesPath(string projectPath) -\u003E string\n  LoadIndexAsync(string projectPath) -\u003E Task\u003CFeatureIndex\u003E\n  LoadFeatureAsync(string projectPath, string featureId) -\u003E Task\u003CFeatureEntry?\u003E\n  LoadAllFeaturesAsync(string projectPath) -\u003E Task\u003CList\u003CFeatureEntry\u003E\u003E\n  SaveFeatureAsync(string projectPath, FeatureEntry feature) -\u003E Task\n  RemoveFeatureAsync(string projectPath, string featureId) -\u003E Task\n  SaveIndexAsync(string projectPath, FeatureIndex index) -\u003E Task\n  BuildFeatureContextBlock(List\u003CFeatureEntry\u003E features) -\u003E string\n  RefreshStaleSignaturesAsync(string projectPath, FeatureEntry feature) -\u003E Task\u003Cbool\u003E\n  BuildDependencyGraph(List\u003CFeatureEntry\u003E features) -\u003E FeatureDependencyGraph\n  ValidateDependencies(List\u003CFeatureEntry\u003E features) -\u003E void\n  Dispose() -\u003E void"
+        "hash": "6a7729ec1e4e",
+        "content": "class FeatureRegistryManager\n  RegistryExists(string projectPath) -\u003E bool\n  GetFeaturesPath(string projectPath) -\u003E string\n  LoadIndexAsync(string projectPath) -\u003E Task\u003CFeatureIndex\u003E\n  LoadFeatureAsync(string projectPath, string featureId) -\u003E Task\u003CFeatureEntry?\u003E\n  LoadAllFeaturesAsync(string projectPath) -\u003E Task\u003CList\u003CFeatureEntry\u003E\u003E\n  SaveFeatureAsync(string projectPath, FeatureEntry feature) -\u003E Task\n  RemoveFeatureAsync(string projectPath, string featureId) -\u003E Task\n  SaveIndexAsync(string projectPath, FeatureIndex index) -\u003E Task\n  RefreshStaleSignaturesAsync(string projectPath, FeatureEntry feature) -\u003E Task\u003Cbool\u003E\n  BuildDependencyGraph(List\u003CFeatureEntry\u003E features) -\u003E FeatureDependencyGraph\n  ValidateDependencies(List\u003CFeatureEntry\u003E features) -\u003E void\n  Dispose() -\u003E void"
       },
-      "Managers/FeatureUpdateAgent.cs": {
-        "hash": "ff1b5010a9c4",
-        "content": "class FeatureUpdateAgent"
+      "Models/FeatureDependencyGraph.cs": {
+        "hash": "edf675f87e9b",
+        "content": "class FeatureDependencyGraph\n  DirectDependencies: Dictionary\u003Cstring, HashSet\u003Cstring\u003E\u003E\n  Dependents: Dictionary\u003Cstring, HashSet\u003Cstring\u003E\u003E\n  TransitiveDependencies: Dictionary\u003Cstring, HashSet\u003Cstring\u003E\u003E\n  Cycles: List\u003CList\u003Cstring\u003E\u003E\n  Build(List\u003CFeatureEntry\u003E features) -\u003E FeatureDependencyGraph\n  GetAllDependencies(string featureId) -\u003E HashSet\u003Cstring\u003E\n  GetAllDependents(string featureId) -\u003E HashSet\u003Cstring\u003E\n  IsInCycle(string featureId) -\u003E bool\n  TopologicalSort() -\u003E List\u003Cstring\u003E"
       },
-      "Managers/SignatureExtractor.cs": {
-        "hash": "d74ecc4e0247",
-        "content": "class SignatureExtractor\n  ExtractSignatures(string filePath) -\u003E string\n  ComputeFileHash(string filePath) -\u003E string\n  GetSupportedExtensions() -\u003E HashSet\u003Cstring\u003E"
+      "Models/FeatureEntry.cs": {
+        "hash": "145ab66c3e40",
+        "content": "class FeatureEntry\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  Keywords: List\u003Cstring\u003E\n  PrimaryFiles: List\u003Cstring\u003E\n  SecondaryFiles: List\u003Cstring\u003E\n  RelatedFeatureIds: List\u003Cstring\u003E\n  DependsOn: List\u003Cstring\u003E\n  Context: FeatureContext\n  ParentModuleId: string?\n  ChildFeatureIds: List\u003Cstring\u003E\n  HierarchyLevel: int\n  SymbolNames: List\u003Cstring\u003E\n  TouchCount: int\n  LastUpdatedAt: DateTime\n  LastUpdatedByTaskId: string?\nclass FeatureContext\n  Signatures: Dictionary\u003Cstring, FileSignature\u003E"
+      },
+      "Models/FeatureIndex.cs": {
+        "hash": "b3442a168c02",
+        "content": "class FeatureIndex\n  Version: int\n  Features: List\u003CFeatureIndexEntry\u003E\n  Modules: List\u003CModuleIndexEntry\u003E\nclass FeatureIndexEntry\n  Id: string\n  Name: string\n  Category: string\n  TouchCount: int\n  PrimaryFileCount: int"
       }
     },
     "keyTypes": [
-      "class FeatureContextResolver",
+      "class DependencyAnalyzer",
+      "class FeatureConstants",
+      "class FeatureDependencyGraph",
       "class FeatureEntry",
       "class FeatureIndex",
-      "class FeatureInitializer",
-      "class FeatureRegistryManager",
-      "class FeatureUpdateAgent",
-      "class SignatureExtractor"
+      "class FeatureRegistryManager"
     ],
     "patterns": [
-      "Fire-and-forget post-completion update",
-      "Git-tracked JSON files per feature in .spritely/features/",
-      "Haiku resolves prompt\u2192features before Opus launch"
+      "Dependency graph built on demand",
+      "Lazy load with index cache",
+      "One JSON file per feature, git-friendly storage"
     ],
     "dependencies": [
-      "Haiku API for feature resolution and updates",
-      "ProjectManager for project path",
-      "SignatureExtractor for code signatures"
+      "Reads/writes .spritely/features/ in project repo",
+      "SignatureExtractor for hash computation"
     ]
   },
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.3672673Z"
+  "parentModuleId": "feature-registry",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Build",
+    "BuildDependencyGraph",
+    "Category",
+    "ChildFeatureIds",
+    "Context",
+    "Cycles",
+    "Dependents",
+    "DependsOn",
+    "Description",
+    "DirectDependencies",
+    "Dispose",
+    "FeatureConstants",
+    "FeatureContext",
+    "FeatureDependencyGraph",
+    "FeatureEntry",
+    "FeatureIndex",
+    "FeatureIndexEntry",
+    "FeatureRegistryManager",
+    "Features",
+    "GetAllDependencies",
+    "GetAllDependents",
+    "GetFeaturesPath",
+    "HierarchyLevel",
+    "Id",
+    "IsInCycle",
+    "Keywords",
+    "LastUpdatedAt",
+    "LastUpdatedByTaskId",
+    "LoadAllFeaturesAsync",
+    "LoadFeatureAsync",
+    "LoadIndexAsync",
+    "Modules",
+    "Name",
+    "ParentModuleId",
+    "PrimaryFiles",
+    "RefreshStaleSignaturesAsync",
+    "RegistryExists",
+    "RelatedFeatureIds",
+    "RemoveFeatureAsync",
+    "SaveFeatureAsync",
+    "SaveIndexAsync",
+    "SecondaryFiles",
+    "Signatures",
+    "SymbolNames",
+    "TopologicalSort",
+    "TouchCount",
+    "TransitiveDependencies",
+    "ValidateDependencies",
+    "Version"
+  ],
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-07T22:07:44.3716918Z",
+  "lastUpdatedByTaskId": "4fa53c33822a4f79"
 }

@@ -29,10 +29,15 @@ public class FeatureInitializer
         _registryManager = registryManager;
     }
 
-    // ── Schema for the Sonnet output ────────────────────────────────────
+    // ── Schema for the Sonnet feature output ─────────────────────────────
 
     private const string OutputSchema =
         """{"type":"object","properties":{"features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"category":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"primary_files":{"type":"array","items":{"type":"string"}},"secondary_files":{"type":"array","items":{"type":"string"}},"related_feature_ids":{"type":"array","items":{"type":"string"}},"key_types":{"type":"array","items":{"type":"string"}},"patterns":{"type":"array","items":{"type":"string"}},"dependencies":{"type":"array","items":{"type":"string"}},"depends_on":{"type":"array","items":{"type":"string"}}},"required":["id","name","description","category","keywords","primary_files"]}}},"required":["features"]}""";
+
+    // ── Schema for the Sonnet module grouping output ─────────────────────
+
+    private const string ModuleOutputSchema =
+        """{"type":"object","properties":{"modules":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"feature_ids":{"type":"array","items":{"type":"string"}}},"required":["id","name","description","feature_ids"]}}},"required":["modules"]}""";
 
     // ── JSON deserialization models for the Sonnet response ──────────────
 
@@ -81,6 +86,27 @@ public class FeatureInitializer
         public List<string> DependsOnFeatures { get; set; } = [];
     }
 
+    private sealed class SonnetModuleResponse
+    {
+        [JsonPropertyName("modules")]
+        public List<SonnetModule> Modules { get; set; } = [];
+    }
+
+    private sealed class SonnetModule
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = "";
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = "";
+
+        [JsonPropertyName("description")]
+        public string Description { get; set; } = "";
+
+        [JsonPropertyName("feature_ids")]
+        public List<string> FeatureIds { get; set; } = [];
+    }
+
     // ── Main entry point ────────────────────────────────────────────────
 
     /// <summary>
@@ -107,94 +133,131 @@ public class FeatureInitializer
                 return null;
             }
 
-            // ── Phase 2: Build Structural Map ───────────────────────────
+            // ── Phase 2: Build Structural Map (chunked) ─────────────────
             ReportProgress("Extracting code signatures...");
 
             var directoryTree = BuildDirectoryTree(projectPath, relativeFiles);
-            var signaturesBuilder = new StringBuilder();
 
-            var filesToProcess = relativeFiles
-                .Take(FeatureConstants.MaxFilesPerSonnetChunk)
-                .ToList();
+            // Split files into chunks of MaxFilesPerSonnetChunk
+            var chunks = ChunkFiles(relativeFiles, FeatureConstants.MaxFilesPerSonnetChunk);
+            var totalChunks = chunks.Count;
 
-            foreach (var relativePath in filesToProcess)
+            var allSonnetFeatures = new Dictionary<string, SonnetFeature>(StringComparer.OrdinalIgnoreCase);
+
+            for (var chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++)
             {
                 ct.ThrowIfCancellationRequested();
 
-                var absolutePath = Path.Combine(projectPath, relativePath);
-                var signatures = SignatureExtractor.ExtractSignatures(absolutePath);
+                var chunk = chunks[chunkIdx];
+                if (totalChunks > 1)
+                    ReportProgress($"Analyzing chunk {chunkIdx + 1}/{totalChunks} ({chunk.Count} files)...");
 
-                if (!string.IsNullOrEmpty(signatures))
+                var signaturesBuilder = new StringBuilder();
+                foreach (var relativePath in chunk)
                 {
-                    signaturesBuilder.AppendLine($"## {relativePath}");
-                    signaturesBuilder.AppendLine(signatures);
-                    signaturesBuilder.AppendLine();
-                }
-            }
+                    ct.ThrowIfCancellationRequested();
 
-            var signaturesText = signaturesBuilder.ToString();
+                    var absolutePath = Path.Combine(projectPath, relativePath);
+                    var signatures = SignatureExtractor.ExtractSignatures(absolutePath);
 
-            // ── Phase 3: LLM Analysis ───────────────────────────────────
-            ReportProgress("Analyzing project structure...");
-
-            var template = PromptLoader.Load("FeatureInitializationPrompt.md");
-            var prompt = string.Format(template, projectType, directoryTree, signaturesText);
-
-            ct.ThrowIfCancellationRequested();
-
-            // Cycle status messages while waiting for the LLM call
-            var cycleMessages = new[]
-            {
-                "Analyzing project structure...",
-                "Scanning code patterns...",
-                "Identifying features...",
-                "Processing signatures...",
-                "Mapping dependencies...",
-                "Classifying components..."
-            };
-            var cycleIndex = 0;
-            using var cycleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            var cycleTask = Task.Run(async () =>
-            {
-                try
-                {
-                    while (!cycleCts.Token.IsCancellationRequested)
+                    if (!string.IsNullOrEmpty(signatures))
                     {
-                        await Task.Delay(3000, cycleCts.Token);
-                        cycleIndex = (cycleIndex + 1) % cycleMessages.Length;
-                        ReportProgress(cycleMessages[cycleIndex]);
+                        signaturesBuilder.AppendLine($"## {relativePath}");
+                        signaturesBuilder.AppendLine(signatures);
+                        signaturesBuilder.AppendLine();
                     }
                 }
-                catch (OperationCanceledException) { }
-            }, cycleCts.Token);
 
-            var sonnetResponse = await CallSonnetAsync(prompt, ct);
+                var signaturesText = signaturesBuilder.ToString();
 
-            // Single retry with backoff for transient CLI failures
-            if (sonnetResponse is null || sonnetResponse.Features.Count == 0)
-            {
+                // ── Phase 3: LLM Analysis ───────────────────────────────
+                if (chunkIdx == 0)
+                    ReportProgress("Analyzing project structure...");
+
+                var template = PromptLoader.Load("FeatureInitializationPrompt.md");
+                var prompt = string.Format(template, projectType, directoryTree, signaturesText);
+
                 ct.ThrowIfCancellationRequested();
-                AppLogger.Info("FeatureInitializer", "First Sonnet call failed, retrying in 3 seconds...");
-                ReportProgress("Retrying AI analysis...");
-                await Task.Delay(3000, ct);
-                sonnetResponse = await CallSonnetAsync(prompt, ct);
+
+                var sonnetResponse = await CallSonnetWithRetryAsync(prompt, OutputSchema, ct);
+
+                if (sonnetResponse is null)
+                    continue;
+
+                var parsed = DeserializeResponse<SonnetResponse>(sonnetResponse);
+                if (parsed?.Features == null || parsed.Features.Count == 0)
+                    continue;
+
+                // Merge features across chunks by unioning file lists and keywords
+                foreach (var sf in parsed.Features)
+                {
+                    if (string.IsNullOrWhiteSpace(sf.Id))
+                        continue;
+
+                    if (allSonnetFeatures.TryGetValue(sf.Id, out var existing))
+                    {
+                        // Union PrimaryFiles, SecondaryFiles, and Keywords from the later chunk
+                        if (sf.PrimaryFiles != null)
+                        {
+                            existing.PrimaryFiles ??= new List<string>();
+                            foreach (var f in sf.PrimaryFiles)
+                                if (!existing.PrimaryFiles.Contains(f, StringComparer.OrdinalIgnoreCase))
+                                    existing.PrimaryFiles.Add(f);
+                        }
+                        if (sf.SecondaryFiles != null)
+                        {
+                            existing.SecondaryFiles ??= new List<string>();
+                            foreach (var f in sf.SecondaryFiles)
+                                if (!existing.SecondaryFiles.Contains(f, StringComparer.OrdinalIgnoreCase))
+                                    existing.SecondaryFiles.Add(f);
+                        }
+                        if (sf.Keywords != null)
+                        {
+                            existing.Keywords ??= new List<string>();
+                            foreach (var kw in sf.Keywords)
+                                if (!existing.Keywords.Contains(kw, StringComparer.OrdinalIgnoreCase))
+                                    existing.Keywords.Add(kw);
+                        }
+                    }
+                    else
+                    {
+                        allSonnetFeatures[sf.Id] = sf;
+                    }
+                }
+
+                if (totalChunks > 1)
+                    ReportProgress($"Chunk {chunkIdx + 1}/{totalChunks}: identified {parsed.Features.Count} features");
             }
 
-            await cycleCts.CancelAsync();
-            try { await cycleTask; } catch (OperationCanceledException) { }
-            if (sonnetResponse is null || sonnetResponse.Features.Count == 0)
+            if (allSonnetFeatures.Count == 0)
             {
-                ReportProgress("AI analysis returned no features after retry — initialization aborted");
+                ReportProgress("AI analysis returned no features after all chunks — initialization aborted");
                 return null;
             }
 
-            // ── Phase 4: Registry Creation ──────────────────────────────
+            ReportProgress($"AI identified {allSonnetFeatures.Count} features across {totalChunks} chunk(s)");
+
+            // ── Phase 4: Registry Creation (merge-aware) ─────────────────
             ReportProgress("Building feature registry...");
 
+            // Load existing features so we can merge task-discovered data
+            var existingFeatures = new Dictionary<string, FeatureEntry>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (var ef in await _registryManager.LoadAllFeaturesAsync(projectPath))
+                    existingFeatures[ef.Id] = ef;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeatureInitializer", $"Could not load existing features for merge: {ex.Message}");
+            }
+
+            var sonnetFeatureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var createdCount = 0;
-            foreach (var sf in sonnetResponse.Features)
+            foreach (var sf in allSonnetFeatures.Values)
             {
                 ct.ThrowIfCancellationRequested();
+                sonnetFeatureIds.Add(sf.Id);
 
                 var feature = new FeatureEntry
                 {
@@ -217,7 +280,36 @@ public class FeatureInitializer
                     TouchCount = 0
                 };
 
-                // Populate signatures for primary files
+                // Merge with existing feature if it was previously task-discovered
+                if (existingFeatures.TryGetValue(sf.Id, out var existing))
+                {
+                    // Preserve task-tracking metadata
+                    feature.TouchCount = existing.TouchCount;
+                    feature.LastUpdatedByTaskId = existing.LastUpdatedByTaskId;
+                    feature.ParentModuleId = existing.ParentModuleId;
+                    feature.HierarchyLevel = existing.HierarchyLevel;
+                    feature.ChildFeatureIds = existing.ChildFeatureIds;
+
+                    // Merge task-added files that Sonnet didn't include
+                    foreach (var pf in existing.PrimaryFiles)
+                    {
+                        if (!feature.PrimaryFiles.Contains(pf, StringComparer.OrdinalIgnoreCase)
+                            && File.Exists(Path.Combine(projectPath, pf)))
+                            feature.PrimaryFiles.Add(pf);
+                    }
+                    foreach (var sf2 in existing.SecondaryFiles)
+                    {
+                        if (!feature.SecondaryFiles.Contains(sf2, StringComparer.OrdinalIgnoreCase)
+                            && File.Exists(Path.Combine(projectPath, sf2)))
+                            feature.SecondaryFiles.Add(sf2);
+                    }
+
+                    feature.PrimaryFiles.Sort(StringComparer.OrdinalIgnoreCase);
+                    feature.SecondaryFiles.Sort(StringComparer.OrdinalIgnoreCase);
+                }
+
+                // Populate signatures and SymbolNames for primary files
+                var symbolNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var primaryFile in feature.PrimaryFiles)
                 {
                     var absolutePath = Path.Combine(projectPath, primaryFile);
@@ -232,13 +324,98 @@ public class FeatureInitializer
                             Content = signatures
                         };
                     }
+
+                    // Extract symbol names for this file
+                    var fileSymbols = SignatureExtractor.GetSymbolNames(absolutePath);
+                    foreach (var sym in fileSymbols)
+                        symbolNames.Add(sym);
                 }
+
+                feature.SymbolNames = symbolNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
 
                 await _registryManager.SaveFeatureAsync(projectPath, feature);
                 createdCount++;
             }
 
-            ReportProgress($"Created {createdCount} features");
+            // ── Phase 4b: Validate task-discovered features not in Sonnet output ──
+            // Features added by FeatureUpdateAgent during tasks but not re-identified
+            // by Sonnet: keep if their primary files still exist, remove if all gone.
+            // Also clean up empty placeholder features created by FeatureContextResolver
+            // that were never populated by FeatureUpdateAgent (empty PrimaryFiles, older than 7 days).
+            var orphanedCount = 0;
+            var refreshedCount = 0;
+            var placeholderCount = 0;
+            foreach (var (existingId, existingFeature) in existingFeatures)
+            {
+                if (sonnetFeatureIds.Contains(existingId))
+                    continue; // Already handled above
+
+                ct.ThrowIfCancellationRequested();
+
+                // Remove empty placeholder features older than 7 days
+                if (existingFeature.PrimaryFiles.Count == 0
+                    && existingFeature.LastUpdatedAt < DateTime.UtcNow.AddDays(-7))
+                {
+                    await _registryManager.RemoveFeatureAsync(projectPath, existingId);
+                    placeholderCount++;
+                    AppLogger.Info("FeatureInitializer",
+                        $"Removed stale placeholder feature '{existingId}' (empty PrimaryFiles, last updated {existingFeature.LastUpdatedAt:u})");
+                    continue;
+                }
+
+                // Check if any primary files still exist on disk
+                var validPrimaryFiles = existingFeature.PrimaryFiles
+                    .Where(f => File.Exists(Path.Combine(projectPath, f)))
+                    .ToList();
+
+                if (validPrimaryFiles.Count == 0)
+                {
+                    // All primary files are gone — remove the orphaned feature
+                    await _registryManager.RemoveFeatureAsync(projectPath, existingId);
+                    orphanedCount++;
+                    AppLogger.Info("FeatureInitializer",
+                        $"Removed orphaned feature '{existingId}' (all primary files deleted)");
+                    continue;
+                }
+
+                // Feature still has valid files — refresh its signatures and prune dead files
+                existingFeature.PrimaryFiles = validPrimaryFiles;
+                existingFeature.SecondaryFiles = existingFeature.SecondaryFiles
+                    .Where(f => File.Exists(Path.Combine(projectPath, f)))
+                    .ToList();
+
+                // Remove signatures for deleted files
+                var deadSigKeys = existingFeature.Context.Signatures.Keys
+                    .Where(k => !existingFeature.PrimaryFiles.Contains(k, StringComparer.OrdinalIgnoreCase))
+                    .ToList();
+                foreach (var key in deadSigKeys)
+                    existingFeature.Context.Signatures.Remove(key);
+
+                // Refresh stale signatures
+                await _registryManager.RefreshStaleSignaturesAsync(projectPath, existingFeature);
+
+                // Rebuild symbol names from current files
+                var symNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var pf in existingFeature.PrimaryFiles)
+                {
+                    foreach (var sym in SignatureExtractor.GetSymbolNames(Path.Combine(projectPath, pf)))
+                        symNames.Add(sym);
+                }
+                existingFeature.SymbolNames = symNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+
+                existingFeature.LastUpdatedAt = DateTime.UtcNow;
+                await _registryManager.SaveFeatureAsync(projectPath, existingFeature);
+                refreshedCount++;
+            }
+
+            var statusParts = new List<string> { $"Created {createdCount} features" };
+            if (refreshedCount > 0)
+                statusParts.Add($"refreshed {refreshedCount} task-discovered");
+            if (orphanedCount > 0)
+                statusParts.Add($"removed {orphanedCount} orphaned");
+            if (placeholderCount > 0)
+                statusParts.Add($"removed {placeholderCount} stale placeholders");
+            ReportProgress(string.Join(", ", statusParts));
 
             // ── Phase 4.5: Dependency Analysis ──────────────────────────
             ReportProgress("Analyzing cross-feature dependencies...");
@@ -247,6 +424,7 @@ public class FeatureInitializer
             var allFeatures = await _registryManager.LoadAllFeaturesAsync(projectPath);
 
             DependencyAnalyzer.AnalyzeDependencies(allFeatures, projectPath);
+            DependencyAnalyzer.AnalyzeImportDependencies(allFeatures, projectPath);
             _registryManager.ValidateDependencies(allFeatures);
 
             // Re-save features with updated DependsOn
@@ -263,7 +441,22 @@ public class FeatureInitializer
 
             ReportProgress($"Dependency analysis complete — {allFeatures.Count(f => f.DependsOn.Count > 0)} features have dependencies");
 
-            // ── Phase 5: Git Integration ────────────────────────────────
+            // ── Phase 5: Codebase Symbol Index ──────────────────────────
+            ReportProgress("Building codebase symbol index...");
+
+            ct.ThrowIfCancellationRequested();
+            var codebaseIndexManager = new CodebaseIndexManager();
+            await codebaseIndexManager.BuildIndexAsync(projectPath, allFeatures, ct);
+
+            ReportProgress("Codebase symbol index written");
+
+            // ── Phase 6: Module Creation ────────────────────────────────
+            ReportProgress("Grouping features into modules...");
+
+            ct.ThrowIfCancellationRequested();
+            await CreateModulesAsync(projectPath, allFeatures, ct);
+
+            // ── Phase 7: Git Integration ────────────────────────────────
             EnsureGitIntegration(projectPath);
 
             ReportProgress($"Feature registry initialized with {createdCount} features");
@@ -278,6 +471,192 @@ public class FeatureInitializer
         {
             AppLogger.Error("FeatureInitializer", $"Initialization failed: {ex.Message}", ex);
             ReportProgress($"Initialization failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    // ── Helper: Chunked Sonnet call with retry ──────────────────────────
+
+    private async Task<string?> CallSonnetWithRetryAsync(string prompt, string schema, CancellationToken ct)
+    {
+        // Cycle status messages while waiting
+        var cycleMessages = new[]
+        {
+            "Analyzing project structure...",
+            "Scanning code patterns...",
+            "Identifying features...",
+            "Processing signatures...",
+            "Mapping dependencies...",
+            "Classifying components..."
+        };
+        var cycleIndex = 0;
+        using var cycleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var cycleTask = Task.Run(async () =>
+        {
+            try
+            {
+                while (!cycleCts.Token.IsCancellationRequested)
+                {
+                    await Task.Delay(3000, cycleCts.Token);
+                    cycleIndex = (cycleIndex + 1) % cycleMessages.Length;
+                    ReportProgress(cycleMessages[cycleIndex]);
+                }
+            }
+            catch (OperationCanceledException) { }
+        }, cycleCts.Token);
+
+        var result = await CallSonnetAsync(prompt, schema, ct);
+
+        if (string.IsNullOrWhiteSpace(result))
+        {
+            ct.ThrowIfCancellationRequested();
+            AppLogger.Info("FeatureInitializer", "First Sonnet call failed, retrying in 3 seconds...");
+            ReportProgress("Retrying AI analysis...");
+            await Task.Delay(3000, ct);
+            result = await CallSonnetAsync(prompt, schema, ct);
+        }
+
+        await cycleCts.CancelAsync();
+        try { await cycleTask; } catch (OperationCanceledException) { }
+
+        return result;
+    }
+
+    // ── Helper: Module creation via Sonnet ───────────────────────────────
+
+    private async Task CreateModulesAsync(string projectPath, List<FeatureEntry> allFeatures, CancellationToken ct)
+    {
+        try
+        {
+            // Build feature summary for the module grouping prompt
+            var featureSummary = new StringBuilder();
+            foreach (var f in allFeatures.OrderBy(f => f.Category).ThenBy(f => f.Id))
+            {
+                featureSummary.AppendLine($"- **{f.Id}**: {f.Name} [{f.Category}] — {f.Description}");
+            }
+
+            var template = PromptLoader.Load("FeatureModuleGroupingPrompt.md");
+            var prompt = string.Format(template, featureSummary.ToString());
+
+            ct.ThrowIfCancellationRequested();
+
+            var result = await CallSonnetWithRetryAsync(prompt, ModuleOutputSchema, ct);
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                ReportProgress("Module grouping returned no results — skipping module creation");
+                return;
+            }
+
+            var moduleResponse = DeserializeResponse<SonnetModuleResponse>(result);
+            if (moduleResponse?.Modules == null || moduleResponse.Modules.Count == 0)
+            {
+                ReportProgress("Module grouping returned no modules — skipping");
+                return;
+            }
+
+            var moduleRegistry = new ModuleRegistryManager();
+            var featureIdSet = new HashSet<string>(allFeatures.Select(f => f.Id), StringComparer.OrdinalIgnoreCase);
+            var createdModuleCount = 0;
+
+            foreach (var sm in moduleResponse.Modules)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // Filter to only valid feature IDs
+                var validFeatureIds = sm.FeatureIds
+                    .Where(id => featureIdSet.Contains(id))
+                    .OrderBy(id => id, StringComparer.Ordinal)
+                    .ToList();
+
+                var module = new ModuleEntry
+                {
+                    Id = sm.Id,
+                    Name = sm.Name,
+                    Description = sm.Description,
+                    Category = "",
+                    FeatureIds = validFeatureIds,
+                    Keywords = [],
+                    LastUpdatedAt = DateTime.UtcNow
+                };
+
+                await moduleRegistry.SaveModuleAsync(projectPath, module);
+                createdModuleCount++;
+
+                // Update features with ParentModuleId
+                foreach (var fid in validFeatureIds)
+                {
+                    var feature = allFeatures.FirstOrDefault(f =>
+                        string.Equals(f.Id, fid, StringComparison.OrdinalIgnoreCase));
+                    if (feature != null)
+                    {
+                        feature.ParentModuleId = sm.Id;
+                        feature.HierarchyLevel = 0;
+                        await _registryManager.SaveFeatureAsync(projectPath, feature);
+                    }
+                }
+            }
+
+            // Use DependencyAnalyzer to infer membership for any features Sonnet missed
+            var modules = await moduleRegistry.LoadAllModulesAsync(projectPath);
+            var inferredMembership = DependencyAnalyzer.InferModuleMembership(allFeatures, modules);
+            foreach (var (featureId, moduleId) in inferredMembership)
+            {
+                var feature = allFeatures.FirstOrDefault(f =>
+                    string.Equals(f.Id, featureId, StringComparison.OrdinalIgnoreCase));
+                if (feature != null)
+                {
+                    feature.ParentModuleId = moduleId;
+                    feature.HierarchyLevel = 0;
+                    await _registryManager.SaveFeatureAsync(projectPath, feature);
+
+                    // Also add to the module's FeatureIds
+                    var module = modules.FirstOrDefault(m =>
+                        string.Equals(m.Id, moduleId, StringComparison.OrdinalIgnoreCase));
+                    if (module != null && !module.FeatureIds.Contains(featureId, StringComparer.OrdinalIgnoreCase))
+                    {
+                        module.FeatureIds.Add(featureId);
+                        await moduleRegistry.SaveModuleAsync(projectPath, module);
+                    }
+                }
+            }
+
+            ReportProgress($"Created {createdModuleCount} modules");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("FeatureInitializer", $"Module creation failed: {ex.Message}", ex);
+            ReportProgress($"Module creation failed (non-fatal): {ex.Message}");
+        }
+    }
+
+    // ── Helper: Chunk file list ─────────────────────────────────────────
+
+    private static List<List<string>> ChunkFiles(List<string> files, int chunkSize)
+    {
+        var chunks = new List<List<string>>();
+        for (var i = 0; i < files.Count; i += chunkSize)
+        {
+            chunks.Add(files.GetRange(i, Math.Min(chunkSize, files.Count - i)));
+        }
+        return chunks;
+    }
+
+    // ── Helper: Deserialize Sonnet JSON ─────────────────────────────────
+
+    private static T? DeserializeResponse<T>(string json) where T : class
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            return JsonSerializer.Deserialize<T>(json, options);
+        }
+        catch (JsonException ex)
+        {
+            AppLogger.Warn("FeatureInitializer", $"Failed to deserialize response: {ex.Message}");
             return null;
         }
     }
@@ -395,11 +774,11 @@ public class FeatureInitializer
     /// <summary>Maximum time to wait for the Sonnet CLI call before giving up.</summary>
     private static readonly TimeSpan SonnetTimeout = TimeSpan.FromMinutes(5);
 
-    private async Task<SonnetResponse?> CallSonnetAsync(string prompt, CancellationToken ct)
+    private async Task<string?> CallSonnetAsync(string prompt, string schema, CancellationToken ct)
     {
         try
         {
-            var escapedSchema = OutputSchema.Replace("\"", "\\\"");
+            var escapedSchema = schema.Replace("\"", "\\\"");
             var arguments = $"-p --output-format json --model {AppConstants.ClaudeSonnet} --max-turns 3 --json-schema \"{escapedSchema}\"";
             AppLogger.Info("FeatureInitializer", $"Calling Sonnet CLI. Prompt length: {prompt.Length} chars, model: {AppConstants.ClaudeSonnet}");
 
@@ -431,7 +810,6 @@ public class FeatureInitializer
             }
             catch (IOException ioEx)
             {
-                // "The pipe is being closed" — CLI process died before we finished writing
                 var earlyStderr = "";
                 try { earlyStderr = await process.StandardError.ReadToEndAsync(ct); } catch { }
                 AppLogger.Error("FeatureInitializer",
@@ -490,8 +868,6 @@ public class FeatureInitializer
             using var doc = JsonDocument.Parse(text);
             var root = doc.RootElement;
 
-            // The CLI with --output-format json + --json-schema puts structured data
-            // in "structured_output"; fall back to "result" for plain text responses
             string resultJson;
             if (root.TryGetProperty("structured_output", out var structured)
                 && structured.ValueKind == JsonValueKind.Object)
@@ -510,23 +886,7 @@ public class FeatureInitializer
             }
 
             AppLogger.Info("FeatureInitializer", $"Sonnet result JSON length: {resultJson.Length}");
-
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var response = JsonSerializer.Deserialize<SonnetResponse>(resultJson, options);
-
-            if (response is null || response.Features.Count == 0)
-            {
-                AppLogger.Warn("FeatureInitializer",
-                    $"Deserialized response has {response?.Features.Count ?? 0} features. " +
-                    $"Raw result (first 500 chars): {resultJson[..Math.Min(500, resultJson.Length)]}");
-                ReportProgress("AI analysis returned no features");
-            }
-            else
-            {
-                AppLogger.Info("FeatureInitializer", $"Sonnet identified {response.Features.Count} features");
-            }
-
-            return response;
+            return resultJson;
         }
         catch (OperationCanceledException)
         {

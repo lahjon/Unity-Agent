@@ -19,5 +19,6 @@
 ## RULES
 - Be selective. Most tasks touch 1-3 features.
 - Prefer existing features over creating new ones. Only flag new when truly novel.
+- Use `primaryFiles` (base filenames) as a strong matching signal — if the task mentions a filename, boost confidence for features whose primaryFiles include it.
 - Confidence reflects how much the feature will be read or modified, not general relatedness.
 - Output ONLY valid JSON matching the required schema. No other text.

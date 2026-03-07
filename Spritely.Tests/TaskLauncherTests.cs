@@ -702,6 +702,16 @@ namespace Spritely.Tests
             Assert.False(_completion.IsTokenLimitError("Task completed successfully."));
         }
 
+        [Theory]
+        [InlineData("The system has capacity for more users")]
+        [InlineData("Port 5290 is open")]
+        [InlineData("Array index 529 out of bounds")]
+        [InlineData("The server was overloaded with requests yesterday")]
+        public void IsTokenLimitError_SimilarButNormalOutput_ReturnsFalse(string output)
+        {
+            Assert.False(_completion.IsTokenLimitError(output));
+        }
+
         [Fact]
         public void IsTokenLimitError_ChecksLast3000Chars()
         {

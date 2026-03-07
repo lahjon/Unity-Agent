@@ -203,6 +203,14 @@ namespace Spritely
             _projectManager.SetTaskFactory(_taskFactory);
             _projectManager.SetSettingsManager(_settingsManager);
 
+            var featureRegistryManager = new FeatureRegistryManager();
+            var codebaseIndexManager = new CodebaseIndexManager();
+            var moduleRegistryManager = new ModuleRegistryManager();
+            var featureContextResolver = new FeatureContextResolver(
+                featureRegistryManager, codebaseIndexManager, moduleRegistryManager);
+            var featureUpdateAgent = new FeatureUpdateAgent(
+                featureRegistryManager, codebaseIndexManager, moduleRegistryManager);
+
             _taskExecutionManager = new TaskExecutionManager(
                 scriptDir, _fileLockManager, _outputTabManager,
                 _gitHelper, _completionAnalyzer, _promptBuilder, _taskFactory,
@@ -216,7 +224,10 @@ namespace Spritely
                 getTokenLimitRetryMinutes: () => _settingsManager.TokenLimitRetryMinutes,
                 getAutoVerify: () => _settingsManager.AutoVerify,
                 getSkillsBlock: () => GetActiveSkillsBlock(),
-                getOpusEffortLevel: () => _settingsManager.OpusEffortLevel);
+                getOpusEffortLevel: () => _settingsManager.OpusEffortLevel,
+                featureRegistryManager: featureRegistryManager,
+                featureContextResolver: featureContextResolver,
+                featureUpdateAgent: featureUpdateAgent);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
 
@@ -1676,7 +1687,26 @@ namespace Spritely
 
         private void TaskCard_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            // Skip drag setup when clicking on buttons so their Click events aren't swallowed
+            if (IsInsideButton(e.OriginalSource as DependencyObject))
+            {
+                _dragStartedOnButton = true;
+                return;
+            }
             _dragStartPoint = e.GetPosition(null);
+            _dragStartedOnButton = false;
+        }
+
+        private bool _dragStartedOnButton;
+
+        private static bool IsInsideButton(DependencyObject? source)
+        {
+            while (source != null)
+            {
+                if (source is System.Windows.Controls.Primitives.ButtonBase) return true;
+                source = VisualTreeHelper.GetParent(source);
+            }
+            return false;
         }
 
         private void TaskCard_MouseMove(object sender, MouseEventArgs e)
@@ -1684,6 +1714,10 @@ namespace Spritely
             if (e.LeftButton != MouseButtonState.Pressed) return;
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (task.IsFinished) return;
+            if (_dragStartedOnButton) return;
+
+            // Double-check: don't drag if mouse is currently over a button
+            if (IsInsideButton(e.OriginalSource as DependencyObject)) return;
 
             var pos = e.GetPosition(null);
             var diff = pos - _dragStartPoint;
@@ -2105,7 +2139,8 @@ namespace Spritely
 
         private void ViewOutput_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            var task = GetTaskFromContextMenuItem(sender);
+            if (task == null) return;
             if (string.IsNullOrEmpty(task.FullOutput) && task.OutputBuilder.Length > 0)
                 task.FullOutput = task.OutputBuilder.ToString();
             StoredTaskViewerDialog.Show(task);
@@ -3238,7 +3273,7 @@ namespace Spritely
             ResetPerTaskToggles();
         }
 
-        private async void RestartProject_Click(object sender, RoutedEventArgs e)
+        private void RestartProject_Click(object sender, RoutedEventArgs e)
         {
             var buildBatPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "build.bat");
             if (!System.IO.File.Exists(buildBatPath))

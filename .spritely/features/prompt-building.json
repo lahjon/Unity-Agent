@@ -1,18 +1,18 @@
 {
   "id": "prompt-building",
-  "name": "Prompt Construction",
-  "description": "Assembles the full system prompt for each AI task by combining system blocks, project rules, skills, MCP configuration, feature context, and user description. Manages prompt file writing and CLI command construction.",
+  "name": "Prompt Building \u0026 Loading",
+  "description": "Constructs the full system prompt for each AI task by assembling project rules, MCP blocks, feature context, skill blocks, and task-specific instructions. Also builds Claude CLI command strings.",
   "category": "core",
   "keywords": [
-    "CLI command",
+    "BuildClaudeCommand",
+    "BuildPrompt",
     "IPromptBuilder",
     "MCP block",
     "PromptBuilder",
     "PromptLoader",
-    "prompt",
-    "prompt template",
+    "feature context",
+    "prompt composition",
     "rules block",
-    "skills block",
     "system prompt"
   ],
   "primaryFiles": [
@@ -22,26 +22,34 @@
   ],
   "secondaryFiles": [
     "Managers/RulesManager.cs",
-    "Managers/SkillManager.cs",
-    "Prompts/ProjectSuggestionPromptTemplate.md",
-    "Prompts/TaskPreprocessorPrompt.md",
     "Spritely.Tests/TaskLauncherTests.cs"
   ],
   "relatedFeatureIds": [
-    "feature-registry",
+    "feature-context-resolution",
     "mcp-integration",
     "project-management",
-    "skills-system"
+    "skill-management"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup",
+    "app-startup-config",
+    "feature-registry",
+    "git-operations",
+    "message-bus",
+    "project-management",
+    "skill-management",
+    "task-factory"
   ],
   "context": {
     "signatures": {
       "Managers/IPromptBuilder.cs": {
-        "hash": "317ed716953e",
+        "hash": "3fa593dd4554",
         "content": "interface IPromptBuilder"
       },
       "Managers/PromptBuilder.cs": {
-        "hash": "6cdd01cb9e1b",
-        "content": "class PromptBuilder\n  GetCliModelForTask(AgentTask task) -\u003E string\n  GetFriendlyModelName(string modelId) -\u003E string\n  GetCliModelForPhase(FeatureModePhase phase) -\u003E string\n  GetFeatureModeLogFilename(string? taskId = null) -\u003E string\n  BuildPromptWithImages(string basePrompt, List\u003Cstring\u003E imagePaths) -\u003E string\n  BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false) -\u003E string\n  BuildProcessStartInfo(string ps1FilePath, bool headless) -\u003E ProcessStartInfo\n  BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = \u0022\u0022) -\u003E string\n  BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription) -\u003E string\n  BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults) -\u003E string"
+        "hash": "1688ba3c5fac",
+        "content": "class PromptBuilder\n  GetCliModelForTask(AgentTask task) -\u003E string\n  GetFriendlyModelName(string modelId) -\u003E string\n  GetCliModelForPhase(FeatureModePhase phase) -\u003E string\n  GetFeatureModeLogFilename(string? taskId = null) -\u003E string\n  BuildPromptWithImages(string basePrompt, List\u003Cstring\u003E imagePaths) -\u003E string\n  BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false, string? effortLevel = null) -\u003E string\n  BuildProcessStartInfo(string ps1FilePath, bool headless) -\u003E ProcessStartInfo\n  BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = \u0022\u0022) -\u003E string\n  BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription) -\u003E string\n  BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults) -\u003E string"
       },
       "Managers/PromptLoader.cs": {
         "hash": "f332a0c15f2b",
@@ -50,19 +58,39 @@
     },
     "keyTypes": [
       "class PromptBuilder",
+      "class PromptLoader",
+      "class RulesManager",
       "interface IPromptBuilder"
     ],
     "patterns": [
-      "Composition of prompt blocks from multiple managers",
-      "Prompt files written to temp paths before CLI invocation"
+      "Layered prompt composition: system \u002B project rules \u002B feature context \u002B skills",
+      "Markdown prompt files loaded from Prompts/ directory"
     ],
     "dependencies": [
-      "FeatureContextResolver for feature context",
-      "ProjectManager for project metadata",
-      "RulesManager for project rules",
-      "SkillManager for skill blocks"
+      "Gets project rules from RulesManager/ProjectManager",
+      "Injects feature context from FeatureContextResolver",
+      "Reads .md prompt templates via PromptLoader"
     ]
   },
+  "parentModuleId": "ai-prompt-services",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "BuildClaudeCommand",
+    "BuildFeatureModeContinuationPrompt",
+    "BuildFeatureModeEvaluationPrompt",
+    "BuildFeatureModePlanConsolidationPrompt",
+    "BuildProcessStartInfo",
+    "BuildPromptWithImages",
+    "GetCliModelForPhase",
+    "GetCliModelForTask",
+    "GetFeatureModeLogFilename",
+    "GetFriendlyModelName",
+    "IPromptBuilder",
+    "Load",
+    "PromptBuilder",
+    "PromptLoader"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.3375287Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.2898032Z"
 }

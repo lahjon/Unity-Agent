@@ -1,33 +1,41 @@
 {
   "id": "helper-suggestions",
-  "name": "AI Project Suggestions",
-  "description": "Generates categorized AI-powered suggestions for the current project (bug fixes, new features, extensions) using the project description and active task context. Supports cancellation and ignore-list management.",
+  "name": "AI-Powered Suggestions",
+  "description": "Generates context-aware improvement suggestions for the active project using Haiku. Categorizes them as bug fixes, new features, extensions, or general, and manages ignore/dismiss state.",
   "category": "ui",
   "keywords": [
     "AI suggestions",
     "HelperManager",
     "Suggestion",
     "SuggestionCategory",
+    "bug fixes",
     "generate suggestions",
-    "project helper",
-    "recommendations",
-    "suggestions"
+    "ignored suggestions",
+    "new features"
   ],
   "primaryFiles": [
     "Managers/HelperManager.cs"
   ],
   "secondaryFiles": [
-    "Managers/ClaudeService.cs",
-    "Prompts/ProjectSuggestionPromptTemplate.md"
+    "Models/AgentTask.cs"
   ],
   "relatedFeatureIds": [
     "llm-services",
     "project-management"
   ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "feature-registry",
+    "llm-services",
+    "logging-diagnostics",
+    "project-management",
+    "prompt-building"
+  ],
   "context": {
     "signatures": {
       "Managers/HelperManager.cs": {
-        "hash": "3c2941e06ec1",
+        "hash": "23c72056738a",
         "content": "enum SuggestionCategory\n    General, BugFixes, NewFeatures, Extensions\nclass Suggestion\n  Title: string\n  Description: string\n  Category: SuggestionCategory\nclass HelperManager\n  Suggestions: ObservableCollection\u003CSuggestion\u003E\n  IsGenerating: bool\n  SetActiveTaskSource(Func\u003CIEnumerable\u003Cstring\u003E\u003E getDescriptions) -\u003E void\n  SwitchProjectAsync(string projectPath) -\u003E Task\n  GenerateSuggestionsAsync(string projectPath, SuggestionCategory category, string? guidance = null, CancellationToken externalToken = default) -\u003E Task\n  CancelGeneration() -\u003E void\n  Dispose() -\u003E void\n  ClearSuggestions() -\u003E void\n  RemoveSuggestion(Suggestion suggestion) -\u003E void\n  IgnoreSuggestion(Suggestion suggestion) -\u003E void\n  ClearIgnoredTitles() -\u003E void\n  Title: string\n  Description: string"
       }
     },
@@ -37,14 +45,36 @@
       "enum SuggestionCategory"
     ],
     "patterns": [
-      "CancellationToken-based generation with external cancel support",
-      "Ignore list persisted to prevent repeated suggestions"
+      "CancellationToken-based generation cancellation",
+      "ObservableCollection\u003CSuggestion\u003E bound to UI"
     ],
     "dependencies": [
-      "ClaudeService for suggestion generation",
-      "ProjectManager for project description and rules"
+      "Calls Haiku to analyze project and generate suggestions",
+      "Reads active task descriptions for context"
     ]
   },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "CancelGeneration",
+    "Category",
+    "ClearIgnoredTitles",
+    "ClearSuggestions",
+    "Description",
+    "Dispose",
+    "GenerateSuggestionsAsync",
+    "HelperManager",
+    "IgnoreSuggestion",
+    "IsGenerating",
+    "RemoveSuggestion",
+    "SetActiveTaskSource",
+    "Suggestion",
+    "SuggestionCategory",
+    "Suggestions",
+    "SwitchProjectAsync",
+    "Title"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.5739338Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.5583685Z"
 }

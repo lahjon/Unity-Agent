@@ -186,57 +186,7 @@ namespace Spritely.Managers
                 List<SuggestionJson>? items = null;
                 var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
-                try
-                {
-                    using var doc = JsonDocument.Parse(text);
-                    var root = doc.RootElement;
-
-                    // The CLI with --json-schema puts structured data in "structured_output"
-                    if (root.TryGetProperty("structured_output", out var structured)
-                        && structured.ValueKind == JsonValueKind.Object
-                        && structured.TryGetProperty("suggestions", out var structSugArr))
-                    {
-                        items = JsonSerializer.Deserialize<List<SuggestionJson>>(structSugArr.GetRawText(), jsonOpts);
-                    }
-                    // Unwrap CLI JSON envelope: {"type":"result","result":"..."}
-                    else if (root.TryGetProperty("result", out var resultElem) && !root.TryGetProperty("suggestions", out _))
-                    {
-                        var innerText = resultElem.ValueKind == JsonValueKind.String
-                            ? resultElem.GetString() ?? ""
-                            : resultElem.GetRawText();
-
-                        try
-                        {
-                            using var innerDoc = JsonDocument.Parse(innerText);
-                            if (innerDoc.RootElement.TryGetProperty("suggestions", out var innerSugArr))
-                                items = JsonSerializer.Deserialize<List<SuggestionJson>>(innerSugArr.GetRawText(), jsonOpts);
-                        }
-                        catch (JsonException)
-                        {
-                            // result field wasn't parseable JSON — try extracting array
-                            var arrStart = innerText.IndexOf('[');
-                            var arrEnd = innerText.LastIndexOf(']');
-                            if (arrStart >= 0 && arrEnd > arrStart)
-                                items = JsonSerializer.Deserialize<List<SuggestionJson>>(innerText[arrStart..(arrEnd + 1)], jsonOpts);
-                        }
-                    }
-                    // Direct structured output: {"suggestions": [...]}
-                    else if (root.TryGetProperty("suggestions", out var sugArr))
-                    {
-                        items = JsonSerializer.Deserialize<List<SuggestionJson>>(sugArr.GetRawText(), jsonOpts);
-                    }
-                }
-                catch (JsonException)
-                {
-                    // Fallback: extract bare JSON array from text output
-                    var jsonStart = text.IndexOf('[');
-                    var jsonEnd = text.LastIndexOf(']');
-                    if (jsonStart >= 0 && jsonEnd > jsonStart)
-                    {
-                        var json = text[jsonStart..(jsonEnd + 1)];
-                        items = JsonSerializer.Deserialize<List<SuggestionJson>>(json, jsonOpts);
-                    }
-                }
+                items = TryParseSuggestions(text, jsonOpts);
 
                 if (items == null || items.Count == 0)
                 {
@@ -472,6 +422,172 @@ namespace Spritely.Managers
         }
 
         private static string StripAnsi(string text) => Helpers.FormatHelpers.StripAnsiCodes(text);
+
+        /// <summary>
+        /// Robust multi-strategy parser for CLI suggestion output.
+        /// Handles: structured_output, result envelope (string or object), direct root,
+        /// markdown-fenced JSON, and bare array fallback.
+        /// </summary>
+        private static List<SuggestionJson>? TryParseSuggestions(string text, JsonSerializerOptions jsonOpts)
+        {
+            // Strategy 1: Parse as JSON envelope from --output-format json
+            try
+            {
+                using var doc = JsonDocument.Parse(text);
+                var root = doc.RootElement;
+
+                // 1a: structured_output (--json-schema puts structured data here)
+                if (root.TryGetProperty("structured_output", out var structured)
+                    && structured.ValueKind == JsonValueKind.Object)
+                {
+                    var items = ExtractSuggestionsFromElement(structured, jsonOpts);
+                    if (items is { Count: > 0 })
+                    {
+                        AppLogger.Debug("HelperManager", "Parsed suggestions from structured_output");
+                        return items;
+                    }
+                }
+
+                // 1b: result field (CLI envelope)
+                if (root.TryGetProperty("result", out var resultElem))
+                {
+                    var items = ParseResultField(resultElem, jsonOpts);
+                    if (items is { Count: > 0 })
+                    {
+                        AppLogger.Debug("HelperManager", "Parsed suggestions from result field");
+                        return items;
+                    }
+                }
+
+                // 1c: Direct root-level suggestions
+                var rootItems = ExtractSuggestionsFromElement(root, jsonOpts);
+                if (rootItems is { Count: > 0 })
+                {
+                    AppLogger.Debug("HelperManager", "Parsed suggestions from root element");
+                    return rootItems;
+                }
+            }
+            catch (JsonException)
+            {
+                // Not valid JSON at the top level — fall through to text extraction
+            }
+
+            // Strategy 2: Extract JSON from markdown code fences or bare JSON in text
+            var extracted = ExtractJsonFromText(text);
+            if (extracted != null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(extracted);
+                    var items = ExtractSuggestionsFromElement(doc.RootElement, jsonOpts);
+                    if (items is { Count: > 0 })
+                    {
+                        AppLogger.Debug("HelperManager", "Parsed suggestions from extracted text JSON");
+                        return items;
+                    }
+
+                    // Maybe extracted text is a bare array
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        var arrItems = JsonSerializer.Deserialize<List<SuggestionJson>>(extracted, jsonOpts);
+                        if (arrItems is { Count: > 0 })
+                        {
+                            AppLogger.Debug("HelperManager", "Parsed suggestions from bare array in text");
+                            return arrItems;
+                        }
+                    }
+                }
+                catch (JsonException) { }
+            }
+
+            return null;
+        }
+
+        private static List<SuggestionJson>? ExtractSuggestionsFromElement(JsonElement element, JsonSerializerOptions opts)
+        {
+            if (element.ValueKind != JsonValueKind.Object) return null;
+            if (element.TryGetProperty("suggestions", out var sugArr) && sugArr.ValueKind == JsonValueKind.Array)
+                return JsonSerializer.Deserialize<List<SuggestionJson>>(sugArr.GetRawText(), opts);
+            return null;
+        }
+
+        private static List<SuggestionJson>? ParseResultField(JsonElement resultElem, JsonSerializerOptions opts)
+        {
+            // result is an object — check for suggestions directly
+            if (resultElem.ValueKind == JsonValueKind.Object)
+                return ExtractSuggestionsFromElement(resultElem, opts);
+
+            if (resultElem.ValueKind != JsonValueKind.String)
+                return null;
+
+            var innerText = resultElem.GetString() ?? "";
+
+            // Try parsing result string as JSON
+            try
+            {
+                using var innerDoc = JsonDocument.Parse(innerText);
+                var items = ExtractSuggestionsFromElement(innerDoc.RootElement, opts);
+                if (items is { Count: > 0 }) return items;
+
+                // Maybe result is a bare array
+                if (innerDoc.RootElement.ValueKind == JsonValueKind.Array)
+                    return JsonSerializer.Deserialize<List<SuggestionJson>>(innerText, opts);
+            }
+            catch (JsonException) { }
+
+            // Try extracting JSON from markdown fences or embedded JSON in result text
+            var extracted = ExtractJsonFromText(innerText);
+            if (extracted != null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(extracted);
+                    var items = ExtractSuggestionsFromElement(doc.RootElement, opts);
+                    if (items is { Count: > 0 }) return items;
+
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                        return JsonSerializer.Deserialize<List<SuggestionJson>>(extracted, opts);
+                }
+                catch (JsonException) { }
+            }
+
+            return null;
+        }
+
+        private static readonly Regex MarkdownJsonFenceRegex = new(
+            @"```(?:json)?\s*\n?([\s\S]*?)\n?\s*```",
+            RegexOptions.Compiled);
+
+        /// <summary>
+        /// Extracts JSON content from text: tries markdown code fences first,
+        /// then looks for a JSON object or array by matching braces/brackets.
+        /// </summary>
+        private static string? ExtractJsonFromText(string text)
+        {
+            // Try markdown code fences
+            var match = MarkdownJsonFenceRegex.Match(text);
+            if (match.Success)
+                return match.Groups[1].Value.Trim();
+
+            // Try to find a JSON object: {"suggestions": ...}
+            var objStart = text.IndexOf('{');
+            var objEnd = text.LastIndexOf('}');
+            if (objStart >= 0 && objEnd > objStart)
+            {
+                var candidate = text[objStart..(objEnd + 1)];
+                // Quick sanity check: must contain "suggestions"
+                if (candidate.Contains("suggestions", StringComparison.OrdinalIgnoreCase))
+                    return candidate;
+            }
+
+            // Try to find a bare JSON array
+            var arrStart = text.IndexOf('[');
+            var arrEnd = text.LastIndexOf(']');
+            if (arrStart >= 0 && arrEnd > arrStart)
+                return text[arrStart..(arrEnd + 1)];
+
+            return null;
+        }
 
         private class SuggestionJson
         {

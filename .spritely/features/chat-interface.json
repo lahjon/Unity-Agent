@@ -26,6 +26,14 @@
   "relatedFeatureIds": [
     "llm-services"
   ],
+  "dependsOn": [
+    "app-settings",
+    "llm-services",
+    "logging-diagnostics",
+    "prompt-building",
+    "task-graph-ui",
+    "task-ui"
+  ],
   "context": {
     "signatures": {
       "Managers/ChatManager.cs": {
@@ -53,6 +61,13 @@
       "ImageAttachmentManager for paste/drop"
     ]
   },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "ChatManager",
+    "GeminiImagePanel"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.5299452Z"
 }

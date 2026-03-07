@@ -15,6 +15,9 @@ namespace Spritely.Models
         /// <summary>Whether the task appears to introduce a brand-new feature.</summary>
         public bool IsNewFeature { get; set; }
 
+        /// <summary>Suggested kebab-case id for the new feature, when <see cref="IsNewFeature"/> is true.</summary>
+        public string? SuggestedNewFeatureId { get; set; }
+
         /// <summary>Suggested name for the new feature, when <see cref="IsNewFeature"/> is true.</summary>
         public string? SuggestedNewFeatureName { get; set; }
 

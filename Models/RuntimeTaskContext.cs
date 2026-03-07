@@ -35,6 +35,9 @@ namespace Spritely
         // Model tracking
         public string? LastCliModel { get; set; }
 
+        // Feature system: resolver suggestion for deferred new-feature creation
+        public Spritely.Models.FeatureContextResult? ResolverSuggestion { get; set; }
+
         // Queue / dependency tracking
         public string? QueuedReason { get; set; }
         public string? BlockedByTaskId { get; set; }

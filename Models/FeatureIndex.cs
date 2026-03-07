@@ -13,6 +13,9 @@ namespace Spritely.Models
 
         /// <summary>Ordered list of every feature registered in this project.</summary>
         public List<FeatureIndexEntry> Features { get; set; } = new();
+
+        /// <summary>Module membership info carried inline so loaders need only one file read.</summary>
+        public List<ModuleIndexEntry> Modules { get; set; } = new();
     }
 
     /// <summary>
@@ -26,5 +29,15 @@ namespace Spritely.Models
 
         /// <summary>Human-readable display name.</summary>
         public string Name { get; set; } = "";
+
+        /// <summary>Broad category (Core, UI, Integration, etc.) copied from the feature entry.</summary>
+        public string Category { get; set; } = "";
+
+        /// <summary>Number of times this feature has been touched by tasks.</summary>
+        public int TouchCount { get; set; }
+
+        /// <summary>Number of primary files in this feature.</summary>
+        public int PrimaryFileCount { get; set; }
     }
+
 }

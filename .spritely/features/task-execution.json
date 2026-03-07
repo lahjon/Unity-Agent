@@ -34,18 +34,60 @@
     "task-orchestration",
     "task-preprocessing"
   ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "app-startup",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "stored-task-viewer",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
+  ],
   "context": {
     "signatures": {
       "MainWindow.TaskExecution.cs": {
-        "hash": "eba25084c5e8",
+        "hash": "76320043711f",
         "content": "class MainWindow"
       },
       "Managers/TaskExecutionManager.cs": {
-        "hash": "fbb838383705",
+        "hash": "f941328ee742",
         "content": "class TaskExecutionManager\n  LaunchHeadless(AgentTask task) -\u003E void\n  CancelTaskImmediate(AgentTask task) -\u003E void\n  KillProcess(AgentTask task) -\u003E void\n  RemoveStreamingState(string taskId) -\u003E void\n  PauseTask(AgentTask task) -\u003E void\n  SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask\n  SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask\n  ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?\n  InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void\n  ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?"
       },
       "Managers/TaskProcessLauncher.cs": {
-        "hash": "8dcc0935d414",
+        "hash": "03feab20187f",
         "content": "class TaskProcessLauncher\n  ProcessQueuedMessagesCallback: Action\u003CAgentTask, ObservableCollection\u003CAgentTask\u003E, ObservableCollection\u003CAgentTask\u003E\u003E?\n  StartManagedProcess(AgentTask task, Process process) -\u003E void\n  KillProcess(AgentTask task) -\u003E void\n  RemoveStreamingState(string taskId) -\u003E void\n  CleanupScripts(string taskId) -\u003E void\n  PauseTask(AgentTask task) -\u003E void"
       }
     },
@@ -66,6 +108,14 @@
       "PromptBuilder for prompt assembly"
     ]
   },
+  "parentModuleId": "task-execution",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "MainWindow",
+    "TaskExecutionManager",
+    "TaskProcessLauncher"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.292708Z"
 }

@@ -28,6 +28,47 @@
     "task-execution",
     "task-orchestration"
   ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "app-startup",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "task-execution",
+    "task-factory",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
+  ],
   "context": {
     "signatures": {
       "Controls/GraphInteractionHandler.cs": {
@@ -62,6 +103,15 @@
       "FileLockManager for lock state display"
     ]
   },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "GraphInteractionHandler",
+    "GraphLayoutEngine",
+    "GraphRenderer",
+    "TaskNodeGraphPanel"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.5195172Z"
 }

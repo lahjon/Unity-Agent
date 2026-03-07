@@ -24,6 +24,12 @@
     "history-analytics",
     "task-execution"
   ],
+  "dependsOn": [
+    "logging-diagnostics",
+    "task-graph-ui",
+    "task-ui",
+    "theming-ui-shared"
+  ],
   "context": {
     "signatures": {
       "Dialogs/StoredTaskViewerDialog.cs": {
@@ -43,6 +49,12 @@
       "HistoryManager for stored task data"
     ]
   },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "StoredTaskViewerDialog"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.6196289Z"
 }

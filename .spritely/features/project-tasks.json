@@ -21,6 +21,14 @@
   "relatedFeatureIds": [
     "project-management"
   ],
+  "dependsOn": [
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-registry",
+    "logging-diagnostics",
+    "module-registry",
+    "project-management"
+  ],
   "context": {
     "signatures": {
       "Managers/ProjectTaskManager.cs": {
@@ -41,6 +49,12 @@
       "SafeFileWriter for background persistence"
     ]
   },
+  "parentModuleId": "data-persistence",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "ProjectTaskManager"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.5654574Z"
 }

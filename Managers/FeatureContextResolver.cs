@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,13 +21,22 @@ namespace Spritely.Managers
             """{"type":"object","properties":{"relevant_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"confidence":{"type":"number"}},"required":["id","confidence"]}},"is_new_feature":{"type":"boolean"},"new_feature_name":{"type":"string"},"new_feature_id":{"type":"string"},"new_feature_keywords":{"type":"array","items":{"type":"string"}}},"required":["relevant_features","is_new_feature"]}""";
 
         private const double MinConfidenceThreshold = 0.3;
+        private const double TreeExpansionConfidenceThreshold = 0.7;
+        private const double SiblingScoreMultiplier = 0.5;
         private static readonly TimeSpan HaikuTimeout = TimeSpan.FromMinutes(2);
 
         private readonly FeatureRegistryManager _registryManager;
+        private readonly CodebaseIndexManager? _codebaseIndexManager;
+        private readonly ModuleRegistryManager? _moduleRegistryManager;
 
-        public FeatureContextResolver(FeatureRegistryManager registryManager)
+        public FeatureContextResolver(
+            FeatureRegistryManager registryManager,
+            CodebaseIndexManager? codebaseIndexManager = null,
+            ModuleRegistryManager? moduleRegistryManager = null)
         {
             _registryManager = registryManager;
+            _codebaseIndexManager = codebaseIndexManager;
+            _moduleRegistryManager = moduleRegistryManager;
         }
 
         /// <summary>
@@ -49,19 +56,129 @@ namespace Spritely.Managers
                 if (allFeatures.Count == 0)
                     return null;
 
-                // Local keyword pre-filter to narrow candidates before the Haiku call
-                var candidates = _registryManager.FindMatchingFeatures(
-                    taskDescription, allFeatures, FeatureConstants.MaxFeaturesPerTask);
+                // Load symbol index for enhanced matching (nullable — degrades gracefully)
+                CodebaseSymbolIndex? symbolIndex = null;
+                if (_codebaseIndexManager != null)
+                {
+                    try { symbolIndex = await _codebaseIndexManager.LoadIndexAsync(projectPath); }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("FeatureContextResolver", $"Symbol index load failed, continuing without: {ex.Message}");
+                    }
+                }
+
+                // Enhanced pre-filter: keyword + symbol matching
+                var candidates = _registryManager.FindMatchingFeaturesEnhanced(
+                    taskDescription, allFeatures, symbolIndex, FeatureConstants.MaxFeaturesPerTask,
+                    _codebaseIndexManager);
+
+                // Add module siblings as lower-confidence candidates
+                if (_moduleRegistryManager != null && candidates.Count > 0)
+                {
+                    try
+                    {
+                        var allModules = await _moduleRegistryManager.LoadAllModulesAsync(projectPath);
+                        if (allModules.Count > 0)
+                        {
+                            var candidateIds = new HashSet<string>(candidates.Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
+                            var siblingCandidates = new List<FeatureEntry>();
+
+                            foreach (var candidate in candidates)
+                            {
+                                if (string.IsNullOrEmpty(candidate.ParentModuleId))
+                                    continue;
+
+                                var siblings = ModuleRegistryManager.GetRelatedFeaturesViaModule(
+                                    candidate.Id, allFeatures, allModules);
+
+                                foreach (var sibling in siblings)
+                                {
+                                    if (candidateIds.Add(sibling.Id))
+                                        siblingCandidates.Add(sibling);
+                                }
+                            }
+
+                            candidates.AddRange(siblingCandidates);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("FeatureContextResolver", $"Module sibling lookup failed, continuing: {ex.Message}");
+                    }
+                }
 
                 bool isLikelyNewFeature = candidates.Count == 0;
 
-                // Build candidates JSON for Haiku — even if empty, Haiku can still confirm new-feature
+                // Fast-path: skip Haiku call when pre-filter scores are unambiguous
+                if (candidates.Count > 0 && candidates.Count <= FeatureConstants.FastPathMaxCandidates)
+                {
+                    var tokens = FeatureRegistryManager.Tokenize(taskDescription);
+                    var scoredCandidates = candidates
+                        .Select(f => (Feature: f, Score: FeatureRegistryManager.ScoreFeature(tokens, taskDescription, f)))
+                        .ToList();
+
+                    if (scoredCandidates.All(s => s.Score >= FeatureConstants.FastPathConfidenceThreshold))
+                    {
+                        AppLogger.Info("FeatureContextResolver",
+                            $"Fast-path: skipping Haiku call — {scoredCandidates.Count} candidate(s) above threshold " +
+                            $"({string.Join(", ", scoredCandidates.Select(s => $"{s.Feature.Id}={s.Score:F2}"))})");
+
+                        var fastPathFeatures = scoredCandidates
+                            .OrderByDescending(s => s.Score)
+                            .Select(s => new MatchedFeature
+                            {
+                                FeatureId = s.Feature.Id,
+                                FeatureName = s.Feature.Name,
+                                Confidence = 1.0
+                            })
+                            .ToList();
+
+                        // Refresh stale signatures
+                        foreach (var entry in candidates)
+                            await _registryManager.RefreshStaleSignaturesAsync(projectPath, entry);
+
+                        // Tree expansion for fast-path confirmed features
+                        var fpSecondary = new List<FeatureEntry>();
+                        var fpPrimaryIds = new HashSet<string>(candidates.Select(e => e.Id), StringComparer.OrdinalIgnoreCase);
+                        try
+                        {
+                            var graph = _registryManager.BuildDependencyGraph(allFeatures);
+                            foreach (var c in candidates)
+                            {
+                                var neighborhood = _registryManager.GetFeatureWithDependencies(c.Id, allFeatures, graph, maxDepth: 1);
+                                foreach (var neighbor in neighborhood)
+                                {
+                                    if (!fpPrimaryIds.Contains(neighbor.Id) && fpSecondary.All(s => s.Id != neighbor.Id))
+                                        fpSecondary.Add(neighbor);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("FeatureContextResolver", $"Fast-path tree expansion failed: {ex.Message}");
+                        }
+
+                        var fastContextBlock = _registryManager.BuildFeatureContextBlock(
+                            candidates, fpSecondary.Count > 0 ? fpSecondary : null);
+
+                        return new FeatureContextResult
+                        {
+                            RelevantFeatures = fastPathFeatures,
+                            IsNewFeature = false,
+                            ContextBlock = fastContextBlock
+                        };
+                    }
+                }
+
+                // Build candidates JSON for Haiku — includes symbolNames for symbol-level matching
                 var candidatesArray = candidates.Select(f => new
                 {
                     id = f.Id,
                     name = f.Name,
                     description = f.Description,
-                    keywords = f.Keywords
+                    keywords = f.Keywords,
+                    symbolNames = f.SymbolNames,
+                    primaryFiles = f.PrimaryFiles.Select(Path.GetFileName).Distinct().ToList()
                 });
                 var candidatesJson = JsonSerializer.Serialize(candidatesArray,
                     new JsonSerializerOptions { WriteIndented = false });
@@ -73,106 +190,13 @@ namespace Spritely.Managers
                 // Call Haiku CLI for intelligent matching
                 AppLogger.Info("FeatureContextResolver", $"Calling Haiku CLI for feature resolution. Prompt length: {prompt.Length} chars");
 
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "claude",
-                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 3 --json-schema \"{ResolverJsonSchema.Replace("\"", "\\\"")}\"",
-                    UseShellExecute = false,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8
-                };
-                psi.Environment.Remove("CLAUDECODE");
-                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
-                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
+                var rootResult = await FeatureSystemCliRunner.RunAsync(
+                    prompt, ResolverJsonSchema, "FeatureContextResolver", HaikuTimeout, ct);
 
-                using var process = new Process { StartInfo = psi };
-                process.Start();
-
-                try
-                {
-                    await process.StandardInput.WriteAsync(prompt.AsMemory(), ct);
-                    process.StandardInput.Close();
-                }
-                catch (IOException ioEx)
-                {
-                    var earlyStderr = "";
-                    try { earlyStderr = await process.StandardError.ReadToEndAsync(ct); } catch { }
-                    AppLogger.Error("FeatureContextResolver",
-                        $"Failed to write prompt to CLI stdin (pipe closed). stderr: {earlyStderr}", ioEx);
+                if (rootResult is null)
                     return null;
-                }
 
-                var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
-                var stderrTask = process.StandardError.ReadToEndAsync(ct);
-
-                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeoutCts.CancelAfter(HaikuTimeout);
-
-                try
-                {
-                    await process.WaitForExitAsync(timeoutCts.Token);
-                }
-                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-                {
-                    AppLogger.Error("FeatureContextResolver",
-                        $"Haiku CLI timed out after {HaikuTimeout.TotalMinutes:F0} minutes (PID: {process.Id}). Killing process.");
-                    try { process.Kill(entireProcessTree: true); } catch { }
-                    return null;
-                }
-
-                var output = await stdoutTask;
-                var stderr = await stderrTask;
-
-                if (!string.IsNullOrWhiteSpace(stderr))
-                    AppLogger.Warn("FeatureContextResolver", $"Haiku CLI stderr: {stderr[..Math.Min(500, stderr.Length)]}");
-
-                if (process.ExitCode != 0)
-                {
-                    AppLogger.Error("FeatureContextResolver",
-                        $"Haiku CLI exited with code {process.ExitCode}. stderr: {stderr[..Math.Min(1000, stderr.Length)]}");
-                    return null;
-                }
-
-                if (string.IsNullOrWhiteSpace(output))
-                {
-                    AppLogger.Warn("FeatureContextResolver", "Haiku CLI returned empty output");
-                    return null;
-                }
-
-                AppLogger.Info("FeatureContextResolver", $"Haiku CLI completed. stdout length: {output.Length}");
-
-                var text = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
-
-                using var doc = JsonDocument.Parse(text);
-                var wrapper = doc.RootElement;
-
-                // The CLI with --output-format json + --json-schema puts structured data
-                // in "structured_output"; fall back to "result" for plain text responses
-                JsonElement root;
-                if (wrapper.TryGetProperty("structured_output", out var structured)
-                    && structured.ValueKind == JsonValueKind.Object)
-                {
-                    root = structured;
-                }
-                else if (wrapper.TryGetProperty("result", out var resultElement))
-                {
-                    if (resultElement.ValueKind == JsonValueKind.String)
-                    {
-                        using var innerDoc = JsonDocument.Parse(resultElement.GetString()!);
-                        root = innerDoc.RootElement.Clone();
-                    }
-                    else
-                    {
-                        root = resultElement;
-                    }
-                }
-                else
-                {
-                    root = wrapper;
-                }
+                var root = rootResult.Value;
 
                 // Parse relevant features from the response
                 var relevantFeatures = new List<MatchedFeature>();
@@ -216,21 +240,94 @@ namespace Spritely.Managers
                 foreach (var entry in confirmedEntries)
                     await _registryManager.RefreshStaleSignaturesAsync(projectPath, entry);
 
-                // Build the context block for prompt injection
-                var contextBlock = _registryManager.BuildFeatureContextBlock(confirmedEntries);
+                // Tree expansion: for high-confidence features, include dependencies as secondary context
+                var primaryFeatures = confirmedEntries;
+                var secondaryFeatures = new List<FeatureEntry>();
+
+                var highConfidenceIds = relevantFeatures
+                    .Where(f => f.Confidence >= TreeExpansionConfidenceThreshold)
+                    .Select(f => f.FeatureId)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                if (highConfidenceIds.Count > 0)
+                {
+                    var primaryIds = new HashSet<string>(
+                        confirmedEntries.Select(e => e.Id), StringComparer.OrdinalIgnoreCase);
+
+                    try
+                    {
+                        var graph = _registryManager.BuildDependencyGraph(allFeatures);
+
+                        foreach (var featureId in highConfidenceIds)
+                        {
+                            var neighborhood = _registryManager.GetFeatureWithDependencies(
+                                featureId, allFeatures, graph, maxDepth: 1);
+
+                            foreach (var neighbor in neighborhood)
+                            {
+                                if (!primaryIds.Contains(neighbor.Id) &&
+                                    secondaryFeatures.All(s => s.Id != neighbor.Id))
+                                {
+                                    secondaryFeatures.Add(neighbor);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("FeatureContextResolver",
+                            $"Dependency tree expansion failed, continuing without: {ex.Message}");
+                    }
+
+                    // Also add module siblings as secondary if not already primary
+                    if (_moduleRegistryManager != null)
+                    {
+                        try
+                        {
+                            var allModules = await _moduleRegistryManager.LoadAllModulesAsync(projectPath);
+                            if (allModules.Count > 0)
+                            {
+                                foreach (var featureId in highConfidenceIds)
+                                {
+                                    var siblings = ModuleRegistryManager.GetRelatedFeaturesViaModule(
+                                        featureId, allFeatures, allModules);
+
+                                    foreach (var sibling in siblings)
+                                    {
+                                        if (!primaryIds.Contains(sibling.Id) &&
+                                            secondaryFeatures.All(s => s.Id != sibling.Id))
+                                        {
+                                            secondaryFeatures.Add(sibling);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("FeatureContextResolver",
+                                $"Module sibling expansion failed, continuing without: {ex.Message}");
+                        }
+                    }
+                }
+
+                // Build context block with primary and secondary features
+                var contextBlock = _registryManager.BuildFeatureContextBlock(
+                    primaryFeatures, secondaryFeatures.Count > 0 ? secondaryFeatures : null);
 
                 // Check if Haiku identified a new feature
                 var isNewFeature = root.TryGetProperty("is_new_feature", out var newFlag) && newFlag.GetBoolean();
                 string? suggestedName = null;
                 List<string>? suggestedKeywords = null;
 
+                string? suggestedId = null;
                 if (isNewFeature)
                 {
                     suggestedName = root.TryGetProperty("new_feature_name", out var nameEl)
                         ? nameEl.GetString()
                         : null;
 
-                    var newFeatureId = root.TryGetProperty("new_feature_id", out var idEl)
+                    suggestedId = root.TryGetProperty("new_feature_id", out var idEl)
                         ? idEl.GetString()
                         : null;
 
@@ -244,26 +341,23 @@ namespace Spritely.Managers
                                 suggestedKeywords.Add(val);
                         }
                     }
+                }
 
-                    // Create a placeholder feature entry so the update agent can fill it in later
-                    if (!string.IsNullOrWhiteSpace(newFeatureId) && !string.IsNullOrWhiteSpace(suggestedName))
-                    {
-                        var placeholder = new FeatureEntry
-                        {
-                            Id = newFeatureId,
-                            Name = suggestedName,
-                            Description = $"New feature identified from task: {taskDescription}",
-                            Keywords = suggestedKeywords ?? new List<string>(),
-                            LastUpdatedAt = DateTime.UtcNow
-                        };
-                        await _registryManager.SaveFeatureAsync(projectPath, placeholder);
-                    }
+                if (relevantFeatures.Count > 0)
+                {
+                    var featureSummary = string.Join(", ", relevantFeatures.Select(f => $"{f.FeatureId} ({f.Confidence:F2})"));
+                    AppLogger.Info("FeatureContextResolver", $"Feature context resolved: {featureSummary}");
+                }
+                else
+                {
+                    AppLogger.Info("FeatureContextResolver", "Feature context resolved: no matching features found");
                 }
 
                 return new FeatureContextResult
                 {
                     RelevantFeatures = relevantFeatures,
                     IsNewFeature = isNewFeature,
+                    SuggestedNewFeatureId = suggestedId,
                     SuggestedNewFeatureName = suggestedName,
                     SuggestedKeywords = suggestedKeywords,
                     ContextBlock = contextBlock

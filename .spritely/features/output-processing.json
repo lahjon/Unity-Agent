@@ -1,56 +1,87 @@
 {
   "id": "output-processing",
-  "name": "Output Processing \u0026 Display",
-  "description": "Processes and renders streaming AI output including ANSI stripping, subtask result injection, and tab management. Manages per-task output tabs in the UI and handles typewriter animations.",
-  "category": "ui",
+  "name": "Output Processing \u0026 Subtask Extraction",
+  "description": "Processes raw Claude CLI output to extract subtasks, team members, and inject child outputs back into parent tasks. Handles token limit errors and model-switching on retry.",
+  "category": "core",
   "keywords": [
-    "ANSI",
+    "ExtractAndSpawnSubtasks",
+    "InjectSubtaskResult",
     "OutputProcessor",
-    "OutputTabManager",
-    "RichTextBox",
-    "output",
-    "output rendering",
-    "streaming",
-    "subtask injection",
-    "tab",
-    "typewriter"
+    "TokenLimitHandler",
+    "model complexity",
+    "output injection",
+    "stream-json",
+    "subtask",
+    "team spawn"
   ],
   "primaryFiles": [
     "Managers/OutputProcessor.cs",
-    "Managers/OutputTabManager.cs"
+    "Managers/TokenLimitHandler.cs"
   ],
   "secondaryFiles": [
     "Helpers/FormatHelpers.cs",
-    "Spritely.Tests/FollowUpOutputTests.cs"
+    "Managers/ModelComplexityAnalyzer.cs",
+    "Managers/TaskExecutionManager.cs"
   ],
   "relatedFeatureIds": [
+    "feature-mode-execution",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup",
+    "app-startup-config",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
     "feature-mode",
-    "task-execution"
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "logging-diagnostics",
+    "message-bus",
+    "prompt-building",
+    "task-execution",
+    "task-factory",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-ui",
+    "theming-ui-shared"
   ],
   "context": {
     "signatures": {
       "Managers/OutputProcessor.cs": {
-        "hash": "0a255f316bd9",
+        "hash": "239a07f76b5f",
         "content": "class OutputProcessor\n  InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void"
       },
-      "Managers/OutputTabManager.cs": {
-        "hash": "d9b90959688f",
-        "content": "class OutputTabManager\n  CreateTab(AgentTask task) -\u003E void\n  CreateGeminiTab(AgentTask task, string imageFolder) -\u003E void\n  AddGeminiImage(string taskId, string imagePath) -\u003E void\n  CloseTab(AgentTask task) -\u003E void\n  UpdateTabHeader(AgentTask task) -\u003E void\n  StopTypewriterAnimation(string taskId) -\u003E void\n  HasTab(string taskId) -\u003E bool\n  GetTab(string taskId) -\u003E TabItem?\n  GetOutputBox(string taskId) -\u003E RichTextBox?\n  EnsureOverflowButton() -\u003E void\n  UpdateOutputTabWidths() -\u003E void"
+      "Managers/TokenLimitHandler.cs": {
+        "hash": "436fb2e2015e",
+        "content": "class TokenLimitHandler"
       }
     },
     "keyTypes": [
       "class OutputProcessor",
-      "class OutputTabManager"
+      "class TokenLimitHandler"
     ],
     "patterns": [
-      "Lazy tab recreation for restarted tasks",
-      "Tab created per task, closed on completion"
+      "JSON stream parsing for tool calls and output events",
+      "Subtask injection writes result back to parent prompt"
     ],
     "dependencies": [
-      "AgentTask for task identity and output buffer",
-      "FormatHelpers for ANSI and path normalization"
+      "Called from TaskProcessLauncher on output events",
+      "Uses ModelComplexityAnalyzer for retry model selection"
     ]
   },
+  "parentModuleId": "task-execution",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "InjectSubtaskResult",
+    "OutputProcessor",
+    "TokenLimitHandler"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.4289478Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.6096016Z"
 }

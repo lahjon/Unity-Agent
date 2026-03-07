@@ -26,6 +26,16 @@
     "task-execution",
     "task-orchestration"
   ],
+  "dependsOn": [
+    "git-operations",
+    "logging-diagnostics",
+    "message-bus",
+    "project-management",
+    "prompt-building",
+    "task-factory",
+    "task-templates",
+    "theming-ui-shared"
+  ],
   "context": {
     "signatures": {
       "Managers/FileLockManager.cs": {
@@ -46,6 +56,12 @@
       "Git operation guard integration"
     ]
   },
+  "parentModuleId": "git-integration",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "FileLockManager"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.4096496Z"
 }

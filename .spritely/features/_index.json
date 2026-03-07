@@ -2,16 +2,36 @@
   "version": 1,
   "features": [
     {
+      "id": "activity-dashboard",
+      "name": "Activity Dashboard"
+    },
+    {
       "id": "agent-bus-operation-logging",
       "name": "Agent Bus Operation Logging"
+    },
+    {
+      "id": "app-settings",
+      "name": "Application Settings \u0026 Constants"
+    },
+    {
+      "id": "app-startup",
+      "name": "Application Bootstrap"
     },
     {
       "id": "app-startup-config",
       "name": "App Startup \u0026 Configuration"
     },
     {
+      "id": "chat",
+      "name": "Chat Interface"
+    },
+    {
       "id": "chat-interface",
       "name": "Chat Interface"
+    },
+    {
+      "id": "codebase-indexing",
+      "name": "Codebase Symbol Index"
     },
     {
       "id": "context-optimization",
@@ -22,12 +42,36 @@
       "name": "Export Task Data"
     },
     {
+      "id": "feature-context-menu",
+      "name": "Feature Context Menu"
+    },
+    {
+      "id": "feature-context-resolution",
+      "name": "Feature Context Resolution"
+    },
+    {
+      "id": "feature-initialization",
+      "name": "Feature Registry Initialization"
+    },
+    {
       "id": "feature-mode",
       "name": "Feature Mode (Multi-Iteration Execution)"
     },
     {
+      "id": "feature-mode-execution",
+      "name": "Feature Mode Execution"
+    },
+    {
+      "id": "feature-output-close-button",
+      "name": "Feature Output Tab Close Button"
+    },
+    {
       "id": "feature-registry",
-      "name": "Feature Registry System"
+      "name": "Feature Registry"
+    },
+    {
+      "id": "feature-update-agent",
+      "name": "Feature Update Agent"
     },
     {
       "id": "file-lock-management",
@@ -66,12 +110,20 @@
       "name": "Logging \u0026 Diagnostics"
     },
     {
+      "id": "logging-infrastructure",
+      "name": "Logging \u0026 Safe File Writing"
+    },
+    {
       "id": "mcp-integration",
       "name": "MCP-for-Unity Integration"
     },
     {
       "id": "message-bus",
       "name": "Inter-Task Message Bus"
+    },
+    {
+      "id": "module-registry",
+      "name": "Module Registry"
     },
     {
       "id": "output-processing",
@@ -98,6 +150,10 @@
       "name": "Prompt Construction"
     },
     {
+      "id": "skill-management",
+      "name": "Skill Management"
+    },
+    {
       "id": "skills-system",
       "name": "Skills System"
     },
@@ -122,8 +178,12 @@
       "name": "Task Dependency Graph UI"
     },
     {
+      "id": "task-history",
+      "name": "Task History \u0026 Group Tracking"
+    },
+    {
       "id": "task-orchestration",
-      "name": "Task Orchestration"
+      "name": "Task Orchestration \u0026 Lifecycle"
     },
     {
       "id": "task-preprocessing",
@@ -134,12 +194,25 @@
       "name": "Saved Prompts \u0026 Task Templates"
     },
     {
+      "id": "task-templates-storage",
+      "name": "Task Templates \u0026 Saved Prompts"
+    },
+    {
+      "id": "task-ui",
+      "name": "Task UI \u0026 Graph Visualization"
+    },
+    {
       "id": "terminal",
       "name": "Integrated Terminal"
     },
     {
       "id": "theming-ui-shared",
       "name": "Theming \u0026 Shared UI Components"
+    },
+    {
+      "id": "ui-theming",
+      "name": "UI Theming \u0026 Style System"
     }
-  ]
+  ],
+  "modules": []
 }

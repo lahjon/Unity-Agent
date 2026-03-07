@@ -120,8 +120,8 @@ namespace Spritely.Managers
                 return;
             }
 
-            // Check for token limit error first
-            if (_completionAnalyzer.IsTokenLimitError(iterationOutput))
+            // Check for token limit error first (only on non-zero exit code to avoid false positives)
+            if (exitCode != 0 && _completionAnalyzer.IsTokenLimitError(iterationOutput))
             {
                 task.ConsecutiveTokenLimitRetries++;
                 const int maxTokenLimitRetries = 5;
@@ -1236,7 +1236,7 @@ namespace Spritely.Managers
                 newFailures = 0;
             }
 
-            if (completionAnalyzer.IsTokenLimitError(iterationOutput))
+            if (exitCode != 0 && completionAnalyzer.IsTokenLimitError(iterationOutput))
                 return new FeatureModeDecision { Action = FeatureModeAction.RetryAfterDelay, ConsecutiveFailures = newFailures };
 
             return new FeatureModeDecision

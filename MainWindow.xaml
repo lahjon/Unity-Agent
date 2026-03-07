@@ -1643,6 +1643,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition x:Name="FeaturesPanelRow" Height="Auto"/>
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Margin="4,2,4,6">
                         <TextBlock Text="TASK LIST" Foreground="{StaticResource Accent}" FontWeight="Bold"
@@ -1803,29 +1804,43 @@
                                      PreviewMouseWheel="TaskList_PreviewMouseWheel"/>
                         </Grid>
                     </TabItem>
-                    <TabItem x:Name="FeaturesTabItem">
-                        <TabItem.Header>
+                </TabControl>
+                <!-- ═══ FEATURES PANEL (docked below task list) ═══ -->
+                <Border Grid.Row="2" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,1,0,0" Margin="0,6,0,0">
+                    <Grid x:Name="FeaturesPanelGrid">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition x:Name="FeaturesListRow" Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <!-- Collapsible header -->
+                        <DockPanel Grid.Row="0" Margin="0,6,0,4" Cursor="Hand"
+                                   MouseLeftButtonDown="ToggleFeaturesPanel_Click">
+                            <Button DockPanel.Dock="Right" Content="Refresh" Click="RefreshFeatures_Click"
+                                    Style="{StaticResource GhostBtn}"/>
+                            <Button x:Name="FeaturesPanelToggleBtn" DockPanel.Dock="Right"
+                                    Content="&#xE70D;" Click="ToggleFeaturesPanel_Click"
+                                    Margin="0,0,4,0">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                        <Setter Property="FontSize" Value="10"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="FEATURES" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"/>
-                                <TextBlock x:Name="FeaturesTabCount" FontWeight="Bold" FontSize="11"
-                                           FontFamily="Segoe UI" Foreground="{StaticResource TextSubdued}"/>
+                                <TextBlock Text="FEATURES" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="FeaturesTabCount" FontWeight="Bold" FontSize="10"
+                                           FontFamily="Segoe UI" Foreground="{StaticResource TextSubdued}"
+                                           VerticalAlignment="Center"/>
                             </StackPanel>
-                        </TabItem.Header>
-                        <Grid Margin="0,6,0,0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <!-- Refresh button -->
-                            <DockPanel Grid.Row="0" Margin="4,0,0,8">
-                                <Button Content="Refresh" Click="RefreshFeatures_Click"
-                                        Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"/>
-                                <TextBlock Text="" FontSize="10" Foreground="Transparent"/>
-                            </DockPanel>
+                        </DockPanel>
+                        <!-- Collapsible content -->
+                        <Grid x:Name="FeaturesPanelContent" Grid.Row="1" Visibility="Visible">
                             <!-- Search box -->
-                            <Grid Grid.Row="1" Margin="4,0,4,6">
+                            <Grid Margin="0,0,0,6">
                                 <TextBox x:Name="FeatureSearchBox"
                                          FontSize="12" Padding="6,4"
                                          Background="{StaticResource BgElevated}"
@@ -1847,102 +1862,121 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                             </Grid>
-                            <!-- Feature list -->
-                            <ListBox x:Name="FeaturesListBox" Grid.Row="2"
-                                     Style="{StaticResource TaskListStyle}"
-                                     SelectionChanged="FeaturesListBox_SelectionChanged"
-                                     PreviewMouseWheel="TaskList_PreviewMouseWheel">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Padding="6,4" CornerRadius="4">
-                                            <StackPanel>
-                                                <DockPanel>
-                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Category}"
-                                                               Foreground="{StaticResource AccentTeal}" FontSize="9"
-                                                               FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBright}"
-                                                               FontSize="12" FontFamily="Segoe UI" FontWeight="SemiBold"
-                                                               TextTrimming="CharacterEllipsis"/>
-                                                </DockPanel>
-                                                <TextBlock Text="{Binding Description}" Foreground="{StaticResource TextSecondary}"
-                                                           FontSize="10" FontFamily="Segoe UI" TextTrimming="CharacterEllipsis"
-                                                           MaxHeight="30" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                            <!-- Feature detail panel -->
-                            <Border x:Name="FeatureDetailPanel" Grid.Row="3" Visibility="Collapsed"
-                                    Background="{StaticResource BgDeep}" CornerRadius="6" Padding="10"
-                                    Margin="0,6,0,0" MaxHeight="280"
-                                    BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel>
-                                        <!-- Name + Category -->
-                                        <DockPanel Margin="0,0,0,4">
-                                            <Border DockPanel.Dock="Right" Background="{StaticResource BgElevated}"
-                                                    CornerRadius="3" Padding="6,2">
-                                                <TextBlock x:Name="FeatureDetailCategory" Foreground="{StaticResource AccentTeal}"
-                                                           FontSize="10" FontFamily="Segoe UI"/>
-                                            </Border>
-                                            <TextBlock x:Name="FeatureDetailName" Foreground="{StaticResource Accent}"
-                                                       FontSize="14" FontWeight="Bold" FontFamily="Segoe UI"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                        </DockPanel>
-                                        <!-- Description -->
-                                        <TextBlock x:Name="FeatureDetailDescription" Foreground="{StaticResource TextBody}"
-                                                   FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
-                                                   Margin="0,0,0,8"/>
-                                        <!-- Keywords -->
-                                        <TextBlock Text="KEYWORDS" Foreground="{StaticResource TextDim}" FontSize="9"
-                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
-                                        <TextBlock x:Name="FeatureDetailKeywords" Foreground="{StaticResource TextSecondary}"
-                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                        <!-- Related features -->
-                                        <TextBlock Text="RELATED FEATURES" Foreground="{StaticResource TextDim}" FontSize="9"
-                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
-                                        <TextBlock x:Name="FeatureDetailRelated" Foreground="{StaticResource TextSecondary}"
-                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                        <!-- Dependencies -->
-                                        <TextBlock Text="DEPENDENCIES" Foreground="{StaticResource TextDim}" FontSize="9"
-                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
-                                        <TextBlock x:Name="FeatureDetailDependencies" Foreground="{StaticResource TextSecondary}"
-                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                        <!-- Key Types -->
-                                        <TextBlock Text="KEY TYPES" Foreground="{StaticResource TextDim}" FontSize="9"
-                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
-                                        <TextBlock x:Name="FeatureDetailKeyTypes" Foreground="{StaticResource AccentBlue}"
-                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                        <!-- Patterns -->
-                                        <TextBlock Text="PATTERNS" Foreground="{StaticResource TextDim}" FontSize="9"
-                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
-                                        <TextBlock x:Name="FeatureDetailPatterns" Foreground="{StaticResource TextSecondary}"
-                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                        <!-- Primary Files -->
-                                        <TextBlock Text="PRIMARY FILES" Foreground="{StaticResource TextDim}" FontSize="9"
-                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
-                                        <TextBlock x:Name="FeatureDetailPrimaryFiles" Foreground="{StaticResource TextSecondary}"
-                                                   FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                        <!-- Secondary Files -->
-                                        <TextBlock Text="SECONDARY FILES" Foreground="{StaticResource TextDim}" FontSize="9"
-                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
-                                        <TextBlock x:Name="FeatureDetailSecondaryFiles" Foreground="{StaticResource TextSecondary}"
-                                                   FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                        <!-- Signatures -->
-                                        <TextBlock Text="SIGNATURES" Foreground="{StaticResource TextDim}" FontSize="9"
-                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
-                                        <TextBlock x:Name="FeatureDetailSignatures" Foreground="{StaticResource TextSecondary}"
-                                                   FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                        <!-- Metadata -->
-                                        <TextBlock x:Name="FeatureDetailMeta" Foreground="{StaticResource TextDisabled}"
-                                                   FontSize="9" FontFamily="Segoe UI" Margin="0,4,0,0"/>
-                                    </StackPanel>
-                                </ScrollViewer>
-                            </Border>
                         </Grid>
-                    </TabItem>
-                </TabControl>
+                        <!-- Feature list -->
+                        <ListBox x:Name="FeaturesListBox" Grid.Row="2"
+                                 Style="{StaticResource TaskListStyle}"
+                                 SelectionChanged="FeaturesListBox_SelectionChanged"
+                                 PreviewMouseWheel="TaskList_PreviewMouseWheel"
+                                 MaxHeight="200">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="6,4" CornerRadius="4">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Update Signatures" Click="UpdateFeature_Click"/>
+                                                <MenuItem Header="Full Update" Click="FullUpdateFeature_Click"/>
+                                                <MenuItem Header="Copy Feature ID" Click="CopyFeatureId_Click"/>
+                                                <Separator/>
+                                                <MenuItem Header="Remove Feature" Click="RemoveFeature_Click"/>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding Category}"
+                                                           Foreground="{StaticResource AccentTeal}" FontSize="9"
+                                                           FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBright}"
+                                                           FontSize="12" FontFamily="Segoe UI" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Description}" Foreground="{StaticResource TextSecondary}"
+                                                       FontSize="10" FontFamily="Segoe UI" TextTrimming="CharacterEllipsis"
+                                                       MaxHeight="30" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <!-- Feature detail panel -->
+                        <Border x:Name="FeatureDetailPanel" Grid.Row="3" Visibility="Collapsed"
+                                Background="{StaticResource BgDeep}" CornerRadius="6" Padding="10"
+                                Margin="0,6,0,0" MaxHeight="280"
+                                BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <!-- Name + Category + Close -->
+                                    <DockPanel Margin="0,0,0,4">
+                                        <Button DockPanel.Dock="Right" Content="&#xE711;"
+                                                Style="{StaticResource IconBtn}" FontSize="10"
+                                                VerticalAlignment="Top" Margin="4,0,0,0"
+                                                Click="CloseFeatureDetail_Click" ToolTip="Close detail"/>
+                                        <Border DockPanel.Dock="Right" Background="{StaticResource BgElevated}"
+                                                CornerRadius="3" Padding="6,2">
+                                            <TextBlock x:Name="FeatureDetailCategory" Foreground="{StaticResource AccentTeal}"
+                                                       FontSize="10" FontFamily="Segoe UI"/>
+                                        </Border>
+                                        <TextBlock x:Name="FeatureDetailName" Foreground="{StaticResource Accent}"
+                                                   FontSize="14" FontWeight="Bold" FontFamily="Segoe UI"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </DockPanel>
+                                    <!-- Description -->
+                                    <TextBlock x:Name="FeatureDetailDescription" Foreground="{StaticResource TextBody}"
+                                               FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                               Margin="0,0,0,8"/>
+                                    <!-- Keywords -->
+                                    <TextBlock Text="KEYWORDS" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailKeywords" Foreground="{StaticResource TextSecondary}"
+                                               FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Related features -->
+                                    <TextBlock Text="RELATED FEATURES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailRelated" Foreground="{StaticResource TextSecondary}"
+                                               FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Depends On (directional feature deps) -->
+                                    <TextBlock Text="DEPENDS ON" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailDependsOn" Foreground="{StaticResource TextSecondary}"
+                                               FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Dependencies -->
+                                    <TextBlock Text="DEPENDENCIES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailDependencies" Foreground="{StaticResource TextSecondary}"
+                                               FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Key Types -->
+                                    <TextBlock Text="KEY TYPES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailKeyTypes" Foreground="{StaticResource AccentBlue}"
+                                               FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Patterns -->
+                                    <TextBlock Text="PATTERNS" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailPatterns" Foreground="{StaticResource TextSecondary}"
+                                               FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Primary Files -->
+                                    <TextBlock Text="PRIMARY FILES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailPrimaryFiles" Foreground="{StaticResource TextSecondary}"
+                                               FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Secondary Files -->
+                                    <TextBlock Text="SECONDARY FILES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailSecondaryFiles" Foreground="{StaticResource TextSecondary}"
+                                               FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Signatures -->
+                                    <TextBlock Text="SIGNATURES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                               FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="FeatureDetailSignatures" Foreground="{StaticResource TextSecondary}"
+                                               FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <!-- Metadata -->
+                                    <TextBlock x:Name="FeatureDetailMeta" Foreground="{StaticResource TextDisabled}"
+                                               FontSize="9" FontFamily="Segoe UI" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </Border>
                 </Grid>
             </Border>
 

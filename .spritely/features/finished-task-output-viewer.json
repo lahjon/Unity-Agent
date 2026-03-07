@@ -15,12 +15,17 @@
   "primaryFiles": [],
   "secondaryFiles": [],
   "relatedFeatureIds": [],
+  "dependsOn": [],
   "context": {
     "signatures": {},
     "keyTypes": [],
     "patterns": [],
     "dependencies": []
   },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T20:14:58.7663744Z"
 }

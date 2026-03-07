@@ -30,6 +30,24 @@
     "prompt-building",
     "task-execution"
   ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-mode-execution",
+    "feature-registry",
+    "file-lock-management",
+    "git-operations",
+    "llm-services",
+    "logging-diagnostics",
+    "message-bus",
+    "output-processing",
+    "prompt-building",
+    "task-execution",
+    "task-factory",
+    "task-ui"
+  ],
   "context": {
     "signatures": {
       "Managers/CompletionAnalyzer.cs": {
@@ -58,6 +76,14 @@
       "TaskExecutionManager for process control"
     ]
   },
+  "parentModuleId": "task-execution",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "CompletionAnalyzer",
+    "FeatureModeAction",
+    "FeatureModeHandler"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.3450915Z"
 }

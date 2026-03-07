@@ -27,6 +27,46 @@
     "project-management",
     "prompt-building"
   ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
+  ],
   "context": {
     "signatures": {
       "Dialogs/SkillEditorDialog.cs": {
@@ -51,6 +91,13 @@
       "SettingsManager for persistence"
     ]
   },
+  "parentModuleId": "ai-prompt-services",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "SkillEditorDialog",
+    "SkillManager"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.4986632Z"
 }

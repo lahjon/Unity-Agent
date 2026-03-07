@@ -26,6 +26,13 @@
     "feature-mode",
     "task-execution"
   ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup",
+    "git-operations",
+    "logging-diagnostics",
+    "prompt-building"
+  ],
   "context": {
     "signatures": {
       "Managers/ITaskFactory.cs": {
@@ -33,7 +40,7 @@
         "content": "interface ITaskFactory"
       },
       "Managers/TaskFactory.cs": {
-        "hash": "16297ac9d043",
+        "hash": "ebcbad3cb14f",
         "content": "class TaskFactory\n  ValidateTaskInput(string? description) -\u003E bool\n  PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  GenerateLocalSummary(string description) -\u003E string\n  GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
       }
     },
@@ -50,6 +57,13 @@
       "ProjectManager for project context"
     ]
   },
+  "parentModuleId": "task-execution",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "ITaskFactory",
+    "TaskFactory"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.3191077Z"
 }

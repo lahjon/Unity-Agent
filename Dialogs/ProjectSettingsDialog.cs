@@ -82,9 +82,7 @@ namespace Spritely.Dialogs
 
                 try
                 {
-                    await projectManager.GenerateProjectDescriptionInBackground(entry);
-
-                    // Update the text boxes with the new descriptions
+                    await projectManager.RegenerateProjectDescriptionAsync(entry);
                     shortDescBox.Text = entry.ShortDescription;
                     longDescBox.Text = entry.LongDescription;
                 }
@@ -101,48 +99,63 @@ namespace Spritely.Dialogs
             };
             stack.Children.Add(regenerateBtn);
 
-            // ── Initialize Project Button ──
-            var initProjectBtn = new Button
+            // ── Initialize Features Button ──
+            var initFeaturesStatusText = new TextBlock
             {
-                Content = "Initialize Project",
+                Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
+                FontSize = 11,
+                FontFamily = new FontFamily("Segoe UI"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
+            var initFeaturesBtn = new Button
+            {
+                Content = "Initialize Features",
                 Style = Application.Current.TryFindResource("SecondaryBtn") as Style,
                 Padding = new Thickness(10, 4, 10, 4),
                 Margin = new Thickness(0, 8, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Left
             };
-            initProjectBtn.Click += async (_, _) =>
+            initFeaturesBtn.Click += async (_, _) =>
             {
                 if (projectManager == null)
                 {
-                    MessageBox.Show("Cannot initialize project: ProjectManager not available.", "Error",
+                    MessageBox.Show("Cannot initialize features: ProjectManager not available.", "Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                initProjectBtn.IsEnabled = false;
+                initFeaturesBtn.IsEnabled = false;
                 regenerateBtn.IsEnabled = false;
-                initProjectBtn.Content = "Initializing...";
+                initFeaturesBtn.Content = "Initializing...";
+                initFeaturesStatusText.Visibility = Visibility.Visible;
+                initFeaturesStatusText.Text = "Scanning project files...";
 
                 try
                 {
-                    await projectManager.ForceInitializeProjectAsync(entry);
+                    await projectManager.ForceInitializeFeaturesAsync(entry, progress =>
+                    {
+                        dlg.Dispatcher.Invoke(() => initFeaturesStatusText.Text = progress);
+                    });
 
-                    shortDescBox.Text = entry.ShortDescription;
-                    longDescBox.Text = entry.LongDescription;
+                    initFeaturesStatusText.Foreground = (Brush)Application.Current.FindResource("Success");
+                    initFeaturesStatusText.Text = "Feature registry initialized successfully.";
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to initialize project: {ex.Message}", "Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    initFeaturesStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
+                    initFeaturesStatusText.Text = $"Failed: {ex.Message}";
                 }
                 finally
                 {
-                    initProjectBtn.IsEnabled = true;
+                    initFeaturesBtn.IsEnabled = true;
                     regenerateBtn.IsEnabled = true;
-                    initProjectBtn.Content = "Initialize Project";
+                    initFeaturesBtn.Content = "Initialize Features";
                 }
             };
-            stack.Children.Add(initProjectBtn);
+            stack.Children.Add(initFeaturesBtn);
+            stack.Children.Add(initFeaturesStatusText);
 
             AddSeparator(stack);
 

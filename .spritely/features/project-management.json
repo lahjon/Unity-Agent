@@ -1,17 +1,16 @@
 {
   "id": "project-management",
   "name": "Project Management",
-  "description": "Manages the list of registered projects, their metadata (name, path, color, descriptions, rules, MCP config), and project-level UI state. Handles project creation, settings persistence, and per-project description generation.",
-  "category": "core",
+  "description": "Manages the list of projects, per-project metadata (descriptions, rules, MCP config, color), and project-level task lists. Provides helpers for current project selection and display.",
+  "category": "data",
   "keywords": [
-    "MCP config",
+    "CreateProject",
+    "MCP status",
     "ProjectEntry",
     "ProjectManager",
-    "description",
-    "multi-project",
-    "project",
+    "ProjectTaskManager",
     "project color",
-    "project list",
+    "project description",
     "project rules",
     "project settings"
   ],
@@ -19,17 +18,59 @@
     "Dialogs/CreateProjectDialog.cs",
     "Dialogs/ProjectSettingsDialog.cs",
     "Managers/ProjectManager.cs",
+    "Managers/ProjectTaskManager.cs",
     "Models/ProjectEntry.cs"
   ],
   "secondaryFiles": [
-    "Managers/RulesManager.cs",
     "Models/ProjectActivityStats.cs",
-    "Spritely.Tests/ProjectSwapTests.cs"
+    "Models/ProjectTaskItem.cs"
   ],
   "relatedFeatureIds": [
+    "activity-dashboard",
+    "app-settings",
+    "mcp-integration"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "app-startup",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
     "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
     "mcp-integration",
-    "prompt-building"
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "stored-task-viewer",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
   ],
   "context": {
     "signatures": {
@@ -38,12 +79,16 @@
         "content": "class CreateProjectResult\n  Name: string\n  Path: string\n  InitGit: bool\n  IsGame: bool\nclass CreateProjectDialog\n  Show() -\u003E CreateProjectResult?"
       },
       "Dialogs/ProjectSettingsDialog.cs": {
-        "hash": "f6211838bc70",
+        "hash": "9029f3597fc7",
         "content": "class ProjectSettingsDialog\n  Show(ProjectEntry entry, Action saveProjects, Action? onMcpVisibilityChanged = null, ProjectManager? projectManager = null) -\u003E void"
       },
       "Managers/ProjectManager.cs": {
-        "hash": "2dc948d0b19a",
+        "hash": "b8be09520236",
         "content": "class ProjectManager\n  SetTaskFactory(ITaskFactory taskFactory) -\u003E void\n  SetSettingsManager(SettingsManager settingsManager) -\u003E void\n  GetProjectStats(string projectPath, IEnumerable\u003CAgentTask\u003E allTasks) -\u003E ProjectActivityStats\n  LoadProjectsAsync() -\u003E Task\n  SaveProjects() -\u003E void\n  RefreshProjectCombo() -\u003E void\n  RefreshDescriptionBoxes() -\u003E void\n  HandleAddProjectPathClick(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  AddProject(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  CreateProject(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  UpdateMcpToggleForProject() -\u003E void\n  GetCurrentProject() -\u003E ProjectEntry?\n  GetProjectColor(string projectPath) -\u003E string\n  GetProjectDisplayName(string projectPath) -\u003E string\n  IsGameProject(string projectPath) -\u003E bool\n  GetProjectDescription(AgentTask task) -\u003E string\n  RegenerateDescriptions() -\u003E void\n  SaveShortDesc() -\u003E void\n  SaveLongDesc() -\u003E void"
+      },
+      "Managers/ProjectTaskManager.cs": {
+        "hash": "d28918dcbb6a",
+        "content": "class ProjectTaskManager\n  LoadTasksAsync() -\u003E Task\n  SaveTasks() -\u003E void\n  SaveTasksAsync() -\u003E Task\n  AddTask(string text) -\u003E ProjectTaskItem\n  CompleteTask(ProjectTaskItem task) -\u003E void\n  RemoveTask(ProjectTaskItem task) -\u003E void"
       },
       "Models/ProjectEntry.cs": {
         "hash": "24d8e2006d90",
@@ -51,21 +96,76 @@
       }
     },
     "keyTypes": [
-      "class CreateProjectResult",
       "class ProjectEntry",
       "class ProjectManager",
+      "class ProjectTaskItem",
+      "class ProjectTaskManager",
       "enum McpStatus"
     ],
     "patterns": [
-      "Manager pattern with async load/save",
-      "Per-project metadata persisted to %LOCALAPPDATA%\\Spritely\\projects.json"
+      "JSON persistence to %LOCALAPPDATA%\\Spritely\\projects.json",
+      "Per-project color palette from fixed set"
     ],
     "dependencies": [
-      "FileLockManager for task coordination",
-      "RulesManager for rule files",
-      "SettingsManager for settings persistence"
+      "MCP config read by McpHealthMonitor",
+      "Saves to %LOCALAPPDATA%\\Spritely\\projects.json"
     ]
   },
+  "parentModuleId": "data-persistence",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AddProject",
+    "AddTask",
+    "AppLogPath",
+    "Color",
+    "CompleteTask",
+    "CrashLogPath",
+    "CreateProject",
+    "CreateProjectDialog",
+    "CreateProjectResult",
+    "GetCurrentProject",
+    "GetProjectColor",
+    "GetProjectDescription",
+    "GetProjectDisplayName",
+    "GetProjectStats",
+    "HandleAddProjectPathClick",
+    "HangLogPath",
+    "InitGit",
+    "IsGame",
+    "IsGameProject",
+    "IsInitializing",
+    "LoadProjectsAsync",
+    "LoadTasksAsync",
+    "LongDescription",
+    "McpAddress",
+    "McpProcessId",
+    "McpServerName",
+    "McpStartCommand",
+    "McpStatus",
+    "Name",
+    "Path",
+    "ProjectEntry",
+    "ProjectManager",
+    "ProjectRules",
+    "ProjectSettingsDialog",
+    "ProjectTaskManager",
+    "RefreshDescriptionBoxes",
+    "RefreshProjectCombo",
+    "RegenerateDescriptions",
+    "RemoveTask",
+    "RuleInstruction",
+    "SaveLongDesc",
+    "SaveProjects",
+    "SaveShortDesc",
+    "SaveTasks",
+    "SaveTasksAsync",
+    "SetSettingsManager",
+    "SetTaskFactory",
+    "ShortDescription",
+    "Show",
+    "UpdateMcpToggleForProject"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.3805045Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.446365Z"
 }

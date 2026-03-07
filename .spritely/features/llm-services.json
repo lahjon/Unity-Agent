@@ -1,33 +1,43 @@
 {
   "id": "llm-services",
-  "name": "LLM Service Configuration",
-  "description": "Encapsulates Claude and Gemini API client configuration, API key management (encrypted storage), model enumeration, and usage tracking. Provides the base infrastructure for all AI calls in the app.",
+  "name": "LLM Service Wrappers",
+  "description": "Abstracts Claude and Gemini API access including key management, model selection, usage tracking, and model complexity analysis. Provides a common base for all LLM-backed operations.",
   "category": "integration",
   "keywords": [
     "API key",
     "BaseLlmService",
-    "Claude",
     "ClaudeService",
     "ClaudeUsageManager",
-    "Gemini",
     "GeminiService",
-    "LLM",
+    "ModelComplexityAnalyzer",
+    "ModelConfigManager",
     "model selection",
+    "token cost",
     "usage tracking"
   ],
   "primaryFiles": [
     "Managers/BaseLlmService.cs",
     "Managers/ClaudeService.cs",
     "Managers/ClaudeUsageManager.cs",
-    "Managers/GeminiService.cs"
+    "Managers/GeminiService.cs",
+    "Managers/ModelComplexityAnalyzer.cs",
+    "Managers/ModelConfigManager.cs"
   ],
   "secondaryFiles": [
     "Constants/AppConstants.cs",
-    "Managers/ModelConfigManager.cs"
+    "Spritely.Tests/HaikuApiTests.cs"
   ],
   "relatedFeatureIds": [
-    "chat-interface",
-    "task-execution"
+    "app-settings",
+    "prompt-building"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup",
+    "app-startup-config",
+    "feature-registry",
+    "logging-diagnostics",
+    "logging-infrastructure"
   ],
   "context": {
     "signatures": {
@@ -46,6 +56,14 @@
       "Managers/GeminiService.cs": {
         "hash": "3b5a619d2ba3",
         "content": "class GeminiService\n  AvailableModels: string[]\n  IsConfigured: bool\n  SaveApiKey(string apiKey) -\u003E void\n  IsValidApiKeyFormat(string? key) -\u003E bool\n  GetImageDirectory() -\u003E string\nclass ChatMessage\n  Role: string\n  Text: string\n  ImagePaths: List\u003Cstring\u003E?\nclass GeminiImageResult\n  Success: bool\n  ImagePaths: List\u003Cstring\u003E\n  TextResponse: string?\n  ErrorMessage: string?\n  Failure(string message) -\u003E GeminiImageResult"
+      },
+      "Managers/ModelComplexityAnalyzer.cs": {
+        "hash": "6a5c7365e0a4",
+        "content": "class ModelComplexityAnalyzer\n  QuickModelSelection(int teamSize, int resultSizeChars, bool hasErrors) -\u003E string\n  DetectedIndicators: List\u003CComplexityIndicator\u003E\n  Name: string\n  Weight: double\n  Occurrences: int\nclass ModelSelectionResult\n  BaseScore: double\n  FinalScore: double\n  RecommendedModel: string\n  Factors: Dictionary\u003Cstring, double\u003E\n  Reasoning: string\n  Phase: FeatureModePhase\n  TeamSize: int"
+      },
+      "Managers/ModelConfigManager.cs": {
+        "hash": "7c21d6457318",
+        "content": "class ModelConfigManager"
       }
     },
     "keyTypes": [
@@ -53,19 +71,77 @@
       "class ClaudeService",
       "class ClaudeUsageManager",
       "class GeminiService",
+      "class ModelComplexityAnalyzer",
       "class ModelUsage",
       "class UsageData"
     ],
     "patterns": [
-      "Base class with encrypted key storage",
-      "Usage tracking per model with reset capability"
+      "Encrypted API key storage in %LOCALAPPDATA%",
+      "Usage tracked per model ID"
     ],
     "dependencies": [
-      "%LOCALAPPDATA%\\Spritely\\ for key storage",
-      "Anthropic Claude API",
-      "Google Gemini API"
+      "API keys stored in %LOCALAPPDATA%\\Spritely\\",
+      "Claude invoked via CLI Process, Gemini via HTTP"
     ]
   },
+  "parentModuleId": "ai-prompt-services",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "ApiKeyDecryptionFailed",
+    "AvailableModels",
+    "BaseLlmService",
+    "BaseScore",
+    "CacheCreationTokens",
+    "CacheReadTokens",
+    "ChatMessage",
+    "ClaudeService",
+    "ClaudeUsageManager",
+    "DetectedIndicators",
+    "Dispose",
+    "ErrorMessage",
+    "Factors",
+    "Failure",
+    "FinalScore",
+    "GeminiImageResult",
+    "GeminiService",
+    "GetApiKeyForRefresh",
+    "GetImageDirectory",
+    "GetMaskedApiKey",
+    "GetUsage",
+    "GetUsageSummary",
+    "ImagePaths",
+    "InputTokens",
+    "IsConfigured",
+    "IsValidApiKeyFormat",
+    "LastUpdated",
+    "ModelComplexityAnalyzer",
+    "ModelConfigManager",
+    "ModelSelectionResult",
+    "ModelUsage",
+    "Name",
+    "Occurrences",
+    "OutputTokens",
+    "Phase",
+    "QuickModelSelection",
+    "Reasoning",
+    "RecommendedModel",
+    "RequestCount",
+    "ResetUsage",
+    "Role",
+    "SaveApiKey",
+    "SetUsageManager",
+    "Success",
+    "TeamSize",
+    "Text",
+    "TextResponse",
+    "TotalCacheCreationTokens",
+    "TotalCacheReadTokens",
+    "TotalInputTokens",
+    "TotalOutputTokens",
+    "UsageData",
+    "Weight"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.4524665Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.4528664Z"
 }

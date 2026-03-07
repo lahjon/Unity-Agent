@@ -31,6 +31,20 @@
     "project-management",
     "task-execution"
   ],
+  "dependsOn": [
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-registry",
+    "file-lock-management",
+    "logging-diagnostics",
+    "message-bus",
+    "module-registry",
+    "project-management",
+    "task-graph-ui",
+    "task-templates",
+    "task-ui",
+    "theming-ui-shared"
+  ],
   "context": {
     "signatures": {
       "Managers/ActivityDashboardManager.cs": {
@@ -65,6 +79,16 @@
       "SafeFileWriter for background persistence"
     ]
   },
+  "parentModuleId": "data-persistence",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "ActivityDashboardManager",
+    "GroupCompletedEventArgs",
+    "HistoryManager",
+    "TaskGroupEntry",
+    "TaskGroupState"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.4770891Z"
 }

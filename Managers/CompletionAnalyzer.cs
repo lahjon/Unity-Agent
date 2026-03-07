@@ -355,9 +355,12 @@ namespace Spritely.Managers
             var lower = tail.ToLowerInvariant();
             return lower.Contains("rate limit") ||
                    lower.Contains("token limit") ||
-                   lower.Contains("overloaded") ||
-                   lower.Contains("529") ||
-                   lower.Contains("capacity") ||
+                   lower.Contains("server overloaded") ||
+                   lower.Contains("overloaded_error") ||
+                   lower.Contains("error 529") ||
+                   lower.Contains("status: 529") ||
+                   lower.Contains("at capacity") ||
+                   lower.Contains("over capacity") ||
                    lower.Contains("too many requests");
         }
     }

@@ -17,10 +17,25 @@ namespace Spritely.Constants
         /// <summary>Filename of the feature index manifest inside the features directory.</summary>
         public const string IndexFileName = "_index.json";
 
+        /// <summary>Filename of the codebase-wide symbol index.</summary>
+        public const string CodebaseIndexFileName = "_codebase_index.json";
+
+        /// <summary>Filename of the module index manifest.</summary>
+        public const string ModuleIndexFileName = "_module_index.json";
+
+        /// <summary>File extension for individual module JSON files.</summary>
+        public const string ModuleFileExtension = ".module.json";
+
         // ── Context Budget ─────────────────────────────────────────────
 
-        /// <summary>Maximum number of features that can be injected into a single task prompt.</summary>
-        public const int MaxFeaturesPerTask = 5;
+        /// <summary>Maximum number of primary features that can be injected into a single task prompt.</summary>
+        public const int MaxFeaturesPerTask = 8;
+
+        /// <summary>Maximum secondary (dependency/sibling) features injected for cross-feature context.</summary>
+        public const int MaxSecondaryFeaturesPerTask = 5;
+
+        /// <summary>Approximate token cap for context injected from a single secondary feature.</summary>
+        public const int MaxTokensPerSecondaryFeature = 150;
 
         /// <summary>Approximate token cap for context injected from a single feature.</summary>
         public const int MaxTokensPerFeature = 500;
@@ -36,8 +51,33 @@ namespace Spritely.Constants
         /// <summary>Maximum source files sent to Sonnet in a single init-scan chunk.</summary>
         public const int MaxFilesPerSonnetChunk = 400;
 
+        /// <summary>Alias for <see cref="MaxFilesPerSonnetChunk"/> — used by newer scan code.</summary>
+        public const int MaxFilesPerChunk = MaxFilesPerSonnetChunk;
+
         /// <summary>Maximum signature lines extracted per source file.</summary>
         public const int MaxSignatureLinesPerFile = 20;
+
+        // ── Module Limits ─────────────────────────────────────────────
+
+        /// <summary>Maximum number of modules allowed per project.</summary>
+        public const int MaxModulesPerProject = 20;
+
+        /// <summary>Maximum number of features a single module can contain.</summary>
+        public const int MaxFeaturesPerModule = 30;
+
+        // ── Symbol Matching ──────────────────────────────────────────────
+
+        /// <summary>Score boost applied when a symbol name matches during feature resolution.</summary>
+        public const double SymbolMatchScoreBoost = 0.4;
+
+        /// <summary>
+        /// Pre-filter score threshold above which the Haiku confirmation call is skipped.
+        /// When 1-3 candidates all score above this, they are treated as confirmed with confidence 1.0.
+        /// </summary>
+        public const double FastPathConfidenceThreshold = 0.85;
+
+        /// <summary>Maximum candidate count eligible for the fast-path (skip Haiku) shortcut.</summary>
+        public const int FastPathMaxCandidates = 3;
 
         // ── Concurrency & Safety ───────────────────────────────────────
 

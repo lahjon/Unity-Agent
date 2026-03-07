@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Spritely.Constants;
 using Spritely.Models;
 
 namespace Spritely.Managers
@@ -19,14 +17,21 @@ namespace Spritely.Managers
     public class FeatureUpdateAgent
     {
         private const string UpdateJsonSchema =
-            """{"type":"object","properties":{"updated_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"add_primary_files":{"type":"array","items":{"type":"string"}},"add_secondary_files":{"type":"array","items":{"type":"string"}},"remove_files":{"type":"array","items":{"type":"string"}},"updated_description":{"type":"string"}},"required":["id"]}},"new_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"category":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"primary_files":{"type":"array","items":{"type":"string"}},"secondary_files":{"type":"array","items":{"type":"string"}}},"required":["id","name","description","keywords","primary_files"]}}},"required":["updated_features","new_features"]}""";
+            """{"type":"object","properties":{"updated_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"add_primary_files":{"type":"array","items":{"type":"string"}},"add_secondary_files":{"type":"array","items":{"type":"string"}},"remove_files":{"type":"array","items":{"type":"string"}},"updated_description":{"type":"string"}},"required":["id"]}},"new_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"category":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"primary_files":{"type":"array","items":{"type":"string"}},"secondary_files":{"type":"array","items":{"type":"string"}},"depends_on":{"type":"array","items":{"type":"string"}},"module_id":{"type":"string"}},"required":["id","name","description","keywords","primary_files"]}}},"required":["updated_features","new_features"]}""";
 
         private static readonly TimeSpan HaikuTimeout = TimeSpan.FromMinutes(2);
         private readonly FeatureRegistryManager _registryManager;
+        private readonly CodebaseIndexManager? _codebaseIndexManager;
+        private readonly ModuleRegistryManager? _moduleRegistryManager;
 
-        public FeatureUpdateAgent(FeatureRegistryManager registryManager)
+        public FeatureUpdateAgent(
+            FeatureRegistryManager registryManager,
+            CodebaseIndexManager? codebaseIndexManager = null,
+            ModuleRegistryManager? moduleRegistryManager = null)
         {
             _registryManager = registryManager;
+            _codebaseIndexManager = codebaseIndexManager;
+            _moduleRegistryManager = moduleRegistryManager;
         }
 
         /// <summary>
@@ -39,6 +44,7 @@ namespace Spritely.Managers
             string taskDescription,
             string? completionSummary,
             List<string> changedFiles,
+            FeatureContextResult? resolverSuggestion = null,
             CancellationToken ct = default)
         {
             try
@@ -54,6 +60,9 @@ namespace Spritely.Managers
                 if (index.Features.Count == 0 && changedFiles.Count == 0)
                     return;
 
+                // Load all features once upfront — used for both the prompt and post-processing
+                var allFeatures = await _registryManager.LoadAllFeaturesAsync(projectPath);
+
                 // Normalize changed file paths to relative
                 var relativeFiles = changedFiles
                     .Select(f => ToRelativePath(f, projectPath))
@@ -61,8 +70,15 @@ namespace Spritely.Managers
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                // Build index JSON for the prompt
-                var indexJson = JsonSerializer.Serialize(index.Features,
+                // Build compact feature summary so Haiku can map files to features
+                var featureSummaries = allFeatures.Select(f => new
+                {
+                    id = f.Id,
+                    name = f.Name,
+                    description = f.Description,
+                    primaryFiles = f.PrimaryFiles
+                });
+                var indexJson = JsonSerializer.Serialize(featureSummaries,
                     new JsonSerializerOptions { WriteIndented = false });
 
                 // Load prompt template and format
@@ -76,116 +92,13 @@ namespace Spritely.Managers
                 // Call Haiku CLI for intelligent feature update analysis
                 AppLogger.Info("FeatureUpdateAgent", $"Calling Haiku CLI for feature update. Task: {taskId}, changed files: {relativeFiles.Count}");
 
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "claude",
-                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 3 --json-schema \"{UpdateJsonSchema.Replace("\"", "\\\"")}\"",
-                    UseShellExecute = false,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8
-                };
-                psi.Environment.Remove("CLAUDECODE");
-                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
-                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
+                var rootResult = await FeatureSystemCliRunner.RunAsync(
+                    prompt, UpdateJsonSchema, "FeatureUpdateAgent", HaikuTimeout, ct);
 
-                using var process = new Process { StartInfo = psi };
-                process.Start();
-
-                // Link external cancellation with the timeout so either triggers cleanup
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                linkedCts.CancelAfter(HaikuTimeout);
-                var linked = linkedCts.Token;
-
-                try
-                {
-                    await process.StandardInput.WriteAsync(prompt.AsMemory(), linked);
-                    process.StandardInput.Close();
-                }
-                catch (OperationCanceledException)
-                {
-                    AppLogger.Warn("FeatureUpdateAgent",
-                        $"Cancelled during stdin write (PID: {process.Id}). Killing process.");
-                    try { process.Kill(entireProcessTree: true); } catch { }
+                if (rootResult is null)
                     return;
-                }
-                catch (IOException ioEx)
-                {
-                    var earlyStderr = "";
-                    try { earlyStderr = await process.StandardError.ReadToEndAsync(CancellationToken.None); } catch { }
-                    AppLogger.Error("FeatureUpdateAgent",
-                        $"Failed to write prompt to CLI stdin (pipe closed). stderr: {earlyStderr}", ioEx);
-                    return;
-                }
 
-                var stdoutTask = process.StandardOutput.ReadToEndAsync(linked);
-                var stderrTask = process.StandardError.ReadToEndAsync(linked);
-
-                try
-                {
-                    await process.WaitForExitAsync(linked);
-                }
-                catch (OperationCanceledException)
-                {
-                    var reason = ct.IsCancellationRequested ? "external cancellation" : $"timeout after {HaikuTimeout.TotalMinutes:F0} minutes";
-                    AppLogger.Warn("FeatureUpdateAgent",
-                        $"Haiku CLI cancelled ({reason}, PID: {process.Id}). Killing process.");
-                    try { process.Kill(entireProcessTree: true); } catch { }
-                    return;
-                }
-
-                var output = await stdoutTask;
-                var stderr = await stderrTask;
-
-                if (!string.IsNullOrWhiteSpace(stderr))
-                    AppLogger.Warn("FeatureUpdateAgent", $"Haiku CLI stderr: {stderr[..Math.Min(500, stderr.Length)]}");
-
-                if (process.ExitCode != 0)
-                {
-                    AppLogger.Error("FeatureUpdateAgent",
-                        $"Haiku CLI exited with code {process.ExitCode}. stderr: {stderr[..Math.Min(1000, stderr.Length)]}");
-                    return;
-                }
-
-                if (string.IsNullOrWhiteSpace(output))
-                {
-                    AppLogger.Warn("FeatureUpdateAgent", "Haiku CLI returned empty output");
-                    return;
-                }
-
-                AppLogger.Info("FeatureUpdateAgent", $"Haiku CLI completed. stdout length: {output.Length}");
-
-                var text = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
-
-                using var doc = JsonDocument.Parse(text);
-                var wrapper = doc.RootElement;
-
-                // The CLI with --output-format json + --json-schema puts structured data
-                // in "structured_output"; fall back to "result" for plain text responses
-                JsonElement root;
-                if (wrapper.TryGetProperty("structured_output", out var structured)
-                    && structured.ValueKind == JsonValueKind.Object)
-                {
-                    root = structured;
-                }
-                else if (wrapper.TryGetProperty("result", out var resultElement))
-                {
-                    if (resultElement.ValueKind == JsonValueKind.String)
-                    {
-                        using var innerDoc = JsonDocument.Parse(resultElement.GetString()!);
-                        root = innerDoc.RootElement.Clone();
-                    }
-                    else
-                    {
-                        root = resultElement;
-                    }
-                }
-                else
-                {
-                    root = wrapper;
-                }
+                var root = rootResult.Value;
 
                 // Process updated features
                 if (root.TryGetProperty("updated_features", out var updatedArray))
@@ -193,16 +106,46 @@ namespace Spritely.Managers
                     foreach (var item in updatedArray.EnumerateArray())
                     {
                         await ProcessUpdatedFeatureAsync(
-                            projectPath, taskId, item);
+                            projectPath, taskId, taskDescription, item, allFeatures);
                     }
                 }
 
                 // Process new features
+                var createdNewFeatureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 if (root.TryGetProperty("new_features", out var newArray))
                 {
                     foreach (var item in newArray.EnumerateArray())
                     {
-                        await ProcessNewFeatureAsync(projectPath, taskId, item);
+                        var newId = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                        if (!string.IsNullOrWhiteSpace(newId))
+                            createdNewFeatureIds.Add(newId);
+                        await ProcessNewFeatureAsync(projectPath, taskId, item, allFeatures);
+                    }
+                }
+
+                // Deferred new-feature creation: if the resolver suggested a new feature
+                // but Haiku's update pass didn't create it, create a placeholder now
+                // (only after successful task completion — avoids orphaned placeholders)
+                if (resolverSuggestion is { IsNewFeature: true, SuggestedNewFeatureId: not null, SuggestedNewFeatureName: not null }
+                    && !createdNewFeatureIds.Contains(resolverSuggestion.SuggestedNewFeatureId))
+                {
+                    var existingFeature = await _registryManager.LoadFeatureAsync(
+                        projectPath, resolverSuggestion.SuggestedNewFeatureId);
+                    if (existingFeature is null)
+                    {
+                        var placeholder = new FeatureEntry
+                        {
+                            Id = resolverSuggestion.SuggestedNewFeatureId,
+                            Name = resolverSuggestion.SuggestedNewFeatureName,
+                            Description = $"New feature identified from task: {taskDescription}",
+                            Keywords = resolverSuggestion.SuggestedKeywords ?? new List<string>(),
+                            TouchCount = 1,
+                            LastUpdatedAt = DateTime.UtcNow,
+                            LastUpdatedByTaskId = taskId
+                        };
+                        await _registryManager.SaveFeatureAsync(projectPath, placeholder);
+                        AppLogger.Info("FeatureUpdateAgent",
+                            $"Created deferred placeholder feature '{placeholder.Id}' from resolver suggestion");
                     }
                 }
             }
@@ -217,7 +160,7 @@ namespace Spritely.Managers
         /// updates description, refreshes signatures for newly added primary files.
         /// </summary>
         private async Task ProcessUpdatedFeatureAsync(
-            string projectPath, string taskId, JsonElement item)
+            string projectPath, string taskId, string taskDescription, JsonElement item, List<FeatureEntry> allFeatures)
         {
             var featureId = item.GetProperty("id").GetString();
             if (string.IsNullOrWhiteSpace(featureId))
@@ -290,6 +233,55 @@ namespace Spritely.Managers
                         Content = signatures
                     };
                 }
+
+                // Extract symbol names for newly added files
+                var symbolNames = SignatureExtractor.GetSymbolNames(absPath);
+                foreach (var sym in symbolNames)
+                {
+                    if (!feature.SymbolNames.Contains(sym, StringComparer.OrdinalIgnoreCase))
+                        feature.SymbolNames.Add(sym);
+                }
+            }
+
+            feature.SymbolNames.Sort(StringComparer.OrdinalIgnoreCase);
+
+            // Refresh keywords from newly added symbols
+            if (newPrimaryFiles.Count > 0)
+                RefreshKeywords(feature, taskDescription);
+
+            // Refresh signatures for existing primary files that the task may have modified
+            await _registryManager.RefreshStaleSignaturesAsync(projectPath, feature);
+
+            // Update codebase symbol index incrementally for new files
+            if (_codebaseIndexManager != null && newPrimaryFiles.Count > 0)
+            {
+                try
+                {
+                    await _codebaseIndexManager.UpdateSymbolsForFeature(projectPath, feature.Id, newPrimaryFiles);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("FeatureUpdateAgent", $"Failed to update codebase index: {ex.Message}");
+                }
+            }
+
+            // Re-run dependency analysis when new files are added
+            if (newPrimaryFiles.Count > 0)
+            {
+                try
+                {
+                    var newDeps = DependencyAnalyzer.ComputeDependsOnForNewFeature(feature, allFeatures, projectPath);
+                    foreach (var dep in newDeps)
+                    {
+                        if (!feature.DependsOn.Contains(dep, StringComparer.OrdinalIgnoreCase))
+                            feature.DependsOn.Add(dep);
+                    }
+                    feature.DependsOn.Sort(StringComparer.Ordinal);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("FeatureUpdateAgent", $"Failed to re-analyze dependencies: {ex.Message}");
+                }
             }
 
             // Sort file lists for deterministic output
@@ -308,7 +300,7 @@ namespace Spritely.Managers
         /// for its primary files, and saves it to the registry.
         /// </summary>
         private async Task ProcessNewFeatureAsync(
-            string projectPath, string taskId, JsonElement item)
+            string projectPath, string taskId, JsonElement item, List<FeatureEntry> allFeatures)
         {
             var featureId = item.GetProperty("id").GetString();
             var name = item.GetProperty("name").GetString();
@@ -374,6 +366,33 @@ namespace Spritely.Managers
             secondaryFiles.Sort(StringComparer.OrdinalIgnoreCase);
             keywords.Sort(StringComparer.OrdinalIgnoreCase);
 
+            // Extract symbol names from primary files
+            var symbolNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var relPath in primaryFiles)
+            {
+                var absPath = Path.Combine(projectPath, relPath);
+                foreach (var sym in SignatureExtractor.GetSymbolNames(absPath))
+                    symbolNames.Add(sym);
+            }
+            var sortedSymbolNames = symbolNames.ToList();
+            sortedSymbolNames.Sort(StringComparer.OrdinalIgnoreCase);
+
+            // Use Haiku-suggested depends_on/module_id as starting point
+            var dependsOn = new List<string>();
+            if (item.TryGetProperty("depends_on", out var depsArray))
+            {
+                foreach (var d in depsArray.EnumerateArray())
+                {
+                    var val = d.GetString();
+                    if (!string.IsNullOrWhiteSpace(val))
+                        dependsOn.Add(val);
+                }
+            }
+
+            string? parentModuleId = null;
+            if (item.TryGetProperty("module_id", out var modEl))
+                parentModuleId = modEl.GetString();
+
             var feature = new FeatureEntry
             {
                 Id = featureId,
@@ -384,12 +403,122 @@ namespace Spritely.Managers
                 PrimaryFiles = primaryFiles,
                 SecondaryFiles = secondaryFiles,
                 Context = new FeatureContext { Signatures = signatures },
+                SymbolNames = sortedSymbolNames,
+                DependsOn = dependsOn,
+                ParentModuleId = parentModuleId,
                 TouchCount = 1,
                 LastUpdatedAt = DateTime.UtcNow,
                 LastUpdatedByTaskId = taskId
             };
 
+            // Code-computed dependencies take precedence over Haiku suggestions
+            try
+            {
+                var computedDeps = DependencyAnalyzer.ComputeDependsOnForNewFeature(feature, allFeatures, projectPath);
+                foreach (var dep in computedDeps)
+                {
+                    if (!feature.DependsOn.Contains(dep, StringComparer.OrdinalIgnoreCase))
+                        feature.DependsOn.Add(dep);
+                }
+                feature.DependsOn.Sort(StringComparer.Ordinal);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeatureUpdateAgent", $"Failed to compute dependencies for new feature: {ex.Message}");
+            }
+
+            // Infer module membership if not already set
+            if (string.IsNullOrEmpty(feature.ParentModuleId) && _moduleRegistryManager != null)
+            {
+                try
+                {
+                    var allModules = await _moduleRegistryManager.LoadAllModulesAsync(projectPath);
+                    if (allModules.Count > 0)
+                    {
+                        var membership = DependencyAnalyzer.InferModuleMembership(
+                            new List<FeatureEntry> { feature }, allModules);
+                        if (membership.TryGetValue(feature.Id, out var inferredModuleId))
+                            feature.ParentModuleId = inferredModuleId;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("FeatureUpdateAgent", $"Failed to infer module membership: {ex.Message}");
+                }
+            }
+
             await _registryManager.SaveFeatureAsync(projectPath, feature);
+
+            // Update codebase symbol index incrementally
+            if (_codebaseIndexManager != null && primaryFiles.Count > 0)
+            {
+                try
+                {
+                    await _codebaseIndexManager.UpdateSymbolsForFeature(projectPath, feature.Id, primaryFiles);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("FeatureUpdateAgent", $"Failed to update codebase index for new feature: {ex.Message}");
+                }
+            }
+        }
+
+        private const int MaxKeywords = 20;
+        private static readonly Regex CamelCaseSplitRegex = new(@"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Merges novel tokens derived from symbol names into the feature's keywords.
+        /// Prefers tokens that appear in both the new symbols and the task description.
+        /// Caps keywords at <see cref="MaxKeywords"/>.
+        /// </summary>
+        private static void RefreshKeywords(FeatureEntry feature, string taskDescription)
+        {
+            var existingKeywords = new HashSet<string>(feature.Keywords, StringComparer.OrdinalIgnoreCase);
+
+            // Split all symbol names into individual tokens via camelCase/PascalCase boundaries
+            var symbolTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var sym in feature.SymbolNames)
+            {
+                foreach (var part in CamelCaseSplitRegex.Split(sym))
+                {
+                    var lower = part.ToLowerInvariant();
+                    if (lower.Length > 1 && !FeatureRegistryManager.Stopwords.Contains(lower))
+                        symbolTokens.Add(lower);
+                }
+            }
+
+            // Find novel tokens not already in keywords
+            var novelTokens = symbolTokens.Where(t => !existingKeywords.Contains(t)).ToList();
+            if (novelTokens.Count == 0)
+                return;
+
+            // Tokens appearing in both symbols and task description get priority
+            var taskTokens = FeatureRegistryManager.Tokenize(taskDescription);
+            var prioritized = novelTokens
+                .OrderByDescending(t => taskTokens.Contains(t) ? 1 : 0)
+                .ThenBy(t => t, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var token in prioritized)
+            {
+                if (feature.Keywords.Count >= MaxKeywords)
+                    break;
+                feature.Keywords.Add(token);
+            }
+
+            // If we exceeded the cap (existing + new > 20), trim least-relevant entries.
+            // Keep entries that overlap with task description; drop others from the tail.
+            if (feature.Keywords.Count > MaxKeywords)
+            {
+                feature.Keywords = feature.Keywords
+                    .OrderByDescending(k => taskTokens.Contains(k) ? 1 : 0)
+                    .ThenByDescending(k => symbolTokens.Contains(k) ? 1 : 0)
+                    .ThenBy(k => k, StringComparer.OrdinalIgnoreCase)
+                    .Take(MaxKeywords)
+                    .ToList();
+            }
+
+            feature.Keywords.Sort(StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>

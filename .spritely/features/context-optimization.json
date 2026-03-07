@@ -1,17 +1,16 @@
 {
   "id": "context-optimization",
-  "name": "Context \u0026 Token Optimization",
-  "description": "Reduces prompt size through deduplication, smart truncation, context reduction, and dynamic model selection to stay within token budgets. Tracks iteration memory to carry discoveries forward across iterations.",
+  "name": "Context Optimization",
+  "description": "Reduces, deduplicates, and smartly truncates prompt context to stay within token limits. Includes iteration memory for preserving key discoveries across feature mode iterations.",
   "category": "core",
   "keywords": [
     "ContextDeduplicationService",
     "ContextReducer",
     "IterationMemoryManager",
-    "ModelComplexityAnalyzer",
     "SmartTruncationService",
-    "context",
+    "context reduction",
     "deduplication",
-    "token budget",
+    "iteration memory",
     "token limit",
     "truncation"
   ],
@@ -19,17 +18,20 @@
     "Managers/ContextDeduplicationService.cs",
     "Managers/ContextReducer.cs",
     "Managers/IterationMemoryManager.cs",
-    "Managers/ModelComplexityAnalyzer.cs",
     "Managers/SmartTruncationService.cs"
   ],
   "secondaryFiles": [
-    "Managers/EarlyTerminationManager.cs",
-    "Managers/ProgressAnalyzer.cs",
-    "Managers/TokenLimitHandler.cs",
     "Models/TokenBudgetConfig.cs"
   ],
   "relatedFeatureIds": [
-    "feature-mode",
+    "feature-mode-execution",
+    "prompt-building"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "feature-registry",
+    "logging-diagnostics",
     "prompt-building"
   ],
   "context": {
@@ -46,10 +48,6 @@
         "hash": "9dc442ec1823",
         "content": "class IterationMemoryManager\n  RecordIteration(string taskId, int iteration, IterationMemory memory) -\u003E void\n  GetPreviousIterations(string taskId) -\u003E List\u003CIterationMemory\u003E\n  BuildIterationContext(string taskId, int currentIteration) -\u003E string\n  ExtractMemoryFromOutput(string output, int iteration) -\u003E IterationMemory\n  CleanupOldMemories(TimeSpan maxAge) -\u003E void\nclass IterationMemory\n  Iteration: int\n  Timestamp: DateTime\n  KeyDiscoveries: List\u003CDiscovery\u003E\n  FailedApproaches: List\u003CFailedApproach\u003E\n  ImportantFiles: List\u003CFileReference\u003E\n  ProgressMetrics: ProgressMetrics?\nclass Discovery\n  Type: string\n  Description: string\n  Impact: string?\n  Timestamp: DateTime\nclass FailedApproach\n  Approach: string"
       },
-      "Managers/ModelComplexityAnalyzer.cs": {
-        "hash": "6a5c7365e0a4",
-        "content": "class ModelComplexityAnalyzer\n  QuickModelSelection(int teamSize, int resultSizeChars, bool hasErrors) -\u003E string\n  DetectedIndicators: List\u003CComplexityIndicator\u003E\n  Name: string\n  Weight: double\n  Occurrences: int\nclass ModelSelectionResult\n  BaseScore: double\n  FinalScore: double\n  RecommendedModel: string\n  Factors: Dictionary\u003Cstring, double\u003E\n  Reasoning: string\n  Phase: FeatureModePhase\n  TeamSize: int"
-      },
       "Managers/SmartTruncationService.cs": {
         "hash": "f8e54423f91d",
         "content": "class SmartTruncationService\n  TruncateWithSemantics(string content, int maxTokens, TruncationPriority priority) -\u003E TruncatedResult\n  Content: string\n  Type: ContentType\n  Score: double\n  StartLine: int\n  EndLine: int\n  Content: string\n  PreservedSections: List\u003Cstring\u003E\n  TruncatedSections: List\u003Cstring\u003E\n  PreservedByType: Dictionary\u003CContentType, int\u003E\n  AverageImportance: double\nclass TruncatedResult\n  ChildId: string?\n  Content: string\n  OriginalLength: int\n  TruncatedLength: int\n  PreservedSections: List\u003Cstring\u003E\n  TruncatedSections: List\u003Cstring\u003E\n  ImportanceScore: double"
@@ -59,21 +57,77 @@
       "class ContextDeduplicationService",
       "class ContextReducer",
       "class DeduplicatedPrompt",
+      "class IterationMemory",
       "class IterationMemoryManager",
-      "class ModelComplexityAnalyzer",
-      "class SmartTruncationService",
-      "class TokenBudgetConfig"
+      "class SmartTruncationService"
     ],
     "patterns": [
-      "Cache hashing for repeated prompt blocks",
-      "Fire-and-forget iteration memory recording",
-      "Priority-scored section truncation"
+      "Hash-based content deduplication cache",
+      "Priority-scored section preservation during truncation"
     ],
     "dependencies": [
-      "FeatureModeHandler for phase context",
-      "PromptBuilder for prompt assembly"
+      "Called from PromptBuilder and TaskExecutionManager",
+      "TokenBudgetConfig drives thresholds"
     ]
   },
+  "parentModuleId": "ai-prompt-services",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Approach",
+    "AverageImportance",
+    "BuildIterationContext",
+    "CachedElementHashes",
+    "ChildId",
+    "CleanupOldCache",
+    "CleanupOldMemories",
+    "Content",
+    "ContextDeduplicationService",
+    "ContextReducer",
+    "DeduplicateContext",
+    "DeduplicatedPrompt",
+    "Description",
+    "Discovery",
+    "EndLine",
+    "ExtractMemoryFromOutput",
+    "FailedApproach",
+    "FailedApproaches",
+    "FirstSeen",
+    "GetCacheStatistics",
+    "GetMinimalTeamMemberPrompt",
+    "GetPreviousIterations",
+    "Hash",
+    "Impact",
+    "ImportanceScore",
+    "ImportantFiles",
+    "InjectContext",
+    "Iteration",
+    "IterationMemory",
+    "IterationMemoryManager",
+    "KeyDiscoveries",
+    "LastUsed",
+    "Length",
+    "OriginalLength",
+    "PreservedByType",
+    "PreservedSections",
+    "Priority",
+    "ProgressMetrics",
+    "RecordIteration",
+    "ReducePromptContext",
+    "Score",
+    "SmartTruncationService",
+    "StartIndex",
+    "StartLine",
+    "TaskId",
+    "Text",
+    "Timestamp",
+    "TruncateWithSemantics",
+    "TruncatedLength",
+    "TruncatedResult",
+    "TruncatedSections",
+    "Type",
+    "UseCount"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.4419396Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.4056097Z"
 }

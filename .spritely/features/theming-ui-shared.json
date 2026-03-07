@@ -31,6 +31,12 @@
   "relatedFeatureIds": [
     "app-startup-config"
   ],
+  "dependsOn": [
+    "app-startup",
+    "logging-diagnostics",
+    "task-graph-ui",
+    "task-ui"
+  ],
   "context": {
     "signatures": {
       "Dialogs/DarkDialog.cs": {
@@ -59,6 +65,14 @@
       "WPF ResourceDictionary for theme merging"
     ]
   },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "BrushCache",
+    "DarkDialog",
+    "DarkDialogWindow"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.6612223Z"
 }

@@ -28,6 +28,19 @@
     "task-execution",
     "task-factory"
   ],
+  "dependsOn": [
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-registry",
+    "llm-services",
+    "logging-diagnostics",
+    "module-registry",
+    "project-management",
+    "prompt-building",
+    "task-graph-ui",
+    "task-ui",
+    "theming-ui-shared"
+  ],
   "context": {
     "signatures": {
       "MainWindow.SavedPrompts.cs": {
@@ -59,6 +72,13 @@
       "TaskOrchestrator for workflow step dependencies"
     ]
   },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "MainWindow",
+    "SettingsManager"
+  ],
   "touchCount": 0,
   "lastUpdatedAt": "2026-03-07T19:49:48.5104111Z"
 }

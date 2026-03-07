@@ -1,35 +1,51 @@
 {
   "id": "task-preprocessing",
   "name": "Task Preprocessing",
-  "description": "Uses Haiku to analyze a task description before execution, enriching it with intent classification, enhanced prompts, and flags such as feature mode, auto-decompose, and spawn-team. Applies the result back to the task before launch.",
+  "description": "Uses Haiku LLM to analyze and enhance a task before main execution: assigns headers, detects feature mode, determines decomposition, and enriches the prompt. Skipped for known utility task types.",
   "category": "core",
   "keywords": [
+    "AutoDecompose",
+    "EnhancedPrompt",
     "Haiku",
+    "IsFeatureMode",
     "PreprocessResult",
+    "SpawnTeam",
+    "TaskFactory",
     "TaskPreprocessor",
-    "auto-decompose",
-    "classification",
-    "enhance prompt",
-    "intent",
-    "preprocessing",
-    "spawn team"
+    "header",
+    "preprocessing"
   ],
   "primaryFiles": [
-    "Managers/TaskPreprocessor.cs",
-    "Prompts/TaskPreprocessorPrompt.md"
+    "Managers/TaskFactory.cs",
+    "Managers/TaskPreprocessor.cs"
   ],
   "secondaryFiles": [
-    "AgentTask.cs",
     "Models/AgentTaskData.cs",
-    "Spritely.Tests/HaikuApiTests.cs"
+    "Spritely.Tests/HaikuApiTests.cs",
+    "Spritely.Tests/TaskLauncherTests.cs"
   ],
   "relatedFeatureIds": [
-    "feature-mode",
+    "llm-services",
     "prompt-building",
-    "task-execution"
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup",
+    "app-startup-config",
+    "feature-registry",
+    "git-operations",
+    "llm-services",
+    "logging-diagnostics",
+    "prompt-building",
+    "task-factory"
   ],
   "context": {
     "signatures": {
+      "Managers/TaskFactory.cs": {
+        "hash": "ebcbad3cb14f",
+        "content": "class TaskFactory\n  ValidateTaskInput(string? description) -\u003E bool\n  PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  GenerateLocalSummary(string description) -\u003E string\n  GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
+      },
       "Managers/TaskPreprocessor.cs": {
         "hash": "1d38c2c57a54",
         "content": "class PreprocessResult\n  Header: string\n  EnhancedPrompt: string\n  ApplyFix: bool\n  ExtendedPlanning: bool\n  IsFeatureMode: bool\n  AutoDecompose: bool\n  SpawnTeam: bool\n  UseMcp: bool\n  Iterations: int\nclass TaskPreprocessor\n  ApplyToTask(AgentTask task, PreprocessResult result) -\u003E void\n  FormatActiveToggles(AgentTask task) -\u003E string"
@@ -37,17 +53,42 @@
     },
     "keyTypes": [
       "class PreprocessResult",
-      "class TaskPreprocessor"
+      "class TaskFactory",
+      "class TaskPreprocessor",
+      "interface ITaskFactory"
     ],
     "patterns": [
-      "Fire-and-await Haiku call before main task launch",
-      "Result applied via ApplyToTask mutation"
+      "Fire-and-forget Haiku call before main task launch",
+      "Skip-list pattern for known task types"
     ],
     "dependencies": [
-      "AgentTask model for flag application",
-      "Claude Haiku via CLI or API"
+      "Calls Haiku via Claude CLI",
+      "Writes PreprocessResult applied to AgentTask by ApplyToTask"
     ]
   },
+  "parentModuleId": "task-execution",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "ApplyFix",
+    "ApplyToTask",
+    "AutoDecompose",
+    "EnhancedPrompt",
+    "ExtendedPlanning",
+    "FormatActiveToggles",
+    "GenerateClaudeMdAsync",
+    "GenerateLocalSummary",
+    "Header",
+    "IsFeatureMode",
+    "Iterations",
+    "PrepareTaskForFeatureModeStart",
+    "PreprocessResult",
+    "SpawnTeam",
+    "TaskFactory",
+    "TaskPreprocessor",
+    "UseMcp",
+    "ValidateTaskInput"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.3291507Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.2788816Z"
 }

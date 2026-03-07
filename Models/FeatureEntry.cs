@@ -43,6 +43,21 @@ namespace Spritely.Models
         /// <summary>Hierarchical code context — signatures, types, patterns, and dependencies.</summary>
         public FeatureContext Context { get; set; } = new();
 
+        /// <summary>Parent module ID if this feature belongs to a module, null otherwise.</summary>
+        public string? ParentModuleId { get; set; }
+
+        /// <summary>IDs of sub-features nested under this feature (sorted).</summary>
+        public List<string> ChildFeatureIds { get; set; } = new();
+
+        /// <summary>Position in the feature hierarchy: 0 = top-level, 1 = sub-feature.</summary>
+        public int HierarchyLevel { get; set; }
+
+        /// <summary>
+        /// Extracted class/interface/enum names for fast symbol lookup
+        /// without needing to invoke <see cref="Managers.SignatureExtractor"/>.
+        /// </summary>
+        public List<string> SymbolNames { get; set; } = new();
+
         /// <summary>Number of times this feature has been touched by tasks.</summary>
         public int TouchCount { get; set; }
 

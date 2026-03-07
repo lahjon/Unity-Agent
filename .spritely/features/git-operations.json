@@ -1,19 +1,18 @@
 {
   "id": "git-operations",
   "name": "Git Operations",
-  "description": "Provides safe Git workflows including status, diff, staging, commit, and push. Enforces that no Git operations run while file locks are active and all mutations flow through GitHelper and GitOperationGuard.",
+  "description": "Core Git command execution, operation safety guarding, and result modeling. Ensures all Git workflows are safe, reversible, and coordinated with file lock state.",
   "category": "integration",
   "keywords": [
     "GitHelper",
     "GitOperationGuard",
-    "GitPanelManager",
     "GitResult",
-    "commit",
-    "diff",
+    "IGitHelper",
     "file lock",
-    "git",
-    "push",
-    "stage"
+    "git commit",
+    "git push",
+    "git status",
+    "safe git"
   ],
   "primaryFiles": [
     "Managers/GitHelper.cs",
@@ -21,23 +20,59 @@
     "Services/GitOperationGuard.cs"
   ],
   "secondaryFiles": [
-    "MainWindow.Orchestration.cs",
-    "Managers/GitPanelManager.cs",
     "Models/GitResult.cs"
   ],
   "relatedFeatureIds": [
+    "git-ui",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
     "file-lock-management",
     "git-ui",
-    "project-management"
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "task-execution",
+    "task-factory",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
   ],
   "context": {
     "signatures": {
       "Managers/GitHelper.cs": {
-        "hash": "ae86b21a015e",
+        "hash": "bcc7c7f2482b",
         "content": "class GitHelper\n  EscapeGitPath(string path) -\u003E string\n  IsValidGitHash(string? hash) -\u003E bool"
       },
       "Managers/IGitHelper.cs": {
-        "hash": "3a5adc21c58b",
+        "hash": "dba0a2dc56c0",
         "content": "interface IGitHelper"
       },
       "Services/GitOperationGuard.cs": {
@@ -46,22 +81,30 @@
       }
     },
     "keyTypes": [
-      "class GitCommitInfo",
-      "class GitFileChange",
       "class GitHelper",
       "class GitOperationGuard",
       "interface IGitHelper",
       "record GitResult"
     ],
     "patterns": [
-      "All mutations through GitHelper abstraction",
-      "Guard pattern preventing concurrent Git\u002Bfile-lock operations"
+      "Guard pattern blocking Git ops while file locks active",
+      "Reversible staged commit flow, no git add -A"
     ],
     "dependencies": [
-      "FileLockManager for lock checks",
-      "git CLI via Process invocation"
+      "Executes git CLI via Process/Bash",
+      "Integrated with FileLockManager for safety"
     ]
   },
+  "parentModuleId": "git-integration",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "EscapeGitPath",
+    "GitHelper",
+    "GitOperationGuard",
+    "IGitHelper",
+    "IsValidGitHash"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.3899635Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.4393963Z"
 }

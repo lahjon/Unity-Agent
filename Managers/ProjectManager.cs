@@ -32,7 +32,6 @@ namespace Spritely.Managers
         private static readonly Random _rng = new();
         private ObservableCollection<AgentTask>? _activeTasks;
         private ObservableCollection<AgentTask>? _historyTasks;
-        private readonly RulesManager _rulesManager = new();
 
         private static readonly string[] ProjectColorPalette =
         {
@@ -494,6 +493,17 @@ namespace Spritely.Managers
                 : entry.ShortDescription;
         }
 
+        /// <summary>
+        /// Generates descriptions and updates the entry. Throws on failure (for callers that handle errors themselves).
+        /// </summary>
+        public async System.Threading.Tasks.Task RegenerateProjectDescriptionAsync(ProjectEntry entry)
+        {
+            var (shortDesc, longDesc) = await _taskFactory!.GenerateProjectDescriptionAsync(entry.Path, default, entry.IsGame);
+            entry.ShortDescription = shortDesc;
+            entry.LongDescription = longDesc;
+            SaveProjects();
+        }
+
         public async System.Threading.Tasks.Task GenerateProjectDescriptionInBackground(ProjectEntry entry)
         {
             try
@@ -630,7 +640,7 @@ namespace Spritely.Managers
             await System.Threading.Tasks.Task.WhenAll(claudeTask, featureTask);
         }
 
-        private async System.Threading.Tasks.Task ForceInitializeFeaturesAsync(ProjectEntry entry)
+        public async System.Threading.Tasks.Task ForceInitializeFeaturesAsync(ProjectEntry entry, Action<string>? onProgress = null)
         {
             try
             {
@@ -638,7 +648,11 @@ namespace Spritely.Managers
 
                 var registryManager = new FeatureRegistryManager();
                 var initializer = new FeatureInitializer(registryManager);
-                initializer.ProgressChanged += msg => AppLogger.Info("FeatureInit", $"[{entry.DisplayName}] {msg}");
+                initializer.ProgressChanged += msg =>
+                {
+                    AppLogger.Info("FeatureInit", $"[{entry.DisplayName}] {msg}");
+                    onProgress?.Invoke(msg);
+                };
 
                 var result = await initializer.InitializeAsync(entry.Path);
                 if (result != null)
@@ -650,6 +664,7 @@ namespace Spritely.Managers
             catch (Exception ex)
             {
                 AppLogger.Warn("ProjectManager", $"Feature initialization failed for {entry.DisplayName}", ex);
+                throw;
             }
         }
 
@@ -735,14 +750,9 @@ namespace Spritely.Managers
 
         public string GetProjectRulesBlock(string projectPath)
         {
+            // CLAUDE.md and .claude/rules/ are read natively by Claude Code CLI,
+            // so we only inject Spritely-managed per-project rules here.
             var sb = new System.Text.StringBuilder();
-
-            // 1. CLAUDE.md / .claude/rules/ discovered from the target project
-            var claudeRules = _rulesManager.GetRulesBlock(projectPath);
-            if (!string.IsNullOrWhiteSpace(claudeRules))
-                sb.Append(claudeRules);
-
-            // 2. Spritely-managed per-project rules (UI-configured)
             var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
             if (entry != null)
             {
@@ -767,10 +777,6 @@ namespace Spritely.Managers
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Invalidates cached CLAUDE.md rules for a project (e.g., after files change).
-        /// </summary>
-        public void InvalidateRulesCache(string projectPath) => _rulesManager.InvalidateCache(projectPath);
 
         public void RefreshProjectList(
             Action<string>? updateTerminalWorkingDirectory,

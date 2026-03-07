@@ -29,7 +29,7 @@ namespace Spritely.Managers
             PropertyNameCaseInsensitive = true
         };
 
-        private static readonly HashSet<string> Stopwords = new(StringComparer.OrdinalIgnoreCase)
+        internal static readonly HashSet<string> Stopwords = new(StringComparer.OrdinalIgnoreCase)
         {
             "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
             "have", "has", "had", "do", "does", "did", "will", "would", "could",
@@ -43,7 +43,7 @@ namespace Spritely.Managers
             "change", "modify", "implement", "create", "remove", "delete"
         };
 
-        private static readonly Regex TokenSplitRegex = new(@"[\s\p{P}]+", RegexOptions.Compiled);
+        internal static readonly Regex TokenSplitRegex = new(@"[\s\p{P}]+", RegexOptions.Compiled);
 
         // ── Persistence ──────────────────────────────────────────────────
 
@@ -102,16 +102,11 @@ namespace Spritely.Managers
         public async Task<List<FeatureEntry>> LoadAllFeaturesAsync(string projectPath)
         {
             var index = await LoadIndexAsync(projectPath);
-            var results = new List<FeatureEntry>();
 
-            foreach (var entry in index.Features)
-            {
-                var feature = await LoadFeatureAsync(projectPath, entry.Id);
-                if (feature != null)
-                    results.Add(feature);
-            }
+            var tasks = index.Features.Select(entry => LoadFeatureAsync(projectPath, entry.Id));
+            var loaded = await Task.WhenAll(tasks);
 
-            return results;
+            return loaded.Where(f => f != null).ToList()!;
         }
 
         /// <summary>
@@ -127,18 +122,43 @@ namespace Spritely.Managers
                 var featuresPath = GetFeaturesPath(projectPath);
                 Directory.CreateDirectory(featuresPath);
 
+                PopulateSymbolNamesIfEmpty(feature);
                 SortFeatureLists(feature);
 
                 var json = SerializeDeterministic(feature);
                 var filePath = Path.Combine(featuresPath, $"{feature.Id}.json");
                 await File.WriteAllTextAsync(filePath, json);
 
-                // Update index if this feature isn't already listed
+                // Update index: add if missing, sync fields if changed
                 var index = await LoadIndexAsync(projectPath);
-                if (!index.Features.Any(f => f.Id == feature.Id))
+                var indexEntry = index.Features.FirstOrDefault(f => f.Id == feature.Id);
+                if (indexEntry == null)
                 {
-                    index.Features.Add(new FeatureIndexEntry { Id = feature.Id, Name = feature.Name });
+                    index.Features.Add(new FeatureIndexEntry
+                    {
+                        Id = feature.Id,
+                        Name = feature.Name,
+                        Category = feature.Category,
+                        TouchCount = feature.TouchCount,
+                        PrimaryFileCount = feature.PrimaryFiles.Count
+                    });
                     await SaveIndexInternalAsync(projectPath, index);
+                }
+                else
+                {
+                    var changed = indexEntry.Name != feature.Name
+                                  || indexEntry.Category != feature.Category
+                                  || indexEntry.TouchCount != feature.TouchCount
+                                  || indexEntry.PrimaryFileCount != feature.PrimaryFiles.Count;
+
+                    if (changed)
+                    {
+                        indexEntry.Name = feature.Name;
+                        indexEntry.Category = feature.Category;
+                        indexEntry.TouchCount = feature.TouchCount;
+                        indexEntry.PrimaryFileCount = feature.PrimaryFiles.Count;
+                        await SaveIndexInternalAsync(projectPath, index);
+                    }
                 }
             }
             catch (Exception ex)
@@ -201,8 +221,167 @@ namespace Spritely.Managers
 
             return scored
                 .OrderByDescending(s => s.Score)
+                .ThenByDescending(s => s.Feature.TouchCount)
                 .Take(maxResults)
                 .Select(s => s.Feature)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Finds features by symbol name using the codebase symbol index.
+        /// Returns features ordered by match confidence (exact > prefix > contains).
+        /// </summary>
+        public List<FeatureEntry> FindMatchingFeaturesBySymbol(
+            string symbolName,
+            CodebaseSymbolIndex symbolIndex,
+            List<FeatureEntry> allFeatures,
+            CodebaseIndexManager? codebaseIndexManager = null)
+        {
+            if (string.IsNullOrWhiteSpace(symbolName) || symbolIndex?.Symbols == null)
+                return new List<FeatureEntry>();
+
+            var indexManager = codebaseIndexManager ?? new CodebaseIndexManager();
+            var results = indexManager.LookupSymbol(symbolIndex, symbolName);
+
+            if (results.Count == 0)
+                return new List<FeatureEntry>();
+
+            var featureLookup = allFeatures.ToDictionary(f => f.Id, StringComparer.OrdinalIgnoreCase);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var matched = new List<FeatureEntry>();
+
+            foreach (var result in results)
+            {
+                if (!string.IsNullOrEmpty(result.FeatureId) &&
+                    seen.Add(result.FeatureId) &&
+                    featureLookup.TryGetValue(result.FeatureId, out var feature))
+                {
+                    matched.Add(feature);
+                }
+            }
+
+            return matched;
+        }
+
+        /// <summary>
+        /// Enhanced feature matching combining keyword scoring with symbol index lookups.
+        /// Falls back to keyword-only <see cref="FindMatchingFeatures"/> when symbolIndex is null.
+        /// </summary>
+        public List<FeatureEntry> FindMatchingFeaturesEnhanced(
+            string taskDescription,
+            List<FeatureEntry> allFeatures,
+            CodebaseSymbolIndex? symbolIndex,
+            int maxResults = 8,
+            CodebaseIndexManager? codebaseIndexManager = null)
+        {
+            if (symbolIndex == null)
+                return FindMatchingFeatures(taskDescription, allFeatures, maxResults);
+
+            var tokens = Tokenize(taskDescription);
+            if (tokens.Count == 0)
+                return new List<FeatureEntry>();
+
+            // Score all features with keyword + symbol scoring
+            var scored = new Dictionary<string, (FeatureEntry Feature, double Score)>();
+
+            foreach (var feature in allFeatures)
+            {
+                var score = ScoreFeature(tokens, taskDescription, feature);
+                if (score > 0.1)
+                    scored[feature.Id] = (feature, score);
+            }
+
+            // Boost features found via symbol index lookup
+            var indexManager = codebaseIndexManager ?? new CodebaseIndexManager();
+            foreach (var token in tokens)
+            {
+                var symbolResults = indexManager.LookupSymbol(symbolIndex, token);
+                foreach (var result in symbolResults)
+                {
+                    if (string.IsNullOrEmpty(result.FeatureId))
+                        continue;
+
+                    if (scored.TryGetValue(result.FeatureId, out var existing))
+                    {
+                        // Boost existing score by symbol confidence
+                        scored[result.FeatureId] = (existing.Feature,
+                            existing.Score + result.Confidence * FeatureConstants.SymbolMatchScoreBoost);
+                    }
+                    else
+                    {
+                        var feature = allFeatures.FirstOrDefault(
+                            f => string.Equals(f.Id, result.FeatureId, StringComparison.OrdinalIgnoreCase));
+                        if (feature != null)
+                        {
+                            scored[result.FeatureId] = (feature,
+                                result.Confidence * FeatureConstants.SymbolMatchScoreBoost);
+                        }
+                    }
+                }
+            }
+
+            return scored.Values
+                .OrderByDescending(s => s.Score)
+                .ThenByDescending(s => s.Feature.TouchCount)
+                .Take(maxResults)
+                .Select(s => s.Feature)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Returns the feature and its dependency neighborhood up to <paramref name="maxDepth"/> hops.
+        /// Includes both direct dependencies and features that depend on it.
+        /// </summary>
+        public List<FeatureEntry> GetFeatureWithDependencies(
+            string featureId,
+            List<FeatureEntry> allFeatures,
+            FeatureDependencyGraph graph,
+            int maxDepth = 2)
+        {
+            if (string.IsNullOrWhiteSpace(featureId))
+                return new List<FeatureEntry>();
+
+            var featureLookup = allFeatures.ToDictionary(f => f.Id, StringComparer.OrdinalIgnoreCase);
+            var collected = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { featureId };
+
+            // BFS outward from the root feature in both directions
+            var frontier = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { featureId };
+            for (var depth = 0; depth < maxDepth && frontier.Count > 0; depth++)
+            {
+                var nextFrontier = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var id in frontier)
+                {
+                    // Dependencies (what this feature depends on)
+                    if (graph.DirectDependencies.TryGetValue(id, out var deps))
+                    {
+                        foreach (var dep in deps)
+                        {
+                            if (collected.Add(dep))
+                                nextFrontier.Add(dep);
+                        }
+                    }
+
+                    // Dependents (what depends on this feature)
+                    if (graph.Dependents.TryGetValue(id, out var dependents))
+                    {
+                        foreach (var dependent in dependents)
+                        {
+                            if (collected.Add(dependent))
+                                nextFrontier.Add(dependent);
+                        }
+                    }
+                }
+
+                frontier = nextFrontier;
+            }
+
+            // Bound the result to prevent unbounded expansion
+            const int maxNeighborhood = 20;
+            return collected
+                .Where(id => featureLookup.ContainsKey(id))
+                .Take(maxNeighborhood)
+                .Select(id => featureLookup[id])
                 .ToList();
         }
 
@@ -210,9 +389,12 @@ namespace Spritely.Managers
 
         /// <summary>
         /// Builds the markdown context block injected into prompts for relevant features.
-        /// Respects per-feature and total token budgets.
+        /// Primary features get full signatures; secondary features (dependencies, siblings)
+        /// get compact summaries (name + files only). Respects per-feature and total token budgets.
         /// </summary>
-        public string BuildFeatureContextBlock(List<FeatureEntry> features)
+        public string BuildFeatureContextBlock(
+            List<FeatureEntry> features,
+            List<FeatureEntry>? secondaryFeatures = null)
         {
             if (features.Count == 0)
                 return string.Empty;
@@ -226,6 +408,7 @@ namespace Spritely.Managers
             var totalCharsUsed = 0;
             var totalCharBudget = FeatureConstants.MaxTotalFeatureContextTokens * 4;
 
+            // Primary features — full detail
             foreach (var feature in features)
             {
                 var featureBlock = BuildSingleFeatureBlock(feature);
@@ -239,6 +422,35 @@ namespace Spritely.Managers
 
                 sb.Append(featureBlock);
                 totalCharsUsed += featureBlock.Length;
+            }
+
+            // Secondary features — compact summaries (name + files only)
+            if (secondaryFeatures is { Count: > 0 })
+            {
+                var secondaryCharBudget = FeatureConstants.MaxTokensPerSecondaryFeature * 4;
+                var maxSecondary = FeatureConstants.MaxSecondaryFeaturesPerTask;
+                var count = 0;
+
+                sb.AppendLine("## Related Context (dependencies & siblings)");
+                sb.AppendLine();
+
+                foreach (var feature in secondaryFeatures)
+                {
+                    if (count >= maxSecondary)
+                        break;
+
+                    var compactBlock = BuildCompactFeatureBlock(feature);
+
+                    if (compactBlock.Length > secondaryCharBudget)
+                        compactBlock = compactBlock[..secondaryCharBudget];
+
+                    if (totalCharsUsed + compactBlock.Length > totalCharBudget)
+                        break;
+
+                    sb.Append(compactBlock);
+                    totalCharsUsed += compactBlock.Length;
+                    count++;
+                }
             }
 
             return sb.ToString();
@@ -367,16 +579,48 @@ namespace Spritely.Managers
             feature.SecondaryFiles.Sort(StringComparer.Ordinal);
             feature.RelatedFeatureIds.Sort(StringComparer.Ordinal);
             feature.DependsOn.Sort(StringComparer.Ordinal);
+            feature.ChildFeatureIds.Sort(StringComparer.Ordinal);
+            feature.SymbolNames.Sort(StringComparer.Ordinal);
             feature.Context.KeyTypes.Sort(StringComparer.Ordinal);
             feature.Context.Patterns.Sort(StringComparer.Ordinal);
             feature.Context.Dependencies.Sort(StringComparer.Ordinal);
         }
 
         /// <summary>
+        /// Extracts symbol names from signature text when SymbolNames is empty but signatures exist.
+        /// Parses class/interface/enum names from compact signature content lines.
+        /// </summary>
+        private static void PopulateSymbolNamesIfEmpty(FeatureEntry feature)
+        {
+            if (feature.SymbolNames.Count > 0 || feature.Context.Signatures.Count == 0)
+                return;
+
+            var symbolRegex = new Regex(
+                @"\b(?:class|interface|enum|struct|record)\s+(\w+)",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (_, sig) in feature.Context.Signatures)
+            {
+                if (string.IsNullOrWhiteSpace(sig.Content))
+                    continue;
+
+                foreach (Match match in symbolRegex.Matches(sig.Content))
+                {
+                    if (match.Groups[1].Value.Length > 1)
+                        names.Add(match.Groups[1].Value);
+                }
+            }
+
+            feature.SymbolNames = names.ToList();
+        }
+
+        /// <summary>
         /// Tokenizes text by splitting on whitespace and punctuation,
         /// lowercasing, and removing stopwords.
         /// </summary>
-        private static HashSet<string> Tokenize(string text)
+        internal static HashSet<string> Tokenize(string text)
         {
             var raw = TokenSplitRegex.Split(text);
             var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -395,7 +639,7 @@ namespace Spritely.Managers
         /// Scores a feature against a set of task tokens.
         /// <c>keywordOverlap * 0.5 + descriptionWordOverlap * 0.3 + fileNameMention * 0.2</c>
         /// </summary>
-        private static double ScoreFeature(HashSet<string> taskTokens, string taskDescription, FeatureEntry feature)
+        internal static double ScoreFeature(HashSet<string> taskTokens, string taskDescription, FeatureEntry feature)
         {
             // Keyword overlap: fraction of feature keywords that appear in task tokens
             var keywordScore = 0.0;
@@ -428,7 +672,31 @@ namespace Spritely.Managers
                 }
             }
 
-            return keywordScore * 0.5 + descriptionScore * 0.3 + fileScore * 0.2;
+            // Symbol name match: boost if task description mentions a class/interface name from this feature
+            var symbolScore = 0.0;
+            if (feature.SymbolNames.Count > 0)
+            {
+                foreach (var sym in feature.SymbolNames)
+                {
+                    if (sym.Length > 2 && descLower.Contains(sym.ToLowerInvariant()))
+                    {
+                        symbolScore = FeatureConstants.SymbolMatchScoreBoost;
+                        break;
+                    }
+                }
+            }
+
+            return keywordScore * 0.5 + descriptionScore * 0.3 + fileScore * 0.2 + symbolScore;
+        }
+
+        /// <summary>Builds a compact markdown block for secondary features (name + files only, no signatures).</summary>
+        private static string BuildCompactFeatureBlock(FeatureEntry feature)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"- **{feature.Name}**: {string.Join(", ", feature.PrimaryFiles)}");
+            if (feature.DependsOn.Count > 0)
+                sb.AppendLine($"  Depends on: {string.Join(", ", feature.DependsOn)}");
+            return sb.ToString();
         }
 
         /// <summary>Builds the markdown block for a single feature.</summary>

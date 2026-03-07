@@ -284,13 +284,20 @@ namespace Spritely.Managers
                 try
                 {
                     featureResult = await featureTask;
-                    if (featureResult != null && !string.IsNullOrWhiteSpace(featureResult.ContextBlock))
+                    if (featureResult != null)
                     {
-                        featureContextBlock = featureResult.ContextBlock;
-                        var featureCount = featureResult.RelevantFeatures.Count;
-                        _outputProcessor.AppendColoredOutput(task.Id,
-                            $"[Features] Matched {featureCount} feature{(featureCount != 1 ? "s" : "")} for context injection\n",
-                            Brushes.MediumAquamarine, activeTasks, historyTasks);
+                        // Store resolver suggestion for deferred new-feature creation at task completion
+                        if (featureResult.IsNewFeature)
+                            task.Runtime.ResolverSuggestion = featureResult;
+
+                        if (!string.IsNullOrWhiteSpace(featureResult.ContextBlock))
+                        {
+                            featureContextBlock = featureResult.ContextBlock;
+                            var featureCount = featureResult.RelevantFeatures.Count;
+                            _outputProcessor.AppendColoredOutput(task.Id,
+                                $"[Features] Matched {featureCount} feature{(featureCount != 1 ? "s" : "")} for context injection\n",
+                                Brushes.MediumAquamarine, activeTasks, historyTasks);
+                        }
                     }
                 }
                 catch (OperationCanceledException) { throw; }
@@ -587,12 +594,26 @@ namespace Spritely.Managers
             }
 
             // Feature System: update registry with task results (fire-and-forget, never blocks teardown)
+            // Use file locks directly — task.ChangedFiles isn't populated until FinalizeTask runs later
             if (exitCode == 0)
             {
+                var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
+                var changedFilesList = lockedFiles.Count > 0
+                    ? lockedFiles.Select(f =>
+                    {
+                        var projectRoot = task.ProjectPath.Replace('\\', '/').TrimEnd('/') + "/";
+                        var normalized = f.Replace('\\', '/');
+                        return normalized.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
+                            ? normalized[projectRoot.Length..]
+                            : normalized;
+                    }).ToList()
+                    : task.ChangedFiles?.ToList() ?? new List<string>();
+
                 _ = _featureUpdateAgent.UpdateFeaturesAsync(
                     task.ProjectPath, task.Id, task.Description,
                     task.CompletionSummary,
-                    task.ChangedFiles?.ToList() ?? new List<string>());
+                    changedFilesList,
+                    resolverSuggestion: task.Runtime.ResolverSuggestion);
             }
 
             // If a follow-up was started during summary generation, the status will

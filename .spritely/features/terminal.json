@@ -1,18 +1,17 @@
 {
   "id": "terminal",
   "name": "Integrated Terminal",
-  "description": "Provides an embedded ConPTY-based terminal with tab management, command history, and working-directory tracking. Allows users to run shell commands directly within the app alongside AI tasks.",
+  "description": "Provides a ConPTY-based pseudo-terminal with command history, multiple tabs, and working directory tracking. Allows developers to run shell commands directly within Spritely.",
   "category": "ui",
   "keywords": [
     "ConPTY",
     "ConPtyTerminal",
+    "SendLine",
     "TerminalTabManager",
     "command history",
-    "interrupt",
+    "pseudo terminal",
     "shell",
-    "tab",
-    "terminal",
-    "working directory"
+    "terminal tabs"
   ],
   "primaryFiles": [
     "ConPtyTerminal.cs",
@@ -20,7 +19,20 @@
   ],
   "secondaryFiles": [],
   "relatedFeatureIds": [
-    "project-management"
+    "app-startup"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup",
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-registry",
+    "logging-diagnostics",
+    "module-registry",
+    "project-management",
+    "task-graph-ui",
+    "task-ui",
+    "theming-ui-shared"
   ],
   "context": {
     "signatures": {
@@ -38,13 +50,39 @@
       "class TerminalTabManager"
     ],
     "patterns": [
-      "ConPTY for full VT100 emulation",
-      "Tab per terminal session"
+      "ConPTY Windows API integration",
+      "Tab-per-terminal model"
     ],
     "dependencies": [
-      "Windows ConPTY API for terminal emulation"
+      "Windows ConPTY API for process I/O",
+      "Working directory synced with project selection"
     ]
   },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AddCommand",
+    "AddTerminal",
+    "ClearOutput",
+    "CloseTerminal",
+    "ConPtyTerminal",
+    "Dispose",
+    "GetCommandFromEnd",
+    "GetOutputText",
+    "HandleKeyDown",
+    "HasBeenUsed",
+    "HistoryIndex",
+    "ProcessId",
+    "SendCommand",
+    "SendInterrupt",
+    "SendLine",
+    "SendRaw",
+    "SwitchTo",
+    "TerminalTabManager",
+    "UpdateWorkingDirectory",
+    "WorkingDirectory"
+  ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.6009682Z"
+  "lastUpdatedAt": "2026-03-07T21:24:30.4947403Z"
 }
