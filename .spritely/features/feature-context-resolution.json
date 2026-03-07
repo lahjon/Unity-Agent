@@ -1,0 +1,85 @@
+{
+  "id": "feature-context-resolution",
+  "name": "Feature Context Resolution",
+  "description": "Resolves which features are relevant to the given task and builds a context block for prompt injection. Now includes fast-path optimization to skip Haiku CLI call when 1-3 candidates all score above confidence threshold (0.85), treating them as confirmed with confidence 1.0. Saves 2-5 seconds per task launch on simple refactors.",
+  "category": "core",
+  "keywords": [
+    "FEATURE CONTEXT",
+    "FeatureContextResolver",
+    "FeatureContextResult",
+    "MatchedFeature",
+    "context block",
+    "feature context",
+    "prompt injection",
+    "resolve features"
+  ],
+  "primaryFiles": [
+    "Managers/FeatureContextResolver.cs",
+    "Models/FeatureContextResult.cs"
+  ],
+  "secondaryFiles": [
+    "Constants/FeatureConstants.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-registry",
+    "llm-services",
+    "prompt-building",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "codebase-indexing",
+    "feature-registry",
+    "llm-services",
+    "logging-diagnostics",
+    "module-registry",
+    "project-management",
+    "prompt-building"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/FeatureContextResolver.cs": {
+        "hash": "a5f09f364322",
+        "content": "class FeatureContextResolver"
+      },
+      "Models/FeatureContextResult.cs": {
+        "hash": "b37d0e21ac66",
+        "content": "class FeatureContextResult\n  RelevantFeatures: List\u003CMatchedFeature\u003E\n  IsNewFeature: bool\n  SuggestedNewFeatureId: string?\n  SuggestedNewFeatureName: string?\n  SuggestedKeywords: List\u003Cstring\u003E?\n  ContextBlock: string\nclass MatchedFeature\n  FeatureId: string\n  FeatureName: string\n  Confidence: double"
+      }
+    },
+    "keyTypes": [
+      "class FeatureContextResolver",
+      "class FeatureContextResult",
+      "class MatchedFeature"
+    ],
+    "patterns": [
+      "Context block injection into Opus prompt",
+      "Haiku pre-flight call before main prompt construction"
+    ],
+    "dependencies": [
+      "Calls Haiku to match task to features",
+      "Reads feature data from FeatureRegistryManager",
+      "Result injected into PromptBuilder"
+    ]
+  },
+  "parentModuleId": "feature-registry",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Confidence",
+    "ContextBlock",
+    "FeatureContextResolver",
+    "FeatureContextResult",
+    "FeatureId",
+    "FeatureName",
+    "IsNewFeature",
+    "MatchedFeature",
+    "RelevantFeatures",
+    "SuggestedKeywords",
+    "SuggestedNewFeatureName"
+  ],
+  "touchCount": 2,
+  "lastUpdatedAt": "2026-03-07T22:07:44.3701763Z",
+  "lastUpdatedByTaskId": "4fa53c33822a4f79"
+}

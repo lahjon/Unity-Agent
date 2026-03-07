@@ -1,0 +1,106 @@
+{
+  "id": "activity-dashboard",
+  "name": "Activity Dashboard",
+  "description": "Computes and renders per-project activity statistics including success rates, token usage, cost, and task timing. Displayed both inline and in a dedicated dialog.",
+  "category": "ui",
+  "keywords": [
+    "ActivityDashboardManager",
+    "ProjectActivityStats",
+    "activity",
+    "cost",
+    "dashboard",
+    "metrics",
+    "stats",
+    "success rate",
+    "token usage"
+  ],
+  "primaryFiles": [
+    "Dialogs/ActivityDashboardDialog.cs",
+    "Managers/ActivityDashboardManager.cs"
+  ],
+  "secondaryFiles": [
+    "Models/ProjectActivityStats.cs"
+  ],
+  "relatedFeatureIds": [
+    "project-management",
+    "task-history"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
+  ],
+  "context": {
+    "signatures": {
+      "Dialogs/ActivityDashboardDialog.cs": {
+        "hash": "1930e2a18ef6",
+        "content": "class ActivityDashboardDialog"
+      },
+      "Managers/ActivityDashboardManager.cs": {
+        "hash": "c40347dbfe5a",
+        "content": "class ActivityDashboardManager\n  MarkDirty() -\u003E void\n  RefreshIfNeeded(ScrollViewer container, string? currentProjectPath = null) -\u003E void\n  RefreshContent(ScrollViewer container, string? currentProjectPath = null) -\u003E void\n  ComputeStats(string? currentProjectPath = null) -\u003E List\u003CProjectActivityStats\u003E\n  BuildDashboardContent(bool isDialog, string? currentProjectPath = null) -\u003E StackPanel"
+      }
+    },
+    "keyTypes": [
+      "class ActivityDashboardManager",
+      "class ProjectActivityStats"
+    ],
+    "patterns": [
+      "Dirty-flag lazy refresh",
+      "Programmatic WPF panel construction"
+    ],
+    "dependencies": [
+      "Gets project metadata from ProjectManager",
+      "Reads task history from HistoryManager"
+    ]
+  },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "ActivityDashboardDialog",
+    "ActivityDashboardManager",
+    "BuildDashboardContent",
+    "ComputeStats",
+    "MarkDirty",
+    "RefreshContent",
+    "RefreshIfNeeded"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.4602607Z"
+}

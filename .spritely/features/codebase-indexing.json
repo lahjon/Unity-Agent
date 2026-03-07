@@ -1,0 +1,94 @@
+{
+  "id": "codebase-indexing",
+  "name": "Codebase Symbol Index",
+  "description": "Builds and maintains a symbol-level index of the project codebase mapping class/method names to features. Enables fast symbol lookup without re-scanning all files.",
+  "category": "data",
+  "keywords": [
+    "BuildIndex",
+    "CodebaseIndexManager",
+    "CodebaseSymbolIndex",
+    "LookupSymbol",
+    "SymbolEntry",
+    "SymbolIndexEntry",
+    "symbol index",
+    "symbol lookup"
+  ],
+  "primaryFiles": [
+    "Managers/CodebaseIndexManager.cs",
+    "Models/SymbolEntry.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/SignatureExtractor.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-initialization",
+    "feature-registry"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-registry",
+    "logging-diagnostics",
+    "module-registry",
+    "project-management"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/CodebaseIndexManager.cs": {
+        "hash": "04feb5cf5c82",
+        "content": "class CodebaseIndexManager\n  BuildIndexAsync(string projectPath, List\u003CFeatureEntry\u003E features, CancellationToken ct) -\u003E Task\n  LoadIndexAsync(string projectPath) -\u003E Task\u003CCodebaseSymbolIndex?\u003E\n  SaveIndexAsync(string projectPath, CodebaseSymbolIndex index) -\u003E Task\n  LookupSymbol(CodebaseSymbolIndex index, string symbolName) -\u003E List\u003CSymbolSearchResult\u003E\n  UpdateSymbolsForFeature(string projectPath, string featureId, List\u003Cstring\u003E filePaths) -\u003E Task\n  GetSymbolsInFeature(CodebaseSymbolIndex index, string featureId) -\u003E List\u003CSymbolIndexEntry\u003E\n  Dispose() -\u003E void"
+      },
+      "Models/SymbolEntry.cs": {
+        "hash": "877d7a6fb5b3",
+        "content": "class ExtractedSymbol\n  Kind: SymbolKind\n  Name: string\nclass TaskExecutionManager\n  Signature: string\n  FilePath: string\nclass CodebaseSymbolIndex\n  Version: int\n  Symbols: Dictionary\u003Cstring, SymbolIndexEntry\u003E\nclass SymbolIndexEntry\n  FeatureId: string\n  FilePath: string\n  Kind: string\n  ShortSignature: string\nclass SymbolSearchResult\n  SymbolName: string\n  FeatureId: string\n  Confidence: double"
+      }
+    },
+    "keyTypes": [
+      "class CodebaseIndexManager",
+      "class CodebaseSymbolIndex",
+      "class SymbolIndexEntry",
+      "class SymbolSearchResult"
+    ],
+    "patterns": [
+      "Incremental index update per feature on task completion",
+      "Version-stamped index for staleness detection"
+    ],
+    "dependencies": [
+      "Index stored in .spritely/ directory",
+      "Uses SignatureExtractor to parse source files"
+    ]
+  },
+  "parentModuleId": "feature-registry",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "BuildIndexAsync",
+    "CodebaseIndexManager",
+    "CodebaseSymbolIndex",
+    "Confidence",
+    "Dispose",
+    "ExtractedSymbol",
+    "FeatureId",
+    "FilePath",
+    "GetSymbolsInFeature",
+    "Kind",
+    "LoadIndexAsync",
+    "LookupSymbol",
+    "Name",
+    "SaveIndexAsync",
+    "ShortSignature",
+    "Signature",
+    "SymbolIndexEntry",
+    "SymbolKind",
+    "SymbolName",
+    "SymbolSearchResult",
+    "Symbols",
+    "TaskExecutionManager",
+    "UpdateSymbolsForFeature",
+    "Version"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.3744009Z"
+}

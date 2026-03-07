@@ -1,0 +1,26 @@
+{
+  "id": "ui",
+  "name": "User Interface",
+  "description": "All user-facing UI components including task cards, output tabs, dependency graph, chat panel, terminal, activity dashboard, stored task viewer, helper suggestions, theming, and miscellaneous UX improvements such as hover feedback and toggle visibility.",
+  "category": "",
+  "featureIds": [
+    "activity-dashboard",
+    "chat",
+    "chat-interface",
+    "export-task-data",
+    "finished-task-output-viewer",
+    "helper-suggestions",
+    "hide-active-toggles",
+    "pause-remove-button-hover",
+    "stored-task-viewer",
+    "task-continuation-button",
+    "task-graph-ui",
+    "task-templates",
+    "task-ui",
+    "terminal",
+    "theming-ui-shared",
+    "ui-theming"
+  ],
+  "keywords": [],
+  "lastUpdatedAt": "2026-03-07T21:25:30.6970025Z"
+}

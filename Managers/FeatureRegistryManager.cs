@@ -122,7 +122,10 @@ namespace Spritely.Managers
                 var featuresPath = GetFeaturesPath(projectPath);
                 Directory.CreateDirectory(featuresPath);
 
+                var hadSymbolNames = feature.SymbolNames.Count > 0;
                 PopulateSymbolNamesIfEmpty(feature);
+                if (!hadSymbolNames && feature.SymbolNames.Count > 0)
+                    feature.SymbolNames = FilterSymbolNames(feature.SymbolNames, feature);
                 SortFeatureLists(feature);
 
                 var json = SerializeDeterministic(feature);
@@ -590,14 +593,24 @@ namespace Spritely.Managers
         /// Extracts symbol names from signature text when SymbolNames is empty but signatures exist.
         /// Parses class/interface/enum names from compact signature content lines.
         /// </summary>
+        /// <summary>Common short property/field names that produce false-positive matches against task descriptions.</summary>
+        private static readonly HashSet<string> NoisySymbolNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id", "Name", "Type", "Value", "Key", "Data", "Item", "Items", "Count",
+            "Index", "Path", "Text", "Title", "Label", "Status", "State", "Error",
+            "Result", "Source", "Target", "Content", "Version", "Description", "Category",
+            "Options", "Config", "Settings", "Context", "Model", "View", "Action", "Event",
+            "Build", "Dispose", "ToString", "GetHashCode", "Equals"
+        };
+
         private static void PopulateSymbolNamesIfEmpty(FeatureEntry feature)
         {
             if (feature.SymbolNames.Count > 0 || feature.Context.Signatures.Count == 0)
                 return;
 
             var symbolRegex = new Regex(
-                @"\b(?:class|interface|enum|struct|record)\s+(\w+)",
-                RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                @"^(?:class|interface|enum|struct|record)\s+(\w+)",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
 
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -608,12 +621,37 @@ namespace Spritely.Managers
 
                 foreach (Match match in symbolRegex.Matches(sig.Content))
                 {
-                    if (match.Groups[1].Value.Length > 1)
-                        names.Add(match.Groups[1].Value);
+                    var name = match.Groups[1].Value;
+                    if (name.Length > 2 && !NoisySymbolNames.Contains(name))
+                        names.Add(name);
                 }
             }
 
             feature.SymbolNames = names.ToList();
+        }
+
+        /// <summary>
+        /// Filters an existing SymbolNames list to only type-level names,
+        /// removing noisy property/method names that cause false matches.
+        /// </summary>
+        internal static List<string> FilterSymbolNames(List<string> symbolNames, FeatureEntry feature)
+        {
+            var typeRegex = new Regex(
+                @"^(?:class|interface|enum|struct|record)\s+(\w+)",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+            var typeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (_, sig) in feature.Context.Signatures)
+            {
+                if (string.IsNullOrWhiteSpace(sig.Content)) continue;
+                foreach (Match match in typeRegex.Matches(sig.Content))
+                    typeNames.Add(match.Groups[1].Value);
+            }
+
+            return symbolNames
+                .Where(n => n.Length > 2 && !NoisySymbolNames.Contains(n) &&
+                            (typeNames.Contains(n) || n.Length >= 8))
+                .ToList();
         }
 
         /// <summary>
@@ -717,10 +755,13 @@ namespace Spritely.Managers
             {
                 sb.AppendLine("### Signatures");
                 sb.AppendLine("```");
-                foreach (var (_, sig) in feature.Context.Signatures)
+                foreach (var (filePath, sig) in feature.Context.Signatures)
                 {
                     if (!string.IsNullOrWhiteSpace(sig.Content))
+                    {
+                        sb.AppendLine($"// {filePath}");
                         sb.AppendLine(sig.Content);
+                    }
                 }
                 sb.AppendLine("```");
                 sb.AppendLine();

@@ -1,0 +1,15 @@
+{
+  "id": "data-persistence",
+  "name": "Data \u0026 History",
+  "description": "Persists and retrieves all application data including project metadata, task history, active queue snapshots, project-level to-do lists, and reusable task templates and saved prompts.",
+  "category": "",
+  "featureIds": [
+    "history-analytics",
+    "project-management",
+    "project-tasks",
+    "task-history",
+    "task-templates-storage"
+  ],
+  "keywords": [],
+  "lastUpdatedAt": "2026-03-07T21:25:30.5616126Z"
+}

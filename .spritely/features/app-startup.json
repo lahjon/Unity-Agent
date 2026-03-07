@@ -1,0 +1,145 @@
+{
+  "id": "app-startup",
+  "name": "Application Bootstrap",
+  "description": "Entry point and composition root for the WPF application. Wires together all managers, handles unhandled exceptions, crash/hang logging, and the system tray icon.",
+  "category": "infrastructure",
+  "keywords": [
+    "App",
+    "MainWindow",
+    "NotifyIcon",
+    "bootstrap",
+    "composition root",
+    "crash",
+    "dispatcher",
+    "hang",
+    "startup",
+    "tray icon"
+  ],
+  "primaryFiles": [
+    "App.xaml",
+    "App.xaml.cs",
+    "MainWindow.xaml",
+    "MainWindow.xaml.cs"
+  ],
+  "secondaryFiles": [
+    "MainWindow.Features.cs",
+    "MainWindow.Orchestration.cs",
+    "MainWindow.SavedPrompts.cs",
+    "MainWindow.Skills.cs",
+    "MainWindow.TaskExecution.cs",
+    "MainWindow.Templates.cs"
+  ],
+  "relatedFeatureIds": [
+    "app-settings",
+    "logging-infrastructure",
+    "project-management",
+    "task-ui"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "stored-task-viewer",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
+  ],
+  "context": {
+    "signatures": {
+      "App.xaml": {
+        "hash": "3bc0fa716a50",
+        "content": "class App\n  root: ResourceDictionary"
+      },
+      "App.xaml.cs": {
+        "hash": "8176c0ac5e47",
+        "content": "class App\n  ShowBalloonNotification(string title, string message, System.Windows.Forms.ToolTipIcon icon) -\u003E void\n  TraceUi(string action) -\u003E void\n  LogCrash(string source, Exception? ex) -\u003E void"
+      },
+      "MainWindow.xaml": {
+        "hash": "6e18cf16fbd2",
+        "content": "class MainWindow\n  root: DataTemplate\n  Card: Border\n  CardBg: SolidColorBrush\n  CardBorder: SolidColorBrush\n  CommitButtonPulseStoryboard: BeginStoryboard\n  StatusGlow: Ellipse\n  GlowStoryboard: BeginStoryboard\n  QueuedGlowStoryboard: BeginStoryboard\n  InitQueuedGlowStoryboard: BeginStoryboard\n  PausedGlowStoryboard: BeginStoryboard\n  PlanningGlowStoryboard: BeginStoryboard\n  UncommittedPulseStoryboard: BeginStoryboard\n  RecommendationPulseStoryboard: BeginStoryboard\n  StatusDot: Ellipse\n  DotPulseStoryboard: BeginStoryboard\n  HistCardBg: SolidColorBrush\n  HistCardBorder: SolidColorBrush\n  CommitButtonPulseStoryboard: BeginStoryboard\n  HistStatusGlow: Ellipse"
+      },
+      "MainWindow.xaml.cs": {
+        "hash": "2968c77f4e35",
+        "content": "class MainWindow\n  Dispose() -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class App",
+      "class MainWindow"
+    ],
+    "patterns": [
+      "Composition root with manager injection",
+      "Partial class decomposition for MainWindow",
+      "WPF code-behind wiring pattern"
+    ],
+    "dependencies": [
+      "All managers initialized here",
+      "WPF Dispatcher for UI thread",
+      "WinForms NotifyIcon for tray"
+    ]
+  },
+  "parentModuleId": "app-infrastructure",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "App",
+    "Card",
+    "CardBg",
+    "CardBorder",
+    "CommitButtonPulseStoryboard",
+    "Dispose",
+    "DotPulseStoryboard",
+    "GlowStoryboard",
+    "HistCardBg",
+    "HistCardBorder",
+    "HistStatusGlow",
+    "InitQueuedGlowStoryboard",
+    "LogCrash",
+    "MainWindow",
+    "PausedGlowStoryboard",
+    "PlanningGlowStoryboard",
+    "QueuedGlowStoryboard",
+    "RecommendationPulseStoryboard",
+    "ShowBalloonNotification",
+    "StatusDot",
+    "StatusGlow",
+    "TraceUi",
+    "UncommittedPulseStoryboard",
+    "root"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.2202562Z"
+}

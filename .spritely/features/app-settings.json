@@ -1,0 +1,73 @@
+{
+  "id": "app-settings",
+  "name": "Application Settings \u0026 Constants",
+  "description": "Central configuration constants, per-session settings persistence, and model configuration. Acts as the single source of truth for magic numbers, model IDs, and timeouts.",
+  "category": "config",
+  "keywords": [
+    "AppConstants",
+    "FeatureConstants",
+    "ModelConfigManager",
+    "SettingsManager",
+    "configuration",
+    "constants",
+    "model IDs",
+    "settings",
+    "timeouts"
+  ],
+  "primaryFiles": [
+    "Constants/AppConstants.cs",
+    "Constants/FeatureConstants.cs",
+    "Managers/ModelConfigManager.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/SettingsManager.cs"
+  ],
+  "relatedFeatureIds": [
+    "llm-services"
+  ],
+  "dependsOn": [
+    "app-startup",
+    "app-startup-config",
+    "feature-registry",
+    "logging-diagnostics"
+  ],
+  "context": {
+    "signatures": {
+      "Constants/AppConstants.cs": {
+        "hash": "d8d6967eef6d",
+        "content": "class AppConstants"
+      },
+      "Constants/FeatureConstants.cs": {
+        "hash": "4ca8c223769d",
+        "content": "class FeatureConstants"
+      },
+      "Managers/ModelConfigManager.cs": {
+        "hash": "7c21d6457318",
+        "content": "class ModelConfigManager"
+      }
+    },
+    "keyTypes": [
+      "class AppConstants",
+      "class FeatureConstants",
+      "class ModelConfigManager"
+    ],
+    "patterns": [
+      "SettingsManager for runtime-configurable values",
+      "Static constants class for compile-time values"
+    ],
+    "dependencies": [
+      "Persists to %LOCALAPPDATA%\\Spritely\\settings.json",
+      "Referenced by nearly all managers"
+    ]
+  },
+  "parentModuleId": "app-infrastructure",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AppConstants",
+    "FeatureConstants",
+    "ModelConfigManager"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.6410126Z"
+}

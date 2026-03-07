@@ -192,6 +192,7 @@ namespace Spritely
             FeaturesPanelContent.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
             FeaturesListBox.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
             FeatureDetailPanel.Visibility = _featuresPanelExpanded && _selectedFeature != null ? Visibility.Visible : Visibility.Collapsed;
+            FeaturesPanelRow.Height = _featuresPanelExpanded ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
             // E70D = chevron down, E70E = chevron up
             FeaturesPanelToggleBtn.Content = _featuresPanelExpanded ? "\uE70D" : "\uE70E";
         }
@@ -361,10 +362,22 @@ namespace Spritely
 
         private static FeatureEntry? GetFeatureFromContextMenu(object sender)
         {
-            if (sender is not MenuItem menuItem) return null;
-            if (menuItem.Parent is not ContextMenu contextMenu) return null;
-            if (contextMenu.PlacementTarget is not Border border) return null;
-            return border.DataContext as FeatureEntry;
+            if (sender is FrameworkElement { DataContext: FeatureEntry direct })
+                return direct;
+
+            if (sender is MenuItem mi)
+            {
+                DependencyObject? current = mi;
+                while (current != null)
+                {
+                    if (current is ContextMenu ctx && ctx.PlacementTarget is FrameworkElement target
+                                                   && target.DataContext is FeatureEntry entry)
+                        return entry;
+                    current = LogicalTreeHelper.GetParent(current);
+                }
+            }
+
+            return null;
         }
     }
 }

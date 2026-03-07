@@ -55,7 +55,7 @@ namespace Spritely.Constants
         public const int MaxFilesPerChunk = MaxFilesPerSonnetChunk;
 
         /// <summary>Maximum signature lines extracted per source file.</summary>
-        public const int MaxSignatureLinesPerFile = 20;
+        public const int MaxSignatureLinesPerFile = 30;
 
         // ── Module Limits ─────────────────────────────────────────────
 

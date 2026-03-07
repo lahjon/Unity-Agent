@@ -1,0 +1,192 @@
+{
+  "id": "task-ui",
+  "name": "Task UI \u0026 Graph Visualization",
+  "description": "Renders task cards, output tabs with live streaming, task dependency graph, and workflow composer. Provides the primary user-facing task management interface.",
+  "category": "ui",
+  "keywords": [
+    "GraphInteractionHandler",
+    "GraphLayoutEngine",
+    "GraphRenderer",
+    "OutputTabManager",
+    "TaskNodeGraphPanel",
+    "active",
+    "animation",
+    "attach",
+    "box",
+    "brush",
+    "button",
+    "canvas",
+    "center",
+    "dependency visualization",
+    "output tab",
+    "panel",
+    "tab",
+    "task card",
+    "task graph",
+    "workflow composer"
+  ],
+  "primaryFiles": [
+    "Controls/GraphInteractionHandler.cs",
+    "Controls/GraphLayoutEngine.cs",
+    "Controls/GraphRenderer.cs",
+    "Controls/TaskNodeGraphPanel.cs",
+    "Dialogs/WorkflowComposerDialog.cs",
+    "MainWindow.Features.cs",
+    "Managers/OutputTabManager.cs"
+  ],
+  "secondaryFiles": [
+    "MainWindow.TaskExecution.cs",
+    "MainWindow.xaml"
+  ],
+  "relatedFeatureIds": [
+    "app-startup",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "app-startup",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "theming-ui-shared"
+  ],
+  "context": {
+    "signatures": {
+      "Controls/GraphInteractionHandler.cs": {
+        "hash": "05811bc061ac",
+        "content": "class GraphInteractionHandler\n  SetActiveTasks(ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E void\n  AttachScrollViewerEvents() -\u003E void\n  ToggleNodeSelection(string taskId) -\u003E void\n  FitToView(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  FocusOnTask(string taskId, Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  FocusOnNode(string nodeId, Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  CenterOnGraph(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  StartLayoutAnimation(Dictionary\u003Cstring, Point\u003E nodePositions, Dictionary\u003Cstring, Point\u003E targetPositions) -\u003E void\n  StopLayoutAnimation() -\u003E void\n  Dispose() -\u003E void"
+      },
+      "Controls/GraphLayoutEngine.cs": {
+        "hash": "12f5105ff38f",
+        "content": "class GraphLayoutEngine\n  WouldCreateCycle(IEnumerable\u003CAgentTask\u003E tasks, string sourceId, string targetId) -\u003E bool"
+      },
+      "Controls/GraphRenderer.cs": {
+        "hash": "c8bc8ef074f2",
+        "content": "class GraphRenderer\n  ClearAll() -\u003E void\n  ClearForRedraw() -\u003E void\n  RemoveEdgeElements() -\u003E void\n  DrawEmptyState() -\u003E void\n  CreateNodeContextMenu(AgentTask task, ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E ContextMenu\n  CreateNodeTooltip(AgentTask task, List\u003CAgentTask\u003E allTasks) -\u003E ToolTip\n  CreateLegendPanel() -\u003E Border\n  ResizeCanvas(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  GetCompactTimeInfo(AgentTask task) -\u003E string\n  CreateGridBrush() -\u003E DrawingBrush\n  CreateHeaderButton(string icon, string tooltip) -\u003E Button"
+      },
+      "Controls/TaskNodeGraphPanel.cs": {
+        "hash": "2e0ae6a980e9",
+        "content": "class TaskNodeGraphPanel\n  Initialize(ObservableCollection\u003CAgentTask\u003E activeTasks, FileLockManager fileLockManager) -\u003E void\n  MarkDirty() -\u003E void\n  RebuildGraph() -\u003E void\n  FocusOnTask(string taskId) -\u003E void\n  FitToView() -\u003E void\n  Dispose() -\u003E void"
+      },
+      "Dialogs/WorkflowComposerDialog.cs": {
+        "hash": "db2330818589",
+        "content": "class WorkflowStep\n  TaskName: string\n  Description: string\n  DependsOn: List\u003Cstring\u003E\nclass WorkflowComposerResult\n  Steps: List\u003CWorkflowStep\u003E\nclass WorkflowComposerDialog"
+      },
+      "Managers/OutputTabManager.cs": {
+        "hash": "d9b90959688f",
+        "content": "class OutputTabManager\n  CreateTab(AgentTask task) -\u003E void\n  CreateGeminiTab(AgentTask task, string imageFolder) -\u003E void\n  AddGeminiImage(string taskId, string imagePath) -\u003E void\n  CloseTab(AgentTask task) -\u003E void\n  UpdateTabHeader(AgentTask task) -\u003E void\n  StopTypewriterAnimation(string taskId) -\u003E void\n  HasTab(string taskId) -\u003E bool\n  GetTab(string taskId) -\u003E TabItem?\n  GetOutputBox(string taskId) -\u003E RichTextBox?\n  EnsureOverflowButton() -\u003E void\n  UpdateOutputTabWidths() -\u003E void"
+      },
+      "MainWindow.Features.cs": {
+        "hash": "258f19d3a765",
+        "content": "class MainWindow"
+      }
+    },
+    "keyTypes": [
+      "class GraphInteractionHandler",
+      "class GraphLayoutEngine",
+      "class GraphRenderer",
+      "class OutputTabManager",
+      "class TaskNodeGraphPanel",
+      "class WorkflowComposerDialog"
+    ],
+    "patterns": [
+      "Canvas-based graph with force-directed layout",
+      "Context menus on graph nodes",
+      "Typewriter animation on output streaming"
+    ],
+    "dependencies": [
+      "Observes ObservableCollection\u003CAgentTask\u003E",
+      "Programmatic WPF canvas rendering in GraphRenderer"
+    ]
+  },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AddGeminiImage",
+    "AttachScrollViewerEvents",
+    "CenterOnGraph",
+    "ClearAll",
+    "ClearForRedraw",
+    "CloseTab",
+    "CreateGeminiTab",
+    "CreateGridBrush",
+    "CreateHeaderButton",
+    "CreateLegendPanel",
+    "CreateNodeContextMenu",
+    "CreateNodeTooltip",
+    "CreateTab",
+    "DependsOn",
+    "Description",
+    "Dispose",
+    "DrawEmptyState",
+    "EnsureOverflowButton",
+    "FitToView",
+    "FocusOnNode",
+    "FocusOnTask",
+    "GetCompactTimeInfo",
+    "GetOutputBox",
+    "GetTab",
+    "GraphInteractionHandler",
+    "GraphLayoutEngine",
+    "GraphRenderer",
+    "HasTab",
+    "Initialize",
+    "MainWindow",
+    "MarkDirty",
+    "OutputTabManager",
+    "RebuildGraph",
+    "RemoveEdgeElements",
+    "ResizeCanvas",
+    "SetActiveTasks",
+    "StartLayoutAnimation",
+    "Steps",
+    "StopLayoutAnimation",
+    "StopTypewriterAnimation",
+    "TaskName",
+    "TaskNodeGraphPanel",
+    "ToggleNodeSelection",
+    "UpdateOutputTabWidths",
+    "UpdateTabHeader",
+    "WorkflowComposerDialog",
+    "WorkflowComposerResult",
+    "WorkflowStep",
+    "WouldCreateCycle"
+  ],
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-07T22:25:40.7349496Z",
+  "lastUpdatedByTaskId": "2f9473c007ed43ca"
+}

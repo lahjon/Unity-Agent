@@ -3,215 +3,374 @@
   "features": [
     {
       "id": "activity-dashboard",
-      "name": "Activity Dashboard"
+      "name": "Activity Dashboard",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "agent-bus-operation-logging",
-      "name": "Agent Bus Operation Logging"
+      "name": "Agent Bus Operation Logging",
+      "category": "",
+      "touchCount": 2,
+      "primaryFileCount": 0
     },
     {
       "id": "app-settings",
-      "name": "Application Settings \u0026 Constants"
+      "name": "Application Settings \u0026 Constants",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "app-startup",
-      "name": "Application Bootstrap"
+      "name": "Application Bootstrap",
+      "category": "infrastructure",
+      "touchCount": 0,
+      "primaryFileCount": 4
     },
     {
       "id": "app-startup-config",
-      "name": "App Startup \u0026 Configuration"
+      "name": "App Startup \u0026 Configuration",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "chat",
-      "name": "Chat Interface"
+      "name": "Chat Interface",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "chat-interface",
-      "name": "Chat Interface"
+      "name": "Chat Interface",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "codebase-indexing",
-      "name": "Codebase Symbol Index"
+      "name": "Codebase Symbol Index",
+      "category": "data",
+      "touchCount": 0,
+      "primaryFileCount": 2
     },
     {
       "id": "context-optimization",
-      "name": "Context \u0026 Token Optimization"
+      "name": "Context \u0026 Token Optimization",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "export-task-data",
-      "name": "Export Task Data"
+      "name": "Export Task Data",
+      "category": "",
+      "touchCount": 1,
+      "primaryFileCount": 1
     },
     {
       "id": "feature-context-menu",
-      "name": "Feature Context Menu"
+      "name": "Feature Context Menu",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "feature-context-resolution",
-      "name": "Feature Context Resolution"
+      "name": "Feature Context Resolution",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "feature-initialization",
-      "name": "Feature Registry Initialization"
+      "name": "Feature Registry Initialization",
+      "category": "core",
+      "touchCount": 0,
+      "primaryFileCount": 2
     },
     {
       "id": "feature-mode",
-      "name": "Feature Mode (Multi-Iteration Execution)"
+      "name": "Feature Mode (Multi-Iteration Execution)",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "feature-mode-execution",
-      "name": "Feature Mode Execution"
+      "name": "Feature Mode Execution",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "feature-output-close-button",
-      "name": "Feature Output Tab Close Button"
+      "name": "Feature Output Tab Close Button",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "feature-registry",
-      "name": "Feature Registry"
+      "name": "Feature Registry",
+      "category": "data",
+      "touchCount": 1,
+      "primaryFileCount": 5
     },
     {
       "id": "feature-update-agent",
-      "name": "Feature Update Agent"
+      "name": "Feature Update Agent",
+      "category": "core",
+      "touchCount": 2,
+      "primaryFileCount": 2
     },
     {
       "id": "file-lock-management",
-      "name": "File Lock Management"
+      "name": "File Lock Management",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "finished-task-output-viewer",
-      "name": "Task Output Context Menu"
+      "name": "Task Output Context Menu",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "git-operations",
-      "name": "Git Operations"
+      "name": "Git Operations",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "git-ui",
-      "name": "Git Panel UI"
+      "name": "Git Panel UI",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "helper-suggestions",
-      "name": "AI Project Suggestions"
+      "name": "AI Project Suggestions",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "hide-active-toggles",
-      "name": "Hide Active Toggles"
+      "name": "Hide Active Toggles",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "history-analytics",
-      "name": "Task History \u0026 Analytics"
+      "name": "Task History \u0026 Analytics",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "llm-services",
-      "name": "LLM Service Configuration"
+      "name": "LLM Service Configuration",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "logging-diagnostics",
-      "name": "Logging \u0026 Diagnostics"
+      "name": "Logging \u0026 Diagnostics",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "logging-infrastructure",
-      "name": "Logging \u0026 Safe File Writing"
+      "name": "Logging \u0026 Safe File Writing",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "mcp-integration",
-      "name": "MCP-for-Unity Integration"
+      "name": "MCP-for-Unity Integration",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "message-bus",
-      "name": "Inter-Task Message Bus"
+      "name": "Inter-Task Message Bus",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "module-registry",
-      "name": "Module Registry"
+      "name": "Module Registry",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "output-processing",
-      "name": "Output Processing \u0026 Display"
+      "name": "Output Processing \u0026 Display",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "pause-remove-button-hover",
-      "name": "Pause/Remove Button Hover Feedback"
+      "name": "Pause/Remove Button Hover Feedback",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "preprocessor-skip-rules",
-      "name": "Preprocessor Skip Rules for Task Types"
+      "name": "Preprocessor Skip Rules for Task Types",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "project-management",
-      "name": "Project Management"
+      "name": "Project Management",
+      "category": "data",
+      "touchCount": 0,
+      "primaryFileCount": 5
     },
     {
       "id": "project-tasks",
-      "name": "Project Task List"
+      "name": "Project Task List",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "prompt-building",
-      "name": "Prompt Construction"
+      "name": "Prompt Construction",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "skill-management",
-      "name": "Skill Management"
+      "name": "Skill Management",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "skills-system",
-      "name": "Skills System"
+      "name": "Skills System",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "stored-task-viewer",
-      "name": "Stored Task Viewer"
+      "name": "Stored Task Viewer",
+      "category": "ui",
+      "touchCount": 0,
+      "primaryFileCount": 1
     },
     {
       "id": "task-continuation-button",
-      "name": "Task Continuation Button"
+      "name": "Task Continuation Button",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "task-execution",
-      "name": "Task Execution Engine"
+      "name": "Task Execution Engine",
+      "category": "core",
+      "touchCount": 0,
+      "primaryFileCount": 3
     },
     {
       "id": "task-factory",
-      "name": "Task Creation \u0026 Validation"
+      "name": "Task Creation \u0026 Validation",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "task-graph-ui",
-      "name": "Task Dependency Graph UI"
+      "name": "Task Dependency Graph UI",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "task-history",
-      "name": "Task History \u0026 Group Tracking"
+      "name": "Task History \u0026 Group Tracking",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "task-orchestration",
-      "name": "Task Orchestration \u0026 Lifecycle"
+      "name": "Task Orchestration \u0026 Lifecycle",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "task-preprocessing",
-      "name": "Task Preprocessing"
+      "name": "Task Preprocessing",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "task-templates",
-      "name": "Saved Prompts \u0026 Task Templates"
+      "name": "Saved Prompts \u0026 Task Templates",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "task-templates-storage",
-      "name": "Task Templates \u0026 Saved Prompts"
+      "name": "Task Templates \u0026 Saved Prompts",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "task-ui",
-      "name": "Task UI \u0026 Graph Visualization"
+      "name": "Task UI \u0026 Graph Visualization",
+      "category": "ui",
+      "touchCount": 1,
+      "primaryFileCount": 7
     },
     {
       "id": "terminal",
-      "name": "Integrated Terminal"
+      "name": "Integrated Terminal",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "theming-ui-shared",
-      "name": "Theming \u0026 Shared UI Components"
+      "name": "Theming \u0026 Shared UI Components",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     },
     {
       "id": "ui-theming",
-      "name": "UI Theming \u0026 Style System"
+      "name": "UI Theming \u0026 Style System",
+      "category": "",
+      "touchCount": 0,
+      "primaryFileCount": 0
     }
   ],
   "modules": []

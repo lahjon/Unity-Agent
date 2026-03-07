@@ -1,0 +1,117 @@
+{
+  "id": "skill-management",
+  "name": "Skill Management",
+  "description": "Manages reusable prompt skills that can be attached to tasks. Skills are stored per-project or globally and injected as a block into task prompts when enabled.",
+  "category": "core",
+  "keywords": [
+    "BuildSkillsBlock",
+    "SkillEditorDialog",
+    "SkillEntry",
+    "SkillManager",
+    "enabled skills",
+    "reusable prompts",
+    "skill block",
+    "skills"
+  ],
+  "primaryFiles": [
+    "Dialogs/SkillEditorDialog.cs",
+    "Managers/SkillManager.cs"
+  ],
+  "secondaryFiles": [
+    "MainWindow.Skills.cs",
+    "Models/SkillEntry.cs"
+  ],
+  "relatedFeatureIds": [
+    "project-management",
+    "prompt-building"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skills-system",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "theming-ui-shared"
+  ],
+  "context": {
+    "signatures": {
+      "Dialogs/SkillEditorDialog.cs": {
+        "hash": "57176f273e47",
+        "content": "class SkillEditorDialog\n  Show(SkillManager skillManager, string? projectPath) -\u003E bool"
+      },
+      "Managers/SkillManager.cs": {
+        "hash": "17476723125b",
+        "content": "class SkillManager\n  LoadAsync(string? projectPath = null) -\u003E Task\n  SaveSkill(SkillEntry skill, string? projectPath = null) -\u003E void\n  DeleteSkill(SkillEntry skill, string? projectPath = null) -\u003E void\n  BuildSkillsBlock() -\u003E string\n  BuildSkillsBlock(IEnumerable\u003Cstring\u003E skillIds) -\u003E string\n  GetEnabledSkillIds() -\u003E List\u003Cstring\u003E\n  SetEnabledSkills(IEnumerable\u003Cstring\u003E skillIds) -\u003E void\n  ClearEnabledSkills() -\u003E void\n  GetCategories() -\u003E List\u003Cstring\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  IsGlobal: bool\n  CreatedAt: DateTime\n  UpdatedAt: DateTime"
+      }
+    },
+    "keyTypes": [
+      "class SkillEntry",
+      "class SkillManager"
+    ],
+    "patterns": [
+      "BuildSkillsBlock injected into PromptBuilder",
+      "JSON persistence per project and global"
+    ],
+    "dependencies": [
+      "Skills injected into prompt via PromptBuilder.BuildSkillsBlock",
+      "Stored in project directory or global config"
+    ]
+  },
+  "parentModuleId": "ai-prompt-services",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "BuildSkillsBlock",
+    "Category",
+    "ClearEnabledSkills",
+    "CreatedAt",
+    "DeleteSkill",
+    "Description",
+    "GetCategories",
+    "GetEnabledSkillIds",
+    "Id",
+    "IsGlobal",
+    "LoadAsync",
+    "Name",
+    "SaveSkill",
+    "SetEnabledSkills",
+    "Show",
+    "SkillEditorDialog",
+    "SkillManager",
+    "UpdatedAt"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.5283233Z"
+}

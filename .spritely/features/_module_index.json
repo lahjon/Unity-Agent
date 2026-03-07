@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "ai-prompt-services",
+      "name": "AI \u0026 Prompt Services",
+      "featureIds": [
+        "context-optimization",
+        "llm-services",
+        "prompt-building",
+        "skill-management",
+        "skills-system"
+      ]
+    },
+    {
+      "id": "app-infrastructure",
+      "name": "App Infrastructure",
+      "featureIds": [
+        "app-settings",
+        "app-startup",
+        "app-startup-config",
+        "logging-diagnostics",
+        "logging-infrastructure"
+      ]
+    },
+    {
+      "id": "data-persistence",
+      "name": "Data \u0026 History",
+      "featureIds": [
+        "history-analytics",
+        "project-management",
+        "project-tasks",
+        "task-history",
+        "task-templates-storage"
+      ]
+    },
+    {
+      "id": "external-integrations",
+      "name": "External Integrations",
+      "featureIds": [
+        "agent-bus-operation-logging",
+        "mcp-integration",
+        "message-bus"
+      ]
+    },
+    {
+      "id": "feature-registry",
+      "name": "Feature Registry System",
+      "featureIds": [
+        "codebase-indexing",
+        "feature-context-resolution",
+        "feature-initialization",
+        "feature-registry",
+        "feature-update-agent",
+        "module-registry"
+      ]
+    },
+    {
+      "id": "git-integration",
+      "name": "Git Integration \u0026 File Safety",
+      "featureIds": [
+        "file-lock-management",
+        "git-operations",
+        "git-ui"
+      ]
+    },
+    {
+      "id": "task-execution",
+      "name": "Task Execution \u0026 Orchestration",
+      "featureIds": [
+        "feature-mode",
+        "feature-mode-execution",
+        "output-processing",
+        "preprocessor-skip-rules",
+        "task-execution",
+        "task-factory",
+        "task-orchestration",
+        "task-preprocessing"
+      ]
+    },
+    {
+      "id": "ui",
+      "name": "User Interface",
+      "featureIds": [
+        "activity-dashboard",
+        "chat",
+        "chat-interface",
+        "export-task-data",
+        "finished-task-output-viewer",
+        "helper-suggestions",
+        "hide-active-toggles",
+        "pause-remove-button-hover",
+        "stored-task-viewer",
+        "task-continuation-button",
+        "task-graph-ui",
+        "task-templates",
+        "task-ui",
+        "terminal",
+        "theming-ui-shared",
+        "ui-theming"
+      ]
+    }
+  ]
+}

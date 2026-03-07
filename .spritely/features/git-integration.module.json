@@ -1,0 +1,13 @@
+{
+  "id": "git-integration",
+  "name": "Git Integration \u0026 File Safety",
+  "description": "Provides safe, reversible Git command execution coordinated with file lock tracking to prevent concurrent mutations. Includes the Git status panel UI, commit/push workflows, and conflict resolution.",
+  "category": "",
+  "featureIds": [
+    "file-lock-management",
+    "git-operations",
+    "git-ui"
+  ],
+  "keywords": [],
+  "lastUpdatedAt": "2026-03-07T21:25:30.5863997Z"
+}

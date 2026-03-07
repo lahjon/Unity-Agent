@@ -36,7 +36,7 @@ namespace Spritely.Dialogs
         public static DarkDialogWindow Create(
             string title, double width, double height,
             ResizeMode resizeMode = ResizeMode.NoResize,
-            bool topmost = true,
+            bool topmost = false,
             string backgroundResource = "BgSurface",
             string titleColorResource = "Accent")
         {

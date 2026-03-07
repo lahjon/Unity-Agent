@@ -50,11 +50,11 @@
   "context": {
     "signatures": {
       "Constants/FeatureConstants.cs": {
-        "hash": "24c4f51ea285",
+        "hash": "bf8487a575bc",
         "content": "class FeatureConstants"
       },
       "Managers/FeatureRegistryManager.cs": {
-        "hash": "6a7729ec1e4e",
+        "hash": "4029c9bf8d7a",
         "content": "class FeatureRegistryManager\n  RegistryExists(string projectPath) -\u003E bool\n  GetFeaturesPath(string projectPath) -\u003E string\n  LoadIndexAsync(string projectPath) -\u003E Task\u003CFeatureIndex\u003E\n  LoadFeatureAsync(string projectPath, string featureId) -\u003E Task\u003CFeatureEntry?\u003E\n  LoadAllFeaturesAsync(string projectPath) -\u003E Task\u003CList\u003CFeatureEntry\u003E\u003E\n  SaveFeatureAsync(string projectPath, FeatureEntry feature) -\u003E Task\n  RemoveFeatureAsync(string projectPath, string featureId) -\u003E Task\n  SaveIndexAsync(string projectPath, FeatureIndex index) -\u003E Task\n  RefreshStaleSignaturesAsync(string projectPath, FeatureEntry feature) -\u003E Task\u003Cbool\u003E\n  BuildDependencyGraph(List\u003CFeatureEntry\u003E features) -\u003E FeatureDependencyGraph\n  ValidateDependencies(List\u003CFeatureEntry\u003E features) -\u003E void\n  Dispose() -\u003E void"
       },
       "Models/FeatureDependencyGraph.cs": {

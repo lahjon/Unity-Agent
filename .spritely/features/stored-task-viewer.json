@@ -33,7 +33,7 @@
   "context": {
     "signatures": {
       "Dialogs/StoredTaskViewerDialog.cs": {
-        "hash": "7d59a793ad02",
+        "hash": "e2898968b41f",
         "content": "class StoredTaskViewerDialog\n  Show(AgentTask task) -\u003E void"
       }
     },

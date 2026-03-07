@@ -83,7 +83,7 @@
         "content": "class MainWindow"
       },
       "Managers/TaskExecutionManager.cs": {
-        "hash": "f941328ee742",
+        "hash": "1acb32796d2c",
         "content": "class TaskExecutionManager\n  LaunchHeadless(AgentTask task) -\u003E void\n  CancelTaskImmediate(AgentTask task) -\u003E void\n  KillProcess(AgentTask task) -\u003E void\n  RemoveStreamingState(string taskId) -\u003E void\n  PauseTask(AgentTask task) -\u003E void\n  SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask\n  SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask\n  ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?\n  InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void\n  ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?"
       },
       "Managers/TaskProcessLauncher.cs": {

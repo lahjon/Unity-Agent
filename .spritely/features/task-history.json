@@ -1,0 +1,107 @@
+{
+  "id": "task-history",
+  "name": "Task History \u0026 Group Tracking",
+  "description": "Persists completed task history, active queue snapshots, and aggregated task group states. Enables session recovery and historical reporting.",
+  "category": "data",
+  "keywords": [
+    "HistoryManager",
+    "TaskGroupState",
+    "TaskGroupTracker",
+    "TaskHistoryEntry",
+    "active queue",
+    "group summary",
+    "history",
+    "session recovery",
+    "stored tasks"
+  ],
+  "primaryFiles": [
+    "Managers/HistoryManager.cs",
+    "Managers/TaskGroupTracker.cs"
+  ],
+  "secondaryFiles": [
+    "Dialogs/GroupSummaryDialog.cs",
+    "Dialogs/StoredTaskViewerDialog.cs",
+    "Models/StoredTaskEntry.cs",
+    "Models/TaskHistoryEntry.cs",
+    "Models/TaskRecordBase.cs"
+  ],
+  "relatedFeatureIds": [
+    "activity-dashboard",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-registry",
+    "history-analytics",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "module-registry",
+    "project-management",
+    "task-graph-ui",
+    "task-ui",
+    "theming-ui-shared"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/HistoryManager.cs": {
+        "hash": "6731b5b396e2",
+        "content": "class HistoryManager\n  SaveHistory(ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  LoadHistoryAsync(int retentionHours) -\u003E Task\u003CList\u003CAgentTask\u003E\u003E\n  SaveActiveQueue(ObservableCollection\u003CAgentTask\u003E activeTasks, object activeTasksLock, bool useBackgroundWrite = false) -\u003E void\n  LoadActiveQueueAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E\n  ClearActiveQueue() -\u003E void\n  SaveStoredTasks(ObservableCollection\u003CAgentTask\u003E storedTasks) -\u003E void\n  LoadStoredTasksAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E"
+      },
+      "Managers/TaskGroupTracker.cs": {
+        "hash": "fb10885904d6",
+        "content": "class TaskGroupState\n  GroupId: string\n  GroupName: string\n  StartTime: DateTime\n  TotalCount: int\n  CompletedCount: int\n  FailedCount: int\nclass TaskGroupEntry\n  TaskId: string\n  TaskNumber: int\n  Description: string\n  Status: AgentTaskStatus\n  StartTime: DateTime\n  EndTime: DateTime?\n  CompletionSummary: string\n  Recommendations: string\n  InputTokens: long\n  OutputTokens: long\nclass GroupCompletedEventArgs\n  GroupState: TaskGroupState"
+      }
+    },
+    "keyTypes": [
+      "class HistoryManager",
+      "class StoredTaskEntry",
+      "class TaskGroupEntry",
+      "class TaskGroupState",
+      "class TaskGroupTracker",
+      "class TaskHistoryEntry"
+    ],
+    "patterns": [
+      "Background file write via SafeFileWriter",
+      "JSON persistence to %LOCALAPPDATA%\\Spritely\\iteration_history\\"
+    ],
+    "dependencies": [
+      "Reads/writes iteration_history directory",
+      "TaskGroupTracker fires GroupCompleted events"
+    ]
+  },
+  "parentModuleId": "data-persistence",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "ClearActiveQueue",
+    "CompletedCount",
+    "CompletionSummary",
+    "Description",
+    "EndTime",
+    "FailedCount",
+    "GroupCompletedEventArgs",
+    "GroupId",
+    "GroupName",
+    "GroupState",
+    "HistoryManager",
+    "InputTokens",
+    "LoadActiveQueueAsync",
+    "LoadHistoryAsync",
+    "LoadStoredTasksAsync",
+    "OutputTokens",
+    "Recommendations",
+    "SaveActiveQueue",
+    "SaveHistory",
+    "SaveStoredTasks",
+    "StartTime",
+    "Status",
+    "TaskGroupEntry",
+    "TaskGroupState",
+    "TaskId",
+    "TaskNumber",
+    "TotalCount"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.4568757Z"
+}

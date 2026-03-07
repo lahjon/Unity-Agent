@@ -79,11 +79,11 @@
         "content": "class CreateProjectResult\n  Name: string\n  Path: string\n  InitGit: bool\n  IsGame: bool\nclass CreateProjectDialog\n  Show() -\u003E CreateProjectResult?"
       },
       "Dialogs/ProjectSettingsDialog.cs": {
-        "hash": "9029f3597fc7",
+        "hash": "00e89c815602",
         "content": "class ProjectSettingsDialog\n  Show(ProjectEntry entry, Action saveProjects, Action? onMcpVisibilityChanged = null, ProjectManager? projectManager = null) -\u003E void"
       },
       "Managers/ProjectManager.cs": {
-        "hash": "b8be09520236",
+        "hash": "ac9c604f0cc1",
         "content": "class ProjectManager\n  SetTaskFactory(ITaskFactory taskFactory) -\u003E void\n  SetSettingsManager(SettingsManager settingsManager) -\u003E void\n  GetProjectStats(string projectPath, IEnumerable\u003CAgentTask\u003E allTasks) -\u003E ProjectActivityStats\n  LoadProjectsAsync() -\u003E Task\n  SaveProjects() -\u003E void\n  RefreshProjectCombo() -\u003E void\n  RefreshDescriptionBoxes() -\u003E void\n  HandleAddProjectPathClick(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  AddProject(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  CreateProject(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  UpdateMcpToggleForProject() -\u003E void\n  GetCurrentProject() -\u003E ProjectEntry?\n  GetProjectColor(string projectPath) -\u003E string\n  GetProjectDisplayName(string projectPath) -\u003E string\n  IsGameProject(string projectPath) -\u003E bool\n  GetProjectDescription(AgentTask task) -\u003E string\n  RegenerateDescriptions() -\u003E void\n  SaveShortDesc() -\u003E void\n  SaveLongDesc() -\u003E void"
       },
       "Managers/ProjectTaskManager.cs": {

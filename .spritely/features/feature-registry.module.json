@@ -1,0 +1,16 @@
+{
+  "id": "feature-registry",
+  "name": "Feature Registry System",
+  "description": "Maintains the per-project feature and module registry stored under \u0060.spritely/features/\u0060, including bootstrapping from codebase scans, resolving relevant features for a task, updating the registry post-completion, and a symbol-level codebase index.",
+  "category": "",
+  "featureIds": [
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-registry",
+    "feature-update-agent",
+    "module-registry"
+  ],
+  "keywords": [],
+  "lastUpdatedAt": "2026-03-07T21:25:30.5288909Z"
+}

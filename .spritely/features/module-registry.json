@@ -1,0 +1,88 @@
+{
+  "id": "module-registry",
+  "name": "Module Registry",
+  "description": "Manages module-level groupings of features, persisting ModuleEntry data alongside the feature registry. Provides lookup of which features belong to which module.",
+  "category": "data",
+  "keywords": [
+    "ModuleEntry",
+    "ModuleIndex",
+    "ModuleRegistryManager",
+    "feature grouping",
+    "module",
+    "module index"
+  ],
+  "primaryFiles": [
+    "Managers/ModuleRegistryManager.cs",
+    "Models/ModuleEntry.cs"
+  ],
+  "secondaryFiles": [
+    "Models/FeatureIndex.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-registry"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-registry",
+    "logging-diagnostics",
+    "project-management"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/ModuleRegistryManager.cs": {
+        "hash": "20c199a8d548",
+        "content": "class ModuleRegistryManager\n  LoadModuleIndexAsync(string projectPath) -\u003E Task\u003CModuleIndex\u003E\n  SaveModuleIndexAsync(string projectPath, ModuleIndex index) -\u003E Task\n  LoadModuleAsync(string projectPath, string moduleId) -\u003E Task\u003CModuleEntry?\u003E\n  LoadAllModulesAsync(string projectPath) -\u003E Task\u003CList\u003CModuleEntry\u003E\u003E\n  SaveModuleAsync(string projectPath, ModuleEntry module) -\u003E Task\n  RemoveModuleAsync(string projectPath, string moduleId) -\u003E Task\n  GetFeaturesInModule(ModuleEntry module, List\u003CFeatureEntry\u003E allFeatures) -\u003E List\u003CFeatureEntry\u003E\n  RebuildModuleIndex(List\u003CModuleEntry\u003E modules) -\u003E ModuleIndex\n  Dispose() -\u003E void"
+      },
+      "Models/ModuleEntry.cs": {
+        "hash": "f855a619c5e9",
+        "content": "class ModuleEntry\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  FeatureIds: List\u003Cstring\u003E\n  Keywords: List\u003Cstring\u003E\n  LastUpdatedAt: DateTime\nclass ModuleIndex\n  Version: int\n  Modules: List\u003CModuleIndexEntry\u003E\nclass ModuleIndexEntry\n  Id: string\n  Name: string\n  FeatureIds: List\u003Cstring\u003E"
+      }
+    },
+    "keyTypes": [
+      "class ModuleEntry",
+      "class ModuleIndex",
+      "class ModuleIndexEntry",
+      "class ModuleRegistryManager"
+    ],
+    "patterns": [
+      "Index rebuilt on demand",
+      "Parallel JSON storage alongside feature registry"
+    ],
+    "dependencies": [
+      "Closely coupled with FeatureRegistryManager",
+      "Reads/writes .spritely/features/modules/ in project repo"
+    ]
+  },
+  "parentModuleId": "feature-registry",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Category",
+    "Description",
+    "Dispose",
+    "FeatureIds",
+    "GetFeaturesInModule",
+    "Id",
+    "Keywords",
+    "LastUpdatedAt",
+    "LoadAllModulesAsync",
+    "LoadModuleAsync",
+    "LoadModuleIndexAsync",
+    "ModuleEntry",
+    "ModuleIndex",
+    "ModuleIndexEntry",
+    "ModuleRegistryManager",
+    "Modules",
+    "Name",
+    "RebuildModuleIndex",
+    "RemoveModuleAsync",
+    "SaveModuleAsync",
+    "SaveModuleIndexAsync",
+    "Version"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.3574178Z"
+}

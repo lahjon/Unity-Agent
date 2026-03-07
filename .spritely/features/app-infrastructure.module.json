@@ -1,0 +1,15 @@
+{
+  "id": "app-infrastructure",
+  "name": "App Infrastructure",
+  "description": "Application entry point, composition root wiring all managers together, global configuration constants, structured logging to rotating log files, crash/hang detection, and the system tray icon lifecycle.",
+  "category": "",
+  "featureIds": [
+    "app-settings",
+    "app-startup",
+    "app-startup-config",
+    "logging-diagnostics",
+    "logging-infrastructure"
+  ],
+  "keywords": [],
+  "lastUpdatedAt": "2026-03-07T21:25:30.7231143Z"
+}

@@ -1,0 +1,84 @@
+{
+  "id": "chat",
+  "name": "Chat Interface",
+  "description": "Direct conversational AI chat panel supporting Claude and Gemini models, image paste/drop, and Gemini image generation. Separate from the task-based agent workflow.",
+  "category": "ui",
+  "keywords": [
+    "ChatManager",
+    "Claude chat",
+    "Gemini chat",
+    "GeminiImagePanel",
+    "chat",
+    "conversation",
+    "image generation",
+    "paste image",
+    "send message"
+  ],
+  "primaryFiles": [
+    "Managers/ChatManager.cs",
+    "Managers/GeminiImagePanel.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/GeminiService.cs",
+    "Managers/ImageAttachmentManager.cs"
+  ],
+  "relatedFeatureIds": [
+    "app-startup",
+    "llm-services"
+  ],
+  "dependsOn": [
+    "llm-services",
+    "logging-diagnostics",
+    "prompt-building",
+    "task-graph-ui",
+    "task-ui"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/ChatManager.cs": {
+        "hash": "4154593c2665",
+        "content": "class ChatManager\n  PopulateModelCombo() -\u003E void\n  HandleNewChat() -\u003E void\n  HandleSendClick() -\u003E void\n  HandleInputKeyDown(KeyEventArgs e) -\u003E void\n  HandlePaste() -\u003E bool\n  HandleDragOver(DragEventArgs e) -\u003E bool\n  HandleDrop(DragEventArgs e) -\u003E bool\n  HandleModelComboChanged() -\u003E void\n  CancelAndDispose() -\u003E void\n  Dispose() -\u003E void"
+      },
+      "Managers/GeminiImagePanel.cs": {
+        "hash": "d1f0b20f09cc",
+        "content": "class GeminiImagePanel\n  Create(AgentTask task, out RichTextBox outputBox, out WrapPanel imageGallery) -\u003E DockPanel\n  AddImage(WrapPanel gallery, string imagePath) -\u003E void\n  SetOpenFolderHandler(DockPanel root, string folderPath) -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class ChatManager",
+      "class ChatMessage",
+      "class GeminiImagePanel",
+      "class GeminiImageResult"
+    ],
+    "patterns": [
+      "Drag-and-drop image attachment",
+      "Streaming response rendering into RichTextBox"
+    ],
+    "dependencies": [
+      "Calls ClaudeService and GeminiService",
+      "ImageAttachmentManager handles clipboard/drag images"
+    ]
+  },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AddImage",
+    "CancelAndDispose",
+    "ChatManager",
+    "Create",
+    "Dispose",
+    "GeminiImagePanel",
+    "HandleDragOver",
+    "HandleDrop",
+    "HandleInputKeyDown",
+    "HandleModelComboChanged",
+    "HandleNewChat",
+    "HandlePaste",
+    "HandleSendClick",
+    "PopulateModelCombo",
+    "SetOpenFolderHandler"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.5179543Z"
+}

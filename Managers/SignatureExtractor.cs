@@ -36,6 +36,9 @@ public class ExtractedSymbol
     public SymbolKind Kind { get; init; }
     public string Name { get; init; } = "";
     public string Signature { get; init; } = "";
+    public int LineNumber { get; init; }
+    public string? Summary { get; init; }
+    public string? BaseTypes { get; init; }
 }
 
 /// <summary>
@@ -45,12 +48,12 @@ public class ExtractedSymbol
 /// </summary>
 public static class SignatureExtractor
 {
-    private static readonly HashSet<string> SupportedExtensions = [".cs", ".ts", ".tsx", ".js", ".jsx", ".py", ".gd", ".xaml"];
+    private static readonly HashSet<string> SupportedExtensions = [".cs", ".ts", ".tsx", ".js", ".jsx", ".py", ".gd"];
 
     // ── C# patterns ──────────────────────────────────────────────────────
 
     private static readonly Regex CsTypeDecl = new(
-        @"(?:public|internal)\s+(?:(?:abstract|static|sealed|partial)\s+)*(?:class|interface|enum|struct|record)\s+(\w+)",
+        @"(?:public|internal)\s+(?:(?:abstract|static|sealed|partial)\s+)*(?:class|interface|enum|struct|record)\s+(\w+)(?:\s*:\s*(.+?))?(?:\s*\{|\s*$|\s*where\b)",
         RegexOptions.Compiled);
 
     private static readonly Regex CsPublicMethod = new(
@@ -63,6 +66,18 @@ public static class SignatureExtractor
 
     private static readonly Regex CsEnumValue = new(
         @"^\s*(\w+)\s*[,=]",
+        RegexOptions.Compiled);
+
+    private static readonly Regex CsConstField = new(
+        @"^\s*(?:public|internal|private|protected)\s+(?:static\s+readonly|const)\s+([\w<>\[\]?,\s]+?)\s+(\w+)\s*=\s*(.+?)\s*;",
+        RegexOptions.Compiled);
+
+    private static readonly Regex CsXmlSummary = new(
+        @"^\s*///\s*<summary>\s*(.*?)\s*$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex CsXmlSummaryContent = new(
+        @"^\s*///\s*(.*?)\s*$",
         RegexOptions.Compiled);
 
     // ── TypeScript / JavaScript patterns ─────────────────────────────────
@@ -107,20 +122,6 @@ public static class SignatureExtractor
         @"^@?export\s+var\s+(\w+)(?:\s*:\s*(\w+))?",
         RegexOptions.Compiled);
 
-    // ── XAML patterns ─────────────────────────────────────────────────────
-
-    private static readonly Regex XamlClass = new(
-        @"x:Class=""([^""]+)""",
-        RegexOptions.Compiled);
-
-    private static readonly Regex XamlNamedElement = new(
-        @"x:Name=""(\w+)""",
-        RegexOptions.Compiled);
-
-    private static readonly Regex XamlRootElement = new(
-        @"<(\w+:)?(\w+)\s",
-        RegexOptions.Compiled);
-
     // ── Public API ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -138,7 +139,6 @@ public static class SignatureExtractor
             ".ts" or ".tsx" or ".js" or ".jsx" => ExtractTypeScript(lines),
             ".py" => ExtractPython(lines),
             ".gd" => ExtractGDScript(lines),
-            ".xaml" => ExtractXaml(lines),
             _ => string.Empty
         };
     }
@@ -184,7 +184,6 @@ public static class SignatureExtractor
             ".ts" or ".tsx" or ".js" or ".jsx" => ExtractTypeScriptSymbols(lines),
             ".py" => ExtractPythonSymbols(lines),
             ".gd" => ExtractGDScriptSymbols(lines),
-            ".xaml" => ExtractXamlSymbols(lines),
             _ => []
         };
     }
@@ -294,13 +293,73 @@ public static class SignatureExtractor
         var enumValues = new List<string>();
         var braceDepth = 0;
         var enumBraceDepth = 0;
+        string? pendingSummary = null;
+        var summaryLines = new List<string>();
+        var inSummaryBlock = false;
 
-        foreach (var rawLine in lines)
+        for (var i = 0; i < lines.Length; i++)
         {
             if (output.Count >= FeatureConstants.MaxSignatureLinesPerFile)
                 break;
 
-            var line = rawLine.TrimEnd('\r');
+            var line = lines[i].TrimEnd('\r');
+            var lineNum = i + 1;
+
+            // Track XML doc summary blocks
+            if (line.TrimStart().StartsWith("///"))
+            {
+                var summaryStart = CsXmlSummary.Match(line);
+                if (summaryStart.Success)
+                {
+                    inSummaryBlock = true;
+                    summaryLines.Clear();
+                    var inlineContent = summaryStart.Groups[1].Value
+                        .Replace("</summary>", "").Trim();
+                    if (inlineContent.Length > 0)
+                        summaryLines.Add(inlineContent);
+                    continue;
+                }
+
+                if (inSummaryBlock)
+                {
+                    if (line.Contains("</summary>"))
+                    {
+                        var contentMatch = CsXmlSummaryContent.Match(line);
+                        if (contentMatch.Success)
+                        {
+                            var content = contentMatch.Groups[1].Value
+                                .Replace("</summary>", "").Trim();
+                            if (content.Length > 0)
+                                summaryLines.Add(content);
+                        }
+                        pendingSummary = string.Join(" ", summaryLines);
+                        if (pendingSummary.Length > 80)
+                            pendingSummary = pendingSummary[..77] + "...";
+                        inSummaryBlock = false;
+                    }
+                    else
+                    {
+                        var contentMatch = CsXmlSummaryContent.Match(line);
+                        if (contentMatch.Success)
+                            summaryLines.Add(contentMatch.Groups[1].Value.Trim());
+                    }
+                    continue;
+                }
+
+                continue;
+            }
+
+            // Non-doc line resets summary tracking
+            if (!line.TrimStart().StartsWith("///") && !line.TrimStart().StartsWith("//")
+                && !string.IsNullOrWhiteSpace(line.TrimStart())
+                && !line.TrimStart().StartsWith("["))
+            {
+                // pendingSummary carries forward to the next member declaration
+            }
+            else if (string.IsNullOrWhiteSpace(line.TrimStart()))
+            {
+                pendingSummary = null;
+            }
 
             // Track brace depth for enum value capture
             braceDepth += CountChar(line, '{') - CountChar(line, '}');
@@ -309,7 +368,6 @@ public static class SignatureExtractor
             {
                 if (braceDepth <= enumBraceDepth)
                 {
-                    // Enum closed — flush values
                     if (enumValues.Count > 0)
                         output.Add($"    {string.Join(", ", enumValues)}");
                     insideEnum = false;
@@ -329,7 +387,10 @@ public static class SignatureExtractor
             {
                 var typeName = typeMatch.Groups[1].Value;
                 var keyword = ExtractCsTypeKeyword(line);
-                output.Add($"{keyword} {typeName}");
+                var baseTypes = typeMatch.Groups[2].Success ? typeMatch.Groups[2].Value.Trim() : null;
+                var baseTypeSuffix = !string.IsNullOrWhiteSpace(baseTypes) ? $" : {baseTypes}" : "";
+                output.Add($"{keyword} {typeName}{baseTypeSuffix}");
+                pendingSummary = null;
 
                 if (keyword == "enum")
                 {
@@ -339,15 +400,55 @@ public static class SignatureExtractor
                 continue;
             }
 
-            // Public methods
+            // Constants and static readonly fields
+            var constMatch = CsConstField.Match(line);
+            if (constMatch.Success)
+            {
+                var constType = CollapseWhitespace(constMatch.Groups[1].Value.Trim());
+                var constName = constMatch.Groups[2].Value;
+                var constValue = constMatch.Groups[3].Value.Trim();
+                if (constValue.Length > 40)
+                    constValue = constValue[..37] + "...";
+                output.Add($"  L{lineNum}: {constName}: {constType} = {constValue}");
+                pendingSummary = null;
+                continue;
+            }
+
+            // Public methods — with multi-line parameter support
             var methodMatch = CsPublicMethod.Match(line);
             if (methodMatch.Success)
             {
                 var returnType = CollapseWhitespace(methodMatch.Groups[1].Value.Trim());
                 var name = methodMatch.Groups[2].Value;
                 var parameters = CollapseWhitespace(methodMatch.Groups[3].Value.Trim());
-                output.Add($"  {name}({parameters}) -> {returnType}");
+                var summaryComment = pendingSummary != null ? $"  // {pendingSummary}" : "";
+                output.Add($"  L{lineNum}: {name}({parameters}) -> {returnType}{summaryComment}");
+                pendingSummary = null;
                 continue;
+            }
+
+            // Check for multi-line method: has public + method start but no closing paren
+            if (IsPartialMethodDeclaration(line))
+            {
+                var fullLine = JoinMultiLineDeclaration(lines, i, out var endIndex);
+                if (fullLine != null)
+                {
+                    var fullMatch = CsPublicMethod.Match(fullLine);
+                    if (fullMatch.Success)
+                    {
+                        var returnType = CollapseWhitespace(fullMatch.Groups[1].Value.Trim());
+                        var name = fullMatch.Groups[2].Value;
+                        var parameters = CollapseWhitespace(fullMatch.Groups[3].Value.Trim());
+                        var summaryComment = pendingSummary != null ? $"  // {pendingSummary}" : "";
+                        output.Add($"  L{lineNum}: {name}({parameters}) -> {returnType}{summaryComment}");
+                        pendingSummary = null;
+                        // Advance past the joined lines, adjusting brace depth
+                        for (var j = i + 1; j <= endIndex; j++)
+                            braceDepth += CountChar(lines[j].TrimEnd('\r'), '{') - CountChar(lines[j].TrimEnd('\r'), '}');
+                        i = endIndex;
+                        continue;
+                    }
+                }
             }
 
             // Public properties
@@ -357,14 +458,42 @@ public static class SignatureExtractor
                 var propType = CollapseWhitespace(propMatch.Groups[1].Value.Trim());
                 var propName = propMatch.Groups[2].Value;
                 output.Add($"  {propName}: {propType}");
+                pendingSummary = null;
             }
         }
 
-        // Flush trailing enum values if file ends inside an enum
+        // Flush trailing enum values
         if (insideEnum && enumValues.Count > 0 && output.Count < FeatureConstants.MaxSignatureLinesPerFile)
             output.Add($"    {string.Join(", ", enumValues)}");
 
         return string.Join('\n', output);
+    }
+
+    /// <summary>Detects a partial public method declaration (has opening paren but no closing paren on this line).</summary>
+    private static bool IsPartialMethodDeclaration(string line)
+    {
+        var trimmed = line.TrimStart();
+        return trimmed.StartsWith("public ") && trimmed.Contains('(') && !trimmed.Contains(')');
+    }
+
+    /// <summary>Joins continuation lines until a closing paren is found (max 5 lines lookahead).</summary>
+    private static string? JoinMultiLineDeclaration(string[] lines, int startIndex, out int endIndex)
+    {
+        const int maxLookahead = 5;
+        var sb = new StringBuilder(lines[startIndex].TrimEnd('\r'));
+        endIndex = startIndex;
+
+        for (var j = startIndex + 1; j < lines.Length && j <= startIndex + maxLookahead; j++)
+        {
+            var continuation = lines[j].TrimEnd('\r').Trim();
+            sb.Append(' ').Append(continuation);
+            endIndex = j;
+
+            if (continuation.Contains(')'))
+                return sb.ToString();
+        }
+
+        return null;
     }
 
     private static string ExtractCsTypeKeyword(string line)
@@ -551,56 +680,6 @@ public static class SignatureExtractor
         return string.Join('\n', output);
     }
 
-    // ── XAML extraction ───────────────────────────────────────────────────
-
-    private static string ExtractXaml(string[] lines)
-    {
-        var output = new List<string>();
-        string? rootType = null;
-
-        foreach (var rawLine in lines)
-        {
-            if (output.Count >= FeatureConstants.MaxSignatureLinesPerFile)
-                break;
-
-            var line = rawLine.TrimEnd('\r');
-
-            // x:Class attribute — the code-behind class
-            var classMatch = XamlClass.Match(line);
-            if (classMatch.Success)
-            {
-                var fullClass = classMatch.Groups[1].Value;
-                var shortName = fullClass.Contains('.') ? fullClass[(fullClass.LastIndexOf('.') + 1)..] : fullClass;
-                output.Add($"class {shortName}");
-                continue;
-            }
-
-            // Root element type (first element in the file)
-            if (rootType is null)
-            {
-                var rootMatch = XamlRootElement.Match(line);
-                if (rootMatch.Success)
-                {
-                    rootType = rootMatch.Groups[2].Value;
-                    output.Add($"  root: {rootType}");
-                    continue;
-                }
-            }
-
-            // Named elements
-            var namedMatch = XamlNamedElement.Match(line);
-            if (namedMatch.Success)
-            {
-                var name = namedMatch.Groups[1].Value;
-                // Try to extract the element type from the same line
-                var elemMatch = Regex.Match(line.TrimStart(), @"^<(\w+:)?(\w+)\s");
-                var elemType = elemMatch.Success ? elemMatch.Groups[2].Value : "Element";
-                output.Add($"  {name}: {elemType}");
-            }
-        }
-
-        return string.Join('\n', output);
-    }
 
     // ── Structured C# extraction ───────────────────────────────────────
 
@@ -610,22 +689,57 @@ public static class SignatureExtractor
         var insideEnum = false;
         var braceDepth = 0;
         var enumBraceDepth = 0;
+        string? pendingSummary = null;
+        var summaryLines = new List<string>();
+        var inSummaryBlock = false;
 
-        foreach (var rawLine in lines)
+        for (var i = 0; i < lines.Length; i++)
         {
             if (symbols.Count >= FeatureConstants.MaxSignatureLinesPerFile)
                 break;
 
-            var line = rawLine.TrimEnd('\r');
+            var line = lines[i].TrimEnd('\r');
+            var lineNum = i + 1;
+
+            // Track XML doc summary blocks
+            if (line.TrimStart().StartsWith("///"))
+            {
+                var summaryStart = CsXmlSummary.Match(line);
+                if (summaryStart.Success)
+                {
+                    inSummaryBlock = true;
+                    summaryLines.Clear();
+                    var inlineContent = summaryStart.Groups[1].Value.Replace("</summary>", "").Trim();
+                    if (inlineContent.Length > 0) summaryLines.Add(inlineContent);
+                    continue;
+                }
+                if (inSummaryBlock)
+                {
+                    if (line.Contains("</summary>"))
+                    {
+                        var cm = CsXmlSummaryContent.Match(line);
+                        if (cm.Success) { var c = cm.Groups[1].Value.Replace("</summary>", "").Trim(); if (c.Length > 0) summaryLines.Add(c); }
+                        pendingSummary = string.Join(" ", summaryLines);
+                        if (pendingSummary.Length > 80) pendingSummary = pendingSummary[..77] + "...";
+                        inSummaryBlock = false;
+                    }
+                    else
+                    {
+                        var cm = CsXmlSummaryContent.Match(line);
+                        if (cm.Success) summaryLines.Add(cm.Groups[1].Value.Trim());
+                    }
+                    continue;
+                }
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(line.TrimStart())) pendingSummary = null;
+
             braceDepth += CountChar(line, '{') - CountChar(line, '}');
 
             if (insideEnum)
             {
-                if (braceDepth <= enumBraceDepth)
-                {
-                    insideEnum = false;
-                    continue;
-                }
+                if (braceDepth <= enumBraceDepth) { insideEnum = false; continue; }
                 continue;
             }
 
@@ -634,6 +748,8 @@ public static class SignatureExtractor
             {
                 var typeName = typeMatch.Groups[1].Value;
                 var keyword = ExtractCsTypeKeyword(line);
+                var baseTypes = typeMatch.Groups[2].Success ? typeMatch.Groups[2].Value.Trim() : null;
+                var baseTypeSuffix = !string.IsNullOrWhiteSpace(baseTypes) ? $" : {baseTypes}" : "";
                 var kind = keyword switch
                 {
                     "interface" => SymbolKind.Interface,
@@ -642,13 +758,33 @@ public static class SignatureExtractor
                     "record" => SymbolKind.Record,
                     _ => SymbolKind.Class
                 };
-                symbols.Add(new ExtractedSymbol { Kind = kind, Name = typeName, Signature = $"{keyword} {typeName}" });
-
-                if (keyword == "enum")
+                symbols.Add(new ExtractedSymbol
                 {
-                    insideEnum = true;
-                    enumBraceDepth = braceDepth - CountChar(line, '{');
-                }
+                    Kind = kind, Name = typeName, LineNumber = lineNum,
+                    Signature = $"{keyword} {typeName}{baseTypeSuffix}",
+                    BaseTypes = baseTypes, Summary = pendingSummary
+                });
+                pendingSummary = null;
+
+                if (keyword == "enum") { insideEnum = true; enumBraceDepth = braceDepth - CountChar(line, '{'); }
+                continue;
+            }
+
+            // Constants
+            var constMatch = CsConstField.Match(line);
+            if (constMatch.Success)
+            {
+                var constName = constMatch.Groups[2].Value;
+                var constType = CollapseWhitespace(constMatch.Groups[1].Value.Trim());
+                var constValue = constMatch.Groups[3].Value.Trim();
+                if (constValue.Length > 40) constValue = constValue[..37] + "...";
+                symbols.Add(new ExtractedSymbol
+                {
+                    Kind = SymbolKind.Const, Name = constName, LineNumber = lineNum,
+                    Signature = $"{constName}: {constType} = {constValue}",
+                    Summary = pendingSummary
+                });
+                pendingSummary = null;
                 continue;
             }
 
@@ -658,8 +794,41 @@ public static class SignatureExtractor
                 var returnType = CollapseWhitespace(methodMatch.Groups[1].Value.Trim());
                 var name = methodMatch.Groups[2].Value;
                 var parameters = CollapseWhitespace(methodMatch.Groups[3].Value.Trim());
-                symbols.Add(new ExtractedSymbol { Kind = SymbolKind.Method, Name = name, Signature = $"{name}({parameters}) -> {returnType}" });
+                symbols.Add(new ExtractedSymbol
+                {
+                    Kind = SymbolKind.Method, Name = name, LineNumber = lineNum,
+                    Signature = $"{name}({parameters}) -> {returnType}",
+                    Summary = pendingSummary
+                });
+                pendingSummary = null;
                 continue;
+            }
+
+            // Multi-line method declarations
+            if (IsPartialMethodDeclaration(line))
+            {
+                var fullLine = JoinMultiLineDeclaration(lines, i, out var endIndex);
+                if (fullLine != null)
+                {
+                    var fullMatch = CsPublicMethod.Match(fullLine);
+                    if (fullMatch.Success)
+                    {
+                        var returnType = CollapseWhitespace(fullMatch.Groups[1].Value.Trim());
+                        var name = fullMatch.Groups[2].Value;
+                        var parameters = CollapseWhitespace(fullMatch.Groups[3].Value.Trim());
+                        symbols.Add(new ExtractedSymbol
+                        {
+                            Kind = SymbolKind.Method, Name = name, LineNumber = lineNum,
+                            Signature = $"{name}({parameters}) -> {returnType}",
+                            Summary = pendingSummary
+                        });
+                        pendingSummary = null;
+                        for (var j = i + 1; j <= endIndex; j++)
+                            braceDepth += CountChar(lines[j].TrimEnd('\r'), '{') - CountChar(lines[j].TrimEnd('\r'), '}');
+                        i = endIndex;
+                        continue;
+                    }
+                }
             }
 
             var propMatch = CsPublicProperty.Match(line);
@@ -667,7 +836,12 @@ public static class SignatureExtractor
             {
                 var propType = CollapseWhitespace(propMatch.Groups[1].Value.Trim());
                 var propName = propMatch.Groups[2].Value;
-                symbols.Add(new ExtractedSymbol { Kind = SymbolKind.Property, Name = propName, Signature = $"{propName}: {propType}" });
+                symbols.Add(new ExtractedSymbol
+                {
+                    Kind = SymbolKind.Property, Name = propName, LineNumber = lineNum,
+                    Signature = $"{propName}: {propType}", Summary = pendingSummary
+                });
+                pendingSummary = null;
             }
         }
 
@@ -837,52 +1011,6 @@ public static class SignatureExtractor
         return symbols;
     }
 
-    // ── Structured XAML extraction ────────────────────────────────────────
-
-    private static List<ExtractedSymbol> ExtractXamlSymbols(string[] lines)
-    {
-        var symbols = new List<ExtractedSymbol>();
-        string? rootType = null;
-
-        foreach (var rawLine in lines)
-        {
-            if (symbols.Count >= FeatureConstants.MaxSignatureLinesPerFile)
-                break;
-
-            var line = rawLine.TrimEnd('\r');
-
-            var classMatch = XamlClass.Match(line);
-            if (classMatch.Success)
-            {
-                var fullClass = classMatch.Groups[1].Value;
-                var shortName = fullClass.Contains('.') ? fullClass[(fullClass.LastIndexOf('.') + 1)..] : fullClass;
-                symbols.Add(new ExtractedSymbol { Kind = SymbolKind.Class, Name = shortName, Signature = $"class {shortName}" });
-                continue;
-            }
-
-            if (rootType is null)
-            {
-                var rootMatch = XamlRootElement.Match(line);
-                if (rootMatch.Success)
-                {
-                    rootType = rootMatch.Groups[2].Value;
-                    symbols.Add(new ExtractedSymbol { Kind = SymbolKind.Property, Name = "root", Signature = $"root: {rootType}" });
-                    continue;
-                }
-            }
-
-            var namedMatch = XamlNamedElement.Match(line);
-            if (namedMatch.Success)
-            {
-                var name = namedMatch.Groups[1].Value;
-                var elemMatch = Regex.Match(line.TrimStart(), @"^<(\w+:)?(\w+)\s");
-                var elemType = elemMatch.Success ? elemMatch.Groups[2].Value : "Element";
-                symbols.Add(new ExtractedSymbol { Kind = SymbolKind.Property, Name = name, Signature = $"{name}: {elemType}" });
-            }
-        }
-
-        return symbols;
-    }
 
     // ── Import extraction ────────────────────────────────────────────────
 

@@ -1,0 +1,60 @@
+{
+  "id": "feature-context-menu",
+  "name": "Feature Context Menu",
+  "description": "New feature identified from task: Right click on a feature and update that specific feature",
+  "category": "",
+  "keywords": [
+    "context-menu",
+    "feature-management",
+    "incremental-updates",
+    "quick-actions",
+    "right-click",
+    "ui",
+    "update-feature"
+  ],
+  "primaryFiles": [
+    "MainWindow.xaml"
+  ],
+  "secondaryFiles": [
+    "MainWindow.Features.cs"
+  ],
+  "relatedFeatureIds": [],
+  "dependsOn": [],
+  "context": {
+    "signatures": {
+      "MainWindow.xaml": {
+        "hash": "e67f2ea40658",
+        "content": "class MainWindow\n  root: DataTemplate\n  Card: Border\n  CardBg: SolidColorBrush\n  CardBorder: SolidColorBrush\n  CommitButtonPulseStoryboard: BeginStoryboard\n  StatusGlow: Ellipse\n  GlowStoryboard: BeginStoryboard\n  QueuedGlowStoryboard: BeginStoryboard\n  InitQueuedGlowStoryboard: BeginStoryboard\n  PausedGlowStoryboard: BeginStoryboard\n  PlanningGlowStoryboard: BeginStoryboard\n  UncommittedPulseStoryboard: BeginStoryboard\n  RecommendationPulseStoryboard: BeginStoryboard\n  StatusDot: Ellipse\n  DotPulseStoryboard: BeginStoryboard\n  HistCardBg: SolidColorBrush\n  HistCardBorder: SolidColorBrush\n  CommitButtonPulseStoryboard: BeginStoryboard\n  HistStatusGlow: Ellipse"
+      }
+    },
+    "keyTypes": [],
+    "patterns": [],
+    "dependencies": []
+  },
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Card",
+    "CardBg",
+    "CardBorder",
+    "CommitButtonPulseStoryboard",
+    "DotPulseStoryboard",
+    "GlowStoryboard",
+    "HistCardBg",
+    "HistCardBorder",
+    "HistStatusGlow",
+    "InitQueuedGlowStoryboard",
+    "MainWindow",
+    "PausedGlowStoryboard",
+    "PlanningGlowStoryboard",
+    "QueuedGlowStoryboard",
+    "RecommendationPulseStoryboard",
+    "StatusDot",
+    "StatusGlow",
+    "UncommittedPulseStoryboard",
+    "root"
+  ],
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-07T21:59:51.8834112Z",
+  "lastUpdatedByTaskId": "4c6ebf52b6864697"
+}

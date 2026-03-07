@@ -1,0 +1,99 @@
+{
+  "id": "feature-update-agent",
+  "name": "Feature Update Agent",
+  "description": "Post-completion fire-and-forget agent that uses Haiku to update the feature registry based on what a completed task changed. Keeps the registry current without blocking the task lifecycle.",
+  "category": "core",
+  "keywords": [
+    "FeatureUpdateAgent",
+    "Haiku update",
+    "feature refresh",
+    "fire and forget",
+    "post-completion",
+    "update registry"
+  ],
+  "primaryFiles": [
+    "MainWindow.Features.cs",
+    "Managers/FeatureUpdateAgent.cs"
+  ],
+  "secondaryFiles": [
+    "Constants/FeatureConstants.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-registry",
+    "llm-services",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-settings",
+    "app-startup-config",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "skill-management",
+    "skills-system",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-history",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/FeatureUpdateAgent.cs": {
+        "hash": "6118638ac4e5",
+        "content": "class FeatureUpdateAgent"
+      },
+      "MainWindow.Features.cs": {
+        "hash": "37dbf2d0e753",
+        "content": "class MainWindow"
+      }
+    },
+    "keyTypes": [
+      "class FeatureUpdateAgent"
+    ],
+    "patterns": [
+      "Fire-and-forget post-completion hook",
+      "Non-blocking background update"
+    ],
+    "dependencies": [
+      "Called after task CompleteWithVerification",
+      "Updates FeatureRegistryManager entries"
+    ]
+  },
+  "parentModuleId": "feature-registry",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "FeatureUpdateAgent",
+    "MainWindow"
+  ],
+  "touchCount": 2,
+  "lastUpdatedAt": "2026-03-07T22:07:21.0753215Z",
+  "lastUpdatedByTaskId": "ebfcc0891ad0416c"
+}

@@ -1,0 +1,107 @@
+{
+  "id": "feature-initialization",
+  "name": "Feature Registry Initialization",
+  "description": "Bootstraps the feature registry for a project from scratch by using Sonnet to scan the full codebase and produce an initial set of features and modules. Triggered by the \u0027Initialize Features\u0027 button.",
+  "category": "core",
+  "keywords": [
+    "FeatureInitializer",
+    "InitializeAsync",
+    "SignatureExtractor",
+    "Sonnet scan",
+    "SonnetFeature",
+    "SonnetModule",
+    "bootstrap registry",
+    "code signatures",
+    "initialize features"
+  ],
+  "primaryFiles": [
+    "Managers/FeatureInitializer.cs",
+    "Managers/SignatureExtractor.cs"
+  ],
+  "secondaryFiles": [
+    "Constants/FeatureConstants.cs",
+    "Spritely.Tests/FeatureSystemTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-registry",
+    "llm-services"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-registry",
+    "git-operations",
+    "git-ui",
+    "llm-services",
+    "logging-diagnostics",
+    "module-registry",
+    "project-management",
+    "prompt-building",
+    "task-factory",
+    "task-orchestration"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/FeatureInitializer.cs": {
+        "hash": "f1001cb88602",
+        "content": "class FeatureInitializer\n  Features: List\u003CSonnetFeature\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  Keywords: List\u003Cstring\u003E\n  PrimaryFiles: List\u003Cstring\u003E\n  SecondaryFiles: List\u003Cstring\u003E\n  RelatedFeatureIds: List\u003Cstring\u003E\n  KeyTypes: List\u003Cstring\u003E\n  Patterns: List\u003Cstring\u003E\n  Dependencies: List\u003Cstring\u003E\n  DependsOnFeatures: List\u003Cstring\u003E\n  Modules: List\u003CSonnetModule\u003E\n  Id: string\n  Name: string\n  Description: string\n  FeatureIds: List\u003Cstring\u003E\n  InitializeAsync(string projectPath, CancellationToken ct = default) -\u003E Task\u003CFeatureIndex?\u003E"
+      },
+      "Managers/SignatureExtractor.cs": {
+        "hash": "d09b60b54e90",
+        "content": "enum SymbolKind\n    Class, Interface, Enum, Struct, Record, Method, Property, Signal, ExportVar, Function, Const\nclass ExtractedSymbol\n  Kind: SymbolKind\n  Name: string\n  Signature: string\n  LineNumber: int\n  Summary: string?\n  BaseTypes: string?\nclass SignatureExtractor\n  ExtractSignatures(string filePath) -\u003E string\n  ComputeFileHash(string filePath) -\u003E string\n  GetSupportedExtensions() -\u003E HashSet\u003Cstring\u003E\n  ExtractStructuredSymbols(string filePath) -\u003E List\u003CExtractedSymbol\u003E\n  GetSymbolNames(string filePath) -\u003E List\u003Cstring\u003E\n  ExtractImports(string filePath) -\u003E List\u003Cstring\u003E"
+      }
+    },
+    "keyTypes": [
+      "class ExtractedSymbol",
+      "class FeatureInitializer",
+      "class SignatureExtractor",
+      "enum SymbolKind"
+    ],
+    "patterns": [
+      "File hash-based change detection for signature staleness",
+      "One-shot Sonnet invocation to produce structured JSON registry"
+    ],
+    "dependencies": [
+      "Calls Sonnet LLM to analyze code signatures",
+      "Writes results via FeatureRegistryManager"
+    ]
+  },
+  "parentModuleId": "feature-registry",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Category",
+    "ComputeFileHash",
+    "Dependencies",
+    "DependsOnFeatures",
+    "Description",
+    "ExtractImports",
+    "ExtractSignatures",
+    "ExtractStructuredSymbols",
+    "ExtractedSymbol",
+    "FeatureIds",
+    "FeatureInitializer",
+    "Features",
+    "GetSupportedExtensions",
+    "GetSymbolNames",
+    "Id",
+    "InitializeAsync",
+    "KeyTypes",
+    "Keywords",
+    "Kind",
+    "Modules",
+    "Name",
+    "Patterns",
+    "PrimaryFiles",
+    "RelatedFeatureIds",
+    "SecondaryFiles",
+    "Signature",
+    "SignatureExtractor",
+    "SymbolKind"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.3139649Z"
+}

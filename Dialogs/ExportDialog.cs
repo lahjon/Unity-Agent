@@ -38,6 +38,9 @@ namespace Spritely.Dialogs
             ResizeMode = ResizeMode.NoResize;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
+            try { Owner = Application.Current.MainWindow; }
+            catch { WindowStartupLocation = WindowStartupLocation.CenterScreen; }
+
             // Create main grid
             var mainGrid = new Grid { Margin = new Thickness(20) };
             mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

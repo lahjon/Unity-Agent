@@ -1,0 +1,146 @@
+{
+  "id": "feature-mode-execution",
+  "name": "Feature Mode Execution",
+  "description": "Implements multi-iteration agent execution where Claude loops through plan/execute/evaluate phases. Manages phase transitions, continuation prompts, team spawning, early termination, and progress tracking.",
+  "category": "core",
+  "keywords": [
+    "CompletionAnalyzer",
+    "EarlyTerminationManager",
+    "FeatureModeHandler",
+    "ProgressAnalyzer",
+    "continuation prompt",
+    "evaluation phase",
+    "feature mode",
+    "iteration",
+    "stall detection",
+    "team planning"
+  ],
+  "primaryFiles": [
+    "Managers/CompletionAnalyzer.cs",
+    "Managers/EarlyTerminationManager.cs",
+    "Managers/FeatureModeHandler.cs",
+    "Managers/ProgressAnalyzer.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/TokenLimitHandler.cs",
+    "Models/ProgressMetrics.cs",
+    "Models/TokenBudgetConfig.cs",
+    "Spritely.Tests/TaskExecutionEngineTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "context-optimization",
+    "prompt-building",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "app-settings",
+    "app-startup-config",
+    "codebase-indexing",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-mode",
+    "feature-registry",
+    "file-lock-management",
+    "git-operations",
+    "llm-services",
+    "logging-diagnostics",
+    "message-bus",
+    "module-registry",
+    "output-processing",
+    "project-management",
+    "prompt-building",
+    "task-execution",
+    "task-factory",
+    "task-orchestration",
+    "task-ui"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/CompletionAnalyzer.cs": {
+        "hash": "10e9ed71b8f5",
+        "content": "class CompletionAnalyzer\n  IsTaskOutputComplete(string[] lines, int recommendationLine) -\u003E bool\n  ExtractRecommendations(string output) -\u003E string?\n  CheckFeatureModeComplete(string output) -\u003E bool\n  IsTokenLimitError(string output) -\u003E bool"
+      },
+      "Managers/EarlyTerminationManager.cs": {
+        "hash": "633462048714",
+        "content": "class EarlyTerminationManager\n  ClearTaskState(string taskId) -\u003E void\n  GetStatistics() -\u003E TerminationStatistics\nclass TerminationState\n  TaskId: string\n  LastEvaluation: DateTime\n  ConsecutiveStallIterations: int\n  RecentErrorCounts: List\u003Cint\u003E\nclass TerminationCheck\n  Type: TerminationCheckType\n  Severity: CheckSeverity\n  Description: string\n  Evidence: List\u003Cstring\u003E\nenum TerminationCheckType\n    Stalled, LowVelocity, BudgetExceeded, BudgetWarning, IterationLimit, CatastrophicError\nenum CheckSeverity\n    Info, Warning\nclass TerminationDecision\n  TaskId: string\n  Iteration: int"
+      },
+      "Managers/FeatureModeHandler.cs": {
+        "hash": "09d43ad514b7",
+        "content": "class FeatureModeHandler\n  Description: string\n  DependsOn: List\u003Cint\u003E?\nenum FeatureModeAction\n    newFailures, Action, ConsecutiveFailures, TrimOutput"
+      },
+      "Managers/ProgressAnalyzer.cs": {
+        "hash": "12172ec57ec9",
+        "content": "class ProgressAnalyzer\n  RecordProgress(string taskId, TaskProgressMetrics metrics) -\u003E void\n  ExtractMetricsFromOutput(string taskId, string output, int iteration) -\u003E TaskProgressMetrics\n  DetectStall(string taskId) -\u003E StallDetectionResult\n  CalculateVelocity(string taskId) -\u003E VelocityAnalysis\n  ClearTaskHistory(string taskId) -\u003E void\nclass StallDetectionResult\n  IsStalled: bool\n  Conditions: List\u003CStallCondition\u003E\n  Recommendation: string\n  ConfidenceScore: double\nclass VelocityAnalysis\n  HasSufficientData: bool\n  AverageVelocity: double\n  VelocityTrend: VelocityTrend\n  EstimatedIterationsRemaining: int\nenum VelocityTrend\n    Accelerating, Stable"
+      }
+    },
+    "keyTypes": [
+      "class CompletionAnalyzer",
+      "class EarlyTerminationManager",
+      "class FeatureModeHandler",
+      "class ProgressAnalyzer",
+      "class TokenBudgetConfig",
+      "enum FeatureModeAction",
+      "enum FeatureModePhase"
+    ],
+    "patterns": [
+      "Crash-loop detection via consecutive failure count",
+      "State machine over FeatureModePhase transitions",
+      "Token limit retry with context trimming"
+    ],
+    "dependencies": [
+      "Drives TaskExecutionManager iteration loop",
+      "Emits continuation prompts via PromptBuilder",
+      "Reads CompletionAnalyzer signals from output"
+    ]
+  },
+  "parentModuleId": "task-execution",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AverageVelocity",
+    "CalculateVelocity",
+    "CheckFeatureModeComplete",
+    "CheckSeverity",
+    "ClearTaskHistory",
+    "ClearTaskState",
+    "CompletionAnalyzer",
+    "Conditions",
+    "ConfidenceScore",
+    "ConsecutiveStallIterations",
+    "DependsOn",
+    "Description",
+    "DetectStall",
+    "EarlyTerminationManager",
+    "EstimatedIterationsRemaining",
+    "Evidence",
+    "ExtractMetricsFromOutput",
+    "ExtractRecommendations",
+    "FeatureModeAction",
+    "FeatureModeHandler",
+    "GetStatistics",
+    "HasSufficientData",
+    "IsStalled",
+    "IsTaskOutputComplete",
+    "IsTokenLimitError",
+    "Iteration",
+    "LastEvaluation",
+    "ProgressAnalyzer",
+    "Reason",
+    "RecentErrorCounts",
+    "Recommendation",
+    "RecordProgress",
+    "Severity",
+    "ShouldTerminate",
+    "StallDetectionResult",
+    "TaskId",
+    "TerminationCheck",
+    "TerminationCheckType",
+    "TerminationDecision",
+    "TerminationState",
+    "Type",
+    "VelocityAnalysis",
+    "VelocityTrend"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T21:24:30.3903554Z"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "task-execution",
+  "name": "Task Execution \u0026 Orchestration",
+  "description": "Manages the full lifecycle of AI agent tasks from creation, preprocessing, queuing, and dependency resolution through CLI invocation, monitoring, pause/unpause, and completion. Includes multi-iteration feature mode execution and output processing.",
+  "category": "",
+  "featureIds": [
+    "feature-mode",
+    "feature-mode-execution",
+    "output-processing",
+    "preprocessor-skip-rules",
+    "task-execution",
+    "task-factory",
+    "task-orchestration",
+    "task-preprocessing"
+  ],
+  "keywords": [],
+  "lastUpdatedAt": "2026-03-07T21:25:30.4781941Z"
+}

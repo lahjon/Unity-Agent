@@ -1,0 +1,13 @@
+{
+  "id": "external-integrations",
+  "name": "External Integrations",
+  "description": "Connects Spritely to external systems: the MCP-for-Unity server for in-editor automation, the file-based agent message bus for inter-task communication, and agent bus operation logging.",
+  "category": "",
+  "featureIds": [
+    "agent-bus-operation-logging",
+    "mcp-integration",
+    "message-bus"
+  ],
+  "keywords": [],
+  "lastUpdatedAt": "2026-03-07T21:25:30.6862489Z"
+}
