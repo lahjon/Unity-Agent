@@ -117,11 +117,7 @@ namespace Spritely
             if (task.IsFeatureMode && int.TryParse(FeatureModeIterationsBox?.Text, out var iterations) && iterations > 0)
                 task.MaxIterations = iterations;
 
-            // Set timeout from UI
-            if (int.TryParse(TimeoutMinutesBox?.Text, out var timeoutMinutes) && timeoutMinutes > 0)
-                task.TimeoutMinutes = timeoutMinutes;
-            else
-                task.TimeoutMinutes = Constants.AppConstants.DefaultTaskTimeoutMinutes;
+            task.TimeoutMinutes = _settingsManager.TaskTimeoutMinutes;
 
             if (model == ModelType.Gemini)
             {
@@ -216,11 +212,7 @@ namespace Spritely
                 task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
                 task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
 
-                // Set timeout from UI
-                if (int.TryParse(TimeoutMinutesBox?.Text, out var timeoutMinutes) && timeoutMinutes > 0)
-                    task.TimeoutMinutes = timeoutMinutes;
-                else
-                    task.TimeoutMinutes = Constants.AppConstants.DefaultTaskTimeoutMinutes;
+                task.TimeoutMinutes = _settingsManager.TaskTimeoutMinutes;
 
                 // Resolve dependencies from name to task ID
                 var depIds = new List<string>();

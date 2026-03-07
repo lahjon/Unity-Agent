@@ -418,7 +418,7 @@ namespace Spritely
 
             MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
-            TimeoutMinutesBox.Text = Constants.AppConstants.DefaultTaskTimeoutMinutes.ToString();
+            TaskTimeoutBox.Text = _settingsManager.TaskTimeoutMinutes.ToString();
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
             DefaultMcpServerNameBox.Text = _settingsManager.DefaultMcpServerName;
             DefaultMcpAddressBox.Text = _settingsManager.DefaultMcpAddress;
@@ -1015,11 +1015,11 @@ namespace Spritely
         private void UpdateExecuteButtonText()
         {
             if (PlanOnlyToggle.IsChecked == true)
-                ExecuteButton.Content = "Plan Task";
+                ExecuteButton.ToolTip = "Plan Task (Ctrl+Enter)";
             else if (FeatureModeToggle.IsChecked == true)
-                ExecuteButton.Content = "Start Feature Mode";
+                ExecuteButton.ToolTip = "Start Feature Mode (Ctrl+Enter)";
             else
-                ExecuteButton.Content = "Execute Task";
+                ExecuteButton.ToolTip = "Execute Task (Ctrl+Enter)";
         }
 
         private void HistoryRetention_Changed(object sender, SelectionChangedEventArgs e)
@@ -1081,6 +1081,31 @@ namespace Spritely
             else
             {
                 TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
+            }
+        }
+
+        private void TaskTimeout_Changed(object sender, RoutedEventArgs e)
+        {
+            ApplyTaskTimeout();
+        }
+
+        private void TaskTimeout_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control)) ApplyTaskTimeout();
+        }
+
+        private void ApplyTaskTimeout()
+        {
+            if (_settingsManager == null || _projectManager == null) return;
+            if (int.TryParse(TaskTimeoutBox.Text?.Trim(), out var val) && val >= 1)
+            {
+                _settingsManager.TaskTimeoutMinutes = val;
+                TaskTimeoutBox.Text = _settingsManager.TaskTimeoutMinutes.ToString();
+                _settingsManager.SaveSettings(_projectManager.ProjectPath);
+            }
+            else
+            {
+                TaskTimeoutBox.Text = _settingsManager.TaskTimeoutMinutes.ToString();
             }
         }
 
@@ -1993,11 +2018,7 @@ namespace Spritely
             newTask.ProjectDisplayName = _projectManager.GetProjectDisplayName(newTask.ProjectPath);
             newTask.Summary = $"Executing stored plan: {task.ShortDescription}";
 
-            // Set timeout from UI
-            if (int.TryParse(TimeoutMinutesBox?.Text, out var timeoutMinutes) && timeoutMinutes > 0)
-                newTask.TimeoutMinutes = timeoutMinutes;
-            else
-                newTask.TimeoutMinutes = Constants.AppConstants.DefaultTaskTimeoutMinutes;
+            newTask.TimeoutMinutes = _settingsManager.TaskTimeoutMinutes;
 
             // Remove the stored task from the list after extracting its data
             _storedTasks.Remove(task);

@@ -33,13 +33,6 @@
                         <MenuItem Header="Retry Task" Click="RetryTask_Click"/>
                         <MenuItem Header="Store Task" Click="StoreHistoryTask_Click"
                                   Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibility}}"/>
-                        <Separator/>
-                        <MenuItem Header="Priority">
-                            <MenuItem Header="Critical" Click="SetPriorityCritical_Click"/>
-                            <MenuItem Header="High" Click="SetPriorityHigh_Click"/>
-                            <MenuItem Header="Normal" Click="SetPriorityNormal_Click"/>
-                            <MenuItem Header="Low" Click="SetPriorityLow_Click"/>
-                        </MenuItem>
                     </ContextMenu>
                 </Border.ContextMenu>
                 <Border.Background>
@@ -1438,20 +1431,21 @@
                                 <TextBlock x:Name="PromptProjectLabel" Text="" Foreground="{StaticResource TextPrimary}" FontFamily="Segoe UI"
                                            FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"
                                            TextTrimming="CharacterEllipsis" MaxWidth="400"/>
-                                <Button Content="Save Prompt" Click="SavePromptEntry_Click"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Margin="0,0,6,0"/>
-                                <Button Content="Store Task" Click="StoreTask_Click"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Margin="0,0,6,0"/>
-                                <Button Content="Compose Workflow" Click="ComposeWorkflow_Click"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Foreground="{StaticResource Accent}"
-                                        Margin="0,0,8,0"
-                                        ToolTip="Generate a task DAG from a natural language workflow description"/>
-                                <Button x:Name="ExecuteButton" Content="&#x21B5;" Click="Execute_Click"
-                                        Background="{StaticResource Accent}" Style="{StaticResource Btn}"
-                                        FontSize="18" Padding="12,4" FontWeight="Bold"
+                                <Button Content="&#xE74E;" Click="SavePromptEntry_Click"
+                                        Style="{StaticResource PromptActionBtn}"
+                                        ToolTip="Save Prompt (Ctrl+S)"
+                                        Margin="0,0,4,0"/>
+                                <Button Content="&#xE7B8;" Click="StoreTask_Click"
+                                        Style="{StaticResource PromptActionBtn}"
+                                        ToolTip="Store Task"
+                                        Margin="0,0,4,0"/>
+                                <Button Content="&#xE8F1;" Click="ComposeWorkflow_Click"
+                                        Style="{StaticResource PromptActionBtn}"
+                                        ToolTip="Compose Workflow"
+                                        Margin="0,0,4,0"/>
+                                <Button x:Name="ExecuteButton" Content="&#xE768;" Click="Execute_Click"
+                                        Style="{StaticResource PromptActionBtn}"
+                                        Background="{StaticResource Accent}" Foreground="White"
                                         ToolTip="Execute Task (Ctrl+Enter)"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,2,0,0">
@@ -1497,15 +1491,6 @@
                                     FontSize="9" FontFamily="Segoe UI" Padding="6,2"
                                     VerticalAlignment="Center" Margin="8,0,0,0"
                                     ToolTip="Save current toggle states as a reusable template"/>
-                            <TextBlock Text="TIMEOUT (MIN)" Foreground="{StaticResource TextMuted}" FontWeight="Bold"
-                                       FontSize="9" FontFamily="Segoe UI" VerticalAlignment="Center"
-                                       Margin="20,0,6,0"/>
-                            <TextBox x:Name="TimeoutMinutesBox" Text="120" Width="60" FontSize="11" FontFamily="Segoe UI"
-                                     Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
-                                     CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
-                                     BorderThickness="1" Padding="4,2" VerticalContentAlignment="Center"
-                                     PreviewTextInput="TimeoutBox_PreviewTextInput"
-                                     ToolTip="Task timeout in minutes (default: 120)"/>
                             <Button Content="Clear" Click="ClearPrompt_Click"
                                     Style="{StaticResource GhostBtn}" Foreground="{StaticResource TextMuted}"
                                     FontSize="10" FontFamily="Segoe UI" Padding="6,2"
@@ -2639,6 +2624,21 @@
                                              TextAlignment="Center"
                                              LostFocus="TokenLimitRetry_Changed"
                                              KeyDown="TokenLimitRetry_KeyDown"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBlock Text="Task timeout (min)" Foreground="{StaticResource TextLight}"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <TextBox x:Name="TaskTimeoutBox" Width="60" Text="120"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="11" FontFamily="Segoe UI" Padding="6,4"
+                                             TextAlignment="Center"
+                                             PreviewTextInput="TimeoutBox_PreviewTextInput"
+                                             LostFocus="TaskTimeout_Changed"
+                                             KeyDown="TaskTimeout_KeyDown"
+                                             ToolTip="Task timeout in minutes (default: 120)"/>
                                 </StackPanel>
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>

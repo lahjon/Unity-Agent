@@ -107,6 +107,11 @@ When adding new functionality, prefer extending these existing areas over invent
   - Follow existing naming conventions for methods, properties, and private fields.
   - Keep methods cohesive and reasonably short; extract private helpers or new classes when logic becomes complex.
 
+- **Class and file size**
+  - Prefer small, focused classes with a single responsibility over large monolithic files.
+  - When adding new features, create dedicated classes/files rather than expanding existing large files.
+  - If a class grows beyond ~300 lines, consider splitting it into smaller, composable pieces (e.g., extract a helper class, a dedicated service, or a partial class).
+
 - **Where to put new code**
   - New app-wide behavior: usually a new or extended manager under `Managers/`.
   - New data shape or persisted entity: add/extend types in `Models/`.

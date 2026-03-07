@@ -17,6 +17,7 @@ namespace Spritely.Managers
         private bool _leftPanelCollapsed;
         private int _maxConcurrentTasks = 10;
         private int _tokenLimitRetryMinutes = 30;
+        private int _taskTimeoutMinutes = 120;
         private bool _autoVerify;
         private bool _autoCommit;
         private string _defaultMcpServerName = "mcp-for-unity-server";
@@ -59,6 +60,12 @@ namespace Spritely.Managers
         {
             get => _tokenLimitRetryMinutes;
             set => _tokenLimitRetryMinutes = Math.Max(1, value);
+        }
+
+        public int TaskTimeoutMinutes
+        {
+            get => _taskTimeoutMinutes;
+            set => _taskTimeoutMinutes = Math.Max(1, value);
         }
 
         public bool AutoVerify
@@ -118,6 +125,8 @@ namespace Spritely.Managers
                     _maxConcurrentTasks = Math.Max(1, mct.GetInt32());
                 if (dict.TryGetValue("tokenLimitRetryMinutes", out var tlr))
                     _tokenLimitRetryMinutes = Math.Max(1, tlr.GetInt32());
+                if (dict.TryGetValue("taskTimeoutMinutes", out var ttm))
+                    _taskTimeoutMinutes = Math.Max(1, ttm.GetInt32());
                 if (dict.TryGetValue("autoVerify", out var av))
                     _autoVerify = av.GetBoolean();
                 if (dict.TryGetValue("autoCommit", out var ac))
@@ -144,6 +153,7 @@ namespace Spritely.Managers
                     ["leftPanelCollapsed"] = _leftPanelCollapsed,
                     ["maxConcurrentTasks"] = _maxConcurrentTasks,
                     ["tokenLimitRetryMinutes"] = _tokenLimitRetryMinutes,
+                    ["taskTimeoutMinutes"] = _taskTimeoutMinutes,
                     ["autoVerify"] = _autoVerify,
                     ["autoCommit"] = _autoCommit,
                     ["defaultMcpServerName"] = _defaultMcpServerName,

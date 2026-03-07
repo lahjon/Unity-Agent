@@ -215,4 +215,13 @@
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="Padding" Value="8,6"/>
     </Style>
+
+    <!-- Prompt action icon button (uniform icon buttons for the prompt panel) -->
+    <Style x:Key="PromptActionBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+        <Setter Property="Background" Value="{StaticResource BgHover}"/>
+        <Setter Property="Foreground" Value="#A8A8A8"/>
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Padding" Value="8,6"/>
+    </Style>
 </ResourceDictionary>
