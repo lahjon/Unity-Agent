@@ -1,0 +1,51 @@
+{
+  "id": "file-lock-management",
+  "name": "File Lock Management",
+  "description": "Tracks which files are locked by which tasks and coordinates task queuing when file conflicts exist. Prevents concurrent file mutations and Git operations from colliding.",
+  "category": "infrastructure",
+  "keywords": [
+    "FileLockManager",
+    "QueuedTaskInfo",
+    "conflict",
+    "file lock",
+    "lock",
+    "queued task",
+    "resource contention",
+    "task queueing"
+  ],
+  "primaryFiles": [
+    "Managers/FileLockManager.cs"
+  ],
+  "secondaryFiles": [
+    "Models/RuntimeTaskContext.cs",
+    "Spritely.Tests/ProjectSwapTests.cs",
+    "Spritely.Tests/SessionDataCleanupTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "git-operations",
+    "task-execution",
+    "task-orchestration"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/FileLockManager.cs": {
+        "hash": "be0d3833678d",
+        "content": "class FileLockManager\n  LockCount: int\n  ReleaseTaskLocks(string taskId) -\u003E void\n  IsFileLocked(string normalizedPath) -\u003E bool\n  GetTaskLockedFiles(string taskId) -\u003E HashSet\u003Cstring\u003E\n  CheckQueuedTasks(ObservableCollection\u003CAgentTask\u003E activeTasks) -\u003E void\n  ForceStartQueuedTask(AgentTask task) -\u003E void\n  AddQueuedTaskInfo(string taskId, QueuedTaskInfo info) -\u003E void\n  RemoveQueuedInfo(string taskId) -\u003E void\n  ClearAll() -\u003E void\n  SetGitOperationInProgress(bool inProgress) -\u003E void\n  TryExtractFilePathFromPartial(string partialJson) -\u003E string?\n  ExtractFilePath(JsonElement input) -\u003E string?"
+      }
+    },
+    "keyTypes": [
+      "class FileLockManager",
+      "class QueuedTaskInfo"
+    ],
+    "patterns": [
+      "Automatic queue re-evaluation on lock release",
+      "Lock tracking per task ID"
+    ],
+    "dependencies": [
+      "AgentTask model for task identification",
+      "Git operation guard integration"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.4096496Z"
+}

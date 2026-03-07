@@ -295,6 +295,41 @@ namespace Spritely.Managers
             return anyRefreshed;
         }
 
+        // ── Dependency Graph ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Builds the full dependency graph from loaded features.
+        /// Computes transitive dependencies, dependents, and detects cycles.
+        /// </summary>
+        public FeatureDependencyGraph BuildDependencyGraph(List<FeatureEntry> features)
+            => FeatureDependencyGraph.Build(features);
+
+        /// <summary>
+        /// Validates all DependsOn references point to existing features.
+        /// Removes dangling references and logs warnings.
+        /// </summary>
+        public void ValidateDependencies(List<FeatureEntry> features)
+        {
+            var knownIds = new HashSet<string>(features.Select(f => f.Id));
+
+            foreach (var feature in features)
+            {
+                var removed = feature.DependsOn.RemoveAll(depId =>
+                {
+                    if (knownIds.Contains(depId) && depId != feature.Id)
+                        return false;
+
+                    AppLogger.Debug("FeatureRegistry",
+                        $"Removed dangling dependency '{depId}' from feature '{feature.Id}'");
+                    return true;
+                });
+
+                if (removed > 0)
+                    AppLogger.Info("FeatureRegistry",
+                        $"Cleaned {removed} invalid dependency reference(s) from '{feature.Id}'");
+            }
+        }
+
         // ── Private Helpers ──────────────────────────────────────────────
 
         /// <summary>Saves the index without acquiring the mutex (caller must hold it).</summary>
@@ -331,6 +366,7 @@ namespace Spritely.Managers
             feature.PrimaryFiles.Sort(StringComparer.Ordinal);
             feature.SecondaryFiles.Sort(StringComparer.Ordinal);
             feature.RelatedFeatureIds.Sort(StringComparer.Ordinal);
+            feature.DependsOn.Sort(StringComparer.Ordinal);
             feature.Context.KeyTypes.Sort(StringComparer.Ordinal);
             feature.Context.Patterns.Sort(StringComparer.Ordinal);
             feature.Context.Dependencies.Sort(StringComparer.Ordinal);
@@ -402,6 +438,10 @@ namespace Spritely.Managers
 
             sb.AppendLine($"## {feature.Name}");
             sb.AppendLine($"**Core files:** {string.Join(", ", feature.PrimaryFiles)}");
+
+            if (feature.DependsOn.Count > 0)
+                sb.AppendLine($"**Depends on:** {string.Join(", ", feature.DependsOn)}");
+
             sb.AppendLine();
 
             // Signatures

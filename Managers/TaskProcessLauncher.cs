@@ -24,6 +24,7 @@ namespace Spritely.Managers
         private readonly string _scriptDir;
         private readonly ConcurrentDictionary<string, StreamingToolState> _streamingToolState = new();
         private readonly ConcurrentDictionary<string, (long Input, long Output, long CacheRead, long CacheCreate)> _preProcessTokenBaseline = new();
+        private readonly ConcurrentDictionary<string, bool> _hasReceivedOutput = new();
         private readonly FileLockManager _fileLockManager;
         private readonly OutputTabManager _outputTabManager;
         private readonly OutputProcessor _outputProcessor;
@@ -143,7 +144,11 @@ namespace Spritely.Managers
             catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill process for task {task.Id}", ex); }
         }
 
-        public void RemoveStreamingState(string taskId) => _streamingToolState.TryRemove(taskId, out _);
+        public void RemoveStreamingState(string taskId)
+        {
+            _streamingToolState.TryRemove(taskId, out _);
+            _hasReceivedOutput.TryRemove(taskId, out _);
+        }
 
         public void CleanupScripts(string taskId)
         {
@@ -448,7 +453,7 @@ namespace Spritely.Managers
                                     var toolName = block.TryGetProperty("name", out var tn) ? tn.GetString() : "unknown";
                                     JsonElement? toolInput = block.TryGetProperty("input", out var inp) ? inp : null;
                                     var actionText = FormatToolAction(toolName ?? "unknown", toolInput);
-                                    _outputProcessor.AppendOutput(taskId, $"\n{actionText}\n", activeTasks, historyTasks);
+                                    _outputProcessor.AppendOutput(taskId, $"{actionText}\n", activeTasks, historyTasks);
                                     var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
                                     actionTask?.AddToolActivity(actionText);
 
@@ -494,7 +499,7 @@ namespace Spritely.Managers
                             {
                                 var toolName = cb.TryGetProperty("name", out var tn) ? tn.GetString() : "tool";
                                 var actionText = FormatToolAction(toolName ?? "tool", null);
-                                _outputProcessor.AppendOutput(taskId, $"\n{actionText}...\n", activeTasks, historyTasks);
+                                _outputProcessor.AppendOutput(taskId, $"{actionText}...\n", activeTasks, historyTasks);
                                 var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
                                 actionTask?.AddToolActivity(actionText);
 
@@ -653,6 +658,10 @@ namespace Spritely.Managers
                         break;
 
                     case "message_start":
+                        // Add blank line between consecutive messages for visual separation
+                        if (!_hasReceivedOutput.TryAdd(taskId, true))
+                            _outputProcessor.AppendOutput(taskId, "\n", activeTasks, historyTasks);
+
                         if (root.TryGetProperty("message", out var startMsg) &&
                             startMsg.TryGetProperty("usage", out var startUsage))
                         {

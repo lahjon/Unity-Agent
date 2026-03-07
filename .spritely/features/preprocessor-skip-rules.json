@@ -1,0 +1,27 @@
+{
+  "id": "preprocessor-skip-rules",
+  "name": "Preprocessor Skip Rules for Task Types",
+  "description": "New feature identified from task: dont run the preprocessor on Test Verification, Build Investigation or Generate Suggestions",
+  "category": "",
+  "keywords": [
+    "Build Investigation",
+    "Generate Suggestions",
+    "Test Verification",
+    "filtering",
+    "preprocessor",
+    "skip",
+    "task-execution",
+    "task-type"
+  ],
+  "primaryFiles": [],
+  "secondaryFiles": [],
+  "relatedFeatureIds": [],
+  "context": {
+    "signatures": {},
+    "keyTypes": [],
+    "patterns": [],
+    "dependencies": []
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T20:04:45.2186967Z"
+}

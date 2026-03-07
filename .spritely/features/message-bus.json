@@ -1,0 +1,52 @@
+{
+  "id": "message-bus",
+  "name": "Inter-Task Message Bus",
+  "description": "Provides a file-system-based message bus enabling AI tasks to communicate with each other during feature mode team execution. Messages are routed via inbox directories under %LOCALAPPDATA%\\Spritely\\agent-bus\\.",
+  "category": "infrastructure",
+  "keywords": [
+    "BusMessage",
+    "FileSystemWatcher",
+    "MessageBusManager",
+    "agent bus",
+    "inbox",
+    "inter-task",
+    "mentions",
+    "message bus",
+    "topic"
+  ],
+  "primaryFiles": [
+    "Managers/MessageBusManager.cs"
+  ],
+  "secondaryFiles": [
+    "Models/AgentTaskData.cs",
+    "Spritely.Tests/SessionDataCleanupTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-mode",
+    "task-execution"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/MessageBusManager.cs": {
+        "hash": "07fa26eed908",
+        "content": "class BusMessage\n  From: string\n  FromSummary: string\n  Type: string\n  Topic: string\n  Body: string\n  Mentions: List\u003Cstring\u003E\n  Timestamp: DateTime\n  SourceFile: string\n  ExpiresAt: DateTime\n  IsExpired() -\u003E bool\nclass BusParticipant\n  TaskId: string\n  Summary: string\nclass BusContext\n  BusDir: string\n  InboxDir: string\n  Watcher: FileSystemWatcher?\n  PollTimer: DispatcherTimer?\n  ParticipantTaskIds: HashSet\u003Cstring\u003E"
+      }
+    },
+    "keyTypes": [
+      "class BusContext",
+      "class BusMessage",
+      "class BusParticipant",
+      "class MessageBusManager"
+    ],
+    "patterns": [
+      "Bus cleanup on all tasks complete",
+      "FileSystemWatcher \u002B DispatcherTimer polling hybrid"
+    ],
+    "dependencies": [
+      "%LOCALAPPDATA%\\Spritely\\agent-bus\\ for message storage",
+      "AgentTask for participant registration"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.5540448Z"
+}

@@ -101,6 +101,49 @@ namespace Spritely.Dialogs
             };
             stack.Children.Add(regenerateBtn);
 
+            // ── Initialize Project Button ──
+            var initProjectBtn = new Button
+            {
+                Content = "Initialize Project",
+                Style = Application.Current.TryFindResource("SecondaryBtn") as Style,
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 8, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+            initProjectBtn.Click += async (_, _) =>
+            {
+                if (projectManager == null)
+                {
+                    MessageBox.Show("Cannot initialize project: ProjectManager not available.", "Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                initProjectBtn.IsEnabled = false;
+                regenerateBtn.IsEnabled = false;
+                initProjectBtn.Content = "Initializing...";
+
+                try
+                {
+                    await projectManager.ForceInitializeProjectAsync(entry);
+
+                    shortDescBox.Text = entry.ShortDescription;
+                    longDescBox.Text = entry.LongDescription;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to initialize project: {ex.Message}", "Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    initProjectBtn.IsEnabled = true;
+                    regenerateBtn.IsEnabled = true;
+                    initProjectBtn.Content = "Initialize Project";
+                }
+            };
+            stack.Children.Add(initProjectBtn);
+
             AddSeparator(stack);
 
             // ── Rule Instruction ──
@@ -248,7 +291,7 @@ namespace Spritely.Dialogs
 
             // ── Log Paths ──
             AddSectionHeader(stack, "Log Paths");
-            AddHint(stack, "Used by Build Investigation to locate crash and error logs.");
+            AddHint(stack, "Used by Crash Log Investigation to locate crash and error logs.");
 
             AddFieldLabel(stack, "Crash Log");
             var crashLogBox = CreateSingleLineInput(

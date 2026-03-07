@@ -1,0 +1,71 @@
+{
+  "id": "llm-services",
+  "name": "LLM Service Configuration",
+  "description": "Encapsulates Claude and Gemini API client configuration, API key management (encrypted storage), model enumeration, and usage tracking. Provides the base infrastructure for all AI calls in the app.",
+  "category": "integration",
+  "keywords": [
+    "API key",
+    "BaseLlmService",
+    "Claude",
+    "ClaudeService",
+    "ClaudeUsageManager",
+    "Gemini",
+    "GeminiService",
+    "LLM",
+    "model selection",
+    "usage tracking"
+  ],
+  "primaryFiles": [
+    "Managers/BaseLlmService.cs",
+    "Managers/ClaudeService.cs",
+    "Managers/ClaudeUsageManager.cs",
+    "Managers/GeminiService.cs"
+  ],
+  "secondaryFiles": [
+    "Constants/AppConstants.cs",
+    "Managers/ModelConfigManager.cs"
+  ],
+  "relatedFeatureIds": [
+    "chat-interface",
+    "task-execution"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/BaseLlmService.cs": {
+        "hash": "0a3037fca53a",
+        "content": "class BaseLlmService\n  ApiKeyDecryptionFailed: bool\n  IsConfigured: bool\n  SaveApiKey(string apiKey) -\u003E void\n  GetMaskedApiKey() -\u003E string\n  GetApiKeyForRefresh() -\u003E string?\n  Dispose() -\u003E void"
+      },
+      "Managers/ClaudeService.cs": {
+        "hash": "f746dd987c09",
+        "content": "class ClaudeService\n  AvailableModels: string[]\n  SetUsageManager(ClaudeUsageManager usageManager) -\u003E void"
+      },
+      "Managers/ClaudeUsageManager.cs": {
+        "hash": "fd962d9fce86",
+        "content": "class ClaudeUsageManager\nclass UsageData\n  TotalInputTokens: long\n  TotalOutputTokens: long\n  TotalCacheReadTokens: long\n  TotalCacheCreationTokens: long\n  LastUpdated: DateTime\n  ModelUsage: Dictionary\u003Cstring, ModelUsage\u003E\nclass ModelUsage\n  InputTokens: long\n  OutputTokens: long\n  CacheReadTokens: long\n  CacheCreationTokens: long\n  RequestCount: int\n  GetUsage() -\u003E UsageData\n  GetUsageSummary() -\u003E string\n  ResetUsage() -\u003E void"
+      },
+      "Managers/GeminiService.cs": {
+        "hash": "3b5a619d2ba3",
+        "content": "class GeminiService\n  AvailableModels: string[]\n  IsConfigured: bool\n  SaveApiKey(string apiKey) -\u003E void\n  IsValidApiKeyFormat(string? key) -\u003E bool\n  GetImageDirectory() -\u003E string\nclass ChatMessage\n  Role: string\n  Text: string\n  ImagePaths: List\u003Cstring\u003E?\nclass GeminiImageResult\n  Success: bool\n  ImagePaths: List\u003Cstring\u003E\n  TextResponse: string?\n  ErrorMessage: string?\n  Failure(string message) -\u003E GeminiImageResult"
+      }
+    },
+    "keyTypes": [
+      "class BaseLlmService",
+      "class ClaudeService",
+      "class ClaudeUsageManager",
+      "class GeminiService",
+      "class ModelUsage",
+      "class UsageData"
+    ],
+    "patterns": [
+      "Base class with encrypted key storage",
+      "Usage tracking per model with reset capability"
+    ],
+    "dependencies": [
+      "%LOCALAPPDATA%\\Spritely\\ for key storage",
+      "Anthropic Claude API",
+      "Google Gemini API"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.4524665Z"
+}

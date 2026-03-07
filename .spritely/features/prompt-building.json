@@ -1,0 +1,68 @@
+{
+  "id": "prompt-building",
+  "name": "Prompt Construction",
+  "description": "Assembles the full system prompt for each AI task by combining system blocks, project rules, skills, MCP configuration, feature context, and user description. Manages prompt file writing and CLI command construction.",
+  "category": "core",
+  "keywords": [
+    "CLI command",
+    "IPromptBuilder",
+    "MCP block",
+    "PromptBuilder",
+    "PromptLoader",
+    "prompt",
+    "prompt template",
+    "rules block",
+    "skills block",
+    "system prompt"
+  ],
+  "primaryFiles": [
+    "Managers/IPromptBuilder.cs",
+    "Managers/PromptBuilder.cs",
+    "Managers/PromptLoader.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/RulesManager.cs",
+    "Managers/SkillManager.cs",
+    "Prompts/ProjectSuggestionPromptTemplate.md",
+    "Prompts/TaskPreprocessorPrompt.md",
+    "Spritely.Tests/TaskLauncherTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-registry",
+    "mcp-integration",
+    "project-management",
+    "skills-system"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/IPromptBuilder.cs": {
+        "hash": "317ed716953e",
+        "content": "interface IPromptBuilder"
+      },
+      "Managers/PromptBuilder.cs": {
+        "hash": "6cdd01cb9e1b",
+        "content": "class PromptBuilder\n  GetCliModelForTask(AgentTask task) -\u003E string\n  GetFriendlyModelName(string modelId) -\u003E string\n  GetCliModelForPhase(FeatureModePhase phase) -\u003E string\n  GetFeatureModeLogFilename(string? taskId = null) -\u003E string\n  BuildPromptWithImages(string basePrompt, List\u003Cstring\u003E imagePaths) -\u003E string\n  BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false) -\u003E string\n  BuildProcessStartInfo(string ps1FilePath, bool headless) -\u003E ProcessStartInfo\n  BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = \u0022\u0022) -\u003E string\n  BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription) -\u003E string\n  BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults) -\u003E string"
+      },
+      "Managers/PromptLoader.cs": {
+        "hash": "f332a0c15f2b",
+        "content": "class PromptLoader\n  Load(string filename) -\u003E string"
+      }
+    },
+    "keyTypes": [
+      "class PromptBuilder",
+      "interface IPromptBuilder"
+    ],
+    "patterns": [
+      "Composition of prompt blocks from multiple managers",
+      "Prompt files written to temp paths before CLI invocation"
+    ],
+    "dependencies": [
+      "FeatureContextResolver for feature context",
+      "ProjectManager for project metadata",
+      "RulesManager for project rules",
+      "SkillManager for skill blocks"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.3375287Z"
+}

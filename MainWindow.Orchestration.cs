@@ -204,7 +204,14 @@ namespace Spritely
 
                     // Persist changed file paths on the task so they survive across sessions
                     PersistChangedFiles(task, lockedFiles);
+                }
 
+                // Even without file locks, attempt commit if the task has a valid GitStartHash —
+                // file locks may be empty when changes are made via Bash or if streaming parser missed tools
+                bool hasChangesToCommit = lockedFiles.Count > 0 || !string.IsNullOrEmpty(task.GitStartHash);
+
+                if (hasChangesToCommit)
+                {
                     // Transition to Committing — task stays in _activeTasks with locks held
                     task.Status = AgentTaskStatus.Committing;
                     _fileLockManager.RemoveQueuedInfo(task.Id);
@@ -240,7 +247,7 @@ namespace Spritely
                     });
                     return; // Don't proceed to teardown yet — FinishTaskAfterCommit will handle it
                 }
-                // else: No files were modified, fall through to normal teardown
+                // else: No files modified and no git start hash — fall through to normal teardown
             }
 
             // Normal teardown: release locks and move to history
@@ -264,6 +271,24 @@ namespace Spritely
                     relativePaths.Add(rel.Replace('\\', '/'));
             }
             task.ChangedFiles = relativePaths;
+        }
+
+        /// <summary>
+        /// Falls back to git diff to discover changed files when file locks are empty.
+        /// Fire-and-forget — best effort to populate ChangedFiles for later manual commit.
+        /// </summary>
+        private async Task PersistChangedFilesFromGitAsync(AgentTask task)
+        {
+            try
+            {
+                var gitFiles = await _gitHelper.GetChangedFileNamesAsync(task.ProjectPath, task.GitStartHash);
+                if (gitFiles != null && gitFiles.Count > 0 && task.ChangedFiles.Count == 0)
+                    task.ChangedFiles = gitFiles;
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Debug("Orchestration", $"Failed to persist changed files from git for task {task.Id}", ex);
+            }
         }
 
         /// <summary>
@@ -297,7 +322,14 @@ namespace Spritely
             {
                 var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
                 if (lockedFiles.Count > 0)
+                {
                     PersistChangedFiles(task, lockedFiles);
+                }
+                else if (!string.IsNullOrEmpty(task.GitStartHash))
+                {
+                    // Fall back to git diff when file locks didn't capture changes
+                    _ = PersistChangedFilesFromGitAsync(task);
+                }
             }
 
             // Snapshot output so it survives restart (OutputBuilder is in-memory only)
@@ -749,7 +781,6 @@ namespace Spritely
                 historicTask.UseMcp,
                 historicTask.SpawnTeam,
                 historicTask.ExtendedPlanning,
-                historicTask.NoGitWrite,
                 historicTask.PlanOnly,
                 historicTask.UseMessageBus,
                 model: historicTask.Model);

@@ -25,6 +25,7 @@ For each feature provide:
 - `key_types`: compact type declarations central to this feature (e.g. "class TaskExecutionManager", "interface IPromptBuilder", "enum TaskStatus")
 - `patterns`: architectural patterns or invariants this feature relies on (e.g. "Manager pattern with async lifecycle", "Fire-and-forget post-completion hook")
 - `dependencies`: cross-feature and external dependencies as freeform strings (e.g. "Reads project config from ProjectManager", "Calls Claude CLI via Process")
+- `depends_on`: array of feature **ids** (not names) that this feature directly depends on — meaning it consumes, calls, or requires that feature to function. Only include direct dependencies, not transitive ones. Use the ids you assigned to other features in this same response.
 
 ## GUIDANCE ON FEATURE BOUNDARIES
 - Group by **logical responsibility**, not by directory. A feature like "git-operations" may span files in Managers/, Models/, and Controls/.

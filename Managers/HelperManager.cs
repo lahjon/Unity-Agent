@@ -117,6 +117,7 @@ namespace Spritely.Managers
 
             _cts?.Dispose();
             _cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
+            _cts.CancelAfter(TimeSpan.FromMinutes(3));
             var ct = _cts.Token;
             IsGenerating = true;
             Suggestions.Clear();
@@ -146,7 +147,7 @@ namespace Spritely.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --max-turns 15 --output-format json --model {AppConstants.ClaudeSonnet} --output-schema '{SuggestionJsonSchema}'",
+                    Arguments = $"-p --max-turns 12 --output-format json --model {AppConstants.ClaudeSonnet} --json-schema \"{SuggestionJsonSchema.Replace("\"", "\\\"")}\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -156,6 +157,8 @@ namespace Spritely.Managers
                     WorkingDirectory = projectPath
                 };
                 psi.Environment.Remove("CLAUDECODE");
+                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
 
                 process = new Process { StartInfo = psi };
                 process.Start();
@@ -188,8 +191,15 @@ namespace Spritely.Managers
                     using var doc = JsonDocument.Parse(text);
                     var root = doc.RootElement;
 
+                    // The CLI with --json-schema puts structured data in "structured_output"
+                    if (root.TryGetProperty("structured_output", out var structured)
+                        && structured.ValueKind == JsonValueKind.Object
+                        && structured.TryGetProperty("suggestions", out var structSugArr))
+                    {
+                        items = JsonSerializer.Deserialize<List<SuggestionJson>>(structSugArr.GetRawText(), jsonOpts);
+                    }
                     // Unwrap CLI JSON envelope: {"type":"result","result":"..."}
-                    if (root.TryGetProperty("result", out var resultElem) && !root.TryGetProperty("suggestions", out _))
+                    else if (root.TryGetProperty("result", out var resultElem) && !root.TryGetProperty("suggestions", out _))
                     {
                         var innerText = resultElem.ValueKind == JsonValueKind.String
                             ? resultElem.GetString() ?? ""
@@ -256,6 +266,8 @@ namespace Spritely.Managers
             catch (OperationCanceledException)
             {
                 try { if (process is { HasExited: false }) process.Kill(true); } catch (Exception ex) { AppLogger.Debug("HelperManager", $"Failed to kill process on cancellation: {ex.Message}"); }
+                if (!externalToken.IsCancellationRequested)
+                    GenerationFailed?.Invoke("Suggestion generation timed out.");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

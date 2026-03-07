@@ -194,6 +194,7 @@ namespace Spritely
             _helperManager.GenerationFailed += OnHelperGenerationFailed;
 
             _messageBusManager = new MessageBusManager(Dispatcher);
+            _messageBusManager.MessageReceived += OnBusMessageReceived;
 
             _gitHelper = new GitHelper();
             _completionAnalyzer = new CompletionAnalyzer(_gitHelper);
@@ -212,9 +213,10 @@ namespace Spritely
                 path => _projectManager.IsGameProject(path),
                 _messageBusManager,
                 Dispatcher,
-                () => _settingsManager.TokenLimitRetryMinutes,
-                () => _settingsManager.AutoVerify,
-                () => GetActiveSkillsBlock());
+                getTokenLimitRetryMinutes: () => _settingsManager.TokenLimitRetryMinutes,
+                getAutoVerify: () => _settingsManager.AutoVerify,
+                getSkillsBlock: () => GetActiveSkillsBlock(),
+                getOpusEffortLevel: () => _settingsManager.OpusEffortLevel);
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
 
@@ -231,7 +233,6 @@ namespace Spritely
             _gitPanelManager = new GitPanelManager(
                 _gitHelper,
                 () => _projectManager.ProjectPath,
-                () => false, // Always show uncommitted changes in git tab
                 _fileLockManager,
                 _gitOperationGuard,
                 Dispatcher,
@@ -404,6 +405,9 @@ namespace Spritely
             ct.ThrowIfCancellationRequested();
             await LoadSkillsAsync();
             ct.ThrowIfCancellationRequested();
+            InitializeFeaturesTab();
+            await LoadFeaturesAsync();
+            ct.ThrowIfCancellationRequested();
             await _settingsManager.LoadTemplatesAsync(_projectManager.ProjectPath);
             RenderTemplateCombo();
 
@@ -423,6 +427,15 @@ namespace Spritely
             DefaultMcpServerNameBox.Text = _settingsManager.DefaultMcpServerName;
             DefaultMcpAddressBox.Text = _settingsManager.DefaultMcpAddress;
             DefaultMcpStartCommandBox.Text = _settingsManager.DefaultMcpStartCommand;
+
+            foreach (ComboBoxItem item in OpusEffortCombo.Items)
+            {
+                if (item.Tag?.ToString() == _settingsManager.OpusEffortLevel)
+                {
+                    OpusEffortCombo.SelectedItem = item;
+                    break;
+                }
+            }
 
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
@@ -507,6 +520,7 @@ namespace Spritely
                 RestoreStarRows();
                 RefreshFilterCombos();
                 RefreshActivityDashboard();
+                _gitPanelManager.RefreshIfNeeded(GitTabContent);
                 _projectTaskManager.CurrentProjectPath = _projectManager.ProjectPath;
                 InitializeTaskList();
                 _projectManager.RefreshProjectList(
@@ -1016,12 +1030,17 @@ namespace Spritely
             AdditionalInstructionsInput.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
             if (AdditionalInstructionsToggle.Template.FindName("CollapseChevron", AdditionalInstructionsToggle) is TextBlock chevron)
             {
-                ((RotateTransform)chevron.RenderTransform).Angle = expanded ? 0 : -90;
+                var angle = expanded ? 0.0 : -90.0;
+                if (chevron.RenderTransform is RotateTransform rt && !rt.IsFrozen)
+                    rt.Angle = angle;
+                else
+                    chevron.RenderTransform = new RotateTransform(angle);
             }
         }
 
         private void UpdateExecuteButtonText()
         {
+            if (PlanOnlyToggle == null || ExecuteButton == null) return;
             if (PlanOnlyToggle.IsChecked == true)
                 ExecuteButton.ToolTip = "Plan Task";
             else if (FeatureModeToggle.IsChecked == true)
@@ -1114,6 +1133,18 @@ namespace Spritely
             else
             {
                 TaskTimeoutBox.Text = _settingsManager.TaskTimeoutMinutes.ToString();
+            }
+        }
+
+        private void OpusEffort_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_settingsManager == null || _projectManager == null) return;
+            if (OpusEffortCombo?.SelectedItem is not ComboBoxItem item) return;
+            var level = item.Tag?.ToString();
+            if (!string.IsNullOrEmpty(level))
+            {
+                _settingsManager.OpusEffortLevel = level;
+                _settingsManager.SaveSettings(_projectManager.ProjectPath);
             }
         }
 
@@ -2025,7 +2056,6 @@ namespace Spritely
                 UseMcpToggle.IsChecked == true,
                 SpawnTeamToggle.IsChecked == true,
                 ExtendedPlanningToggle.IsChecked == true,
-                true, // NoGitWrite always on — the commit system handles git writes
                 PlanOnlyToggle.IsChecked == true,
                 imagePaths: _imageManager.DetachImages(),
                 model: selectedModel,
@@ -2070,6 +2100,14 @@ namespace Spritely
         private void ViewStoredTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            StoredTaskViewerDialog.Show(task);
+        }
+
+        private void ViewOutput_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            if (string.IsNullOrEmpty(task.FullOutput) && task.OutputBuilder.Length > 0)
+                task.FullOutput = task.OutputBuilder.ToString();
             StoredTaskViewerDialog.Show(task);
         }
 
@@ -2341,10 +2379,11 @@ namespace Spritely
             _gitPanelManager.MarkDirty();
             _activityDashboard.MarkDirty();
 
-            // Refresh the currently selected tab immediately
-            if (StatisticsTabs.SelectedItem == GitTabItem)
-                _gitPanelManager.RefreshIfNeeded(GitTabContent);
-            else if (StatisticsTabs.SelectedItem == ActivityTabItem)
+            // Always initialize git panel on project set so data is ready before tab click
+            _gitPanelManager.RefreshIfNeeded(GitTabContent);
+
+            // Refresh activity tab if currently selected
+            if (StatisticsTabs.SelectedItem == ActivityTabItem)
                 _activityDashboard.RefreshIfNeeded(ActivityTabContent, _projectManager.ProjectPath);
 
             // Update file locks display
@@ -2361,6 +2400,9 @@ namespace Spritely
 
             // Reload skills for the new project (global + project-scoped)
             _ = LoadSkillsAsync();
+
+            // Reload features for the new project
+            _ = LoadFeaturesAsync();
         }
 
         private async Task ReloadTemplatesForProjectAsync()
@@ -3133,9 +3175,37 @@ namespace Spritely
 
             LaunchTaskFromDescription(
                 desc,
-                "Build Investigation",
+                "Crash Log Investigation",
                 imagePaths: _imageManager.DetachImages(),
-                planOnly: false);
+                planOnly: false,
+                header: "Crash Log Investigation");
+
+            ResetPerTaskToggles();
+        }
+
+        private void BuildTest_Click(object sender, RoutedEventArgs e)
+        {
+            var projectPath = _projectManager.ProjectPath;
+            if (string.IsNullOrEmpty(projectPath)) return;
+
+            var desc = "Build this project and fix all build errors until it compiles successfully.\n\n" +
+                       "## Instructions\n\n" +
+                       "1. Determine the build system used by this project (e.g. `dotnet build`, Unity, CMake, npm, etc.).\n" +
+                       "2. Run a full build of the project.\n" +
+                       "3. If the build succeeds, report success.\n" +
+                       "4. If the build fails:\n" +
+                       "   a. Analyze each build error to determine the root cause.\n" +
+                       "   b. Implement fixes for the errors.\n" +
+                       "   c. Re-run the build to verify the fixes.\n" +
+                       "   d. Repeat until the build succeeds with no errors.\n\n" +
+                       "Provide a clear summary of what errors were found and how they were fixed.";
+
+            LaunchTaskFromDescription(
+                desc,
+                "Build Test",
+                imagePaths: _imageManager.DetachImages(),
+                planOnly: false,
+                header: "Build Test");
 
             ResetPerTaskToggles();
         }
@@ -3162,9 +3232,41 @@ namespace Spritely
                 desc,
                 "Test Verification",
                 imagePaths: _imageManager.DetachImages(),
-                planOnly: false);
+                planOnly: false,
+                header: "Test Verification");
 
             ResetPerTaskToggles();
+        }
+
+        private async void RestartProject_Click(object sender, RoutedEventArgs e)
+        {
+            var buildBatPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "build.bat");
+            if (!System.IO.File.Exists(buildBatPath))
+            {
+                Managers.AppLogger.Warn("RestartProject", "build.bat not found at " + buildBatPath);
+                return;
+            }
+
+            RestartProjectBtn.IsEnabled = false;
+            RestartProjectBtn.Content = "Restarting...";
+
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{buildBatPath}\"",
+                    WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
+                    UseShellExecute = true,
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Warn("RestartProject", $"Failed to launch build.bat: {ex.Message}", ex);
+                RestartProjectBtn.IsEnabled = true;
+                RestartProjectBtn.Content = "Restart Project";
+            }
         }
 
         private async void GenerateSuggestions_Click(object sender, RoutedEventArgs e)
@@ -3337,6 +3439,11 @@ namespace Spritely
                 GenerateSuggestionsBtn.Content = "Generate Suggestions";
                 HelperStatusText.Text = error;
             });
+        }
+
+        private void OnBusMessageReceived(string projectPath, BusMessage message)
+        {
+            // Bus status messages are internal coordination noise — suppress from task output
         }
 
         // ── Chat Panel (delegated to ChatManager) ─────────────────

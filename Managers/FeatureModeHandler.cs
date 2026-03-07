@@ -264,7 +264,6 @@ namespace Spritely.Managers
                 child.AutoDecompose = false;
                 child.IsFeatureMode = false;
                 child.UseMessageBus = true;
-                child.NoGitWrite = true;
                 child.SkipPermissions = true;
                 // Inject planning-only restriction so team members don't write files
                 // (e.g., ARCHITECTURE.md) that could conflict between concurrent agents
@@ -733,7 +732,6 @@ namespace Spritely.Managers
                     useMcp: parent.UseMcp,
                     spawnTeam: false,
                     extendedPlanning: true,
-                    noGitWrite: parent.NoGitWrite,
                     planOnly: false,
                     useMessageBus: false, // Start with false, will determine later
                     model: parent.Model,

@@ -31,7 +31,7 @@ namespace Spritely.Tests
 
         private static AgentTask MakeFeatureModeTask(string projectPath)
         {
-            var t = _factory.CreateTask("feature mode task", projectPath, true, false, false, true, false, false);
+            var t = _factory.CreateTask("feature mode task", projectPath, true, false, true, true, false, false);
             _factory.PrepareTaskForFeatureModeStart(t);
             return t;
         }
@@ -608,7 +608,7 @@ namespace Spritely.Tests
         {
             var task = _factory.CreateTask("plan task", @"C:\Projects\Alpha",
                 false, false, false, false, false, false,
-                noGitWrite: false, planOnly: true);
+                planOnly: true);
             task.ProjectColor = "#D4806B";
 
             Assert.Equal(@"C:\Projects\Alpha", task.ProjectPath);
@@ -774,18 +774,14 @@ namespace Spritely.Tests
             Assert.Equal(ModelType.Gemini, task.Model);
         }
 
-        // ── Swap with NoGitWrite tasks ───────────────────────────────
+        // ── NoGitWrite block always present ─────────────────────────────
 
         [Fact]
-        public void NoGitWrite_Task_RetainsFlag_AfterSwap()
+        public void Prompt_AlwaysContains_NoGitWriteBlock()
         {
-            var task = _factory.CreateTask("no git task", @"C:\Projects\Alpha",
-                false, false, false, false, false, false, noGitWrite: true);
+            var task = _factory.CreateTask("some task", @"C:\Projects\Alpha",
+                false, false, false, false, false, false);
 
-            Assert.True(task.NoGitWrite);
-            Assert.Equal(@"C:\Projects\Alpha", task.ProjectPath);
-
-            // Prompt should contain the no-git-write block
             var prompt = _prompt.BuildFullPrompt("SYS:", task);
             Assert.Contains("NO GIT WRITES", prompt);
         }
@@ -797,7 +793,7 @@ namespace Spritely.Tests
         {
             var task = _factory.CreateTask("plan task", @"C:\Projects\Alpha",
                 false, false, false, false, false, false,
-                noGitWrite: false, planOnly: true);
+                planOnly: true);
 
             Assert.True(task.PlanOnly);
             Assert.Equal(@"C:\Projects\Alpha", task.ProjectPath);
@@ -889,13 +885,12 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void FormatCompletionSummary_IncludesProjectInfo_Implicitly()
+        public void FormatCompletionSummary_ReturnsEmpty()
         {
-            // The summary format includes status and duration
             var summary = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.FromMinutes(10), null);
 
-            Assert.Contains("Status: Completed", summary);
+            Assert.Equal("", summary);
         }
 
         // ── GeneratedImagePaths during swap ──────────────────────────

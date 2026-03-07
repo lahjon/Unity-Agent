@@ -1,0 +1,70 @@
+{
+  "id": "history-analytics",
+  "name": "Task History \u0026 Analytics",
+  "description": "Persists and loads task history, active queue state, and stored tasks. Tracks task groups, computes per-project activity statistics, and surfaces them through the activity dashboard.",
+  "category": "data",
+  "keywords": [
+    "ActivityDashboardManager",
+    "HistoryManager",
+    "TaskGroupTracker",
+    "activity stats",
+    "completion summary",
+    "history",
+    "retention",
+    "task group",
+    "token usage"
+  ],
+  "primaryFiles": [
+    "Managers/ActivityDashboardManager.cs",
+    "Managers/HistoryManager.cs",
+    "Managers/TaskGroupTracker.cs"
+  ],
+  "secondaryFiles": [
+    "Dialogs/ActivityDashboardDialog.cs",
+    "Dialogs/GroupSummaryDialog.cs",
+    "Models/ProjectActivityStats.cs",
+    "Models/TaskHistoryEntry.cs",
+    "Models/TaskRecordBase.cs",
+    "Spritely.Tests/SessionDataCleanupTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "project-management",
+    "task-execution"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/ActivityDashboardManager.cs": {
+        "hash": "c40347dbfe5a",
+        "content": "class ActivityDashboardManager\n  MarkDirty() -\u003E void\n  RefreshIfNeeded(ScrollViewer container, string? currentProjectPath = null) -\u003E void\n  RefreshContent(ScrollViewer container, string? currentProjectPath = null) -\u003E void\n  ComputeStats(string? currentProjectPath = null) -\u003E List\u003CProjectActivityStats\u003E\n  BuildDashboardContent(bool isDialog, string? currentProjectPath = null) -\u003E StackPanel"
+      },
+      "Managers/HistoryManager.cs": {
+        "hash": "6731b5b396e2",
+        "content": "class HistoryManager\n  SaveHistory(ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  LoadHistoryAsync(int retentionHours) -\u003E Task\u003CList\u003CAgentTask\u003E\u003E\n  SaveActiveQueue(ObservableCollection\u003CAgentTask\u003E activeTasks, object activeTasksLock, bool useBackgroundWrite = false) -\u003E void\n  LoadActiveQueueAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E\n  ClearActiveQueue() -\u003E void\n  SaveStoredTasks(ObservableCollection\u003CAgentTask\u003E storedTasks) -\u003E void\n  LoadStoredTasksAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E"
+      },
+      "Managers/TaskGroupTracker.cs": {
+        "hash": "fb10885904d6",
+        "content": "class TaskGroupState\n  GroupId: string\n  GroupName: string\n  StartTime: DateTime\n  TotalCount: int\n  CompletedCount: int\n  FailedCount: int\nclass TaskGroupEntry\n  TaskId: string\n  TaskNumber: int\n  Description: string\n  Status: AgentTaskStatus\n  StartTime: DateTime\n  EndTime: DateTime?\n  CompletionSummary: string\n  Recommendations: string\n  InputTokens: long\n  OutputTokens: long\nclass GroupCompletedEventArgs\n  GroupState: TaskGroupState"
+      }
+    },
+    "keyTypes": [
+      "class ActivityDashboardManager",
+      "class HistoryManager",
+      "class ProjectActivityStats",
+      "class TaskGroupEntry",
+      "class TaskGroupState",
+      "class TaskGroupTracker",
+      "class TaskHistoryEntry"
+    ],
+    "patterns": [
+      "Dirty-flag lazy dashboard refresh",
+      "Group events fired on all-complete",
+      "JSON persistence to %LOCALAPPDATA%\\Spritely\\iteration_history\\"
+    ],
+    "dependencies": [
+      "AgentTask model for status and token data",
+      "SafeFileWriter for background persistence"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.4770891Z"
+}

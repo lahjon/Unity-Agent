@@ -1,0 +1,64 @@
+{
+  "id": "theming-ui-shared",
+  "name": "Theming \u0026 Shared UI Components",
+  "description": "Defines the app-wide dark theme through XAML resource dictionaries, semantic brush keys, and value converters. Provides shared dialog infrastructure (DarkDialog, DarkDialogWindow) and common UI helpers.",
+  "category": "ui",
+  "keywords": [
+    "BrushCache",
+    "Colors.xaml",
+    "DarkDialog",
+    "DarkDialogWindow",
+    "brush",
+    "converters",
+    "dark theme",
+    "semantic brushes",
+    "styles",
+    "theming"
+  ],
+  "primaryFiles": [
+    "Dialogs/DarkDialog.cs",
+    "Dialogs/DarkDialogWindow.xaml.cs",
+    "Helpers/BrushCache.cs"
+  ],
+  "secondaryFiles": [
+    "Converters/InvertBoolConverter.cs",
+    "Converters/NestingDepthToMarginConverter.cs",
+    "Converters/StringToBrushConverter.cs",
+    "Converters/StringToVisibilityConverter.cs",
+    "Converters/WrapTooltipTextConverter.cs",
+    "Helpers/FormatHelpers.cs"
+  ],
+  "relatedFeatureIds": [
+    "app-startup-config"
+  ],
+  "context": {
+    "signatures": {
+      "Dialogs/DarkDialog.cs": {
+        "hash": "3532b8a28ae8",
+        "content": "class DarkDialog\n  ShowConfirm(string message, string title) -\u003E bool\n  ShowAlert(string message, string title) -\u003E void\n  ShowTextInput(string title, string prompt, string defaultValue = \u0022\u0022) -\u003E string?"
+      },
+      "Dialogs/DarkDialogWindow.xaml.cs": {
+        "hash": "cb361ba5b325",
+        "content": "class DarkDialogWindow\n  SetBodyContent(UIElement content) -\u003E void"
+      },
+      "Helpers/BrushCache.cs": {
+        "hash": "325a57e5fe0a",
+        "content": "class BrushCache\n  Get(string hex) -\u003E SolidColorBrush\n  Theme(string key) -\u003E SolidColorBrush"
+      }
+    },
+    "keyTypes": [
+      "class BrushCache",
+      "class DarkDialog",
+      "class DarkDialogWindow"
+    ],
+    "patterns": [
+      "Semantic brush keys referenced by name throughout XAML",
+      "Static BrushCache for efficient brush reuse"
+    ],
+    "dependencies": [
+      "WPF ResourceDictionary for theme merging"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.6612223Z"
+}

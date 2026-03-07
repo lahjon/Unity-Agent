@@ -14,5 +14,5 @@ Generate 5-8 actionable suggestions. Each:
 - Description: 2-4 sentences as implementation instructions — files to change, code to write, expected outcome. No analytical observations.
 
 ## STEP 3 — OUTPUT
-- Output ONLY JSON array: [{{"title": "...", "description": "..."}}]
+- Output ONLY a JSON object matching the required schema: {{"suggestions": [{{"title": "...", "description": "..."}}]}}
 - No other text, no markdown fences.

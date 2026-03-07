@@ -32,7 +32,6 @@ namespace Spritely.Managers
             bool useMcp,
             bool spawnTeam = false,
             bool extendedPlanning = false,
-            bool noGitWrite = false,
             bool planOnly = false,
             bool useMessageBus = false,
             List<string>? imagePaths = null,
@@ -51,7 +50,6 @@ namespace Spritely.Managers
                 UseMcp = useMcp,
                 SpawnTeam = spawnTeam,
                 ExtendedPlanning = extendedPlanning,
-                NoGitWrite = noGitWrite,
                 PlanOnly = planOnly,
                 UseMessageBus = useMessageBus,
                 AutoDecompose = autoDecompose,
@@ -132,7 +130,7 @@ namespace Spritely.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --max-turns {maxTurns} --output-format json --output-schema '{DescriptionJsonSchema}'",
+                    Arguments = $"-p --model {Constants.AppConstants.ClaudeSonnet} --max-turns {maxTurns} --output-format json --json-schema \"{DescriptionJsonSchema.Replace("\"", "\\\"")}\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -142,6 +140,8 @@ namespace Spritely.Managers
                     WorkingDirectory = projectPath
                 };
                 psi.Environment.Remove("CLAUDECODE");
+                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
 
                 process = new Process { StartInfo = psi };
                 process.Start();
@@ -176,9 +176,15 @@ namespace Spritely.Managers
                     using var doc = JsonDocument.Parse(text);
                     var root = doc.RootElement;
 
-                    // The CLI with --output-format json wraps the result; extract the "result" field
+                    // The CLI with --output-format json + --json-schema puts structured data
+                    // in "structured_output"; fall back to "result" for plain text responses
                     JsonElement data;
-                    if (root.TryGetProperty("result", out var resultElement))
+                    if (root.TryGetProperty("structured_output", out var structured)
+                        && structured.ValueKind == JsonValueKind.Object)
+                    {
+                        data = structured;
+                    }
+                    else if (root.TryGetProperty("result", out var resultElement))
                     {
                         if (resultElement.ValueKind == JsonValueKind.String)
                         {
@@ -261,6 +267,8 @@ namespace Spritely.Managers
                     WorkingDirectory = projectPath
                 };
                 psi.Environment.Remove("CLAUDECODE");
+                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
 
                 process = new Process { StartInfo = psi };
                 process.Start();

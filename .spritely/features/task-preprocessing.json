@@ -1,0 +1,53 @@
+{
+  "id": "task-preprocessing",
+  "name": "Task Preprocessing",
+  "description": "Uses Haiku to analyze a task description before execution, enriching it with intent classification, enhanced prompts, and flags such as feature mode, auto-decompose, and spawn-team. Applies the result back to the task before launch.",
+  "category": "core",
+  "keywords": [
+    "Haiku",
+    "PreprocessResult",
+    "TaskPreprocessor",
+    "auto-decompose",
+    "classification",
+    "enhance prompt",
+    "intent",
+    "preprocessing",
+    "spawn team"
+  ],
+  "primaryFiles": [
+    "Managers/TaskPreprocessor.cs",
+    "Prompts/TaskPreprocessorPrompt.md"
+  ],
+  "secondaryFiles": [
+    "AgentTask.cs",
+    "Models/AgentTaskData.cs",
+    "Spritely.Tests/HaikuApiTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-mode",
+    "prompt-building",
+    "task-execution"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/TaskPreprocessor.cs": {
+        "hash": "1d38c2c57a54",
+        "content": "class PreprocessResult\n  Header: string\n  EnhancedPrompt: string\n  ApplyFix: bool\n  ExtendedPlanning: bool\n  IsFeatureMode: bool\n  AutoDecompose: bool\n  SpawnTeam: bool\n  UseMcp: bool\n  Iterations: int\nclass TaskPreprocessor\n  ApplyToTask(AgentTask task, PreprocessResult result) -\u003E void\n  FormatActiveToggles(AgentTask task) -\u003E string"
+      }
+    },
+    "keyTypes": [
+      "class PreprocessResult",
+      "class TaskPreprocessor"
+    ],
+    "patterns": [
+      "Fire-and-await Haiku call before main task launch",
+      "Result applied via ApplyToTask mutation"
+    ],
+    "dependencies": [
+      "AgentTask model for flag application",
+      "Claude Haiku via CLI or API"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.3291507Z"
+}

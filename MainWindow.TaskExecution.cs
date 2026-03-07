@@ -44,7 +44,6 @@ namespace Spritely
             target.PlanOnly = PlanOnlyToggle.IsChecked == true;
             target.IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true;
             target.UseMcp = UseMcpToggle.IsChecked == true;
-            target.NoGitWrite = true; // Always on — the commit system handles git writes
             target.AutoDecompose = AutoDecomposeToggle.IsChecked == true;
             target.ApplyFix = ApplyFixToggle.IsChecked == true;
             if (int.TryParse(FeatureModeIterationsBox?.Text, out var iter) && iter > 0)
@@ -54,6 +53,7 @@ namespace Spritely
         /// <summary>Applies flags from a <see cref="TaskConfigBase"/> to the main-window toggle controls.</summary>
         private void ApplyFlagsToUi(TaskConfigBase source)
         {
+            if (SpawnTeamToggle == null) return; // Not yet loaded during InitializeComponent
             SpawnTeamToggle.IsChecked = source.SpawnTeam;
             FeatureModeToggle.IsChecked = source.IsFeatureMode;
             ExtendedPlanningToggle.IsChecked = source.ExtendedPlanning;
@@ -87,7 +87,8 @@ namespace Spritely
             List<string>? imagePaths = null,
             bool planOnly = false,
             List<AgentTask>? dependencies = null,
-            string? additionalInstructions = null)
+            string? additionalInstructions = null,
+            string? header = null)
         {
             var task = _taskFactory.CreateTask(
                 description,
@@ -99,7 +100,7 @@ namespace Spritely
                 useMcp: UseMcpToggle.IsChecked == true,
                 spawnTeam: SpawnTeamToggle.IsChecked == true,
                 extendedPlanning: ExtendedPlanningToggle.IsChecked == true,
-                noGitWrite: true, // Always on — the commit system handles git writes                planOnly: planOnly,
+                planOnly: planOnly,
                 imagePaths: imagePaths,
                 model: model,
                 autoDecompose: AutoDecomposeToggle.IsChecked == true,
@@ -108,6 +109,8 @@ namespace Spritely
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
             task.Summary = summary;
+            if (!string.IsNullOrEmpty(header))
+                task.Header = header;
             task.AdditionalInstructions = additionalInstructions ?? "";
 
             if (task.IsFeatureMode && int.TryParse(FeatureModeIterationsBox?.Text, out var iterations) && iterations > 0)
@@ -204,8 +207,7 @@ namespace Spritely
                     headless: false,
                     isFeatureMode: false,
                     ignoreFileLocks: IgnoreFileLocksToggle.IsChecked == true,
-                    useMcp: UseMcpToggle.IsChecked == true,
-                    noGitWrite: true); // Always on — the commit system handles git writes
+                    useMcp: UseMcpToggle.IsChecked == true);
 
                 task.Summary = step.TaskName;
                 task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
@@ -715,9 +717,21 @@ TextureImporter:
         private void OnTabInterruptInputSent(AgentTask task, TextBox inputBox)
         {
             var text = inputBox.Text?.Trim();
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text))
+            {
+                // No input text — treat interrupt as pause/resume toggle
+                if (task.Status == AgentTaskStatus.Paused)
+                {
+                    _taskExecutionManager.ResumeTask(task, _activeTasks, _historyTasks);
+                }
+                else if (task.IsRunning)
+                {
+                    _taskExecutionManager.PauseTask(task);
+                    _outputTabManager.AppendOutput(task.Id, "\nTask paused.\n", _activeTasks, _historyTasks);
+                }
+                return;
+            }
             inputBox.Clear();
-            // Pass true for isInterrupt parameter
             _taskExecutionManager.SendFollowUp(task, text, _activeTasks, _historyTasks, isInterrupt: true);
         }
 
@@ -938,7 +952,6 @@ TextureImporter:
                 sourceTask.UseMcp,
                 sourceTask.SpawnTeam,
                 sourceTask.ExtendedPlanning,
-                sourceTask.NoGitWrite,
                 sourceTask.PlanOnly,
                 sourceTask.UseMessageBus,
                 sourceTask.ImagePaths,
@@ -1372,35 +1385,52 @@ TextureImporter:
                             lockedFiles = new HashSet<string>(task.ChangedFiles.Select(f =>
                                 Path.IsPathRooted(f) ? f : Path.Combine(task.ProjectPath, f)));
                         }
-                        else
-                        {
-                            return (false, "No files were modified by this task to commit");
-                        }
                     }
-                    // Store for later use
-                    task.Runtime.LockedFilesForCommit = lockedFiles;
+                    if (lockedFiles != null && lockedFiles.Count > 0)
+                        task.Runtime.LockedFilesForCommit = lockedFiles;
                 }
 
                 // Build relative paths from the project root for the git commands
                 var projectRoot = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
                 var relativePaths = new List<string>();
-                foreach (var absPath in lockedFiles)
+
+                if (lockedFiles != null && lockedFiles.Count > 0)
                 {
-                    var rel = absPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
-                        ? absPath.Substring(projectRoot.Length)
-                        : absPath;
-
-                    // Validate against path traversal attacks
-                    if (rel.Contains("..") || Path.IsPathRooted(rel))
+                    foreach (var absPath in lockedFiles)
                     {
-                        AppLogger.Warn("TaskExecution", $"Rejected suspicious path during git operation: {rel}");
-                        continue;
-                    }
+                        var rel = absPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
+                            ? absPath.Substring(projectRoot.Length)
+                            : absPath;
 
-                    relativePaths.Add(rel.Replace('\\', '/'));
+                        if (rel.Contains("..") || Path.IsPathRooted(rel))
+                        {
+                            AppLogger.Warn("TaskExecution", $"Rejected suspicious path during git operation: {rel}");
+                            continue;
+                        }
+
+                        relativePaths.Add(rel.Replace('\\', '/'));
+                    }
                 }
 
-                // Persist changed files on the task if not already set (manual commit path)
+                // Fall back to git diff against GitStartHash when file locks didn't capture changes
+                if (relativePaths.Count == 0 && !string.IsNullOrEmpty(task.GitStartHash))
+                {
+                    var gitChangedFiles = await _gitHelper.GetChangedFileNamesAsync(
+                        task.ProjectPath, task.GitStartHash);
+                    if (gitChangedFiles != null && gitChangedFiles.Count > 0)
+                    {
+                        foreach (var f in gitChangedFiles)
+                        {
+                            if (!f.Contains("..") && !Path.IsPathRooted(f))
+                                relativePaths.Add(f.Replace('\\', '/'));
+                        }
+                    }
+                }
+
+                if (relativePaths.Count == 0)
+                    return (false, "No files were modified by this task to commit");
+
+                // Persist changed files on the task if not already set
                 if (task.ChangedFiles.Count == 0 && relativePaths.Count > 0)
                     task.ChangedFiles = new List<string>(relativePaths);
 
@@ -1431,7 +1461,7 @@ TextureImporter:
                         commitMessage,
                         pathArgs);
 
-                    if (result != null)
+                    if (result.IsSuccess)
                     {
                         // Get the commit hash to verify commit succeeded
                         var hash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath);
@@ -1456,7 +1486,7 @@ TextureImporter:
                     }
                     else
                     {
-                        return (false, "Git commit command failed. This could be due to no changes to commit, pre-commit hooks failing, or other git issues");
+                        return (false, $"Git commit failed: {result.GetErrorMessage()}");
                     }
                 }, $"commit for task #{task.TaskNumber}");
 

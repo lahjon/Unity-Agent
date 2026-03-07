@@ -1,0 +1,56 @@
+{
+  "id": "skills-system",
+  "name": "Skills System",
+  "description": "Allows users to define reusable instruction blocks (\u0027skills\u0027) that get injected into task prompts. Supports global and per-project skills with enable/disable toggles and a dedicated editor dialog.",
+  "category": "core",
+  "keywords": [
+    "SkillEditorDialog",
+    "SkillEntry",
+    "SkillManager",
+    "enabled skills",
+    "prompt injection",
+    "reusable instructions",
+    "skill block",
+    "skill categories",
+    "skills"
+  ],
+  "primaryFiles": [
+    "Dialogs/SkillEditorDialog.cs",
+    "Managers/SkillManager.cs"
+  ],
+  "secondaryFiles": [
+    "MainWindow.Skills.cs",
+    "Managers/PromptBuilder.cs",
+    "Models/SkillEntry.cs"
+  ],
+  "relatedFeatureIds": [
+    "project-management",
+    "prompt-building"
+  ],
+  "context": {
+    "signatures": {
+      "Dialogs/SkillEditorDialog.cs": {
+        "hash": "57176f273e47",
+        "content": "class SkillEditorDialog\n  Show(SkillManager skillManager, string? projectPath) -\u003E bool"
+      },
+      "Managers/SkillManager.cs": {
+        "hash": "17476723125b",
+        "content": "class SkillManager\n  LoadAsync(string? projectPath = null) -\u003E Task\n  SaveSkill(SkillEntry skill, string? projectPath = null) -\u003E void\n  DeleteSkill(SkillEntry skill, string? projectPath = null) -\u003E void\n  BuildSkillsBlock() -\u003E string\n  BuildSkillsBlock(IEnumerable\u003Cstring\u003E skillIds) -\u003E string\n  GetEnabledSkillIds() -\u003E List\u003Cstring\u003E\n  SetEnabledSkills(IEnumerable\u003Cstring\u003E skillIds) -\u003E void\n  ClearEnabledSkills() -\u003E void\n  GetCategories() -\u003E List\u003Cstring\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  IsGlobal: bool\n  CreatedAt: DateTime\n  UpdatedAt: DateTime"
+      }
+    },
+    "keyTypes": [
+      "class SkillEntry",
+      "class SkillManager"
+    ],
+    "patterns": [
+      "Global \u002B per-project layered skill loading",
+      "Skill IDs tracked in TaskConfigBase for per-task enablement"
+    ],
+    "dependencies": [
+      "PromptBuilder for skill block injection",
+      "SettingsManager for persistence"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.4986632Z"
+}

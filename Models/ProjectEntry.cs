@@ -46,10 +46,7 @@ namespace Spritely.Models
         [JsonIgnore]
         public string DisplayName => string.IsNullOrWhiteSpace(Name) ? FolderName : Name;
         [JsonIgnore]
-        public bool IsInitialized =>
-            !string.IsNullOrEmpty(Path) &&
-            (System.IO.Directory.Exists(System.IO.Path.Combine(Path, ".claude")) ||
-             System.IO.File.Exists(System.IO.Path.Combine(Path, "CLAUDE.md")));
+        public bool IsInitialized => IsFeatureRegistryInitialized;
 
         [JsonIgnore]
         public bool IsFeatureRegistryInitialized =>

@@ -152,6 +152,50 @@ namespace Spritely.Managers
         }
 
         /// <summary>
+        /// Returns relative file paths changed since the given commit hash,
+        /// including both tracked modifications and untracked new files.
+        /// Used as a fallback when file locks don't capture all changes (e.g. Bash edits).
+        /// </summary>
+        public async Task<List<string>?> GetChangedFileNamesAsync(
+            string projectPath, string? gitStartHash,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(gitStartHash)) return null;
+
+            // Get modified/deleted tracked files since the start hash
+            var diffResult = await RunGitCommandAsync(
+                projectPath, $"diff {gitStartHash} --name-only", cancellationToken).ConfigureAwait(false);
+
+            // Also get untracked files that the task may have created
+            var untrackedResult = await RunGitCommandAsync(
+                projectPath, "ls-files --others --exclude-standard", cancellationToken).ConfigureAwait(false);
+
+            var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (diffResult.IsSuccess && !string.IsNullOrEmpty(diffResult.Output))
+            {
+                foreach (var line in diffResult.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var trimmed = line.Trim();
+                    if (!string.IsNullOrEmpty(trimmed) && !trimmed.Contains(".."))
+                        files.Add(trimmed);
+                }
+            }
+
+            if (untrackedResult.IsSuccess && !string.IsNullOrEmpty(untrackedResult.Output))
+            {
+                foreach (var line in untrackedResult.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var trimmed = line.Trim();
+                    if (!string.IsNullOrEmpty(trimmed) && !trimmed.Contains(".."))
+                        files.Add(trimmed);
+                }
+            }
+
+            return files.Count > 0 ? new List<string>(files) : null;
+        }
+
+        /// <summary>
         /// Escapes a file path for safe use in git command-line arguments.
         /// Public static method so it can be used by other components.
         /// </summary>

@@ -15,7 +15,6 @@ namespace Spritely.Models
         bool PlanOnly { get; set; }
         bool IgnoreFileLocks { get; set; }
         bool UseMcp { get; set; }
-        bool NoGitWrite { get; set; }
         bool UseMessageBus { get; set; }
         bool AutoDecompose { get; set; }
         bool ApplyFix { get; set; }
@@ -33,7 +32,6 @@ namespace Spritely.Models
             target.PlanOnly = source.PlanOnly;
             target.IgnoreFileLocks = source.IgnoreFileLocks;
             target.UseMcp = source.UseMcp;
-            target.NoGitWrite = source.NoGitWrite;
             target.UseMessageBus = source.UseMessageBus;
             target.AutoDecompose = source.AutoDecompose;
             target.ApplyFix = source.ApplyFix;

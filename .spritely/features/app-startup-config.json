@@ -1,0 +1,64 @@
+{
+  "id": "app-startup-config",
+  "name": "App Startup \u0026 Configuration",
+  "description": "Bootstraps the WPF application, wires up managers and services at the composition root (MainWindow), manages app-wide constants, and handles tray icon and window lifecycle.",
+  "category": "config",
+  "keywords": [
+    "App.xaml",
+    "AppConstants",
+    "MainWindow",
+    "bootstrap",
+    "composition root",
+    "configuration",
+    "constants",
+    "initialization",
+    "startup",
+    "tray icon"
+  ],
+  "primaryFiles": [
+    "App.xaml.cs",
+    "Constants/AppConstants.cs",
+    "MainWindow.xaml.cs"
+  ],
+  "secondaryFiles": [
+    "Constants/FeatureConstants.cs",
+    "MainWindow.Orchestration.cs",
+    "MainWindow.xaml"
+  ],
+  "relatedFeatureIds": [
+    "llm-services",
+    "logging-diagnostics",
+    "project-management"
+  ],
+  "context": {
+    "signatures": {
+      "App.xaml.cs": {
+        "hash": "8176c0ac5e47",
+        "content": "class App\n  ShowBalloonNotification(string title, string message, System.Windows.Forms.ToolTipIcon icon) -\u003E void\n  TraceUi(string action) -\u003E void\n  LogCrash(string source, Exception? ex) -\u003E void"
+      },
+      "Constants/AppConstants.cs": {
+        "hash": "d8d6967eef6d",
+        "content": "class AppConstants"
+      },
+      "MainWindow.xaml.cs": {
+        "hash": "9113e5d95cf4",
+        "content": "class MainWindow\n  Dispose() -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class App",
+      "class AppConstants",
+      "class MainWindow"
+    ],
+    "patterns": [
+      "MainWindow as composition root wiring all managers",
+      "WinForms NotifyIcon for tray integration"
+    ],
+    "dependencies": [
+      "All manager classes composed at startup",
+      "WPF/WinForms interop for tray icon"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.6470278Z"
+}

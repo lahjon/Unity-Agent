@@ -36,6 +36,7 @@ namespace Spritely.Managers
         private readonly Func<string, string> _getProjectRulesBlock;
         private readonly Func<string, bool> _isGameProject;
         private readonly Func<string> _getSkillsBlock;
+        private readonly Func<string> _getOpusEffortLevel;
         private readonly MessageBusManager _messageBusManager;
         private readonly Dispatcher _dispatcher;
 
@@ -52,6 +53,7 @@ namespace Spritely.Managers
         private readonly FeatureModeHandler _featureModeHandler;
         private readonly TokenLimitHandler _tokenLimitHandler;
         private readonly EarlyTerminationManager _earlyTerminationManager;
+        private readonly TaskPreprocessor _taskPreprocessor;
 
         // ── Feature System ──────────────────────────────────────────────
         private readonly FeatureRegistryManager _featureRegistryManager;
@@ -88,9 +90,14 @@ namespace Spritely.Managers
             Func<string, bool> isGameProject,
             MessageBusManager messageBusManager,
             Dispatcher dispatcher,
+            TaskPreprocessor? taskPreprocessor = null,
             Func<int>? getTokenLimitRetryMinutes = null,
             Func<bool>? getAutoVerify = null,
-            Func<string>? getSkillsBlock = null)
+            Func<string>? getSkillsBlock = null,
+            Func<string>? getOpusEffortLevel = null,
+            FeatureRegistryManager? featureRegistryManager = null,
+            FeatureContextResolver? featureContextResolver = null,
+            FeatureUpdateAgent? featureUpdateAgent = null)
         {
             _scriptDir = scriptDir;
             _fileLockManager = fileLockManager;
@@ -105,8 +112,10 @@ namespace Spritely.Managers
             _getProjectRulesBlock = getProjectRulesBlock;
             _isGameProject = isGameProject;
             _getSkillsBlock = getSkillsBlock ?? (() => "");
+            _getOpusEffortLevel = getOpusEffortLevel ?? (() => "high");
             _messageBusManager = messageBusManager;
             _dispatcher = dispatcher;
+            _taskPreprocessor = taskPreprocessor ?? new TaskPreprocessor();
 
             var retryMinutesFunc = getTokenLimitRetryMinutes ?? (() => 30);
 
@@ -115,10 +124,10 @@ namespace Spritely.Managers
             _processLauncher = new TaskProcessLauncher(scriptDir, fileLockManager, outputTabManager, _outputProcessor, promptBuilder, dispatcher);
             _earlyTerminationManager = new EarlyTerminationManager(new ProgressAnalyzer());
 
-            // Feature System
-            _featureRegistryManager = new FeatureRegistryManager();
-            _featureContextResolver = new FeatureContextResolver(_featureRegistryManager);
-            _featureUpdateAgent = new FeatureUpdateAgent(_featureRegistryManager);
+            // Feature System (injectable for testability)
+            _featureRegistryManager = featureRegistryManager ?? new FeatureRegistryManager();
+            _featureContextResolver = featureContextResolver ?? new FeatureContextResolver(_featureRegistryManager);
+            _featureUpdateAgent = featureUpdateAgent ?? new FeatureUpdateAgent(_featureRegistryManager);
             _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, completionAnalyzer, promptBuilder, taskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
             _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, completionAnalyzer, retryMinutesFunc);
 
@@ -184,22 +193,75 @@ namespace Spritely.Managers
 
             task.GitStartHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
 
-            // Haiku pre-processing: enhance prompt, generate header, auto-detect toggles
-            if (!task.HasHeader && !task.IsSubTask)
+            // Run preprocessor and feature resolver in parallel to reduce startup latency.
+            // Both are independent Haiku CLI calls; feature resolver uses the original description
+            // (before enhancement) since that better represents the user's intent for matching.
+            var originalDescription = task.Description;
+            var needsPreprocess = !task.HasHeader && !task.IsSubTask && !IsKnownTaskType(task.Summary);
+            var needsFeatures = !task.IsSubTask && _featureRegistryManager.RegistryExists(task.ProjectPath);
+
+            if (needsPreprocess || needsFeatures)
+            {
+                _outputProcessor.AppendColoredOutput(task.Id,
+                    $"[Startup] Preparing task{(needsFeatures ? " (preprocessor + features)" : " (preprocessor)")}...\n",
+                    Brushes.DarkGray, activeTasks, historyTasks);
+            }
+
+            System.Threading.Tasks.Task<PreprocessResult?> preprocessTask = needsPreprocess
+                ? _taskPreprocessor.PreprocessAsync(task.Description, task.Cts.Token)
+                : System.Threading.Tasks.Task.FromResult<PreprocessResult?>(null);
+
+            System.Threading.Tasks.Task<FeatureContextResult?> featureTask = needsFeatures
+                ? _featureContextResolver.ResolveAsync(task.ProjectPath, originalDescription, task.Cts.Token)
+                : System.Threading.Tasks.Task.FromResult<FeatureContextResult?>(null);
+
+            // Await both in parallel
+            PreprocessResult? preprocessResult = null;
+            FeatureContextResult? featureResult = null;
+            try
+            {
+                await System.Threading.Tasks.Task.WhenAll(preprocessTask, featureTask);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch
+            {
+                // Individual results checked below
+            }
+
+            // Apply preprocessor result
+            if (needsPreprocess)
             {
                 try
                 {
-                    var preprocessor = new TaskPreprocessor();
-                    var result = await preprocessor.PreprocessAsync(task.Description, task.Cts.Token);
-                    if (result != null)
+                    preprocessResult = await preprocessTask;
+                    if (preprocessResult != null)
                     {
-                        TaskPreprocessor.ApplyToTask(task, result);
+                        TaskPreprocessor.ApplyToTask(task, preprocessResult);
+                        _outputTabManager.UpdateTabHeader(task);
+                        if (string.IsNullOrEmpty(task.OriginalFeatureDescription))
+                            task.OriginalFeatureDescription = originalDescription;
                         _outputProcessor.AppendColoredOutput(task.Id,
-                            $"[Preprocessor] Header: {result.Header}\n",
+                            $"[Preprocessor] OK — \"{preprocessResult.Header}\"\n",
                             Brushes.MediumPurple, activeTasks, historyTasks);
-                        _outputProcessor.AppendOutput(task.Id,
-                            TaskPreprocessor.FormatActiveToggles(task),
-                            activeTasks, historyTasks);
+                        if (preprocessResult.EnhancedPrompt != originalDescription)
+                        {
+                            _outputProcessor.AppendColoredOutput(task.Id,
+                                $"[Preprocessor] Enhanced prompt:\n{preprocessResult.EnhancedPrompt}\n",
+                                Brushes.MediumPurple, activeTasks, historyTasks);
+                        }
+                        else
+                        {
+                            _outputProcessor.AppendColoredOutput(task.Id,
+                                "[Preprocessor] Prompt unchanged\n",
+                                Brushes.DarkGray, activeTasks, historyTasks);
+                        }
+                        AppLogger.Info("TaskExecution", $"[Task {task.Id}] {TaskPreprocessor.FormatActiveToggles(task).TrimEnd()}");
+                    }
+                    else
+                    {
+                        _outputProcessor.AppendColoredOutput(task.Id,
+                            "[Preprocessor] Failed — using defaults\n",
+                            Brushes.Orange, activeTasks, historyTasks);
                     }
                 }
                 catch (OperationCanceledException) { throw; }
@@ -215,13 +277,13 @@ namespace Spritely.Managers
             if (task.IsFeatureMode)
                 _taskFactory.PrepareTaskForFeatureModeStart(task);
 
-            // Feature System: resolve relevant features and build context block for prompt injection
+            // Apply feature resolver result
             var featureContextBlock = "";
-            if (!task.IsSubTask)
+            if (needsFeatures)
             {
                 try
                 {
-                    var featureResult = await _featureContextResolver.ResolveAsync(task.ProjectPath, task.Description, task.Cts.Token);
+                    featureResult = await featureTask;
                     if (featureResult != null && !string.IsNullOrWhiteSpace(featureResult.ContextBlock))
                     {
                         featureContextBlock = featureResult.ContextBlock;
@@ -243,7 +305,8 @@ namespace Spritely.Managers
 
             var cliModel = PromptBuilder.GetCliModelForTask(task);
             task.Runtime.LastCliModel = cliModel;
-            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, cliModel, task.PlanOnly);
+            var effortLevel = cliModel == PromptBuilder.CliOpusModel ? _getOpusEffortLevel() : null;
+            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, cliModel, task.PlanOnly, effortLevel);
 
             var ps1File = Path.Combine(_scriptDir, $"task_{task.Id}.ps1");
             File.WriteAllText(ps1File,
@@ -390,13 +453,16 @@ namespace Spritely.Managers
                                 task.CompletionSummary = $"Task completed with status: {expectedStatus}";
                             }
 
-                            // Only extract recommendations when the AI explicitly outputs the status marker as a standalone line
                             if (HasExplicitRecommendationStatus(outputText))
                             {
                                 var recommendations = _completionAnalyzer.ExtractRecommendations(outputText);
                                 if (!string.IsNullOrWhiteSpace(recommendations))
                                 {
                                     task.Recommendations = recommendations;
+                                }
+                                else if (HasNeedsMoreWorkStatus(outputText))
+                                {
+                                    task.Recommendations = "Continue working on the incomplete task.";
                                 }
                             }
                         }
@@ -614,10 +680,11 @@ namespace Spritely.Managers
             var projectPath = task.ProjectPath;
             var cliModel = PromptBuilder.GetCliModelForTask(task);
             task.Runtime.LastCliModel = cliModel;
+            var effortLevel = cliModel == PromptBuilder.CliOpusModel ? _getOpusEffortLevel() : null;
 
             var ps1File = Path.Combine(_scriptDir, $"headless_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                _promptBuilder.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, cliModel),
+                _promptBuilder.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, cliModel, effortLevel),
                 Encoding.UTF8);
 
             var psi = _promptBuilder.BuildProcessStartInfo(ps1File, headless: true);
@@ -1017,7 +1084,6 @@ namespace Spritely.Managers
                     parent.UseMcp,
                     parent.SpawnTeam,
                     parent.ExtendedPlanning,
-                    parent.NoGitWrite,
                     planOnly: false,
                     parent.UseMessageBus,
                     model: parent.Model)
@@ -1580,9 +1646,20 @@ namespace Spritely.Managers
             _featureModeHandler.OnFeatureModePhaseComplete(featureParent, activeTasks, historyTasks, moveToHistory);
         }
 
+        private static bool HasNeedsMoreWorkStatus(string outputText)
+        {
+            var tail = outputText.Length > 2000 ? outputText[^2000..] : outputText;
+            foreach (var line in tail.Split('\n'))
+            {
+                if (line.Trim() == "STATUS: NEEDS_MORE_WORK")
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>
-        /// Checks whether the output contains "STATUS: COMPLETE WITH RECOMMENDATIONS" as a
-        /// standalone line in the tail (not echoed prompt instructions).
+        /// Checks whether the output contains "STATUS: COMPLETE WITH RECOMMENDATIONS" or
+        /// "STATUS: NEEDS_MORE_WORK" as a standalone line in the tail.
         /// </summary>
         private static bool HasExplicitRecommendationStatus(string outputText)
         {
@@ -1590,11 +1667,23 @@ namespace Spritely.Managers
             var lines = tail.Split('\n');
             for (int i = lines.Length - 1; i >= 0; i--)
             {
-                if (lines[i].Trim() == "STATUS: COMPLETE WITH RECOMMENDATIONS")
+                var trimmed = lines[i].Trim();
+                if (trimmed == "STATUS: COMPLETE WITH RECOMMENDATIONS" || trimmed == "STATUS: NEEDS_MORE_WORK")
                     return true;
             }
             return false;
         }
+
+        private static readonly HashSet<string> _skipPreprocessSummaries = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Test Verification",
+            "Crash Log Investigation",
+            "Build Test",
+            "Generate Suggestions"
+        };
+
+        private static bool IsKnownTaskType(string? summary) =>
+            !string.IsNullOrEmpty(summary) && _skipPreprocessSummaries.Contains(summary);
     }
 }
 

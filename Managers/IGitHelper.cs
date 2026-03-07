@@ -39,6 +39,14 @@ namespace Spritely.Managers
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Returns relative file paths changed since the given commit hash,
+        /// including both tracked modifications and untracked new files.
+        /// </summary>
+        Task<List<string>?> GetChangedFileNamesAsync(
+            string projectPath, string? gitStartHash,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Validates that a string is a valid git commit hash (SHA-1).
         /// Valid hashes are 7-40 hexadecimal characters.
         /// </summary>

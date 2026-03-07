@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Spritely.Constants;
 using Spritely.Models;
@@ -20,6 +21,7 @@ namespace Spritely.Managers
         private const string UpdateJsonSchema =
             """{"type":"object","properties":{"updated_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"add_primary_files":{"type":"array","items":{"type":"string"}},"add_secondary_files":{"type":"array","items":{"type":"string"}},"remove_files":{"type":"array","items":{"type":"string"}},"updated_description":{"type":"string"}},"required":["id"]}},"new_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"category":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"primary_files":{"type":"array","items":{"type":"string"}},"secondary_files":{"type":"array","items":{"type":"string"}}},"required":["id","name","description","keywords","primary_files"]}}},"required":["updated_features","new_features"]}""";
 
+        private static readonly TimeSpan HaikuTimeout = TimeSpan.FromMinutes(2);
         private readonly FeatureRegistryManager _registryManager;
 
         public FeatureUpdateAgent(FeatureRegistryManager registryManager)
@@ -36,7 +38,8 @@ namespace Spritely.Managers
             string taskId,
             string taskDescription,
             string? completionSummary,
-            List<string> changedFiles)
+            List<string> changedFiles,
+            CancellationToken ct = default)
         {
             try
             {
@@ -71,10 +74,12 @@ namespace Spritely.Managers
                     indexJson);
 
                 // Call Haiku CLI for intelligent feature update analysis
+                AppLogger.Info("FeatureUpdateAgent", $"Calling Haiku CLI for feature update. Task: {taskId}, changed files: {relativeFiles.Count}");
+
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 1 --output-schema '{UpdateJsonSchema}'",
+                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 3 --json-schema \"{UpdateJsonSchema.Replace("\"", "\\\"")}\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -83,24 +88,89 @@ namespace Spritely.Managers
                     StandardOutputEncoding = Encoding.UTF8
                 };
                 psi.Environment.Remove("CLAUDECODE");
+                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
 
                 using var process = new Process { StartInfo = psi };
                 process.Start();
 
-                await process.StandardInput.WriteAsync(prompt.AsMemory(), default);
-                process.StandardInput.Close();
+                // Link external cancellation with the timeout so either triggers cleanup
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                linkedCts.CancelAfter(HaikuTimeout);
+                var linked = linkedCts.Token;
 
-                var output = await process.StandardOutput.ReadToEndAsync(default);
-                await process.WaitForExitAsync(default);
+                try
+                {
+                    await process.StandardInput.WriteAsync(prompt.AsMemory(), linked);
+                    process.StandardInput.Close();
+                }
+                catch (OperationCanceledException)
+                {
+                    AppLogger.Warn("FeatureUpdateAgent",
+                        $"Cancelled during stdin write (PID: {process.Id}). Killing process.");
+                    try { process.Kill(entireProcessTree: true); } catch { }
+                    return;
+                }
+                catch (IOException ioEx)
+                {
+                    var earlyStderr = "";
+                    try { earlyStderr = await process.StandardError.ReadToEndAsync(CancellationToken.None); } catch { }
+                    AppLogger.Error("FeatureUpdateAgent",
+                        $"Failed to write prompt to CLI stdin (pipe closed). stderr: {earlyStderr}", ioEx);
+                    return;
+                }
+
+                var stdoutTask = process.StandardOutput.ReadToEndAsync(linked);
+                var stderrTask = process.StandardError.ReadToEndAsync(linked);
+
+                try
+                {
+                    await process.WaitForExitAsync(linked);
+                }
+                catch (OperationCanceledException)
+                {
+                    var reason = ct.IsCancellationRequested ? "external cancellation" : $"timeout after {HaikuTimeout.TotalMinutes:F0} minutes";
+                    AppLogger.Warn("FeatureUpdateAgent",
+                        $"Haiku CLI cancelled ({reason}, PID: {process.Id}). Killing process.");
+                    try { process.Kill(entireProcessTree: true); } catch { }
+                    return;
+                }
+
+                var output = await stdoutTask;
+                var stderr = await stderrTask;
+
+                if (!string.IsNullOrWhiteSpace(stderr))
+                    AppLogger.Warn("FeatureUpdateAgent", $"Haiku CLI stderr: {stderr[..Math.Min(500, stderr.Length)]}");
+
+                if (process.ExitCode != 0)
+                {
+                    AppLogger.Error("FeatureUpdateAgent",
+                        $"Haiku CLI exited with code {process.ExitCode}. stderr: {stderr[..Math.Min(1000, stderr.Length)]}");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(output))
+                {
+                    AppLogger.Warn("FeatureUpdateAgent", "Haiku CLI returned empty output");
+                    return;
+                }
+
+                AppLogger.Info("FeatureUpdateAgent", $"Haiku CLI completed. stdout length: {output.Length}");
 
                 var text = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
 
                 using var doc = JsonDocument.Parse(text);
                 var wrapper = doc.RootElement;
 
-                // The CLI with --output-format json wraps the result; extract the "result" field
+                // The CLI with --output-format json + --json-schema puts structured data
+                // in "structured_output"; fall back to "result" for plain text responses
                 JsonElement root;
-                if (wrapper.TryGetProperty("result", out var resultElement))
+                if (wrapper.TryGetProperty("structured_output", out var structured)
+                    && structured.ValueKind == JsonValueKind.Object)
+                {
+                    root = structured;
+                }
+                else if (wrapper.TryGetProperty("result", out var resultElement))
                 {
                     if (resultElement.ValueKind == JsonValueKind.String)
                     {
@@ -138,7 +208,7 @@ namespace Spritely.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("FeatureUpdateAgent", "Feature update failed (fire-and-forget)", ex);
+                AppLogger.Warn("FeatureUpdateAgent", $"Feature update failed (fire-and-forget): {ex.Message}", ex);
             }
         }
 

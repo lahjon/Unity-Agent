@@ -1,0 +1,71 @@
+{
+  "id": "task-execution",
+  "name": "Task Execution Engine",
+  "description": "Handles launching, monitoring, pausing, cancelling, and completing AI tasks as OS processes. Coordinates the full task lifecycle from CLI invocation through streaming output to final status resolution.",
+  "category": "core",
+  "keywords": [
+    "CLI",
+    "PowerShell",
+    "TaskExecutionManager",
+    "TaskProcessLauncher",
+    "cancel",
+    "execution",
+    "launch",
+    "pause",
+    "process",
+    "streaming"
+  ],
+  "primaryFiles": [
+    "MainWindow.TaskExecution.cs",
+    "Managers/TaskExecutionManager.cs",
+    "Managers/TaskProcessLauncher.cs"
+  ],
+  "secondaryFiles": [
+    "AgentTask.cs",
+    "Models/AgentTaskData.cs",
+    "Models/RuntimeTaskContext.cs",
+    "Spritely.Tests/TaskExecutionEngineTests.cs",
+    "Spritely.Tests/TaskLauncherTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "file-lock-management",
+    "output-processing",
+    "prompt-building",
+    "task-orchestration",
+    "task-preprocessing"
+  ],
+  "context": {
+    "signatures": {
+      "MainWindow.TaskExecution.cs": {
+        "hash": "eba25084c5e8",
+        "content": "class MainWindow"
+      },
+      "Managers/TaskExecutionManager.cs": {
+        "hash": "fbb838383705",
+        "content": "class TaskExecutionManager\n  LaunchHeadless(AgentTask task) -\u003E void\n  CancelTaskImmediate(AgentTask task) -\u003E void\n  KillProcess(AgentTask task) -\u003E void\n  RemoveStreamingState(string taskId) -\u003E void\n  PauseTask(AgentTask task) -\u003E void\n  SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask\n  SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask\n  ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?\n  InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void\n  ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?"
+      },
+      "Managers/TaskProcessLauncher.cs": {
+        "hash": "8dcc0935d414",
+        "content": "class TaskProcessLauncher\n  ProcessQueuedMessagesCallback: Action\u003CAgentTask, ObservableCollection\u003CAgentTask\u003E, ObservableCollection\u003CAgentTask\u003E\u003E?\n  StartManagedProcess(AgentTask task, Process process) -\u003E void\n  KillProcess(AgentTask task) -\u003E void\n  RemoveStreamingState(string taskId) -\u003E void\n  CleanupScripts(string taskId) -\u003E void\n  PauseTask(AgentTask task) -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class AgentTask",
+      "class TaskExecutionManager",
+      "class TaskProcessLauncher",
+      "enum AgentTaskStatus"
+    ],
+    "patterns": [
+      "Pause/unpause preserves conversation ID and process",
+      "Process-per-task with streaming stdout",
+      "async/await with CancellationToken"
+    ],
+    "dependencies": [
+      "Claude Code CLI via PowerShell pipe",
+      "FileLockManager for lock coordination",
+      "PromptBuilder for prompt assembly"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.292708Z"
+}

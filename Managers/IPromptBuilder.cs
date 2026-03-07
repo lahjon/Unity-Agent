@@ -6,7 +6,7 @@ namespace Spritely.Managers
     public interface IPromptBuilder
     {
         string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
-            bool isFeatureMode, bool extendedPlanning = false, bool noGitWrite = false /* deprecated: always treated as true */,
+            bool isFeatureMode, bool extendedPlanning = false,
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
@@ -24,13 +24,13 @@ namespace Spritely.Managers
         string BuildMessageBusBlock(string taskId, string projectPath,
             List<(string id, string summary)> siblings);
 
-        string BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false);
+        string BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false, string? effortLevel = null);
 
         string BuildPowerShellScript(string projectPath, string promptFilePath,
             string claudeCmd);
 
         string BuildHeadlessPowerShellScript(string projectPath, string promptFilePath,
-            bool skipPermissions, string? modelId = null);
+            bool skipPermissions, string? modelId = null, string? effortLevel = null);
 
         ProcessStartInfo BuildProcessStartInfo(string ps1FilePath, bool headless);
 

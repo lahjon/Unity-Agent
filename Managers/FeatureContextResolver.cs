@@ -23,6 +23,7 @@ namespace Spritely.Managers
             """{"type":"object","properties":{"relevant_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"confidence":{"type":"number"}},"required":["id","confidence"]}},"is_new_feature":{"type":"boolean"},"new_feature_name":{"type":"string"},"new_feature_id":{"type":"string"},"new_feature_keywords":{"type":"array","items":{"type":"string"}}},"required":["relevant_features","is_new_feature"]}""";
 
         private const double MinConfidenceThreshold = 0.3;
+        private static readonly TimeSpan HaikuTimeout = TimeSpan.FromMinutes(2);
 
         private readonly FeatureRegistryManager _registryManager;
 
@@ -70,10 +71,12 @@ namespace Spritely.Managers
                 var prompt = string.Format(template, taskDescription, candidatesJson);
 
                 // Call Haiku CLI for intelligent matching
+                AppLogger.Info("FeatureContextResolver", $"Calling Haiku CLI for feature resolution. Prompt length: {prompt.Length} chars");
+
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 1 --output-schema '{ResolverJsonSchema}'",
+                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 3 --json-schema \"{ResolverJsonSchema.Replace("\"", "\\\"")}\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -82,24 +85,79 @@ namespace Spritely.Managers
                     StandardOutputEncoding = Encoding.UTF8
                 };
                 psi.Environment.Remove("CLAUDECODE");
+                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
 
                 using var process = new Process { StartInfo = psi };
                 process.Start();
 
-                await process.StandardInput.WriteAsync(prompt.AsMemory(), ct);
-                process.StandardInput.Close();
+                try
+                {
+                    await process.StandardInput.WriteAsync(prompt.AsMemory(), ct);
+                    process.StandardInput.Close();
+                }
+                catch (IOException ioEx)
+                {
+                    var earlyStderr = "";
+                    try { earlyStderr = await process.StandardError.ReadToEndAsync(ct); } catch { }
+                    AppLogger.Error("FeatureContextResolver",
+                        $"Failed to write prompt to CLI stdin (pipe closed). stderr: {earlyStderr}", ioEx);
+                    return null;
+                }
 
-                var output = await process.StandardOutput.ReadToEndAsync(ct);
-                await process.WaitForExitAsync(ct);
+                var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
+                var stderrTask = process.StandardError.ReadToEndAsync(ct);
+
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(HaikuTimeout);
+
+                try
+                {
+                    await process.WaitForExitAsync(timeoutCts.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    AppLogger.Error("FeatureContextResolver",
+                        $"Haiku CLI timed out after {HaikuTimeout.TotalMinutes:F0} minutes (PID: {process.Id}). Killing process.");
+                    try { process.Kill(entireProcessTree: true); } catch { }
+                    return null;
+                }
+
+                var output = await stdoutTask;
+                var stderr = await stderrTask;
+
+                if (!string.IsNullOrWhiteSpace(stderr))
+                    AppLogger.Warn("FeatureContextResolver", $"Haiku CLI stderr: {stderr[..Math.Min(500, stderr.Length)]}");
+
+                if (process.ExitCode != 0)
+                {
+                    AppLogger.Error("FeatureContextResolver",
+                        $"Haiku CLI exited with code {process.ExitCode}. stderr: {stderr[..Math.Min(1000, stderr.Length)]}");
+                    return null;
+                }
+
+                if (string.IsNullOrWhiteSpace(output))
+                {
+                    AppLogger.Warn("FeatureContextResolver", "Haiku CLI returned empty output");
+                    return null;
+                }
+
+                AppLogger.Info("FeatureContextResolver", $"Haiku CLI completed. stdout length: {output.Length}");
 
                 var text = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
 
                 using var doc = JsonDocument.Parse(text);
                 var wrapper = doc.RootElement;
 
-                // The CLI with --output-format json wraps the result; extract the "result" field
+                // The CLI with --output-format json + --json-schema puts structured data
+                // in "structured_output"; fall back to "result" for plain text responses
                 JsonElement root;
-                if (wrapper.TryGetProperty("result", out var resultElement))
+                if (wrapper.TryGetProperty("structured_output", out var structured)
+                    && structured.ValueKind == JsonValueKind.Object)
+                {
+                    root = structured;
+                }
+                else if (wrapper.TryGetProperty("result", out var resultElement))
                 {
                     if (resultElement.ValueKind == JsonValueKind.String)
                     {
@@ -214,7 +272,7 @@ namespace Spritely.Managers
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                AppLogger.Debug("FeatureContextResolver", "Feature resolution failed, skipping context injection", ex);
+                AppLogger.Warn("FeatureContextResolver", $"Feature resolution failed, skipping context injection: {ex.Message}", ex);
                 return null;
             }
         }

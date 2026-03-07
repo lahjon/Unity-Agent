@@ -14,7 +14,6 @@ namespace Spritely.Models
         public bool PlanOnly { get; set; }
         public bool IgnoreFileLocks { get; set; }
         public bool UseMcp { get; set; }
-        public bool NoGitWrite { get; set; }
         public bool UseMessageBus { get; set; }
         public bool AutoDecompose { get; set; }
         public bool ApplyFix { get; set; } = true;

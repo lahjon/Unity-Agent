@@ -16,7 +16,7 @@ namespace Spritely.Managers;
 /// </summary>
 public static class SignatureExtractor
 {
-    private static readonly HashSet<string> SupportedExtensions = [".cs", ".ts", ".tsx", ".js", ".jsx", ".py", ".gd"];
+    private static readonly HashSet<string> SupportedExtensions = [".cs", ".ts", ".tsx", ".js", ".jsx", ".py", ".gd", ".xaml"];
 
     // ── C# patterns ──────────────────────────────────────────────────────
 
@@ -78,6 +78,20 @@ public static class SignatureExtractor
         @"^@?export\s+var\s+(\w+)(?:\s*:\s*(\w+))?",
         RegexOptions.Compiled);
 
+    // ── XAML patterns ─────────────────────────────────────────────────────
+
+    private static readonly Regex XamlClass = new(
+        @"x:Class=""([^""]+)""",
+        RegexOptions.Compiled);
+
+    private static readonly Regex XamlNamedElement = new(
+        @"x:Name=""(\w+)""",
+        RegexOptions.Compiled);
+
+    private static readonly Regex XamlRootElement = new(
+        @"<(\w+:)?(\w+)\s",
+        RegexOptions.Compiled);
+
     // ── Public API ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -117,6 +131,7 @@ public static class SignatureExtractor
             ".ts" or ".tsx" or ".js" or ".jsx" => ExtractTypeScript(lines),
             ".py" => ExtractPython(lines),
             ".gd" => ExtractGDScript(lines),
+            ".xaml" => ExtractXaml(lines),
             _ => string.Empty
         };
     }
@@ -407,6 +422,57 @@ public static class SignatureExtractor
                 var varName = exportMatch.Groups[1].Value;
                 var varType = exportMatch.Groups[2].Success ? exportMatch.Groups[2].Value : "Variant";
                 output.Add($"  {varName}: {varType}");
+            }
+        }
+
+        return string.Join('\n', output);
+    }
+
+    // ── XAML extraction ───────────────────────────────────────────────────
+
+    private static string ExtractXaml(string[] lines)
+    {
+        var output = new List<string>();
+        string? rootType = null;
+
+        foreach (var rawLine in lines)
+        {
+            if (output.Count >= FeatureConstants.MaxSignatureLinesPerFile)
+                break;
+
+            var line = rawLine.TrimEnd('\r');
+
+            // x:Class attribute — the code-behind class
+            var classMatch = XamlClass.Match(line);
+            if (classMatch.Success)
+            {
+                var fullClass = classMatch.Groups[1].Value;
+                var shortName = fullClass.Contains('.') ? fullClass[(fullClass.LastIndexOf('.') + 1)..] : fullClass;
+                output.Add($"class {shortName}");
+                continue;
+            }
+
+            // Root element type (first element in the file)
+            if (rootType is null)
+            {
+                var rootMatch = XamlRootElement.Match(line);
+                if (rootMatch.Success)
+                {
+                    rootType = rootMatch.Groups[2].Value;
+                    output.Add($"  root: {rootType}");
+                    continue;
+                }
+            }
+
+            // Named elements
+            var namedMatch = XamlNamedElement.Match(line);
+            if (namedMatch.Success)
+            {
+                var name = namedMatch.Groups[1].Value;
+                // Try to extract the element type from the same line
+                var elemMatch = Regex.Match(line.TrimStart(), @"^<(\w+:)?(\w+)\s");
+                var elemType = elemMatch.Success ? elemMatch.Groups[2].Value : "Element";
+                output.Add($"  {name}: {elemType}");
             }
         }
 

@@ -1,0 +1,55 @@
+{
+  "id": "task-factory",
+  "name": "Task Creation \u0026 Validation",
+  "description": "Responsible for creating new AgentTask instances with correct defaults, validating user input, and preparing tasks for feature mode. Also handles CLAUDE.md generation for new projects.",
+  "category": "core",
+  "keywords": [
+    "CLAUDE.md",
+    "ITaskFactory",
+    "TaskFactory",
+    "create task",
+    "feature mode prep",
+    "task creation",
+    "task factory",
+    "validate input"
+  ],
+  "primaryFiles": [
+    "Managers/ITaskFactory.cs",
+    "Managers/TaskFactory.cs"
+  ],
+  "secondaryFiles": [
+    "Models/AgentTaskData.cs",
+    "Models/TaskConfigBase.cs",
+    "Spritely.Tests/TaskLauncherTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-mode",
+    "task-execution"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/ITaskFactory.cs": {
+        "hash": "f7d47977f37a",
+        "content": "interface ITaskFactory"
+      },
+      "Managers/TaskFactory.cs": {
+        "hash": "16297ac9d043",
+        "content": "class TaskFactory\n  ValidateTaskInput(string? description) -\u003E bool\n  PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  GenerateLocalSummary(string description) -\u003E string\n  GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
+      }
+    },
+    "keyTypes": [
+      "class TaskFactory",
+      "interface ITaskFactory"
+    ],
+    "patterns": [
+      "Factory pattern",
+      "Input validation at system boundary"
+    ],
+    "dependencies": [
+      "AgentTask model",
+      "ProjectManager for project context"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.3191077Z"
+}

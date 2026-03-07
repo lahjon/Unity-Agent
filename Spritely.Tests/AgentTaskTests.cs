@@ -94,18 +94,18 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void ShortDescription_LongText_TruncatedAt45()
+        public void ShortDescription_LongText_TruncatedAt60()
         {
-            var task = new AgentTask { Description = new string('a', 50) };
-            Assert.Equal(48, task.ShortDescription.Length); // 45 + "..."
+            var task = new AgentTask { Description = new string('a', 70) };
+            Assert.Equal(63, task.ShortDescription.Length); // 60 + "..."
             Assert.EndsWith("...", task.ShortDescription);
         }
 
         [Fact]
-        public void ShortDescription_Exactly45_NotTruncated()
+        public void ShortDescription_Exactly60_NotTruncated()
         {
-            var task = new AgentTask { Description = new string('x', 45) };
-            Assert.Equal(45, task.ShortDescription.Length);
+            var task = new AgentTask { Description = new string('x', 60) };
+            Assert.Equal(60, task.ShortDescription.Length);
             Assert.DoesNotContain("...", task.ShortDescription);
         }
 

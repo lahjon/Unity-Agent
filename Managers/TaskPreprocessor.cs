@@ -36,27 +36,7 @@ namespace Spritely.Managers
         private const string PreprocessJsonSchema =
             """{"type":"object","properties":{"header":{"type":"string"},"enhanced_prompt":{"type":"string"},"apply_fix":{"type":"boolean"},"extended_planning":{"type":"boolean"},"feature_mode":{"type":"boolean"},"auto_decompose":{"type":"boolean"},"spawn_team":{"type":"boolean"},"use_mcp":{"type":"boolean"},"iterations":{"type":"integer"}},"required":["header","enhanced_prompt","apply_fix","extended_planning","feature_mode","auto_decompose","spawn_team","use_mcp","iterations"]}""";
 
-        private const string PreprocessPrompt = """
-You are a task pre-processor for an AI coding assistant. Analyze the user's task and produce:
-
-1. **header**: A 2-5 word title summarizing the task (e.g. "Fix Auth Bug", "Add Dark Mode", "Refactor DB Layer", "Update Unit Tests")
-2. **enhanced_prompt**: An improved, clearer version of the user's prompt. Keep the original intent but make it more precise and actionable. Do NOT add requirements the user didn't ask for. If the prompt is already clear, keep it mostly as-is.
-3. **Toggle recommendations** based on task scope:
-
-TOGGLE RULES (apply these heuristics):
-- apply_fix (default: true) — Almost all tasks should be apply_fix=true. This is the standard "make changes and apply them" mode. Only set false for pure research/exploration tasks that don't need code changes.
-- extended_planning (default: false) — Set true ONLY for tasks that require significant architectural thinking: large refactors, new system design, complex multi-file features. Simple bug fixes, small features, and code changes do NOT need this.
-- feature_mode (default: false) — Set true ONLY for large multi-step features that need iterative implementation with verification cycles. Most tasks do NOT need this. Only for things like "implement full authentication system" or "build new dashboard page".
-- auto_decompose (default: false) — Set true ONLY for very large tasks that should be broken into independent subtasks. Rarely needed.
-- spawn_team (default: false) — Set true ONLY when auto_decompose is true AND the subtasks are truly independent and parallelizable.
-- use_mcp (default: false) — Set true ONLY if the task explicitly mentions Unity, game engine interaction, or MCP tools.
-- iterations (default: 2) — Number of feature mode iterations. Only relevant when feature_mode=true. Use 2-3 for medium features, 4-5 for large ones.
-
-IMPORTANT: Most tasks are simple fixes, small features, or code changes. Default to apply_fix=true with everything else false. Only escalate toggles when the task clearly warrants it.
-
-USER TASK:
-{0}
-""";
+        private static readonly string PreprocessPrompt = PromptLoader.Load("TaskPreprocessorPrompt.md");
 
         public async Task<PreprocessResult?> PreprocessAsync(
             string taskDescription, CancellationToken ct = default)
@@ -68,7 +48,7 @@ USER TASK:
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 1 --output-schema '{PreprocessJsonSchema}'",
+                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 3 --json-schema \"{PreprocessJsonSchema.Replace("\"", "\\\"")}\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -76,7 +56,10 @@ USER TASK:
                     CreateNoWindow = true,
                     StandardOutputEncoding = Encoding.UTF8
                 };
+                // Remove all Claude Code session env vars so the CLI doesn't detect a nested session
                 psi.Environment.Remove("CLAUDECODE");
+                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
 
                 using var process = new Process { StartInfo = psi };
                 process.Start();
@@ -88,14 +71,23 @@ USER TASK:
                 await process.WaitForExitAsync(ct);
 
                 var text = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
+                AppLogger.Debug("TaskPreprocessor", $"CLI raw output ({text.Length} chars): {(text.Length > 500 ? text[..500] + "..." : text)}");
 
                 using var doc = JsonDocument.Parse(text);
                 var root = doc.RootElement;
 
-                // The CLI with --output-format json wraps the result; extract the "result" field
+                // The CLI with --output-format json + --json-schema puts structured data
+                // in "structured_output"; fall back to "result" for plain text responses
                 JsonElement data;
-                if (root.TryGetProperty("result", out var resultElement))
+                if (root.TryGetProperty("structured_output", out var structured)
+                    && structured.ValueKind == JsonValueKind.Object)
                 {
+                    data = structured;
+                    AppLogger.Debug("TaskPreprocessor", "Using structured_output path");
+                }
+                else if (root.TryGetProperty("result", out var resultElement))
+                {
+                    AppLogger.Debug("TaskPreprocessor", $"No structured_output; result kind={resultElement.ValueKind}");
                     if (resultElement.ValueKind == JsonValueKind.String)
                     {
                         using var innerDoc = JsonDocument.Parse(resultElement.GetString()!);
@@ -108,10 +100,20 @@ USER TASK:
                 }
                 else
                 {
+                    AppLogger.Debug("TaskPreprocessor", "No structured_output or result; using root");
                     data = root;
                 }
 
-                var header = data.GetProperty("header").GetString() ?? "";
+                var header = data.TryGetProperty("header", out var h) ? h.GetString() ?? "" : "";
+                // Fallback: derive header from first 4 words of the task description
+                if (string.IsNullOrWhiteSpace(header))
+                {
+                    AppLogger.Debug("TaskPreprocessor", "Header empty from CLI response, deriving from description");
+                    var descWords = taskDescription.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    header = string.Join(' ', descWords.Length > 4 ? descWords[..4] : descWords);
+                    if (header.Length > 40)
+                        header = header[..40].TrimEnd();
+                }
                 // Enforce 2-5 words
                 var words = header.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (words.Length > 5)
@@ -120,13 +122,13 @@ USER TASK:
                 return new PreprocessResult
                 {
                     Header = header,
-                    EnhancedPrompt = data.GetProperty("enhanced_prompt").GetString() ?? taskDescription,
-                    ApplyFix = data.GetProperty("apply_fix").GetBoolean(),
-                    ExtendedPlanning = data.GetProperty("extended_planning").GetBoolean(),
-                    IsFeatureMode = data.GetProperty("feature_mode").GetBoolean(),
-                    AutoDecompose = data.GetProperty("auto_decompose").GetBoolean(),
-                    SpawnTeam = data.GetProperty("spawn_team").GetBoolean(),
-                    UseMcp = data.GetProperty("use_mcp").GetBoolean(),
+                    EnhancedPrompt = data.TryGetProperty("enhanced_prompt", out var ep) ? ep.GetString() ?? taskDescription : taskDescription,
+                    ApplyFix = !data.TryGetProperty("apply_fix", out var af) || af.GetBoolean(),
+                    ExtendedPlanning = data.TryGetProperty("extended_planning", out var xp) && xp.GetBoolean(),
+                    IsFeatureMode = data.TryGetProperty("feature_mode", out var fm) && fm.GetBoolean(),
+                    AutoDecompose = data.TryGetProperty("auto_decompose", out var ad) && ad.GetBoolean(),
+                    SpawnTeam = data.TryGetProperty("spawn_team", out var st) && st.GetBoolean(),
+                    UseMcp = data.TryGetProperty("use_mcp", out var um) && um.GetBoolean(),
                     Iterations = data.TryGetProperty("iterations", out var iter) ? iter.GetInt32() : 2
                 };
             }
@@ -139,20 +141,31 @@ USER TASK:
         }
 
         /// <summary>
-        /// Applies preprocessor results to an AgentTask, overriding toggle values.
-        /// Does NOT override toggles that the user explicitly set in the UI.
+        /// Applies preprocessor results to an AgentTask.
+        /// Only overrides toggles the user left at their default value — if the user
+        /// explicitly changed a toggle in the UI, that choice is preserved.
         /// </summary>
         public static void ApplyToTask(AgentTask task, PreprocessResult result)
         {
             task.Header = result.Header;
             task.Description = result.EnhancedPrompt;
-            task.ApplyFix = result.ApplyFix;
-            task.ExtendedPlanning = result.ExtendedPlanning;
-            task.IsFeatureMode = result.IsFeatureMode;
-            task.AutoDecompose = result.AutoDecompose;
-            task.SpawnTeam = result.SpawnTeam;
-            task.UseMcp = result.UseMcp;
-            if (result.IsFeatureMode)
+
+            // Only override toggles still at their default values.
+            // Defaults: ApplyFix=true, everything else=false.
+            if (task.ApplyFix)                  // still at default (true)
+                task.ApplyFix = result.ApplyFix;
+            if (!task.ExtendedPlanning)          // still at default (false)
+                task.ExtendedPlanning = result.ExtendedPlanning;
+            if (!task.IsFeatureMode)             // still at default (false)
+                task.IsFeatureMode = result.IsFeatureMode;
+            if (!task.AutoDecompose)             // still at default (false)
+                task.AutoDecompose = result.AutoDecompose;
+            if (!task.SpawnTeam)                 // still at default (false)
+                task.SpawnTeam = result.SpawnTeam;
+            if (!task.UseMcp)                    // still at default (false)
+                task.UseMcp = result.UseMcp;
+
+            if (result.IsFeatureMode && task.IsFeatureMode)
                 task.MaxIterations = Math.Max(2, result.Iterations);
         }
 
@@ -169,7 +182,6 @@ USER TASK:
             sb.AppendLine($"  Auto Decompose:    {(task.AutoDecompose ? "ON" : "OFF")}");
             sb.AppendLine($"  Spawn Team:        {(task.SpawnTeam ? "ON" : "OFF")}");
             sb.AppendLine($"  Use MCP:           {(task.UseMcp ? "ON" : "OFF")}");
-            sb.AppendLine($"  No Git Write:      {(task.NoGitWrite ? "ON" : "OFF")}");
             sb.AppendLine($"  Message Bus:       {(task.UseMessageBus ? "ON" : "OFF")}");
             sb.AppendLine($"  Plan Only:         {(task.PlanOnly ? "ON" : "OFF")}");
             sb.AppendLine("─────────────────────────────────────────────");

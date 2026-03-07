@@ -124,7 +124,8 @@ namespace Spritely.Managers
             bool hasExplicitRecommendationStatus = false;
             for (int i = lines.Length - 1; i >= Math.Max(0, lines.Length - AppConstants.MaxOutputTailLines); i--)
             {
-                if (lines[i].Trim() == "STATUS: COMPLETE WITH RECOMMENDATIONS")
+                var trimmed = lines[i].Trim();
+                if (trimmed == "STATUS: COMPLETE WITH RECOMMENDATIONS" || trimmed == "STATUS: NEEDS_MORE_WORK")
                 {
                     hasExplicitRecommendationStatus = true;
                     break;
@@ -166,7 +167,7 @@ namespace Spritely.Managers
 
         public async Task<ResultVerification?> VerifyResultAsync(
             string outputTail, string taskDescription, string? completionSummary,
-            CancellationToken ct = default)
+            CancellationToken ct = default, string? modelOverride = null)
         {
             try
             {
@@ -182,7 +183,7 @@ namespace Spritely.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 1 --output-schema '{VerificationJsonSchema}'",
+                    Arguments = $"-p --output-format json --model {modelOverride ?? AppConstants.ClaudeHaiku} --max-turns 3 --json-schema \"{VerificationJsonSchema.Replace("\"", "\\\"")}\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -191,6 +192,8 @@ namespace Spritely.Managers
                     StandardOutputEncoding = Encoding.UTF8
                 };
                 psi.Environment.Remove("CLAUDECODE");
+                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
 
                 using var process = new Process { StartInfo = psi };
                 process.Start();
@@ -209,13 +212,18 @@ namespace Spritely.Managers
                     using var doc = JsonDocument.Parse(processedText);
                     var wrapper = doc.RootElement;
 
-                    // The CLI with --output-format json wraps the result; extract the "result" field
+                    // The CLI with --output-format json + --json-schema puts structured data
+                    // in "structured_output"; fall back to "result" for plain text responses
                     JsonElement root;
-                    if (wrapper.TryGetProperty("result", out var resultElement) &&
+                    if (wrapper.TryGetProperty("structured_output", out var structured)
+                        && structured.ValueKind == JsonValueKind.Object)
+                    {
+                        root = structured;
+                    }
+                    else if (wrapper.TryGetProperty("result", out var resultElement) &&
                         resultElement.ValueKind == JsonValueKind.String)
                     {
                         var resultStr = resultElement.GetString()!;
-                        // Check if the result is a JSON object (schema output) vs a plain string
                         if (resultStr.TrimStart().StartsWith("{"))
                         {
                             using var innerDoc = JsonDocument.Parse(resultStr);

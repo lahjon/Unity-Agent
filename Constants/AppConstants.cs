@@ -17,7 +17,7 @@ namespace Spritely.Constants
         public const string ClaudeSonnet = "claude-sonnet-4-6";
 
         /// <summary>Claude Haiku — fastest/cheapest, used for lightweight classification tasks.</summary>
-        public const string ClaudeHaiku = "claude-haiku-4-5";
+        public const string ClaudeHaiku = "claude-haiku-4-5-20251001";
 
         /// <summary>Default model for the Claude chat panel (API-based conversations).</summary>
         public const string ClaudeDefaultChatModel = ClaudeSonnet;

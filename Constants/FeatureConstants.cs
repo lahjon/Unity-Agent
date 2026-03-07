@@ -34,7 +34,7 @@ namespace Spritely.Constants
         public const int SignatureHashLength = 12;
 
         /// <summary>Maximum source files sent to Sonnet in a single init-scan chunk.</summary>
-        public const int MaxFilesPerSonnetChunk = 200;
+        public const int MaxFilesPerSonnetChunk = 400;
 
         /// <summary>Maximum signature lines extracted per source file.</summary>
         public const int MaxSignatureLinesPerFile = 20;

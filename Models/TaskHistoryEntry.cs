@@ -27,7 +27,6 @@ namespace Spritely.Models
         public bool UseMcp { get; set; }
         public bool SpawnTeam { get; set; }
         public bool ExtendedPlanning { get; set; }
-        public bool NoGitWrite { get; set; }
         public bool PlanOnly { get; set; }
         public bool UseMessageBus { get; set; }
         public bool AutoDecompose { get; set; }

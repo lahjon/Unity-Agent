@@ -34,6 +34,12 @@ namespace Spritely.Models
         /// <summary>Ids of features that are closely related to this one (sorted).</summary>
         public List<string> RelatedFeatureIds { get; set; } = new();
 
+        /// <summary>
+        /// Feature IDs this feature directly depends on (consumes/calls/references).
+        /// Directional: "this feature depends on these features." Sorted.
+        /// </summary>
+        public List<string> DependsOn { get; set; } = new();
+
         /// <summary>Hierarchical code context — signatures, types, patterns, and dependencies.</summary>
         public FeatureContext Context { get; set; } = new();
 

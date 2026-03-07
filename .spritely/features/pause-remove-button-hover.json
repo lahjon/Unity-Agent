@@ -1,0 +1,27 @@
+{
+  "id": "pause-remove-button-hover",
+  "name": "Pause/Remove Button Hover Feedback",
+  "description": "New feature identified from task: Add hover feedback (tooltip and/or visual highlight) to the pause and remove buttons in the task card. Users should see clear indication that these buttons are interactive when hovering over them.",
+  "category": "",
+  "keywords": [
+    "button-hover",
+    "interactivity",
+    "pause-button",
+    "remove-button",
+    "task-card",
+    "tooltip",
+    "ui-enhancement",
+    "visual-feedback"
+  ],
+  "primaryFiles": [],
+  "secondaryFiles": [],
+  "relatedFeatureIds": [],
+  "context": {
+    "signatures": {},
+    "keyTypes": [],
+    "patterns": [],
+    "dependencies": []
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T20:18:53.134335Z"
+}

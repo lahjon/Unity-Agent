@@ -1,0 +1,58 @@
+{
+  "id": "chat-interface",
+  "name": "Chat Interface",
+  "description": "Provides a direct multi-turn chat UI for conversing with Claude or Gemini, including image paste/drag-drop, model selection, and Gemini image generation display.",
+  "category": "ui",
+  "keywords": [
+    "ChatManager",
+    "GeminiImagePanel",
+    "chat",
+    "chat history",
+    "drag drop",
+    "image generation",
+    "model selection",
+    "multi-turn",
+    "paste image"
+  ],
+  "primaryFiles": [
+    "Managers/ChatManager.cs",
+    "Managers/GeminiImagePanel.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/ClaudeService.cs",
+    "Managers/GeminiService.cs",
+    "Managers/ImageAttachmentManager.cs"
+  ],
+  "relatedFeatureIds": [
+    "llm-services"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/ChatManager.cs": {
+        "hash": "4154593c2665",
+        "content": "class ChatManager\n  PopulateModelCombo() -\u003E void\n  HandleNewChat() -\u003E void\n  HandleSendClick() -\u003E void\n  HandleInputKeyDown(KeyEventArgs e) -\u003E void\n  HandlePaste() -\u003E bool\n  HandleDragOver(DragEventArgs e) -\u003E bool\n  HandleDrop(DragEventArgs e) -\u003E bool\n  HandleModelComboChanged() -\u003E void\n  CancelAndDispose() -\u003E void\n  Dispose() -\u003E void"
+      },
+      "Managers/GeminiImagePanel.cs": {
+        "hash": "d1f0b20f09cc",
+        "content": "class GeminiImagePanel\n  Create(AgentTask task, out RichTextBox outputBox, out WrapPanel imageGallery) -\u003E DockPanel\n  AddImage(WrapPanel gallery, string imagePath) -\u003E void\n  SetOpenFolderHandler(DockPanel root, string folderPath) -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class ChatManager",
+      "class ChatMessage",
+      "class GeminiImagePanel",
+      "class GeminiImageResult"
+    ],
+    "patterns": [
+      "Cancel-and-dispose on new chat",
+      "Image gallery in side panel for Gemini image results"
+    ],
+    "dependencies": [
+      "ClaudeService for text chat",
+      "GeminiService for image generation",
+      "ImageAttachmentManager for paste/drop"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.5299452Z"
+}

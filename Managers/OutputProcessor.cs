@@ -88,9 +88,8 @@ namespace Spritely.Managers
                 if (_getAutoVerify())
                     await RunResultVerificationAsync(task, outputText, activeTasks, historyTasks);
 
-                // Only extract recommendations when the AI's actual output contains
-                // "STATUS: COMPLETE WITH RECOMMENDATIONS" as a standalone line (not as
-                // part of prompt instructions that get echoed in the output).
+                // Extract recommendations when the AI outputs STATUS: COMPLETE WITH RECOMMENDATIONS
+                // or STATUS: NEEDS_MORE_WORK as a standalone line.
                 if (!task.HasRecommendations && HasExplicitRecommendationStatus(outputText))
                 {
                     try
@@ -102,6 +101,12 @@ namespace Spritely.Managers
                             AppendOutput(task.Id,
                                 $"\nRecommendations:\n{recommendations}\n",
                                 activeTasks, historyTasks);
+                        }
+                        else if (HasNeedsMoreWorkStatus(outputText))
+                        {
+                            // NEEDS_MORE_WORK without explicit recommendation headers —
+                            // still enable the Continue button with a generic prompt
+                            task.Recommendations = "Continue working on the incomplete task.";
                         }
                     }
                     catch (Exception recEx)
@@ -138,8 +143,12 @@ namespace Spritely.Managers
 
             try
             {
+                // Use Sonnet for build/test tasks — better reasoning on complex build/test scenarios
+                var useSonnet = task.Summary is "Crash Log Investigation" or "Test Verification" or "Build Test";
+                var verificationModel = useSonnet ? Constants.AppConstants.ClaudeSonnet : null;
+
                 var result = await _completionAnalyzer.VerifyResultAsync(
-                    outputText, task.Description, task.CompletionSummary, ct);
+                    outputText, task.Description, task.CompletionSummary, ct, verificationModel);
 
                 if (result != null)
                 {
@@ -276,23 +285,30 @@ namespace Spritely.Managers
         public void InjectSubtaskResult(AgentTask parent, AgentTask child)
             => _ = InjectSubtaskResultAsync(parent, child);
 
+        private static bool HasNeedsMoreWorkStatus(string outputText)
+        {
+            var tail = outputText.Length > 2000 ? outputText[^2000..] : outputText;
+            foreach (var line in tail.Split('\n'))
+            {
+                if (line.Trim() == "STATUS: NEEDS_MORE_WORK")
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>
-        /// Checks whether the output contains "STATUS: COMPLETE WITH RECOMMENDATIONS" as a
-        /// standalone line produced by the AI, not as part of echoed prompt instructions.
-        /// Only looks at the last portion of the output where the AI's status marker would be.
+        /// Checks whether the output contains "STATUS: COMPLETE WITH RECOMMENDATIONS" or
+        /// "STATUS: NEEDS_MORE_WORK" as a standalone line produced by the AI.
         /// </summary>
         private static bool HasExplicitRecommendationStatus(string outputText)
         {
-            // Only check the tail of the output (last ~2000 chars) where the AI's
-            // actual status marker would appear, not in echoed prompt instructions
             var tail = outputText.Length > 2000 ? outputText[^2000..] : outputText;
             var lines = tail.Split('\n');
 
-            // Look for the marker as a standalone trimmed line (not inside a bullet, quote, or backtick)
             for (int i = lines.Length - 1; i >= 0; i--)
             {
                 var trimmed = lines[i].Trim();
-                if (trimmed == "STATUS: COMPLETE WITH RECOMMENDATIONS")
+                if (trimmed == "STATUS: COMPLETE WITH RECOMMENDATIONS" || trimmed == "STATUS: NEEDS_MORE_WORK")
                     return true;
             }
             return false;

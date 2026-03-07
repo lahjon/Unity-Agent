@@ -72,7 +72,6 @@ namespace Spritely
             if (t.ExtendedPlanning) flags.Add("ExtPlanning");
             if (t.PlanOnly) flags.Add("PlanOnly");
             if (t.AutoDecompose) flags.Add("AutoDecompose");
-            if (t.NoGitWrite) flags.Add("NoGitWrite");
             if (t.IgnoreFileLocks) flags.Add("IgnoreLocks");
             if (t.UseMcp) flags.Add("MCP");
             var tooltip = flags.Count > 0 ? string.Join(", ", flags) : "(default settings)";
@@ -333,7 +332,6 @@ namespace Spritely
             var planOnlyChk = MakeTemplateCheckBox("PlanOnly", t.PlanOnly);
             var ignoreLockChk = MakeTemplateCheckBox("IgnoreLocks", t.IgnoreFileLocks);
             var mcpChk = MakeTemplateCheckBox("MCP", t.UseMcp);
-            var noGitChk = MakeTemplateCheckBox("NoGitWrite", t.NoGitWrite);
             var msgBusChk = MakeTemplateCheckBox("MsgBus", t.UseMessageBus);
             var autoDecompChk = MakeTemplateCheckBox("AutoDecompose", t.AutoDecompose);
 
@@ -344,7 +342,6 @@ namespace Spritely
             togglePanel.Children.Add(planOnlyChk);
             togglePanel.Children.Add(ignoreLockChk);
             togglePanel.Children.Add(mcpChk);
-            togglePanel.Children.Add(noGitChk);
             togglePanel.Children.Add(msgBusChk);
             togglePanel.Children.Add(autoDecompChk);
             content.Children.Add(togglePanel);
@@ -424,7 +421,6 @@ namespace Spritely
                 t.PlanOnly = planOnlyChk.IsChecked == true;
                 t.IgnoreFileLocks = ignoreLockChk.IsChecked == true;
                 t.UseMcp = mcpChk.IsChecked == true;
-                t.NoGitWrite = noGitChk.IsChecked == true;
                 t.UseMessageBus = msgBusChk.IsChecked == true;
                 t.AutoDecompose = autoDecompChk.IsChecked == true;
                 t.AdditionalInstructions = instrBox.Text?.Trim() ?? "";

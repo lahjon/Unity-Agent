@@ -1,0 +1,3 @@
+﻿# Track features/ (shared context), ignore local caches
+cache/
+*.local.json

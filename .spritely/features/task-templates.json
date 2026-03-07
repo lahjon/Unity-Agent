@@ -1,0 +1,64 @@
+{
+  "id": "task-templates",
+  "name": "Saved Prompts \u0026 Task Templates",
+  "description": "Lets users save, load, and manage reusable task descriptions and templates including their flags (skip permissions, max iterations). Templates are stored per-project and globally via SettingsManager.",
+  "category": "ui",
+  "keywords": [
+    "SavedPromptEntry",
+    "SettingsManager",
+    "TaskTemplate",
+    "WorkflowComposer",
+    "preset",
+    "reuse",
+    "saved prompts",
+    "stored prompt",
+    "templates"
+  ],
+  "primaryFiles": [
+    "MainWindow.SavedPrompts.cs",
+    "MainWindow.Templates.cs",
+    "Managers/SettingsManager.cs"
+  ],
+  "secondaryFiles": [
+    "Dialogs/WorkflowComposerDialog.cs",
+    "Models/SavedPromptEntry.cs",
+    "Models/TaskTemplate.cs"
+  ],
+  "relatedFeatureIds": [
+    "task-execution",
+    "task-factory"
+  ],
+  "context": {
+    "signatures": {
+      "MainWindow.SavedPrompts.cs": {
+        "hash": "96cbb6f17bc6",
+        "content": "class MainWindow"
+      },
+      "MainWindow.Templates.cs": {
+        "hash": "9c994d5ad0cc",
+        "content": "class MainWindow"
+      },
+      "Managers/SettingsManager.cs": {
+        "hash": "5821781d4f6a",
+        "content": "class SettingsManager\n  TaskTemplates: List\u003CTaskTemplate\u003E\n  LoadSettingsAsync() -\u003E Task\n  SaveSettings(string? projectPath) -\u003E void\n  LoadTemplatesAsync(string? projectPath) -\u003E Task\n  SaveTemplate(TaskTemplate template) -\u003E void\n  DeleteTemplate(TaskTemplate template) -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class SavedPromptEntry",
+      "class SettingsManager",
+      "class TaskTemplate",
+      "class WorkflowComposerDialog",
+      "class WorkflowStep"
+    ],
+    "patterns": [
+      "Templates persisted per-project in .spritely/templates/",
+      "Workflow composer builds multi-step dependency graphs"
+    ],
+    "dependencies": [
+      "SafeFileWriter for background writes",
+      "TaskOrchestrator for workflow step dependencies"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.5104111Z"
+}

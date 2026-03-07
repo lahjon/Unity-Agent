@@ -89,13 +89,6 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void CreateTask_NoGitWrite_SetsProperty()
-        {
-            var task = _factory.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, noGitWrite: true);
-            Assert.True(task.NoGitWrite);
-        }
-
-        [Fact]
         public void CreateTask_MaxIterationsIs2()
         {
             var task = _factory.CreateTask("desc", @"C:\proj", false, false, false, false, false, false);
@@ -133,22 +126,13 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void BuildBasePrompt_WithNoGitWrite_IncludesGitBlock()
+        public void BuildBasePrompt_AlwaysIncludesNoGitWriteBlock()
         {
-            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: true);
+            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false);
             Assert.Contains("NO GIT WRITES", result);
             Assert.Contains("Never commit", result);
             Assert.StartsWith("SYS:", result);
             Assert.EndsWith("task", result);
-        }
-
-        [Fact]
-        public void BuildBasePrompt_WithoutNoGitWrite_StillIncludesNoGitWriteBlock()
-        {
-            // NoGitWrite is always enforced — the commit system handles all git writes
-            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false, noGitWrite: false);
-            Assert.Contains("NO GIT WRITES", result);
-            Assert.Contains("Never commit", result);
         }
 
         [Fact]
@@ -281,7 +265,7 @@ namespace Spritely.Tests
         [Fact]
         public void GetCliModelForTask_PlanningTeamMember_ReturnsSonnet()
         {
-            var task = new AgentTask { NoGitWrite = true, ParentTaskId = "parent123" };
+            var task = new AgentTask { ParentTaskId = "parent123" };
             Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForTask(task));
         }
 
@@ -295,7 +279,7 @@ namespace Spritely.Tests
         [Fact]
         public void GetCliModelForTask_ExecutionStep_ReturnsOpus()
         {
-            var task = new AgentTask { ExtendedPlanning = true, ParentTaskId = "parent123", NoGitWrite = true };
+            var task = new AgentTask { ExtendedPlanning = true, ParentTaskId = "parent123" };
             Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForTask(task));
         }
 
@@ -796,32 +780,15 @@ namespace Spritely.Tests
         // ── Completion Summary ─────────────────────────────────────────
 
         [Fact]
-        public void FormatCompletionSummary_ContainsStatus()
+        public void FormatCompletionSummary_ReturnsEmpty()
         {
             var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Completed, TimeSpan.FromMinutes(5), null);
-            Assert.Contains("Completed", result);
+            Assert.Equal("", result);
         }
 
         [Fact]
-        public void FormatCompletionSummary_ContainsDuration()
-        {
-            var result = _completion.FormatCompletionSummary(
-                AgentTaskStatus.Completed, TimeSpan.FromSeconds(323), null);
-            Assert.Contains("5m 23s", result);
-        }
-
-        [Fact]
-        public void FormatCompletionSummary_NullFiles_NoFileSection()
-        {
-            var result = _completion.FormatCompletionSummary(
-                AgentTaskStatus.Completed, TimeSpan.Zero, null);
-            Assert.DoesNotContain("Files modified", result);
-            Assert.DoesNotContain("Lines changed", result);
-        }
-
-        [Fact]
-        public void FormatCompletionSummary_WithFiles_NoFileSection()
+        public void FormatCompletionSummary_WithFiles_ReturnsEmpty()
         {
             var files = new List<(string name, int added, int removed)>
             {
@@ -830,18 +797,7 @@ namespace Spritely.Tests
             };
             var result = _completion.FormatCompletionSummary(
                 AgentTaskStatus.Failed, TimeSpan.FromMinutes(2), files);
-            Assert.DoesNotContain("Files modified", result);
-            Assert.DoesNotContain("Lines changed", result);
-            Assert.DoesNotContain("src/App.cs", result);
-            Assert.Contains("Failed", result);
-        }
-
-        [Fact]
-        public void FormatCompletionSummary_ContainsSummaryHeader()
-        {
-            var result = _completion.FormatCompletionSummary(
-                AgentTaskStatus.Completed, TimeSpan.Zero, null);
-            Assert.Contains("Status: Completed", result);
+            Assert.Equal("", result);
         }
 
         [Fact]
@@ -880,11 +836,11 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public async Task GenerateCompletionSummaryAsync_InvalidPath_StillReturnsFormatted()
+        public async Task GenerateCompletionSummaryAsync_InvalidPath_ReturnsEmpty()
         {
             var result = await _completion.GenerateCompletionSummaryAsync(
                 @"C:\nonexistent_path_12345", null, AgentTaskStatus.Completed, TimeSpan.FromMinutes(1));
-            Assert.Contains("Status: Completed", result);
+            Assert.Equal("", result);
         }
     }
 }

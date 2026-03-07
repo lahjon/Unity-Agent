@@ -18,7 +18,6 @@ namespace Spritely.Managers
             bool useMcp,
             bool spawnTeam = false,
             bool extendedPlanning = false,
-            bool noGitWrite = false,
             bool planOnly = false,
             bool useMessageBus = false,
             List<string>? imagePaths = null,

@@ -1,0 +1,63 @@
+{
+  "id": "feature-mode",
+  "name": "Feature Mode (Multi-Iteration Execution)",
+  "description": "Enables multi-iteration AI task execution with optional team spawning, plan consolidation, and evaluation phases. Drives the FeatureModePhase state machine and makes per-iteration continuation decisions including early termination.",
+  "category": "core",
+  "keywords": [
+    "FeatureModeHandler",
+    "FeatureModePhase",
+    "continuation",
+    "evaluation",
+    "feature mode",
+    "iteration",
+    "multi-iteration",
+    "plan consolidation",
+    "team spawning"
+  ],
+  "primaryFiles": [
+    "Managers/CompletionAnalyzer.cs",
+    "Managers/FeatureModeHandler.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/EarlyTerminationManager.cs",
+    "Managers/ProgressAnalyzer.cs",
+    "Managers/TokenLimitHandler.cs",
+    "Models/TaskConfigBase.cs",
+    "Spritely.Tests/TaskExecutionEngineTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "context-optimization",
+    "prompt-building",
+    "task-execution"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/CompletionAnalyzer.cs": {
+        "hash": "aef548c5c0d0",
+        "content": "class CompletionAnalyzer\n  IsTaskOutputComplete(string[] lines, int recommendationLine) -\u003E bool\n  ExtractRecommendations(string output) -\u003E string?\n  CheckFeatureModeComplete(string output) -\u003E bool\n  IsTokenLimitError(string output) -\u003E bool"
+      },
+      "Managers/FeatureModeHandler.cs": {
+        "hash": "747a93de8b02",
+        "content": "class FeatureModeHandler\n  Description: string\n  DependsOn: List\u003Cint\u003E?\nenum FeatureModeAction\n    newFailures, Action, ConsecutiveFailures, TrimOutput"
+      }
+    },
+    "keyTypes": [
+      "class CompletionAnalyzer",
+      "class FeatureModeHandler",
+      "enum FeatureModeAction",
+      "enum FeatureModePhase"
+    ],
+    "patterns": [
+      "Fire-and-await continuation prompt",
+      "Per-iteration decision with crash-loop detection",
+      "Phase state machine (None\u2192TeamPlanning\u2192PlanConsolidation\u2192Execution\u2192Evaluation)"
+    ],
+    "dependencies": [
+      "CompletionAnalyzer for completion detection",
+      "PromptBuilder for continuation prompts",
+      "TaskExecutionManager for process control"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.3450915Z"
+}

@@ -21,14 +21,15 @@
                     AllowDrop="True"
                     DragOver="TaskCard_DragOver"
                     Drop="TaskCard_Drop"
-                    ToolTip="{Binding Id, StringFormat='Task ID: {0}'}"
-                    ToolTipService.InitialShowDelay="500">
+                    >
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Continue Recommendations" Click="ContinueTask_Click"
                                   Visibility="{Binding IsContinuable, Converter={StaticResource BoolToVisibility}}"/>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
                         <MenuItem Header="Export Output" Click="ExportTask_Click"/>
+                        <MenuItem Header="View Output" Click="ViewOutput_Click"
+                                  Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibility}}"/>
                         <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
                         <Separator/>
                         <MenuItem Header="Clone Task" Click="CloneTask_Click"/>
@@ -105,6 +106,9 @@
                                     <Setter Property="ToolTip" Value="Pause task"/>
                                     <Setter Property="Visibility" Value="Visible"/>
                                     <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource AccentHover}"/>
+                                        </Trigger>
                                         <DataTrigger Binding="{Binding IsPaused}" Value="True">
                                             <Setter Property="Content" Value="&#xE768;"/>
                                             <Setter Property="Foreground" Value="{StaticResource AccentHover}"/>
@@ -183,6 +187,9 @@
                                     <Setter Property="Content" Value="&#xE8BB;"/>
                                     <Setter Property="ToolTip" Value="Cancel task"/>
                                     <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource DangerDeleteHover}"/>
+                                        </Trigger>
                                         <DataTrigger Binding="{Binding IsFinished}" Value="True">
                                             <Setter Property="Content" Value="&#xE73E;"/>
                                             <Setter Property="Foreground" Value="{StaticResource Success}"/>
@@ -198,7 +205,11 @@
                                FontSize="10" FontFamily="Consolas" Margin="0,2,2,0"
                                HorizontalAlignment="Right"/>
                     </StackPanel>
-                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="{Binding Id, StringFormat='ID: {0}'}"
+                                   Foreground="{StaticResource TextMuted}"
+                                   FontSize="9" FontFamily="Consolas" Margin="0,0,0,2"/>
+                    <StackPanel Orientation="Horizontal">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse x:Name="StatusGlow" Width="8" Height="8"
                                      Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}">
@@ -433,6 +444,7 @@
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
                     </StackPanel>
+                    </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
                                Foreground="{StaticResource TextLight}" FontSize="12" FontFamily="Segoe UI"
                                TextTrimming="CharacterEllipsis" Margin="0,4,0,0">
@@ -641,8 +653,7 @@
         <DataTemplate x:Key="HistoryTaskTemplate">
             <Border CornerRadius="8" Padding="10" Margin="0,2"
                     BorderThickness="1"
-                    ToolTip="{Binding Id, StringFormat='Task ID: {0}'}"
-                    ToolTipService.InitialShowDelay="500">
+                    >
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Resume" Click="Resume_Click"/>
@@ -652,6 +663,7 @@
                         <Separator/>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
                         <MenuItem Header="Export Output" Click="ExportTask_Click"/>
+                        <MenuItem Header="View Output" Click="ViewOutput_Click"/>
                         <Separator/>
                         <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
                     </ContextMenu>
@@ -755,7 +767,11 @@
                                FontSize="10" FontFamily="Consolas" Margin="0,2,2,0"
                                HorizontalAlignment="Right"/>
                     </StackPanel>
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="14,0,0,0">
+                    <StackPanel Grid.Row="0" Margin="14,0,0,0">
+                        <TextBlock Text="{Binding Id, StringFormat='ID: {0}'}"
+                                   Foreground="{StaticResource TextMuted}"
+                                   FontSize="9" FontFamily="Consolas" Margin="0,0,0,2"/>
+                    <StackPanel Orientation="Horizontal">
                         <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse x:Name="HistStatusGlow" Width="8" Height="8"
                                      Fill="{Binding StatusColor, Converter={StaticResource StringToBrush}}">
@@ -904,6 +920,7 @@
                                    TextTrimming="CharacterEllipsis" MaxWidth="100"
                                    ToolTip="{Binding ProjectPath}"/>
                     </StackPanel>
+                    </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
                                Foreground="{StaticResource TextSubdued}" FontSize="12" FontFamily="Segoe UI"
                                TextTrimming="CharacterEllipsis" Margin="0,4,0,0">
@@ -1040,8 +1057,7 @@
         <DataTemplate x:Key="StoredTaskTemplate">
             <Border CornerRadius="8" Padding="10" Margin="0,2"
                     BorderThickness="1"
-                    ToolTip="{Binding Id, StringFormat='Task ID: {0}'}"
-                    ToolTipService.InitialShowDelay="500">
+                    >
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Copy Stored Prompt" Click="CopyStoredPrompt_Click"/>
@@ -1095,19 +1111,24 @@
                                    FontSize="10" FontFamily="Consolas" Margin="0,2,2,0"
                                    HorizontalAlignment="Right"/>
                     </StackPanel>
-                    <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
-                            <Ellipse Width="8" Height="8" Fill="{StaticResource AccentTeal}"/>
-                        </Grid>
-                        <TextBlock Text="Stored" Foreground="{StaticResource AccentTeal}"
-                                   FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="11" FontFamily="Segoe UI"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding ProjectName}" Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
-                                   FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" MaxWidth="100"
-                                   ToolTip="{Binding ProjectPath}"/>
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="{Binding Id, StringFormat='ID: {0}'}"
+                                   Foreground="{StaticResource TextMuted}"
+                                   FontSize="9" FontFamily="Consolas" Margin="0,0,0,2"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
+                                <Ellipse Width="8" Height="8" Fill="{StaticResource AccentTeal}"/>
+                            </Grid>
+                            <TextBlock Text="Stored" Foreground="{StaticResource AccentTeal}"
+                                       FontSize="11" FontWeight="SemiBold" FontFamily="Segoe UI"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text=" | " Foreground="{StaticResource SeparatorDark}" FontSize="11" FontFamily="Segoe UI"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ProjectName}" Foreground="{Binding ProjectColor, Converter={StaticResource StringToBrush}}"
+                                       FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="100"
+                                       ToolTip="{Binding ProjectPath}"/>
+                        </StackPanel>
                     </StackPanel>
                     <TextBlock Grid.Row="1" Text="{Binding ShortDescription}"
                                Foreground="{StaticResource TextSubdued}" FontSize="12" FontFamily="Segoe UI"
@@ -1420,25 +1441,6 @@
 
                     <!-- Prompt input area -->
                 <DockPanel>
-                    <!-- Right: Action buttons beside prompt -->
-                    <StackPanel DockPanel.Dock="Right" Margin="6,0,0,0" VerticalAlignment="Center">
-                        <Button Content="&#xE7B8;" Click="StoreTask_Click"
-                                Style="{StaticResource PromptActionBtn}"
-                                ToolTip="Store Task"
-                                Margin="0,0,0,4"/>
-                        <Button Content="&#xE74E;" Click="SavePromptEntry_Click"
-                                Style="{StaticResource PromptActionBtn}"
-                                ToolTip="Save Prompt"
-                                Margin="0,0,0,4"/>
-                        <Button Content="&#xE8F1;" Click="ComposeWorkflow_Click"
-                                Style="{StaticResource PromptActionBtn}"
-                                ToolTip="Compose Workflow"
-                                Margin="0,0,0,4"/>
-                        <Button x:Name="ExecuteButton" Content="&#xE768;" Click="Execute_Click"
-                                Style="{StaticResource PromptActionBtn}"
-                                Background="{StaticResource Accent}" Foreground="White"
-                                ToolTip="Execute Task"/>
-                    </StackPanel>
                     <!-- Top: Prompt label, model selector, text input -->
                     <DockPanel>
                         <!-- Panel label + Model selector -->
@@ -1550,16 +1552,38 @@
                         <!-- Divider between deps and prompt -->
                         <Border DockPanel.Dock="Top" Margin="0,3,0,3" Height="1"
                                 Background="{StaticResource BorderSubtle}" Opacity="0.4"/>
-                        <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
-                                 MinHeight="80"
-                                 VerticalScrollBarVisibility="Auto"
-                                 Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
-                                 CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                 FontSize="13" FontFamily="Consolas" Padding="6"
-                                 PreviewKeyDown="TaskInput_PreviewKeyDown"
-                                 TextChanged="TaskInput_TextChanged"
-                                 AllowDrop="True" PreviewDragOver="TaskInput_DragOver"
-                                 Drop="TaskInput_Drop"/>
+                        <!-- Prompt input + action buttons -->
+                        <DockPanel>
+                            <!-- Right: Action buttons beside prompt input -->
+                            <StackPanel DockPanel.Dock="Right" Margin="6,0,0,0" VerticalAlignment="Center">
+                                <Button Content="&#xE7B8;" Click="StoreTask_Click"
+                                        Style="{StaticResource PromptActionBtn}"
+                                        ToolTip="Store Task"
+                                        Margin="0,0,0,4"/>
+                                <Button Content="&#xE74E;" Click="SavePromptEntry_Click"
+                                        Style="{StaticResource PromptActionBtn}"
+                                        ToolTip="Save Prompt"
+                                        Margin="0,0,0,4"/>
+                                <Button Content="&#xE8F1;" Click="ComposeWorkflow_Click"
+                                        Style="{StaticResource PromptActionBtn}"
+                                        ToolTip="Compose Workflow"
+                                        Margin="0,0,0,4"/>
+                                <Button x:Name="ExecuteButton" Content="&#xE768;" Click="Execute_Click"
+                                        Style="{StaticResource PromptActionBtn}"
+                                        Background="{StaticResource Accent}" Foreground="White"
+                                        ToolTip="Execute Task"/>
+                            </StackPanel>
+                            <TextBox x:Name="TaskInput" AcceptsReturn="True" TextWrapping="Wrap"
+                                     MinHeight="80"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
+                                     CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                     FontSize="13" FontFamily="Consolas" Padding="6"
+                                     PreviewKeyDown="TaskInput_PreviewKeyDown"
+                                     TextChanged="TaskInput_TextChanged"
+                                     AllowDrop="True" PreviewDragOver="TaskInput_DragOver"
+                                     Drop="TaskInput_Drop"/>
+                        </DockPanel>
                     </DockPanel>
                 </DockPanel>
 
@@ -1777,6 +1801,145 @@
                                      Style="{StaticResource TaskListStyle}"
                                      ItemTemplate="{StaticResource StoredTaskTemplate}"
                                      PreviewMouseWheel="TaskList_PreviewMouseWheel"/>
+                        </Grid>
+                    </TabItem>
+                    <TabItem x:Name="FeaturesTabItem">
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="FEATURES" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"/>
+                                <TextBlock x:Name="FeaturesTabCount" FontWeight="Bold" FontSize="11"
+                                           FontFamily="Segoe UI" Foreground="{StaticResource TextSubdued}"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <!-- Refresh button -->
+                            <DockPanel Grid.Row="0" Margin="4,0,0,8">
+                                <Button Content="Refresh" Click="RefreshFeatures_Click"
+                                        Style="{StaticResource GhostBtn}" DockPanel.Dock="Right"/>
+                                <TextBlock Text="" FontSize="10" Foreground="Transparent"/>
+                            </DockPanel>
+                            <!-- Search box -->
+                            <Grid Grid.Row="1" Margin="4,0,4,6">
+                                <TextBox x:Name="FeatureSearchBox"
+                                         FontSize="12" Padding="6,4"
+                                         Background="{StaticResource BgElevated}"
+                                         Foreground="{StaticResource TextPrimary}"
+                                         BorderThickness="1"
+                                         TextChanged="FeatureSearchBox_TextChanged"/>
+                                <TextBlock Text="Search features..." IsHitTestVisible="False"
+                                           FontSize="12" Padding="8,5"
+                                           Foreground="{StaticResource TextSubdued}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=FeatureSearchBox}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                            <!-- Feature list -->
+                            <ListBox x:Name="FeaturesListBox" Grid.Row="2"
+                                     Style="{StaticResource TaskListStyle}"
+                                     SelectionChanged="FeaturesListBox_SelectionChanged"
+                                     PreviewMouseWheel="TaskList_PreviewMouseWheel">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="6,4" CornerRadius="4">
+                                            <StackPanel>
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Category}"
+                                                               Foreground="{StaticResource AccentTeal}" FontSize="9"
+                                                               FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBright}"
+                                                               FontSize="12" FontFamily="Segoe UI" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </DockPanel>
+                                                <TextBlock Text="{Binding Description}" Foreground="{StaticResource TextSecondary}"
+                                                           FontSize="10" FontFamily="Segoe UI" TextTrimming="CharacterEllipsis"
+                                                           MaxHeight="30" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <!-- Feature detail panel -->
+                            <Border x:Name="FeatureDetailPanel" Grid.Row="3" Visibility="Collapsed"
+                                    Background="{StaticResource BgDeep}" CornerRadius="6" Padding="10"
+                                    Margin="0,6,0,0" MaxHeight="280"
+                                    BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel>
+                                        <!-- Name + Category -->
+                                        <DockPanel Margin="0,0,0,4">
+                                            <Border DockPanel.Dock="Right" Background="{StaticResource BgElevated}"
+                                                    CornerRadius="3" Padding="6,2">
+                                                <TextBlock x:Name="FeatureDetailCategory" Foreground="{StaticResource AccentTeal}"
+                                                           FontSize="10" FontFamily="Segoe UI"/>
+                                            </Border>
+                                            <TextBlock x:Name="FeatureDetailName" Foreground="{StaticResource Accent}"
+                                                       FontSize="14" FontWeight="Bold" FontFamily="Segoe UI"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </DockPanel>
+                                        <!-- Description -->
+                                        <TextBlock x:Name="FeatureDetailDescription" Foreground="{StaticResource TextBody}"
+                                                   FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                                   Margin="0,0,0,8"/>
+                                        <!-- Keywords -->
+                                        <TextBlock Text="KEYWORDS" Foreground="{StaticResource TextDim}" FontSize="9"
+                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                        <TextBlock x:Name="FeatureDetailKeywords" Foreground="{StaticResource TextSecondary}"
+                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <!-- Related features -->
+                                        <TextBlock Text="RELATED FEATURES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                        <TextBlock x:Name="FeatureDetailRelated" Foreground="{StaticResource TextSecondary}"
+                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <!-- Dependencies -->
+                                        <TextBlock Text="DEPENDENCIES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                        <TextBlock x:Name="FeatureDetailDependencies" Foreground="{StaticResource TextSecondary}"
+                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <!-- Key Types -->
+                                        <TextBlock Text="KEY TYPES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                        <TextBlock x:Name="FeatureDetailKeyTypes" Foreground="{StaticResource AccentBlue}"
+                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <!-- Patterns -->
+                                        <TextBlock Text="PATTERNS" Foreground="{StaticResource TextDim}" FontSize="9"
+                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                        <TextBlock x:Name="FeatureDetailPatterns" Foreground="{StaticResource TextSecondary}"
+                                                   FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <!-- Primary Files -->
+                                        <TextBlock Text="PRIMARY FILES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                        <TextBlock x:Name="FeatureDetailPrimaryFiles" Foreground="{StaticResource TextSecondary}"
+                                                   FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <!-- Secondary Files -->
+                                        <TextBlock Text="SECONDARY FILES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                        <TextBlock x:Name="FeatureDetailSecondaryFiles" Foreground="{StaticResource TextSecondary}"
+                                                   FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <!-- Signatures -->
+                                        <TextBlock Text="SIGNATURES" Foreground="{StaticResource TextDim}" FontSize="9"
+                                                   FontWeight="Bold" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                        <TextBlock x:Name="FeatureDetailSignatures" Foreground="{StaticResource TextSecondary}"
+                                                   FontSize="10" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <!-- Metadata -->
+                                        <TextBlock x:Name="FeatureDetailMeta" Foreground="{StaticResource TextDisabled}"
+                                                   FontSize="9" FontFamily="Segoe UI" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
                         </Grid>
                     </TabItem>
                 </TabControl>
@@ -2379,12 +2542,20 @@
                                            Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
                                            Margin="0,0,0,8"/>
                                 <StackPanel Orientation="Horizontal">
-                                    <Button x:Name="BuildInvestigationBtn" Content="Build Investigation"
+                                    <Button x:Name="BuildInvestigationBtn" Content="Crash Log Investigation"
                                             Click="BuildInvestigation_Click"
                                             Style="{StaticResource SecondaryBtn}"
                                             FontSize="11" Padding="10,4" HorizontalAlignment="Left"/>
                                     <Button x:Name="TestVerificationBtn" Content="Test Verification"
                                             Click="TestVerification_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4" HorizontalAlignment="Left" Margin="8,0,0,0"/>
+                                    <Button x:Name="BuildTestBtn" Content="Build Test"
+                                            Click="BuildTest_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4" HorizontalAlignment="Left" Margin="8,0,0,0"/>
+                                    <Button x:Name="RestartProjectBtn" Content="Restart Project"
+                                            Click="RestartProject_Click"
                                             Style="{StaticResource SecondaryBtn}"
                                             FontSize="11" Padding="10,4" HorizontalAlignment="Left" Margin="8,0,0,0"/>
                                 </StackPanel>
@@ -2619,6 +2790,7 @@
                                                FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
                                                Margin="0,0,12,0"/>
                                     <ComboBox x:Name="HistoryRetentionCombo" Width="120"
+                                              FontSize="11" Padding="6,3"
                                               SelectionChanged="HistoryRetention_Changed">
                                         <ComboBoxItem Content="6 hours" Tag="6"/>
                                         <ComboBoxItem Content="12 hours" Tag="12"/>
@@ -2654,6 +2826,19 @@
                                              LostFocus="TaskTimeout_Changed"
                                              KeyDown="TaskTimeout_KeyDown"
                                              ToolTip="Task timeout in minutes (default: 120)"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBlock Text="Opus effort level" Foreground="{StaticResource TextLight}"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <ComboBox x:Name="OpusEffortCombo" Width="120"
+                                              FontSize="11" Padding="6,3"
+                                              SelectionChanged="OpusEffort_Changed">
+                                        <ComboBoxItem Content="Low" Tag="low"/>
+                                        <ComboBoxItem Content="Medium" Tag="medium"/>
+                                        <ComboBoxItem Content="High" Tag="high" IsSelected="True"/>
+                                    </ComboBox>
                                 </StackPanel>
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>

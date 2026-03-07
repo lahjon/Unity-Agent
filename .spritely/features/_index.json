@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "features": [
+    {
+      "id": "agent-bus-operation-logging",
+      "name": "Agent Bus Operation Logging"
+    },
+    {
+      "id": "app-startup-config",
+      "name": "App Startup \u0026 Configuration"
+    },
+    {
+      "id": "chat-interface",
+      "name": "Chat Interface"
+    },
+    {
+      "id": "context-optimization",
+      "name": "Context \u0026 Token Optimization"
+    },
+    {
+      "id": "export-task-data",
+      "name": "Export Task Data"
+    },
+    {
+      "id": "feature-mode",
+      "name": "Feature Mode (Multi-Iteration Execution)"
+    },
+    {
+      "id": "feature-registry",
+      "name": "Feature Registry System"
+    },
+    {
+      "id": "file-lock-management",
+      "name": "File Lock Management"
+    },
+    {
+      "id": "finished-task-output-viewer",
+      "name": "Task Output Context Menu"
+    },
+    {
+      "id": "git-operations",
+      "name": "Git Operations"
+    },
+    {
+      "id": "git-ui",
+      "name": "Git Panel UI"
+    },
+    {
+      "id": "helper-suggestions",
+      "name": "AI Project Suggestions"
+    },
+    {
+      "id": "hide-active-toggles",
+      "name": "Hide Active Toggles"
+    },
+    {
+      "id": "history-analytics",
+      "name": "Task History \u0026 Analytics"
+    },
+    {
+      "id": "llm-services",
+      "name": "LLM Service Configuration"
+    },
+    {
+      "id": "logging-diagnostics",
+      "name": "Logging \u0026 Diagnostics"
+    },
+    {
+      "id": "mcp-integration",
+      "name": "MCP-for-Unity Integration"
+    },
+    {
+      "id": "message-bus",
+      "name": "Inter-Task Message Bus"
+    },
+    {
+      "id": "output-processing",
+      "name": "Output Processing \u0026 Display"
+    },
+    {
+      "id": "pause-remove-button-hover",
+      "name": "Pause/Remove Button Hover Feedback"
+    },
+    {
+      "id": "preprocessor-skip-rules",
+      "name": "Preprocessor Skip Rules for Task Types"
+    },
+    {
+      "id": "project-management",
+      "name": "Project Management"
+    },
+    {
+      "id": "project-tasks",
+      "name": "Project Task List"
+    },
+    {
+      "id": "prompt-building",
+      "name": "Prompt Construction"
+    },
+    {
+      "id": "skills-system",
+      "name": "Skills System"
+    },
+    {
+      "id": "stored-task-viewer",
+      "name": "Stored Task Viewer"
+    },
+    {
+      "id": "task-continuation-button",
+      "name": "Task Continuation Button"
+    },
+    {
+      "id": "task-execution",
+      "name": "Task Execution Engine"
+    },
+    {
+      "id": "task-factory",
+      "name": "Task Creation \u0026 Validation"
+    },
+    {
+      "id": "task-graph-ui",
+      "name": "Task Dependency Graph UI"
+    },
+    {
+      "id": "task-orchestration",
+      "name": "Task Orchestration"
+    },
+    {
+      "id": "task-preprocessing",
+      "name": "Task Preprocessing"
+    },
+    {
+      "id": "task-templates",
+      "name": "Saved Prompts \u0026 Task Templates"
+    },
+    {
+      "id": "terminal",
+      "name": "Integrated Terminal"
+    },
+    {
+      "id": "theming-ui-shared",
+      "name": "Theming \u0026 Shared UI Components"
+    }
+  ]
+}

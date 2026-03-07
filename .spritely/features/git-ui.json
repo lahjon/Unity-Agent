@@ -1,0 +1,55 @@
+{
+  "id": "git-ui",
+  "name": "Git Panel UI",
+  "description": "Renders the Git status panel showing changed files, recent commits, and provides UI actions for staging, committing, and pushing. Refreshes lazily on demand and integrates with the commit dialog.",
+  "category": "ui",
+  "keywords": [
+    "CommitDialog",
+    "GitPanelManager",
+    "commit dialog",
+    "file changes",
+    "git UI",
+    "git panel",
+    "git status",
+    "recent commits",
+    "staging"
+  ],
+  "primaryFiles": [
+    "Dialogs/CommitDialog.cs",
+    "Managers/GitPanelManager.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/GitHelper.cs",
+    "Models/GitResult.cs"
+  ],
+  "relatedFeatureIds": [
+    "git-operations"
+  ],
+  "context": {
+    "signatures": {
+      "Dialogs/CommitDialog.cs": {
+        "hash": "e4634bcc5a84",
+        "content": "class CommitResult\n  Message: string\n  Cancelled: bool\nclass CommitDialog\n  Show(List\u003CGitFileChange\u003E selectedFiles, string suggestedMessage) -\u003E CommitResult"
+      },
+      "Managers/GitPanelManager.cs": {
+        "hash": "fbf159582c11",
+        "content": "class GitPanelManager\n  MarkDirty() -\u003E void\n  RefreshIfNeeded(ScrollViewer container) -\u003E void\n  RefreshAsync(ScrollViewer container) -\u003E Task\nclass GitCommitInfo\n  FullHash: string\n  ShortHash: string\n  Author: string\n  RelativeTime: string\n  Message: string\nclass GitFileChange\n  Status: string\n  FilePath: string\n  DisplayStatus: string"
+      }
+    },
+    "keyTypes": [
+      "class CommitDialog",
+      "class CommitResult",
+      "class GitPanelManager"
+    ],
+    "patterns": [
+      "Dialog for user-reviewed commit messages",
+      "Dirty-flag lazy refresh pattern"
+    ],
+    "dependencies": [
+      "FileLockManager to block commits during active locks",
+      "GitHelper for git operations"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.3983981Z"
+}

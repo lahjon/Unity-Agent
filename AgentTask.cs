@@ -93,7 +93,6 @@ namespace Spritely
         public bool UseMcp { get => Data.UseMcp; set => Data.UseMcp = value; }
         public bool SpawnTeam { get => Data.SpawnTeam; set => Data.SpawnTeam = value; }
         public bool ExtendedPlanning { get => Data.ExtendedPlanning; set => Data.ExtendedPlanning = value; }
-        public bool NoGitWrite { get => Data.NoGitWrite; set => Data.NoGitWrite = value; }
         public bool PlanOnly { get => Data.PlanOnly; set => Data.PlanOnly = value; }
         public bool UseMessageBus { get => Data.UseMessageBus; set => Data.UseMessageBus = value; }
         public bool AutoDecompose { get => Data.AutoDecompose; set => Data.AutoDecompose = value; }

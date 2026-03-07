@@ -279,11 +279,30 @@ namespace Spritely.Dialogs
             }
         }
 
+        private static string? TryReadPromptFile(AgentTask task)
+        {
+            var scriptDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Spritely", "scripts");
+            var promptFile = Path.Combine(scriptDir, $"prompt_{task.Id}.txt");
+            try
+            {
+                if (File.Exists(promptFile))
+                    return File.ReadAllText(promptFile, Encoding.UTF8);
+            }
+            catch { /* best-effort */ }
+            return null;
+        }
+
+        private static string FormatDuration(TimeSpan duration) =>
+            duration.TotalHours >= 1
+                ? $"{duration.TotalHours:F1} hours ({duration.TotalMinutes:F0} minutes)"
+                : $"{duration.TotalMinutes:F1} minutes";
+
         private string ExportToMarkdown()
         {
             var sb = new StringBuilder();
 
-            // Header
             sb.AppendLine($"# Task Export - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine();
             sb.AppendLine($"**Total Tasks:** {_tasksToExport.Count}");
@@ -328,60 +347,185 @@ namespace Spritely.Dialogs
                 sb.AppendLine($"### Task #{task.TaskNumber:D4}");
                 sb.AppendLine();
 
-                // Metadata
-                sb.AppendLine($"**Status:** {task.Status}");
-                sb.AppendLine($"**Model:** {task.Model}");
-                sb.AppendLine($"**Project:** {task.ProjectName}");
-                sb.AppendLine($"**Started:** {task.StartTime:yyyy-MM-dd HH:mm:ss}");
+                // ── Metadata ──
+                sb.AppendLine("#### Metadata");
+                sb.AppendLine();
+                sb.AppendLine($"| Field | Value |");
+                sb.AppendLine($"|-------|-------|");
+                sb.AppendLine($"| **ID** | `{task.Id}` |");
+                sb.AppendLine($"| **Status** | {task.Status} |");
+                sb.AppendLine($"| **Model** | {task.Model} |");
+                sb.AppendLine($"| **Project** | {task.ProjectName} |");
+                sb.AppendLine($"| **Project Path** | `{task.ProjectPath}` |");
+                sb.AppendLine($"| **Started** | {task.StartTime:yyyy-MM-dd HH:mm:ss} |");
 
                 if (task.EndTime.HasValue)
                 {
-                    var duration = task.EndTime.Value - task.StartTime;
-                    sb.AppendLine($"**Duration:** {duration.TotalMinutes:F1} minutes");
+                    sb.AppendLine($"| **Ended** | {task.EndTime.Value:yyyy-MM-dd HH:mm:ss} |");
+                    sb.AppendLine($"| **Duration** | {FormatDuration(task.EndTime.Value - task.StartTime)} |");
                 }
 
-                if (task.HasTokenData)
-                {
-                    sb.AppendLine($"**Tokens:** {task.TokenDisplayText}");
-                }
+                sb.AppendLine($"| **Priority** | {task.PriorityLevel} |");
+                sb.AppendLine($"| **Iterations** | {task.CurrentIteration} / {task.MaxIterations} |");
 
                 if (!string.IsNullOrWhiteSpace(task.ActiveTogglesText))
-                {
-                    sb.AppendLine($"**Features:** {task.ActiveTogglesText}");
-                }
+                    sb.AppendLine($"| **Flags** | {task.ActiveTogglesText} |");
+
+                if (!string.IsNullOrEmpty(task.ConversationId))
+                    sb.AppendLine($"| **Conversation ID** | `{task.ConversationId}` |");
+
+                if (!string.IsNullOrEmpty(task.GitStartHash))
+                    sb.AppendLine($"| **Git Start Hash** | `{task.GitStartHash}` |");
+                if (!string.IsNullOrEmpty(task.CommitHash))
+                    sb.AppendLine($"| **Commit Hash** | `{task.CommitHash}` |");
+                if (task.IsCommitted)
+                    sb.AppendLine($"| **Committed** | Yes |");
+
+                if (!string.IsNullOrEmpty(task.GroupId))
+                    sb.AppendLine($"| **Group** | {task.GroupName ?? task.GroupId} |");
+                if (!string.IsNullOrEmpty(task.ParentTaskId))
+                    sb.AppendLine($"| **Parent Task** | `{task.ParentTaskId}` |");
+                if (task.TimeoutMinutes.HasValue)
+                    sb.AppendLine($"| **Timeout** | {task.TimeoutMinutes} min |");
 
                 sb.AppendLine();
 
-                // Description
-                sb.AppendLine("#### Description");
+                // ── Token Usage ──
+                if (task.HasTokenData)
+                {
+                    sb.AppendLine("#### Token Usage");
+                    sb.AppendLine();
+                    var cost = FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens,
+                        task.CacheReadTokens, task.CacheCreationTokens);
+                    sb.AppendLine($"| Metric | Count |");
+                    sb.AppendLine($"|--------|-------|");
+                    sb.AppendLine($"| Input Tokens | {task.InputTokens:N0} |");
+                    sb.AppendLine($"| Output Tokens | {task.OutputTokens:N0} |");
+                    if (task.CacheReadTokens > 0)
+                        sb.AppendLine($"| Cache Read Tokens | {task.CacheReadTokens:N0} |");
+                    if (task.CacheCreationTokens > 0)
+                        sb.AppendLine($"| Cache Creation Tokens | {task.CacheCreationTokens:N0} |");
+                    sb.AppendLine($"| **Total Tokens** | **{task.TotalAllTokens:N0}** |");
+                    sb.AppendLine($"| **Estimated Cost** | **{FormatHelpers.FormatCost(cost)}** |");
+                    sb.AppendLine();
+                }
+
+                // ── Description / User Prompt ──
+                sb.AppendLine("#### User Prompt (Description)");
+                sb.AppendLine();
                 sb.AppendLine("```");
                 sb.AppendLine(task.Description);
                 sb.AppendLine("```");
                 sb.AppendLine();
 
-                // Completion summary if available
+                if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
+                {
+                    sb.AppendLine("#### Additional Instructions");
+                    sb.AppendLine();
+                    sb.AppendLine("```");
+                    sb.AppendLine(task.AdditionalInstructions);
+                    sb.AppendLine("```");
+                    sb.AppendLine();
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.DependencyContext))
+                {
+                    sb.AppendLine("#### Dependency Context");
+                    sb.AppendLine();
+                    sb.AppendLine("```");
+                    sb.AppendLine(task.DependencyContext);
+                    sb.AppendLine("```");
+                    sb.AppendLine();
+                }
+
+                // ── Full Prompt Sent to Model ──
+                var promptText = TryReadPromptFile(task);
+                if (!string.IsNullOrWhiteSpace(promptText))
+                {
+                    sb.AppendLine("#### Full Prompt Sent to Model");
+                    sb.AppendLine();
+                    sb.AppendLine("<details><summary>Click to expand full prompt</summary>");
+                    sb.AppendLine();
+                    sb.AppendLine("```");
+                    sb.AppendLine(promptText);
+                    sb.AppendLine("```");
+                    sb.AppendLine();
+                    sb.AppendLine("</details>");
+                    sb.AppendLine();
+                }
+
+                // ── Completion Summary ──
                 if (!string.IsNullOrWhiteSpace(task.CompletionSummary))
                 {
                     sb.AppendLine("#### Completion Summary");
+                    sb.AppendLine();
                     sb.AppendLine(task.CompletionSummary);
                     sb.AppendLine();
                 }
 
-                // Recommendations if available
+                // ── Verification ──
+                if (!string.IsNullOrWhiteSpace(task.VerificationResult))
+                {
+                    sb.AppendLine("#### Verification Result");
+                    sb.AppendLine();
+                    sb.AppendLine($"**Verified:** {(task.IsVerified ? "Yes" : "No")}");
+                    sb.AppendLine();
+                    sb.AppendLine(task.VerificationResult);
+                    sb.AppendLine();
+                }
+
+                // ── Recommendations ──
                 if (!string.IsNullOrWhiteSpace(task.Recommendations))
                 {
                     sb.AppendLine("#### Recommendations");
+                    sb.AppendLine();
                     sb.AppendLine(task.Recommendations);
                     sb.AppendLine();
                 }
 
-                // Full output (optional, could be large)
+                // ── Changed Files ──
+                if (task.ChangedFiles.Count > 0)
+                {
+                    sb.AppendLine("#### Changed Files");
+                    sb.AppendLine();
+                    foreach (var file in task.ChangedFiles)
+                        sb.AppendLine($"- `{file}`");
+                    sb.AppendLine();
+                }
+
+                // ── Commit Info ──
+                if (!string.IsNullOrWhiteSpace(task.CommitDiff))
+                {
+                    sb.AppendLine("#### Commit Diff (stat)");
+                    sb.AppendLine();
+                    sb.AppendLine("```");
+                    sb.AppendLine(task.CommitDiff);
+                    sb.AppendLine("```");
+                    sb.AppendLine();
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.CommitError))
+                {
+                    sb.AppendLine("#### Commit Error");
+                    sb.AppendLine();
+                    sb.AppendLine("```");
+                    sb.AppendLine(task.CommitError);
+                    sb.AppendLine("```");
+                    sb.AppendLine();
+                }
+
+                // ── Full Model Output ──
                 if (!string.IsNullOrWhiteSpace(task.FullOutput))
                 {
-                    sb.AppendLine("#### Full Output");
+                    sb.AppendLine("#### Full Model Output");
+                    sb.AppendLine();
+                    sb.AppendLine("<details><summary>Click to expand full output</summary>");
+                    sb.AppendLine();
                     sb.AppendLine("```");
                     sb.AppendLine(task.FullOutput);
                     sb.AppendLine("```");
+                    sb.AppendLine();
+                    sb.AppendLine("</details>");
                     sb.AppendLine();
                 }
 
@@ -394,17 +538,73 @@ namespace Spritely.Dialogs
 
         private string ExportToJson()
         {
-            // Create a list of serializable task data
-            var exportData = _tasksToExport.Select(task => task.Data).ToList();
+            var exportData = _tasksToExport.OrderBy(t => t.TaskNumber).Select(task =>
+            {
+                var cost = task.HasTokenData
+                    ? FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens,
+                        task.CacheReadTokens, task.CacheCreationTokens)
+                    : 0m;
+
+                var entry = new Dictionary<string, object?>
+                {
+                    ["id"] = task.Id,
+                    ["taskNumber"] = task.TaskNumber,
+                    ["status"] = task.Status.ToString(),
+                    ["model"] = task.Model.ToString(),
+                    ["projectName"] = task.ProjectName,
+                    ["projectPath"] = task.ProjectPath,
+                    ["startTime"] = task.StartTime.ToString("o"),
+                    ["endTime"] = task.EndTime?.ToString("o"),
+                    ["durationMinutes"] = task.EndTime.HasValue
+                        ? Math.Round((task.EndTime.Value - task.StartTime).TotalMinutes, 2)
+                        : null,
+                    ["priority"] = task.PriorityLevel.ToString(),
+                    ["iterations"] = new { current = task.CurrentIteration, max = task.MaxIterations },
+                    ["flags"] = task.ActiveTogglesText,
+                    ["conversationId"] = task.ConversationId,
+                    ["gitStartHash"] = task.GitStartHash,
+                    ["commitHash"] = task.CommitHash,
+                    ["isCommitted"] = task.IsCommitted,
+                    ["groupId"] = task.GroupId,
+                    ["groupName"] = task.GroupName,
+                    ["parentTaskId"] = task.ParentTaskId,
+                    ["timeoutMinutes"] = task.TimeoutMinutes,
+                    ["tokens"] = new
+                    {
+                        input = task.InputTokens,
+                        output = task.OutputTokens,
+                        cacheRead = task.CacheReadTokens,
+                        cacheCreation = task.CacheCreationTokens,
+                        total = task.TotalAllTokens,
+                        estimatedCost = cost
+                    },
+                    ["description"] = task.Description,
+                    ["additionalInstructions"] = NullIfEmpty(task.AdditionalInstructions),
+                    ["dependencyContext"] = task.DependencyContext,
+                    ["fullPromptSentToModel"] = TryReadPromptFile(task),
+                    ["completionSummary"] = NullIfEmpty(task.CompletionSummary),
+                    ["verificationResult"] = NullIfEmpty(task.VerificationResult),
+                    ["isVerified"] = task.IsVerified,
+                    ["recommendations"] = NullIfEmpty(task.Recommendations),
+                    ["changedFiles"] = task.ChangedFiles.Count > 0 ? task.ChangedFiles : null,
+                    ["commitDiff"] = task.CommitDiff,
+                    ["commitError"] = task.CommitError,
+                    ["fullOutput"] = task.FullOutput
+                };
+
+                return entry;
+            }).ToList();
 
             var options = new JsonSerializerOptions
             {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                WriteIndented = true
             };
 
             return JsonSerializer.Serialize(exportData, options);
         }
+
+        private static string? NullIfEmpty(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? null : value;
 
         private string ExportToPlainText()
         {
@@ -412,28 +612,130 @@ namespace Spritely.Dialogs
 
             foreach (var task in _tasksToExport.OrderBy(t => t.TaskNumber))
             {
-                sb.AppendLine($"=== Task #{task.TaskNumber:D4} ===");
-                sb.AppendLine($"Status: {task.Status}");
-                sb.AppendLine($"Started: {task.StartTime:yyyy-MM-dd HH:mm:ss}");
+                sb.AppendLine(new string('=', 60));
+                sb.AppendLine($"  TASK #{task.TaskNumber:D4}  (ID: {task.Id})");
+                sb.AppendLine(new string('=', 60));
+                sb.AppendLine();
+
+                // Metadata
+                sb.AppendLine($"Status:       {task.Status}");
+                sb.AppendLine($"Model:        {task.Model}");
+                sb.AppendLine($"Project:      {task.ProjectName}");
+                sb.AppendLine($"Project Path: {task.ProjectPath}");
+                sb.AppendLine($"Priority:     {task.PriorityLevel}");
+                sb.AppendLine($"Iterations:   {task.CurrentIteration} / {task.MaxIterations}");
+                sb.AppendLine($"Started:      {task.StartTime:yyyy-MM-dd HH:mm:ss}");
 
                 if (task.EndTime.HasValue)
                 {
-                    sb.AppendLine($"Ended: {task.EndTime.Value:yyyy-MM-dd HH:mm:ss}");
+                    sb.AppendLine($"Ended:        {task.EndTime.Value:yyyy-MM-dd HH:mm:ss}");
+                    sb.AppendLine($"Duration:     {FormatDuration(task.EndTime.Value - task.StartTime)}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.ActiveTogglesText))
+                    sb.AppendLine($"Flags:        {task.ActiveTogglesText}");
+                if (!string.IsNullOrEmpty(task.ConversationId))
+                    sb.AppendLine($"Conversation: {task.ConversationId}");
+                if (!string.IsNullOrEmpty(task.GitStartHash))
+                    sb.AppendLine($"Git Start:    {task.GitStartHash}");
+                if (!string.IsNullOrEmpty(task.CommitHash))
+                    sb.AppendLine($"Commit Hash:  {task.CommitHash}");
+                if (task.IsCommitted)
+                    sb.AppendLine($"Committed:    Yes");
+
+                if (task.HasTokenData)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("── Token Usage ──");
+                    sb.AppendLine($"  Input:          {task.InputTokens:N0}");
+                    sb.AppendLine($"  Output:         {task.OutputTokens:N0}");
+                    if (task.CacheReadTokens > 0)
+                        sb.AppendLine($"  Cache Read:     {task.CacheReadTokens:N0}");
+                    if (task.CacheCreationTokens > 0)
+                        sb.AppendLine($"  Cache Creation: {task.CacheCreationTokens:N0}");
+                    sb.AppendLine($"  Total:          {task.TotalAllTokens:N0}");
+                    var cost = FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens,
+                        task.CacheReadTokens, task.CacheCreationTokens);
+                    sb.AppendLine($"  Est. Cost:      {FormatHelpers.FormatCost(cost)}");
                 }
 
                 sb.AppendLine();
-                sb.AppendLine("Description:");
+                sb.AppendLine("── Description ──");
                 sb.AppendLine(task.Description);
                 sb.AppendLine();
 
+                if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
+                {
+                    sb.AppendLine("── Additional Instructions ──");
+                    sb.AppendLine(task.AdditionalInstructions);
+                    sb.AppendLine();
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.DependencyContext))
+                {
+                    sb.AppendLine("── Dependency Context ──");
+                    sb.AppendLine(task.DependencyContext);
+                    sb.AppendLine();
+                }
+
+                var promptText = TryReadPromptFile(task);
+                if (!string.IsNullOrWhiteSpace(promptText))
+                {
+                    sb.AppendLine("── Full Prompt Sent to Model ──");
+                    sb.AppendLine(promptText);
+                    sb.AppendLine();
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.CompletionSummary))
+                {
+                    sb.AppendLine("── Completion Summary ──");
+                    sb.AppendLine(task.CompletionSummary);
+                    sb.AppendLine();
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.VerificationResult))
+                {
+                    sb.AppendLine($"── Verification (Verified: {(task.IsVerified ? "Yes" : "No")}) ──");
+                    sb.AppendLine(task.VerificationResult);
+                    sb.AppendLine();
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.Recommendations))
+                {
+                    sb.AppendLine("── Recommendations ──");
+                    sb.AppendLine(task.Recommendations);
+                    sb.AppendLine();
+                }
+
+                if (task.ChangedFiles.Count > 0)
+                {
+                    sb.AppendLine("── Changed Files ──");
+                    foreach (var file in task.ChangedFiles)
+                        sb.AppendLine($"  {file}");
+                    sb.AppendLine();
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.CommitDiff))
+                {
+                    sb.AppendLine("── Commit Diff ──");
+                    sb.AppendLine(task.CommitDiff);
+                    sb.AppendLine();
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.CommitError))
+                {
+                    sb.AppendLine("── Commit Error ──");
+                    sb.AppendLine(task.CommitError);
+                    sb.AppendLine();
+                }
+
                 if (!string.IsNullOrWhiteSpace(task.FullOutput))
                 {
-                    sb.AppendLine("Output:");
+                    sb.AppendLine("── Full Model Output ──");
                     sb.AppendLine(task.FullOutput);
                     sb.AppendLine();
                 }
 
-                sb.AppendLine(new string('=', 50));
                 sb.AppendLine();
             }
 

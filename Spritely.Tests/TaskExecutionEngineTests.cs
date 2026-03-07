@@ -43,7 +43,7 @@ namespace Spritely.Tests
 
         private static AgentTask MakeFeatureModeTask(string projectPath = @"C:\Projects\Test")
         {
-            var t = _factory.CreateTask("feature mode task", projectPath, true, false, false, true, false, false);
+            var t = _factory.CreateTask("feature mode task", projectPath, true, false, true, true, false, false);
             _factory.PrepareTaskForFeatureModeStart(t);
             return t;
         }

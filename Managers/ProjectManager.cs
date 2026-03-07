@@ -13,6 +13,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Spritely.Helpers;
 using Spritely.Dialogs;
@@ -610,6 +611,48 @@ namespace Spritely.Managers
             RefreshDescriptionBoxes();
         }
 
+        public async System.Threading.Tasks.Task ForceInitializeProjectAsync(ProjectEntry entry)
+        {
+            entry.IsInitializing = true;
+            entry.ShortDescription = "";
+            entry.LongDescription = "";
+            SaveProjects();
+            _view.ViewDispatcher.Invoke(() =>
+            {
+                RefreshProjectCombo();
+                RefreshProjectList(null, null, null);
+            });
+
+            await GenerateProjectDescriptionInBackground(entry);
+
+            var claudeTask = EnsureClaudeMdAsync(entry);
+            var featureTask = ForceInitializeFeaturesAsync(entry);
+            await System.Threading.Tasks.Task.WhenAll(claudeTask, featureTask);
+        }
+
+        private async System.Threading.Tasks.Task ForceInitializeFeaturesAsync(ProjectEntry entry)
+        {
+            try
+            {
+                AppLogger.Info("ProjectManager", $"Force-initializing feature registry for {entry.DisplayName}...");
+
+                var registryManager = new FeatureRegistryManager();
+                var initializer = new FeatureInitializer(registryManager);
+                initializer.ProgressChanged += msg => AppLogger.Info("FeatureInit", $"[{entry.DisplayName}] {msg}");
+
+                var result = await initializer.InitializeAsync(entry.Path);
+                if (result != null)
+                {
+                    AppLogger.Info("FeatureInit", $"Initialized {result.Features.Count} features for {entry.DisplayName}");
+                    _view.ViewDispatcher.Invoke(() => RefreshProjectList(null, null, null));
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ProjectManager", $"Feature initialization failed for {entry.DisplayName}", ex);
+            }
+        }
+
         public void SaveShortDesc()
         {
             var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
@@ -916,12 +959,12 @@ namespace Spritely.Managers
 
                 var initBrush = proj.IsInitialized
                     ? BrushCache.Theme("SuccessGreen")
-                    : BrushCache.Theme("TextMuted");
+                    : BrushCache.Theme("WarningAmber");
                 var initIndicator = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
                     Margin = new Thickness(0, 4, 0, 0),
-                    ToolTip = proj.IsInitialized ? "Project is initialized (.claude or CLAUDE.md found)" : "Project is not initialized"
+                    ToolTip = proj.IsInitialized ? "Feature registry initialized" : "Feature registry not initialized"
                 };
                 initIndicator.Children.Add(new System.Windows.Shapes.Ellipse
                 {
@@ -937,35 +980,11 @@ namespace Spritely.Managers
                     Foreground = initBrush,
                     FontSize = 10,
                     FontFamily = new FontFamily("Segoe UI"),
-                    VerticalAlignment = VerticalAlignment.Center
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = proj.IsInitialized ? new Thickness(0) : new Thickness(0, 0, 6, 0)
                 });
-                infoPanel.Children.Add(initIndicator);
-
-                // Feature registry status + inline init button
-                if (!proj.IsFeatureRegistryInitialized)
+                if (!proj.IsInitialized)
                 {
-                    var featureRow = new StackPanel
-                    {
-                        Orientation = Orientation.Horizontal,
-                        Margin = new Thickness(0, 4, 0, 0)
-                    };
-                    featureRow.Children.Add(new System.Windows.Shapes.Ellipse
-                    {
-                        Width = 8,
-                        Height = 8,
-                        Fill = BrushCache.Theme("WarningAmber"),
-                        Margin = new Thickness(0, 0, 4, 0),
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                    featureRow.Children.Add(new TextBlock
-                    {
-                        Text = "Features not initialized",
-                        Foreground = BrushCache.Theme("WarningAmber"),
-                        FontSize = 10,
-                        FontFamily = new FontFamily("Segoe UI"),
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(0, 0, 6, 0)
-                    });
                     var inlineInitBtn = new Button
                     {
                         Content = "Init",
@@ -983,18 +1002,30 @@ namespace Spritely.Managers
                         ev.Handled = true;
                         if (s is not Button btn) return;
                         btn.IsEnabled = false;
-                        var originalContent = btn.Content;
-                        btn.Content = "Initializing...";
+                        btn.Content = "Analyzing...";
+
+                        // Pulsing opacity animation for visual activity indication
+                        var pulseAnim = new DoubleAnimation(1.0, 0.4, TimeSpan.FromSeconds(0.8))
+                        {
+                            AutoReverse = true,
+                            RepeatBehavior = RepeatBehavior.Forever,
+                            EasingFunction = new SineEase()
+                        };
+                        btn.BeginAnimation(UIElement.OpacityProperty, pulseAnim);
+
                         try
                         {
                             var registryManager = new FeatureRegistryManager();
                             var initializer = new FeatureInitializer(registryManager);
                             initializer.ProgressChanged += msg =>
                             {
-                                Application.Current?.Dispatcher?.BeginInvoke(() => btn.Content = msg.Length > 30 ? msg[..30] + "…" : msg);
+                                Application.Current?.Dispatcher?.BeginInvoke(() =>
+                                    btn.Content = msg.Length > 30 ? msg[..30] + "…" : msg);
                                 AppLogger.Info("FeatureInit", $"[{inlineInitEntry.DisplayName}] {msg}");
                             };
                             var result = await initializer.InitializeAsync(inlineInitEntry.Path);
+                            btn.BeginAnimation(UIElement.OpacityProperty, null);
+                            btn.Opacity = 1.0;
                             if (result != null)
                             {
                                 AppLogger.Info("FeatureInit", $"Initialized {result.Features.Count} features for {inlineInitEntry.DisplayName}");
@@ -1008,40 +1039,16 @@ namespace Spritely.Managers
                         }
                         catch (Exception ex)
                         {
+                            btn.BeginAnimation(UIElement.OpacityProperty, null);
+                            btn.Opacity = 1.0;
                             AppLogger.Error("FeatureInit", $"Feature initialization failed for {inlineInitEntry.DisplayName}", ex);
                             btn.Content = "Failed – Retry";
                             btn.IsEnabled = true;
                         }
                     };
-                    featureRow.Children.Add(inlineInitBtn);
-                    infoPanel.Children.Add(featureRow);
+                    initIndicator.Children.Add(inlineInitBtn);
                 }
-                else
-                {
-                    var featureOk = new StackPanel
-                    {
-                        Orientation = Orientation.Horizontal,
-                        Margin = new Thickness(0, 4, 0, 0),
-                        ToolTip = "Feature registry initialized"
-                    };
-                    featureOk.Children.Add(new System.Windows.Shapes.Ellipse
-                    {
-                        Width = 8,
-                        Height = 8,
-                        Fill = BrushCache.Theme("SuccessGreen"),
-                        Margin = new Thickness(0, 0, 4, 0),
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                    featureOk.Children.Add(new TextBlock
-                    {
-                        Text = "Features initialized",
-                        Foreground = BrushCache.Theme("SuccessGreen"),
-                        FontSize = 10,
-                        FontFamily = new FontFamily("Segoe UI"),
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                    infoPanel.Children.Add(featureOk);
-                }
+                infoPanel.Children.Add(initIndicator);
 
                 // ── Inline project stats panel ──
                 if (_activeTasks != null && _historyTasks != null)
@@ -1309,9 +1316,18 @@ namespace Spritely.Managers
                         ev.Handled = true;
                         if (s is not Button btn) return;
                         btn.IsEnabled = false;
-                        var originalContent = btn.Content;
                         btn.Content = "\u23F3"; // hourglass
-                        btn.ToolTip = "Initializing feature registry...";
+                        btn.ToolTip = "Analyzing project structure...";
+
+                        // Pulsing opacity animation
+                        var pulseAnim = new DoubleAnimation(1.0, 0.4, TimeSpan.FromSeconds(0.8))
+                        {
+                            AutoReverse = true,
+                            RepeatBehavior = RepeatBehavior.Forever,
+                            EasingFunction = new SineEase()
+                        };
+                        btn.BeginAnimation(UIElement.OpacityProperty, pulseAnim);
+
                         try
                         {
                             var registryManager = new FeatureRegistryManager();
@@ -1322,6 +1338,8 @@ namespace Spritely.Managers
                                 AppLogger.Info("FeatureInit", $"[{initEntry.DisplayName}] {msg}");
                             };
                             var result = await initializer.InitializeAsync(initEntry.Path);
+                            btn.BeginAnimation(UIElement.OpacityProperty, null);
+                            btn.Opacity = 1.0;
                             if (result != null)
                             {
                                 AppLogger.Info("FeatureInit", $"Initialized {result.Features.Count} features for {initEntry.DisplayName}");
@@ -1336,6 +1354,8 @@ namespace Spritely.Managers
                         }
                         catch (Exception ex)
                         {
+                            btn.BeginAnimation(UIElement.OpacityProperty, null);
+                            btn.Opacity = 1.0;
                             AppLogger.Error("FeatureInit", $"Feature initialization failed for {initEntry.DisplayName}", ex);
                             btn.Content = "\u274C"; // X mark
                             btn.ToolTip = $"Failed: {ex.Message}. Click to retry.";

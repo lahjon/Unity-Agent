@@ -32,7 +32,7 @@ public class FeatureInitializer
     // ── Schema for the Sonnet output ────────────────────────────────────
 
     private const string OutputSchema =
-        """{"type":"object","properties":{"features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"category":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"primary_files":{"type":"array","items":{"type":"string"}},"secondary_files":{"type":"array","items":{"type":"string"}},"related_feature_ids":{"type":"array","items":{"type":"string"}},"key_types":{"type":"array","items":{"type":"string"}},"patterns":{"type":"array","items":{"type":"string"}},"dependencies":{"type":"array","items":{"type":"string"}}},"required":["id","name","description","category","keywords","primary_files"]}}},"required":["features"]}""";
+        """{"type":"object","properties":{"features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"category":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"primary_files":{"type":"array","items":{"type":"string"}},"secondary_files":{"type":"array","items":{"type":"string"}},"related_feature_ids":{"type":"array","items":{"type":"string"}},"key_types":{"type":"array","items":{"type":"string"}},"patterns":{"type":"array","items":{"type":"string"}},"dependencies":{"type":"array","items":{"type":"string"}},"depends_on":{"type":"array","items":{"type":"string"}}},"required":["id","name","description","category","keywords","primary_files"]}}},"required":["features"]}""";
 
     // ── JSON deserialization models for the Sonnet response ──────────────
 
@@ -76,6 +76,9 @@ public class FeatureInitializer
 
         [JsonPropertyName("dependencies")]
         public List<string> Dependencies { get; set; } = [];
+
+        [JsonPropertyName("depends_on")]
+        public List<string> DependsOnFeatures { get; set; } = [];
     }
 
     // ── Main entry point ────────────────────────────────────────────────
@@ -132,17 +135,56 @@ public class FeatureInitializer
             var signaturesText = signaturesBuilder.ToString();
 
             // ── Phase 3: LLM Analysis ───────────────────────────────────
-            ReportProgress("Analyzing project structure with AI...");
+            ReportProgress("Analyzing project structure...");
 
             var template = PromptLoader.Load("FeatureInitializationPrompt.md");
             var prompt = string.Format(template, projectType, directoryTree, signaturesText);
 
             ct.ThrowIfCancellationRequested();
 
+            // Cycle status messages while waiting for the LLM call
+            var cycleMessages = new[]
+            {
+                "Analyzing project structure...",
+                "Scanning code patterns...",
+                "Identifying features...",
+                "Processing signatures...",
+                "Mapping dependencies...",
+                "Classifying components..."
+            };
+            var cycleIndex = 0;
+            using var cycleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var cycleTask = Task.Run(async () =>
+            {
+                try
+                {
+                    while (!cycleCts.Token.IsCancellationRequested)
+                    {
+                        await Task.Delay(3000, cycleCts.Token);
+                        cycleIndex = (cycleIndex + 1) % cycleMessages.Length;
+                        ReportProgress(cycleMessages[cycleIndex]);
+                    }
+                }
+                catch (OperationCanceledException) { }
+            }, cycleCts.Token);
+
             var sonnetResponse = await CallSonnetAsync(prompt, ct);
+
+            // Single retry with backoff for transient CLI failures
             if (sonnetResponse is null || sonnetResponse.Features.Count == 0)
             {
-                ReportProgress("AI analysis returned no features — initialization aborted");
+                ct.ThrowIfCancellationRequested();
+                AppLogger.Info("FeatureInitializer", "First Sonnet call failed, retrying in 3 seconds...");
+                ReportProgress("Retrying AI analysis...");
+                await Task.Delay(3000, ct);
+                sonnetResponse = await CallSonnetAsync(prompt, ct);
+            }
+
+            await cycleCts.CancelAsync();
+            try { await cycleTask; } catch (OperationCanceledException) { }
+            if (sonnetResponse is null || sonnetResponse.Features.Count == 0)
+            {
+                ReportProgress("AI analysis returned no features after retry — initialization aborted");
                 return null;
             }
 
@@ -164,6 +206,7 @@ public class FeatureInitializer
                     PrimaryFiles = sf.PrimaryFiles.OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList(),
                     SecondaryFiles = (sf.SecondaryFiles ?? []).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList(),
                     RelatedFeatureIds = (sf.RelatedFeatureIds ?? []).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList(),
+                    DependsOn = (sf.DependsOnFeatures ?? []).OrderBy(d => d, StringComparer.OrdinalIgnoreCase).ToList(),
                     Context = new FeatureContext
                     {
                         KeyTypes = (sf.KeyTypes ?? []).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList(),
@@ -197,6 +240,29 @@ public class FeatureInitializer
 
             ReportProgress($"Created {createdCount} features");
 
+            // ── Phase 4.5: Dependency Analysis ──────────────────────────
+            ReportProgress("Analyzing cross-feature dependencies...");
+
+            ct.ThrowIfCancellationRequested();
+            var allFeatures = await _registryManager.LoadAllFeaturesAsync(projectPath);
+
+            DependencyAnalyzer.AnalyzeDependencies(allFeatures, projectPath);
+            _registryManager.ValidateDependencies(allFeatures);
+
+            // Re-save features with updated DependsOn
+            foreach (var feature in allFeatures)
+                await _registryManager.SaveFeatureAsync(projectPath, feature);
+
+            var graph = _registryManager.BuildDependencyGraph(allFeatures);
+            if (graph.Cycles.Count > 0)
+            {
+                AppLogger.Warn("FeatureInitializer",
+                    $"Detected {graph.Cycles.Count} dependency cycle(s) in feature graph");
+                ReportProgress($"Warning: {graph.Cycles.Count} circular dependency cycle(s) detected");
+            }
+
+            ReportProgress($"Dependency analysis complete — {allFeatures.Count(f => f.DependsOn.Count > 0)} features have dependencies");
+
             // ── Phase 5: Git Integration ────────────────────────────────
             EnsureGitIntegration(projectPath);
 
@@ -210,7 +276,7 @@ public class FeatureInitializer
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("FeatureInitializer", $"Initialization failed: {ex.Message}", ex);
+            AppLogger.Error("FeatureInitializer", $"Initialization failed: {ex.Message}", ex);
             ReportProgress($"Initialization failed: {ex.Message}");
             return null;
         }
@@ -326,85 +392,156 @@ public class FeatureInitializer
 
     // ── Helper: Call Sonnet via Claude Code CLI ─────────────────────────
 
+    /// <summary>Maximum time to wait for the Sonnet CLI call before giving up.</summary>
+    private static readonly TimeSpan SonnetTimeout = TimeSpan.FromMinutes(5);
+
     private async Task<SonnetResponse?> CallSonnetAsync(string prompt, CancellationToken ct)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = "claude",
-            Arguments = $"-p --output-format json --model {AppConstants.ClaudeSonnet} --max-turns 1 --output-schema '{OutputSchema}'",
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8
-        };
-        psi.Environment.Remove("CLAUDECODE");
-
-        using var process = new Process { StartInfo = psi };
-
         try
         {
+            var escapedSchema = OutputSchema.Replace("\"", "\\\"");
+            var arguments = $"-p --output-format json --model {AppConstants.ClaudeSonnet} --max-turns 3 --json-schema \"{escapedSchema}\"";
+            AppLogger.Info("FeatureInitializer", $"Calling Sonnet CLI. Prompt length: {prompt.Length} chars, model: {AppConstants.ClaudeSonnet}");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "claude",
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8
+            };
+            psi.Environment.Remove("CLAUDECODE");
+            psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+            psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
+
+            using var process = new Process { StartInfo = psi };
+
             process.Start();
+            AppLogger.Info("FeatureInitializer", $"Sonnet CLI process started (PID: {process.Id})");
 
             // Write the prompt to stdin and close it
-            await process.StandardInput.WriteAsync(prompt);
-            process.StandardInput.Close();
+            try
+            {
+                await process.StandardInput.WriteAsync(prompt.AsMemory(), ct);
+                process.StandardInput.Close();
+            }
+            catch (IOException ioEx)
+            {
+                // "The pipe is being closed" — CLI process died before we finished writing
+                var earlyStderr = "";
+                try { earlyStderr = await process.StandardError.ReadToEndAsync(ct); } catch { }
+                AppLogger.Error("FeatureInitializer",
+                    $"Failed to write prompt to CLI stdin (pipe closed). stderr: {earlyStderr}", ioEx);
+                ReportProgress($"CLI process rejected input: {(string.IsNullOrWhiteSpace(earlyStderr) ? ioEx.Message : earlyStderr.Trim())}");
+                return null;
+            }
 
             // Read stdout and stderr concurrently to avoid deadlocks
             var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
             var stderrTask = process.StandardError.ReadToEndAsync(ct);
 
-            await process.WaitForExitAsync(ct);
+            // Apply timeout so we don't hang forever
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(SonnetTimeout);
+
+            try
+            {
+                await process.WaitForExitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                AppLogger.Error("FeatureInitializer",
+                    $"Sonnet CLI timed out after {SonnetTimeout.TotalMinutes:F0} minutes (PID: {process.Id}). Killing process.");
+                ReportProgress($"AI analysis timed out after {SonnetTimeout.TotalMinutes:F0} minutes");
+                try { process.Kill(entireProcessTree: true); } catch { }
+                return null;
+            }
 
             var stdout = await stdoutTask;
             var stderr = await stderrTask;
 
+            if (!string.IsNullOrWhiteSpace(stderr))
+                AppLogger.Warn("FeatureInitializer", $"Sonnet CLI stderr: {stderr[..Math.Min(500, stderr.Length)]}");
+
             if (process.ExitCode != 0)
             {
-                AppLogger.Debug("FeatureInitializer", $"Claude CLI exited with code {process.ExitCode}. stderr: {stderr}");
+                AppLogger.Error("FeatureInitializer",
+                    $"Claude CLI exited with code {process.ExitCode}. stderr: {stderr[..Math.Min(1000, stderr.Length)]}");
+                ReportProgress($"AI analysis failed (exit code {process.ExitCode})");
                 return null;
             }
 
             if (string.IsNullOrWhiteSpace(stdout))
             {
-                AppLogger.Debug("FeatureInitializer", "Claude CLI returned empty output");
+                AppLogger.Warn("FeatureInitializer", $"Claude CLI returned empty output. stderr: {stderr}");
+                ReportProgress("AI analysis returned empty output");
                 return null;
             }
 
+            AppLogger.Info("FeatureInitializer", $"Sonnet CLI completed. stdout length: {stdout.Length}");
+
+            var text = Helpers.FormatHelpers.StripAnsiCodes(stdout).Trim();
+
             // The CLI with --output-format json wraps the result; extract the "result" field
-            using var doc = JsonDocument.Parse(stdout);
+            using var doc = JsonDocument.Parse(text);
             var root = doc.RootElement;
 
+            // The CLI with --output-format json + --json-schema puts structured data
+            // in "structured_output"; fall back to "result" for plain text responses
             string resultJson;
-            if (root.TryGetProperty("result", out var resultElement))
+            if (root.TryGetProperty("structured_output", out var structured)
+                && structured.ValueKind == JsonValueKind.Object)
             {
-                // result may be a string containing JSON or an object directly
+                resultJson = structured.GetRawText();
+            }
+            else if (root.TryGetProperty("result", out var resultElement))
+            {
                 resultJson = resultElement.ValueKind == JsonValueKind.String
                     ? resultElement.GetString()!
                     : resultElement.GetRawText();
             }
             else
             {
-                // Fallback: treat the whole output as the response
-                resultJson = stdout;
+                resultJson = text;
             }
 
+            AppLogger.Info("FeatureInitializer", $"Sonnet result JSON length: {resultJson.Length}");
+
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            return JsonSerializer.Deserialize<SonnetResponse>(resultJson, options);
+            var response = JsonSerializer.Deserialize<SonnetResponse>(resultJson, options);
+
+            if (response is null || response.Features.Count == 0)
+            {
+                AppLogger.Warn("FeatureInitializer",
+                    $"Deserialized response has {response?.Features.Count ?? 0} features. " +
+                    $"Raw result (first 500 chars): {resultJson[..Math.Min(500, resultJson.Length)]}");
+                ReportProgress("AI analysis returned no features");
+            }
+            else
+            {
+                AppLogger.Info("FeatureInitializer", $"Sonnet identified {response.Features.Count} features");
+            }
+
+            return response;
         }
         catch (OperationCanceledException)
         {
-            if (!process.HasExited)
-            {
-                try { process.Kill(entireProcessTree: true); }
-                catch { /* best effort */ }
-            }
             throw;
+        }
+        catch (JsonException jsonEx)
+        {
+            AppLogger.Error("FeatureInitializer", $"Failed to parse Sonnet CLI response as JSON: {jsonEx.Message}", jsonEx);
+            ReportProgress("AI response was not valid JSON");
+            return null;
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("FeatureInitializer", $"Error calling Claude CLI: {ex.Message}", ex);
+            AppLogger.Error("FeatureInitializer", $"Error calling Claude CLI: {ex.Message}", ex);
+            ReportProgress($"AI analysis error: {ex.Message}");
             return null;
         }
     }

@@ -1,0 +1,71 @@
+{
+  "id": "project-management",
+  "name": "Project Management",
+  "description": "Manages the list of registered projects, their metadata (name, path, color, descriptions, rules, MCP config), and project-level UI state. Handles project creation, settings persistence, and per-project description generation.",
+  "category": "core",
+  "keywords": [
+    "MCP config",
+    "ProjectEntry",
+    "ProjectManager",
+    "description",
+    "multi-project",
+    "project",
+    "project color",
+    "project list",
+    "project rules",
+    "project settings"
+  ],
+  "primaryFiles": [
+    "Dialogs/CreateProjectDialog.cs",
+    "Dialogs/ProjectSettingsDialog.cs",
+    "Managers/ProjectManager.cs",
+    "Models/ProjectEntry.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/RulesManager.cs",
+    "Models/ProjectActivityStats.cs",
+    "Spritely.Tests/ProjectSwapTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "git-operations",
+    "mcp-integration",
+    "prompt-building"
+  ],
+  "context": {
+    "signatures": {
+      "Dialogs/CreateProjectDialog.cs": {
+        "hash": "30b86704a9e6",
+        "content": "class CreateProjectResult\n  Name: string\n  Path: string\n  InitGit: bool\n  IsGame: bool\nclass CreateProjectDialog\n  Show() -\u003E CreateProjectResult?"
+      },
+      "Dialogs/ProjectSettingsDialog.cs": {
+        "hash": "f6211838bc70",
+        "content": "class ProjectSettingsDialog\n  Show(ProjectEntry entry, Action saveProjects, Action? onMcpVisibilityChanged = null, ProjectManager? projectManager = null) -\u003E void"
+      },
+      "Managers/ProjectManager.cs": {
+        "hash": "2dc948d0b19a",
+        "content": "class ProjectManager\n  SetTaskFactory(ITaskFactory taskFactory) -\u003E void\n  SetSettingsManager(SettingsManager settingsManager) -\u003E void\n  GetProjectStats(string projectPath, IEnumerable\u003CAgentTask\u003E allTasks) -\u003E ProjectActivityStats\n  LoadProjectsAsync() -\u003E Task\n  SaveProjects() -\u003E void\n  RefreshProjectCombo() -\u003E void\n  RefreshDescriptionBoxes() -\u003E void\n  HandleAddProjectPathClick(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  AddProject(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  CreateProject(Action\u003Cstring\u003E updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings) -\u003E void\n  UpdateMcpToggleForProject() -\u003E void\n  GetCurrentProject() -\u003E ProjectEntry?\n  GetProjectColor(string projectPath) -\u003E string\n  GetProjectDisplayName(string projectPath) -\u003E string\n  IsGameProject(string projectPath) -\u003E bool\n  GetProjectDescription(AgentTask task) -\u003E string\n  RegenerateDescriptions() -\u003E void\n  SaveShortDesc() -\u003E void\n  SaveLongDesc() -\u003E void"
+      },
+      "Models/ProjectEntry.cs": {
+        "hash": "24d8e2006d90",
+        "content": "enum McpStatus\n    Disabled, NotConnected, Connecting, Connected, Failed, Initialized, Investigating\nclass ProjectEntry\n  Name: string\n  Path: string\n  McpStatus: McpStatus\n  McpServerName: string\n  McpAddress: string\n  McpStartCommand: string\n  ShortDescription: string\n  LongDescription: string\n  RuleInstruction: string\n  ProjectRules: List\u003Cstring\u003E\n  Color: string\n  IsGame: bool\n  CrashLogPath: string\n  AppLogPath: string\n  HangLogPath: string\n  IsInitializing: bool\n  McpProcessId: int"
+      }
+    },
+    "keyTypes": [
+      "class CreateProjectResult",
+      "class ProjectEntry",
+      "class ProjectManager",
+      "enum McpStatus"
+    ],
+    "patterns": [
+      "Manager pattern with async load/save",
+      "Per-project metadata persisted to %LOCALAPPDATA%\\Spritely\\projects.json"
+    ],
+    "dependencies": [
+      "FileLockManager for task coordination",
+      "RulesManager for rule files",
+      "SettingsManager for settings persistence"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.3805045Z"
+}

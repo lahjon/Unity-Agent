@@ -1,0 +1,57 @@
+{
+  "id": "logging-diagnostics",
+  "name": "Logging \u0026 Diagnostics",
+  "description": "Provides structured application logging (debug/info/warn/error) to rotating log files, crash and hang detection with dedicated log paths, and a log viewer dialog for in-app inspection.",
+  "category": "infrastructure",
+  "keywords": [
+    "AppLogger",
+    "LogViewerDialog",
+    "SafeFileWriter",
+    "crash log",
+    "diagnostics",
+    "error reporting",
+    "hang log",
+    "log file",
+    "log viewer",
+    "logging"
+  ],
+  "primaryFiles": [
+    "Dialogs/LogViewerDialog.cs",
+    "Managers/AppLogger.cs",
+    "Managers/SafeFileWriter.cs"
+  ],
+  "secondaryFiles": [
+    "App.xaml.cs"
+  ],
+  "relatedFeatureIds": [],
+  "context": {
+    "signatures": {
+      "Dialogs/LogViewerDialog.cs": {
+        "hash": "7df1893d0a82",
+        "content": "class LogViewerDialog\n  Show() -\u003E void"
+      },
+      "Managers/AppLogger.cs": {
+        "hash": "910d73c6d8dc",
+        "content": "enum LogLevel\n    Debug, Info, Warning\nclass AppLogger\n  Initialize() -\u003E void\n  Debug(string source, string message, Exception? ex = null) -\u003E void\n  Info(string source, string message, Exception? ex = null) -\u003E void\n  Warn(string source, string message, Exception? ex = null) -\u003E void\n  Error(string source, string message, Exception? ex = null) -\u003E void\n  Log(LogLevel level, string source, string message, Exception? ex = null) -\u003E void\n  Flush() -\u003E void\n  GetRecentEntries() -\u003E string[]\n  GetLogDir() -\u003E string\n  GetLogFilePath() -\u003E string\n  ReadLogFile() -\u003E string\n  ClearMemory() -\u003E void"
+      },
+      "Managers/SafeFileWriter.cs": {
+        "hash": "b39abf2e3270",
+        "content": "class SafeFileWriter\n  WriteInBackground(string filePath, string content, string callerName, Action\u003Cstring\u003E? onError = null) -\u003E void\n  FlushAll(int timeoutMs = 5000) -\u003E bool"
+      }
+    },
+    "keyTypes": [
+      "class AppLogger",
+      "class SafeFileWriter",
+      "enum LogLevel"
+    ],
+    "patterns": [
+      "Background file write queue to avoid blocking UI thread",
+      "Crash/hang logs written by unhandled exception handlers in App.xaml.cs"
+    ],
+    "dependencies": [
+      "%LOCALAPPDATA%\\Spritely\\logs\\ for log storage"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.5825795Z"
+}

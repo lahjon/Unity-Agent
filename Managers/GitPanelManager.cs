@@ -20,13 +20,12 @@ namespace Spritely.Managers
     /// <summary>
     /// Manages the Git tab in the Statistics panel.
     /// Shows unpushed commits, uncommitted changes, and provides push/fetch operations.
-    /// Respects the file lock system and NoGitWrite toggle.
+    /// Respects the file lock system.
     /// </summary>
     public class GitPanelManager
     {
         private readonly IGitHelper _gitHelper;
         private readonly Func<string> _getProjectPath;
-        private readonly Func<bool> _getNoGitWrite;
         private readonly FileLockManager _fileLockManager;
         private readonly GitOperationGuard _gitOperationGuard;
         private readonly Dispatcher _dispatcher;
@@ -61,7 +60,6 @@ namespace Spritely.Managers
         public GitPanelManager(
             IGitHelper gitHelper,
             Func<string> getProjectPath,
-            Func<bool> getNoGitWrite,
             FileLockManager fileLockManager,
             GitOperationGuard gitOperationGuard,
             Dispatcher dispatcher,
@@ -69,7 +67,6 @@ namespace Spritely.Managers
         {
             _gitHelper = gitHelper;
             _getProjectPath = getProjectPath;
-            _getNoGitWrite = getNoGitWrite;
             _fileLockManager = fileLockManager;
             _gitOperationGuard = gitOperationGuard;
             _dispatcher = dispatcher;
@@ -163,7 +160,7 @@ namespace Spritely.Managers
                 await LoadUnpushedCommitsAsync(projectPath, ct);
                 if (ct.IsCancellationRequested) return;
 
-                // Get uncommitted changes (for NoGitWrite mode)
+                // Get uncommitted changes
                 var previousUncommittedCount = _uncommittedChanges.Count;
                 await LoadUncommittedChangesAsync(projectPath, ct);
                 if (ct.IsCancellationRequested) return;
@@ -309,20 +306,12 @@ namespace Spritely.Managers
                 UpdateStatusMessage();
             }
 
-            bool noGitWrite = _getNoGitWrite();
-
-            if (noGitWrite && _uncommittedChanges.Count > 0)
-            {
-                // NoGitWrite mode: show uncommitted changes with encouragement to commit
-                _cachedRoot.Children.Add(BuildCommitEncouragementPanel());
-            }
-
             // Unpushed commits section - cache container
             _cachedUnpushedSection = new StackPanel();
             _cachedRoot.Children.Add(_cachedUnpushedSection);
             UpdateUnpushedSection();
 
-            if (!noGitWrite && _uncommittedChanges.Count > 0)
+            if (_uncommittedChanges.Count > 0)
             {
                 // Uncommitted changes section - cache container
                 _cachedUncommittedSection = new StackPanel();
@@ -735,115 +724,6 @@ namespace Spritely.Managers
             }
 
             return panel;
-        }
-
-        private Border BuildCommitEncouragementPanel()
-        {
-            var panel = new StackPanel();
-
-            // Header
-            var header = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
-            header.Children.Add(new TextBlock
-            {
-                Text = "\uE946", // Lightbulb icon
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 14,
-                Foreground = BrushCache.Theme("WarningAmber"),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 6, 0)
-            });
-            header.Children.Add(new TextBlock
-            {
-                Text = "Uncommitted Changes Detected",
-                Foreground = BrushCache.Theme("WarningAmber"),
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                FontFamily = new FontFamily("Segoe UI"),
-                VerticalAlignment = VerticalAlignment.Center
-            });
-            panel.Children.Add(header);
-
-            panel.Children.Add(new TextBlock
-            {
-                Text = $"There are {_uncommittedChanges.Count} changed file(s) that should be committed. " +
-                       "Since No Git Write is enabled, tasks are not committing their changes automatically. " +
-                       "Review the diff below and commit with a proper summary.",
-                Foreground = BrushCache.Theme("TextSecondary"),
-                FontSize = 11,
-                FontFamily = new FontFamily("Segoe UI"),
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 8)
-            });
-
-            // Generate commit summary suggestion
-            var suggestionText = GenerateCommitSummary();
-            if (!string.IsNullOrEmpty(suggestionText))
-            {
-                panel.Children.Add(new TextBlock
-                {
-                    Text = "Suggested commit message:",
-                    Foreground = BrushCache.Theme("TextMuted"),
-                    FontSize = 10,
-                    FontFamily = new FontFamily("Segoe UI"),
-                    Margin = new Thickness(0, 0, 0, 2)
-                });
-
-                var suggestionBox = new TextBox
-                {
-                    Text = suggestionText,
-                    Background = BrushCache.Get("#1A1A2E"),
-                    Foreground = BrushCache.Theme("TextLight"),
-                    FontSize = 11,
-                    FontFamily = new FontFamily("Consolas"),
-                    Padding = new Thickness(8, 6, 8, 6),
-                    IsReadOnly = true,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 8),
-                    BorderThickness = new Thickness(1)
-                };
-                panel.Children.Add(suggestionBox);
-            }
-
-            // Commit All button (when NoGitWrite is enabled, this allows manual commit)
-            if (HasNoFileLocks())
-            {
-                var commitBtn = MakeActionButton("\uE73E", "Commit All Changes", "Stage and commit all changes with the suggested message");
-                commitBtn.Click += async (_, _) =>
-                {
-                    // Find the suggestion textbox for commit message
-                    var msg = suggestionText ?? "chore: commit pending changes";
-                    await ExecuteCommitAllAsync(msg);
-                };
-                panel.Children.Add(commitBtn);
-            }
-            else
-            {
-                panel.Children.Add(new TextBlock
-                {
-                    Text = "Cannot commit while file locks are active. Wait for running tasks to complete.",
-                    Foreground = BrushCache.Theme("WarningOrange"),
-                    FontSize = 11,
-                    FontFamily = new FontFamily("Segoe UI"),
-                    FontStyle = FontStyles.Italic,
-                    Margin = new Thickness(0, 4, 0, 4)
-                });
-            }
-
-            panel.Children.Add(MakeSeparator());
-
-            // Show file list
-            panel.Children.Add(BuildUncommittedFilesList());
-
-            return new Border
-            {
-                Background = BrushCache.Get("#1A1A1A"),
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(12),
-                Margin = new Thickness(0, 4, 0, 8),
-                BorderThickness = new Thickness(1),
-                BorderBrush = BrushCache.Theme("WarningAmber"),
-                Child = panel
-            };
         }
 
         private StackPanel BuildUnpushedCommitsSection()

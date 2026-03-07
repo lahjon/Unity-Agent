@@ -1,0 +1,27 @@
+{
+  "id": "agent-bus-operation-logging",
+  "name": "Agent Bus Operation Logging",
+  "description": "New feature identified from task: Add logging to display agent bus write operations in the Task Output panel. When task data is written to the agent bus (e.g., status JSON files like \u00601741384800000_52998c58f8274975_status.json\u0060), show a message in the Task Output indicating what was written (filename, path, or similar). This helps users track when task state is persisted to the bus.",
+  "category": "",
+  "keywords": [
+    "agent-bus",
+    "bus-writes",
+    "logging",
+    "persistence",
+    "state-tracking",
+    "task-output",
+    "visibility",
+    "write-operations"
+  ],
+  "primaryFiles": [],
+  "secondaryFiles": [],
+  "relatedFeatureIds": [],
+  "context": {
+    "signatures": {},
+    "keyTypes": [],
+    "patterns": [],
+    "dependencies": []
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T20:09:02.2571457Z"
+}

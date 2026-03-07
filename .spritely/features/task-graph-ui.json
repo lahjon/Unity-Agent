@@ -1,0 +1,67 @@
+{
+  "id": "task-graph-ui",
+  "name": "Task Dependency Graph UI",
+  "description": "Renders an interactive visual graph of active tasks and their dependency relationships. Supports node selection, zoom/pan, force-directed layout animation, and context menus for task actions.",
+  "category": "ui",
+  "keywords": [
+    "GraphInteractionHandler",
+    "GraphLayoutEngine",
+    "GraphRenderer",
+    "TaskNodeGraphPanel",
+    "dependency graph",
+    "edge",
+    "layout",
+    "node",
+    "task graph",
+    "visualization"
+  ],
+  "primaryFiles": [
+    "Controls/GraphInteractionHandler.cs",
+    "Controls/GraphLayoutEngine.cs",
+    "Controls/GraphRenderer.cs",
+    "Controls/TaskNodeGraphPanel.cs"
+  ],
+  "secondaryFiles": [
+    "Models/AgentTaskData.cs"
+  ],
+  "relatedFeatureIds": [
+    "task-execution",
+    "task-orchestration"
+  ],
+  "context": {
+    "signatures": {
+      "Controls/GraphInteractionHandler.cs": {
+        "hash": "05811bc061ac",
+        "content": "class GraphInteractionHandler\n  SetActiveTasks(ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E void\n  AttachScrollViewerEvents() -\u003E void\n  ToggleNodeSelection(string taskId) -\u003E void\n  FitToView(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  FocusOnTask(string taskId, Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  FocusOnNode(string nodeId, Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  CenterOnGraph(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  StartLayoutAnimation(Dictionary\u003Cstring, Point\u003E nodePositions, Dictionary\u003Cstring, Point\u003E targetPositions) -\u003E void\n  StopLayoutAnimation() -\u003E void\n  Dispose() -\u003E void"
+      },
+      "Controls/GraphLayoutEngine.cs": {
+        "hash": "12f5105ff38f",
+        "content": "class GraphLayoutEngine\n  WouldCreateCycle(IEnumerable\u003CAgentTask\u003E tasks, string sourceId, string targetId) -\u003E bool"
+      },
+      "Controls/GraphRenderer.cs": {
+        "hash": "c8bc8ef074f2",
+        "content": "class GraphRenderer\n  ClearAll() -\u003E void\n  ClearForRedraw() -\u003E void\n  RemoveEdgeElements() -\u003E void\n  DrawEmptyState() -\u003E void\n  CreateNodeContextMenu(AgentTask task, ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E ContextMenu\n  CreateNodeTooltip(AgentTask task, List\u003CAgentTask\u003E allTasks) -\u003E ToolTip\n  CreateLegendPanel() -\u003E Border\n  ResizeCanvas(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  GetCompactTimeInfo(AgentTask task) -\u003E string\n  CreateGridBrush() -\u003E DrawingBrush\n  CreateHeaderButton(string icon, string tooltip) -\u003E Button"
+      },
+      "Controls/TaskNodeGraphPanel.cs": {
+        "hash": "2e0ae6a980e9",
+        "content": "class TaskNodeGraphPanel\n  Initialize(ObservableCollection\u003CAgentTask\u003E activeTasks, FileLockManager fileLockManager) -\u003E void\n  MarkDirty() -\u003E void\n  RebuildGraph() -\u003E void\n  FocusOnTask(string taskId) -\u003E void\n  FitToView() -\u003E void\n  Dispose() -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class GraphInteractionHandler",
+      "class GraphLayoutEngine",
+      "class GraphRenderer",
+      "class TaskNodeGraphPanel"
+    ],
+    "patterns": [
+      "Canvas-based rendering with layout animation",
+      "Dirty-flag with RebuildGraph on change"
+    ],
+    "dependencies": [
+      "AgentTask collection for node data",
+      "FileLockManager for lock state display"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.5195172Z"
+}

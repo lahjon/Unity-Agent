@@ -1,0 +1,80 @@
+{
+  "id": "feature-registry",
+  "name": "Feature Registry System",
+  "description": "Maintains a per-project registry of code features stored in \u0060.spritely/features/\u0060. Resolves relevant features for a task prompt via Haiku, injects a FEATURE CONTEXT block, and updates the registry after task completion.",
+  "category": "core",
+  "keywords": [
+    "FeatureContextResolver",
+    "FeatureInitializer",
+    "FeatureRegistryManager",
+    "FeatureUpdateAgent",
+    "SignatureExtractor",
+    "code signatures",
+    "feature context",
+    "feature index",
+    "feature registry"
+  ],
+  "primaryFiles": [
+    "Managers/FeatureContextResolver.cs",
+    "Managers/FeatureInitializer.cs",
+    "Managers/FeatureRegistryManager.cs",
+    "Managers/FeatureUpdateAgent.cs",
+    "Managers/SignatureExtractor.cs"
+  ],
+  "secondaryFiles": [
+    "Constants/FeatureConstants.cs",
+    "Models/FeatureContextResult.cs",
+    "Models/FeatureEntry.cs",
+    "Models/FeatureIndex.cs"
+  ],
+  "relatedFeatureIds": [
+    "project-management",
+    "prompt-building",
+    "task-preprocessing"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/FeatureContextResolver.cs": {
+        "hash": "de1942fa1551",
+        "content": "class FeatureContextResolver"
+      },
+      "Managers/FeatureInitializer.cs": {
+        "hash": "c92e6ba60cd4",
+        "content": "class FeatureInitializer\n  Features: List\u003CSonnetFeature\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  Keywords: List\u003Cstring\u003E\n  PrimaryFiles: List\u003Cstring\u003E\n  SecondaryFiles: List\u003Cstring\u003E\n  RelatedFeatureIds: List\u003Cstring\u003E\n  KeyTypes: List\u003Cstring\u003E\n  Patterns: List\u003Cstring\u003E\n  Dependencies: List\u003Cstring\u003E\n  DependsOnFeatures: List\u003Cstring\u003E\n  InitializeAsync(string projectPath, CancellationToken ct = default) -\u003E Task\u003CFeatureIndex?\u003E\n  ScanSourceFiles(string projectPath) -\u003E List\u003Cstring\u003E\n  BuildDirectoryTree(string projectPath, List\u003Cstring\u003E relativeFiles) -\u003E string\n  DetectProjectType(string projectPath) -\u003E string"
+      },
+      "Managers/FeatureRegistryManager.cs": {
+        "hash": "ee149b3cad28",
+        "content": "class FeatureRegistryManager\n  RegistryExists(string projectPath) -\u003E bool\n  GetFeaturesPath(string projectPath) -\u003E string\n  LoadIndexAsync(string projectPath) -\u003E Task\u003CFeatureIndex\u003E\n  LoadFeatureAsync(string projectPath, string featureId) -\u003E Task\u003CFeatureEntry?\u003E\n  LoadAllFeaturesAsync(string projectPath) -\u003E Task\u003CList\u003CFeatureEntry\u003E\u003E\n  SaveFeatureAsync(string projectPath, FeatureEntry feature) -\u003E Task\n  RemoveFeatureAsync(string projectPath, string featureId) -\u003E Task\n  SaveIndexAsync(string projectPath, FeatureIndex index) -\u003E Task\n  BuildFeatureContextBlock(List\u003CFeatureEntry\u003E features) -\u003E string\n  RefreshStaleSignaturesAsync(string projectPath, FeatureEntry feature) -\u003E Task\u003Cbool\u003E\n  BuildDependencyGraph(List\u003CFeatureEntry\u003E features) -\u003E FeatureDependencyGraph\n  ValidateDependencies(List\u003CFeatureEntry\u003E features) -\u003E void\n  Dispose() -\u003E void"
+      },
+      "Managers/FeatureUpdateAgent.cs": {
+        "hash": "ff1b5010a9c4",
+        "content": "class FeatureUpdateAgent"
+      },
+      "Managers/SignatureExtractor.cs": {
+        "hash": "d74ecc4e0247",
+        "content": "class SignatureExtractor\n  ExtractSignatures(string filePath) -\u003E string\n  ComputeFileHash(string filePath) -\u003E string\n  GetSupportedExtensions() -\u003E HashSet\u003Cstring\u003E"
+      }
+    },
+    "keyTypes": [
+      "class FeatureContextResolver",
+      "class FeatureEntry",
+      "class FeatureIndex",
+      "class FeatureInitializer",
+      "class FeatureRegistryManager",
+      "class FeatureUpdateAgent",
+      "class SignatureExtractor"
+    ],
+    "patterns": [
+      "Fire-and-forget post-completion update",
+      "Git-tracked JSON files per feature in .spritely/features/",
+      "Haiku resolves prompt\u2192features before Opus launch"
+    ],
+    "dependencies": [
+      "Haiku API for feature resolution and updates",
+      "ProjectManager for project path",
+      "SignatureExtractor for code signatures"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.3672673Z"
+}

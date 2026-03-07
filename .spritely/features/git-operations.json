@@ -1,0 +1,67 @@
+{
+  "id": "git-operations",
+  "name": "Git Operations",
+  "description": "Provides safe Git workflows including status, diff, staging, commit, and push. Enforces that no Git operations run while file locks are active and all mutations flow through GitHelper and GitOperationGuard.",
+  "category": "integration",
+  "keywords": [
+    "GitHelper",
+    "GitOperationGuard",
+    "GitPanelManager",
+    "GitResult",
+    "commit",
+    "diff",
+    "file lock",
+    "git",
+    "push",
+    "stage"
+  ],
+  "primaryFiles": [
+    "Managers/GitHelper.cs",
+    "Managers/IGitHelper.cs",
+    "Services/GitOperationGuard.cs"
+  ],
+  "secondaryFiles": [
+    "MainWindow.Orchestration.cs",
+    "Managers/GitPanelManager.cs",
+    "Models/GitResult.cs"
+  ],
+  "relatedFeatureIds": [
+    "file-lock-management",
+    "git-ui",
+    "project-management"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/GitHelper.cs": {
+        "hash": "ae86b21a015e",
+        "content": "class GitHelper\n  EscapeGitPath(string path) -\u003E string\n  IsValidGitHash(string? hash) -\u003E bool"
+      },
+      "Managers/IGitHelper.cs": {
+        "hash": "3a5adc21c58b",
+        "content": "interface IGitHelper"
+      },
+      "Services/GitOperationGuard.cs": {
+        "hash": "ca5c8d2faea0",
+        "content": "class GitOperationGuard"
+      }
+    },
+    "keyTypes": [
+      "class GitCommitInfo",
+      "class GitFileChange",
+      "class GitHelper",
+      "class GitOperationGuard",
+      "interface IGitHelper",
+      "record GitResult"
+    ],
+    "patterns": [
+      "All mutations through GitHelper abstraction",
+      "Guard pattern preventing concurrent Git\u002Bfile-lock operations"
+    ],
+    "dependencies": [
+      "FileLockManager for lock checks",
+      "git CLI via Process invocation"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.3899635Z"
+}

@@ -1,0 +1,53 @@
+{
+  "id": "mcp-integration",
+  "name": "MCP-for-Unity Integration",
+  "description": "Monitors MCP server health for Unity Editor integration, manages connection state, and injects MCP configuration into task prompts when enabled. Handles automatic reconnection on failure.",
+  "category": "integration",
+  "keywords": [
+    "MCP",
+    "MCP config",
+    "MCP prompt",
+    "MCP server",
+    "MCP status",
+    "McpHealthMonitor",
+    "McpStatus",
+    "Unity",
+    "Unity Editor",
+    "game project"
+  ],
+  "primaryFiles": [
+    "Managers/McpHealthMonitor.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/ProjectManager.cs",
+    "Managers/PromptBuilder.cs",
+    "Models/ProjectEntry.cs"
+  ],
+  "relatedFeatureIds": [
+    "project-management",
+    "prompt-building"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/McpHealthMonitor.cs": {
+        "hash": "b2a089f49986",
+        "content": "enum McpHealthStatus\n    Connected, Disconnected\nclass McpHealthMonitor\n  Start() -\u003E void\n  Stop() -\u003E void\n  Dispose() -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class McpHealthMonitor",
+      "enum McpHealthStatus",
+      "enum McpStatus"
+    ],
+    "patterns": [
+      "MCP prompt block injected conditionally",
+      "Periodic health polling with reconnection"
+    ],
+    "dependencies": [
+      "ProjectEntry.McpAddress and McpStartCommand for configuration",
+      "PromptBuilder for MCP block injection"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.4606454Z"
+}

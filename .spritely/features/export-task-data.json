@@ -1,0 +1,27 @@
+{
+  "id": "export-task-data",
+  "name": "Export Task Data",
+  "description": "New feature identified from task: Improve the \u0022Export Output\u0022 right-click option on tasks to export comprehensive data including: the full actual prompt text sent to the model, the complete model response/output, any feedback or iterations, and all relevant task metadata. Ensure nothing is truncated or omitted from the export.",
+  "category": "",
+  "keywords": [
+    "comprehensive",
+    "data-export",
+    "export",
+    "iterations",
+    "metadata",
+    "prompt",
+    "response",
+    "task-output"
+  ],
+  "primaryFiles": [],
+  "secondaryFiles": [],
+  "relatedFeatureIds": [],
+  "context": {
+    "signatures": {},
+    "keyTypes": [],
+    "patterns": [],
+    "dependencies": []
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T20:10:44.3671189Z"
+}

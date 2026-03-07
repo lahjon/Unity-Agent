@@ -22,6 +22,7 @@ namespace Spritely.Managers
         private readonly Dictionary<string, RichTextBox> _outputBoxes = new();
         private readonly Dictionary<string, WrapPanel> _geminiGalleries = new();
         private readonly Dictionary<string, TypewriterState> _typewriterStates = new();
+        private readonly Dictionary<string, Button> _sendButtons = new();
         private readonly HashSet<string> _userScrolledUp = new();
         private Button? _overflowBtn;
         private readonly TabControl _outputTabs;
@@ -97,14 +98,16 @@ namespace Spritely.Managers
 
             var sendBtn = new Button
             {
-                Content = "Send",
+                Content = task.IsContinuable ? "Continue" : "Send",
                 Style = (Style)Application.Current.FindResource("Btn"),
                 Background = (Brush)Application.Current.FindResource("Accent"),
+                Foreground = Brushes.White,
                 FontWeight = FontWeights.Bold,
                 FontSize = 12,
                 Padding = new Thickness(14, 6, 14, 6),
                 Margin = new Thickness(4, 0, 0, 0)
             };
+            _sendButtons[task.Id] = sendBtn;
 
             sendBtn.Click += (_, _) =>
             {
@@ -127,7 +130,7 @@ namespace Spritely.Managers
             {
                 if (ke.Key == Key.LeftShift || ke.Key == Key.RightShift)
                 {
-                    sendBtn.Content = "Send";
+                    sendBtn.Content = task.IsContinuable ? "Continue" : "Send";
                     sendBtn.Background = (Brush)Application.Current.FindResource("Accent");
                 }
             };
@@ -418,6 +421,7 @@ namespace Spritely.Managers
             _outputTabs.Items.Remove(tab);
             _tabs.Remove(task.Id);
             _outputBoxes.Remove(task.Id);
+            _sendButtons.Remove(task.Id);
             _geminiGalleries.Remove(task.Id);
             UpdateOutputTabWidths();
         }
@@ -427,6 +431,12 @@ namespace Spritely.Managers
             // Stop typewriter and pulsing dots when task reaches a terminal state
             if (task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled or AgentTaskStatus.Recommendation)
                 StopTypewriterAnimation(task.Id);
+
+            if (_sendButtons.TryGetValue(task.Id, out var sendBtn))
+            {
+                sendBtn.Content = task.IsContinuable ? "Continue" : "Send";
+                sendBtn.Background = (Brush)Application.Current.FindResource("Accent");
+            }
 
             if (!_tabs.TryGetValue(task.Id, out var tab)) return;
             if (tab.Header is StackPanel sp && sp.Children[0] is Grid dotGrid

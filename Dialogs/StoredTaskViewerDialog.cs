@@ -9,7 +9,8 @@ namespace Spritely.Dialogs
     {
         public static void Show(AgentTask task)
         {
-            var dlg = DarkDialogWindow.Create("Stored Task Context", 850, 560,
+            var title = !string.IsNullOrEmpty(task.StoredPrompt) ? "Stored Task Context" : "Task Output";
+            var dlg = DarkDialogWindow.Create(title, 850, 560,
                 ResizeMode.CanResize, topmost: false, backgroundResource: "BgDeep",
                 titleColorResource: "AccentTeal");
 
@@ -82,7 +83,8 @@ namespace Spritely.Dialogs
                 VerticalAlignment = VerticalAlignment.Center
             };
             viewCombo.Items.Add(new ComboBoxItem { Content = "Full Output", Tag = "output" });
-            viewCombo.Items.Add(new ComboBoxItem { Content = "Stored Prompt", Tag = "prompt" });
+            if (!string.IsNullOrWhiteSpace(task.StoredPrompt))
+                viewCombo.Items.Add(new ComboBoxItem { Content = "Stored Prompt", Tag = "prompt" });
             viewCombo.Items.Add(new ComboBoxItem { Content = "Original Prompt", Tag = "original" });
             viewCombo.SelectedIndex = 0;
 

@@ -24,7 +24,7 @@ namespace Spritely.Managers
 
         Task<ResultVerification?> VerifyResultAsync(
             string outputTail, string taskDescription, string? completionSummary,
-            CancellationToken ct = default);
+            CancellationToken ct = default, string? modelOverride = null);
 
         bool CheckFeatureModeComplete(string output);
 

@@ -1,0 +1,46 @@
+{
+  "id": "project-tasks",
+  "name": "Project Task List",
+  "description": "Manages a lightweight to-do list of project-level tasks (not AI tasks) \u2014 items that can be added, completed, and removed per project. Persisted per-project with async load/save.",
+  "category": "data",
+  "keywords": [
+    "ProjectTaskItem",
+    "ProjectTaskManager",
+    "checklist",
+    "project tasks",
+    "project work items",
+    "task list",
+    "todo"
+  ],
+  "primaryFiles": [
+    "Managers/ProjectTaskManager.cs"
+  ],
+  "secondaryFiles": [
+    "Models/ProjectTaskItem.cs"
+  ],
+  "relatedFeatureIds": [
+    "project-management"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/ProjectTaskManager.cs": {
+        "hash": "d28918dcbb6a",
+        "content": "class ProjectTaskManager\n  LoadTasksAsync() -\u003E Task\n  SaveTasks() -\u003E void\n  SaveTasksAsync() -\u003E Task\n  AddTask(string text) -\u003E ProjectTaskItem\n  CompleteTask(ProjectTaskItem task) -\u003E void\n  RemoveTask(ProjectTaskItem task) -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class ProjectTaskItem",
+      "class ProjectTaskManager"
+    ],
+    "patterns": [
+      "Async JSON load/save with background write",
+      "Per-project storage in .spritely/ directory"
+    ],
+    "dependencies": [
+      "ProjectManager for current project path",
+      "SafeFileWriter for background persistence"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.5654574Z"
+}

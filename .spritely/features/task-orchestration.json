@@ -1,0 +1,53 @@
+{
+  "id": "task-orchestration",
+  "name": "Task Orchestration",
+  "description": "Manages the dependency graph between tasks, determines which tasks are runnable, and fires events when tasks become unblocked. Enforces ordering, priority, and cycle detection across the full task queue.",
+  "category": "core",
+  "keywords": [
+    "TaskOrchestrator",
+    "cycle",
+    "dependency",
+    "graph",
+    "orchestration",
+    "priority",
+    "queue",
+    "runnable",
+    "task ordering",
+    "unblock"
+  ],
+  "primaryFiles": [
+    "Managers/TaskOrchestrator.cs"
+  ],
+  "secondaryFiles": [
+    "Models/AgentTaskData.cs",
+    "Models/RuntimeTaskContext.cs",
+    "Spritely.Tests/TaskOrchestratorTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "file-lock-management",
+    "task-execution"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/TaskOrchestrator.cs": {
+        "hash": "2fe41d9b5ea4",
+        "content": "class TaskOrchestrator\n  AddTask(AgentTask task, List\u003Cstring\u003E dependsOn) -\u003E void\n  GetNextRunnableTasks(int maxCount) -\u003E List\u003CAgentTask\u003E\n  OnTaskCompleted(string taskId) -\u003E void\n  DetectCycle(string fromId, string toId) -\u003E bool\n  ReevaluateAll() -\u003E void\n  RemoveTask(string taskId) -\u003E void\n  ContainsTask(string taskId) -\u003E bool\n  MarkResolved(string taskId) -\u003E void\n  Id: string\n  Task: AgentTask?\n  IsResolved: bool\n  UnresolvedDependencies: HashSet\u003Cstring\u003E\n  Dependents: HashSet\u003Cstring\u003E"
+      }
+    },
+    "keyTypes": [
+      "class TaskNode",
+      "class TaskOrchestrator"
+    ],
+    "patterns": [
+      "Dependency graph with cycle detection",
+      "Event-driven unblocking via TaskReady event",
+      "Manager pattern"
+    ],
+    "dependencies": [
+      "AgentTask model for task state",
+      "FileLockManager for queue coordination"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.270905Z"
+}

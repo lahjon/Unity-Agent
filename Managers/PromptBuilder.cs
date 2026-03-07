@@ -32,8 +32,8 @@ namespace Spritely.Managers
             if (task.IsFeatureMode && task.FeatureModePhase == FeatureModePhase.None)
                 return CliSonnetModel;
 
-            // Planning team members: explore codebase, post findings (NoGitWrite + subtask + no ExtendedPlanning)
-            if (task.NoGitWrite && task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly)
+            // Planning team members: explore codebase, post findings (subtask + no ExtendedPlanning)
+            if (task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly)
                 return CliSonnetModel;
 
             // Everything else: planning + execution → Opus
@@ -126,7 +126,7 @@ namespace Spritely.Managers
         // ── Prompt Assembly ─────────────────────────────────────────
 
         public string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
-            bool isFeatureMode, bool extendedPlanning = false, bool noGitWrite = false /* deprecated: always treated as true */,
+            bool isFeatureMode, bool extendedPlanning = false,
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
@@ -150,8 +150,6 @@ namespace Spritely.Managers
             var planOnlyBlock = planOnly ? PlanOnlyBlock : "";
             // Skip git blocks when planOnly is active — PlanOnlyBlock already
             // prohibits all file operations which subsumes git-write restrictions.
-            // NoGitWrite is always true for standard tasks — the app's commit system
-            // handles all git writes, so Claude should never commit/push directly.
             var gitBlock = planOnly ? "" : NoGitWriteBlock;
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
@@ -171,10 +169,10 @@ namespace Spritely.Managers
 
             // Planning team members and planOnly tasks produce findings/plans as their deliverable —
             // suppressing their output would lose the actual work product.
-            var isPlanningMember = task.NoGitWrite && task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly;
+            var isPlanningMember = task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly;
             var suppressEfficiency = isPlanningMember || task.PlanOnly;
 
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency, skillsBlock, featureContextBlock);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency, skillsBlock, featureContextBlock);
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
                 basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
@@ -217,12 +215,13 @@ namespace Spritely.Managers
 
         // ── Command & Script Building ────────────────────────────────
 
-        public string BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false)
+        public string BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false, string? effortLevel = null)
         {
             var skipFlag = skipPermissions ? " --dangerously-skip-permissions" : "";
             var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
             var planFlag = planMode ? " --plan" : "";
-            return $"claude -p{skipFlag}{modelFlag}{planFlag} --verbose --output-format stream-json";
+            var effortFlag = !string.IsNullOrEmpty(effortLevel) && effortLevel != "high" ? $" --effort {effortLevel}" : "";
+            return $"claude -p{skipFlag}{modelFlag}{planFlag}{effortFlag} --verbose --output-format stream-json";
         }
 
         public string BuildPowerShellScript(string projectPath, string promptFilePath,
@@ -234,17 +233,18 @@ namespace Spritely.Managers
         }
 
         public string BuildHeadlessPowerShellScript(string projectPath, string promptFilePath,
-            bool skipPermissions, string? modelId = null)
+            bool skipPermissions, string? modelId = null, string? effortLevel = null)
         {
             var skipFlag = skipPermissions ? " --dangerously-skip-permissions" : "";
             var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
+            var effortFlag = !string.IsNullOrEmpty(effortLevel) && effortLevel != "high" ? $" --effort {effortLevel}" : "";
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
                    $"Write-Host 'Project: {projectPath}' -ForegroundColor DarkGray\n" +
                    $"Write-Host 'Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
                    "Write-Host 'Starting Claude...' -ForegroundColor Cyan\n" +
                    "Write-Host ''\n" +
-                   $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{modelFlag} --verbose\n" +
+                   $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{modelFlag}{effortFlag} --verbose\n" +
                    "if ($LASTEXITCODE -ne 0) { Write-Host \"`nClaude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
                    "Write-Host \"`nProcess finished. Press any key to close...\" -ForegroundColor Cyan\n" +
                    "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n";

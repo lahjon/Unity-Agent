@@ -16,7 +16,15 @@
       "Read(//c/Users/fredr/RiderProjects/Unity-Agent/$LOCALAPPDATA/Spritely/**)",
       "Read(//c/Users/fredr/RiderProjects/Unity-Agent/$LOCALAPPDATA/**)",
       "Bash(dir=\"C:/Users/fredr/AppData/Local/Spritely/logs\")",
-      "Read(//c/Users/fredr/RiderProjects/Unity-Agent/**)"
+      "Read(//c/Users/fredr/RiderProjects/Unity-Agent/**)",
+      "Bash(xargs grep:*)",
+      "Bash(grep:*)",
+      "Bash(claude:*)",
+      "Bash(CLAUDECODE= claude:*)",
+      "Bash(CLAUDECODE= echo Say hi:*)",
+      "Bash(timeout 30 claude:*)",
+      "Bash(env:*)",
+      "Bash(echo:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -1,0 +1,50 @@
+{
+  "id": "terminal",
+  "name": "Integrated Terminal",
+  "description": "Provides an embedded ConPTY-based terminal with tab management, command history, and working-directory tracking. Allows users to run shell commands directly within the app alongside AI tasks.",
+  "category": "ui",
+  "keywords": [
+    "ConPTY",
+    "ConPtyTerminal",
+    "TerminalTabManager",
+    "command history",
+    "interrupt",
+    "shell",
+    "tab",
+    "terminal",
+    "working directory"
+  ],
+  "primaryFiles": [
+    "ConPtyTerminal.cs",
+    "TerminalTabManager.cs"
+  ],
+  "secondaryFiles": [],
+  "relatedFeatureIds": [
+    "project-management"
+  ],
+  "context": {
+    "signatures": {
+      "ConPtyTerminal.cs": {
+        "hash": "4ef7bda95a9e",
+        "content": "class ConPtyTerminal\n  HistoryIndex: int\n  HasBeenUsed: bool\n  AddCommand(string command) -\u003E void\n  GetCommandFromEnd(int historyIndex) -\u003E string?\n  WorkingDirectory: string\n  ProcessId: int\n  SendLine(string text) -\u003E void\n  SendRaw(string text) -\u003E void\n  SendInterrupt() -\u003E void\n  GetOutputText() -\u003E string\n  ClearOutput() -\u003E void\n  Dispose() -\u003E void"
+      },
+      "TerminalTabManager.cs": {
+        "hash": "c8a64e01987e",
+        "content": "class TerminalTabManager\n  UpdateWorkingDirectory(string directory) -\u003E void\n  AddTerminal(string? workingDirectory = null) -\u003E void\n  CloseTerminal(int index) -\u003E void\n  SwitchTo(int index) -\u003E void\n  SendCommand() -\u003E void\n  SendInterrupt() -\u003E void\n  HandleKeyDown(KeyEventArgs e) -\u003E void\n  Dispose() -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class ConPtyTerminal",
+      "class TerminalTabManager"
+    ],
+    "patterns": [
+      "ConPTY for full VT100 emulation",
+      "Tab per terminal session"
+    ],
+    "dependencies": [
+      "Windows ConPTY API for terminal emulation"
+    ]
+  },
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-07T19:49:48.6009682Z"
+}
