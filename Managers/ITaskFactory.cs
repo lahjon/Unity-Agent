@@ -12,7 +12,6 @@ namespace Spritely.Managers
             string description,
             string projectPath,
             bool skipPermissions,
-            bool remoteSession,
             bool headless,
             bool isFeatureMode,
             bool ignoreFileLocks,
@@ -34,5 +33,7 @@ namespace Spritely.Managers
 
         Task<(string Short, string Long)> GenerateProjectDescriptionAsync(
             string projectPath, CancellationToken cancellationToken = default, bool? isGameProject = null);
+
+        Task<string> GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default);
     }
 }

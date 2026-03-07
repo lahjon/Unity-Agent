@@ -5,6 +5,7 @@
 - **Write safe, reversible Git workflows**. Do not bypass `GitHelper`, `GitPanelManager`, or `GitOperationGuard` when changing Git behavior.
 - **Avoid adding temporary files in the project** Avoid creating temporary .md, .bat or .ps1 files for quick. If required, add too `./temp`
 - **NEVER read or search in ./temp** This folder is only for temp files that should not be tracked
+- **NEVER read or search in .spritely/templates/** These are per-project saved task templates managed by the app
 
 ---
 
@@ -43,6 +44,12 @@
   - `Constants/AppConstants.cs`: central “magic-number” and config constants.
 
 When adding new functionality, prefer extending these existing areas over inventing new patterns.
+
+- **Log and crash files** (`%LOCALAPPDATA%\Spritely\logs\`)
+  - `crash.log`: unhandled-exception crash logs (written by `App.xaml.cs`).
+  - `hang.log`: hang/deadlock detection logs (written by `App.xaml.cs`).
+  - `app.log`: general application log (written by `AppLogger`).
+  - Per-project crash log path is configurable via `ProjectEntry.CrashLogPath` (defaults to `crash.log` above).
 
 ---
 

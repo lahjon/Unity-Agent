@@ -33,7 +33,7 @@ namespace Spritely
             ReadUiFlagsInto(template);
 
             _settingsManager.TaskTemplates.Insert(0, template);
-            _settingsManager.SaveTemplates();
+            _settingsManager.SaveTemplate(template);
             RenderTemplateCombo();
         }
 
@@ -66,7 +66,6 @@ namespace Spritely
         private static string BuildTemplateTooltip(TaskTemplate t)
         {
             var flags = new List<string>();
-            if (t.RemoteSession) flags.Add("Remote");
             if (t.Headless) flags.Add("Headless");
             if (t.SpawnTeam) flags.Add("Team");
             if (t.IsFeatureMode) flags.Add("FeatureMode");
@@ -117,6 +116,7 @@ namespace Spritely
             ApplyFlagsToUi(template);
 
             AdditionalInstructionsInput.Text = template.AdditionalInstructions ?? "";
+            SetAdditionalInstructionsExpanded(!string.IsNullOrWhiteSpace(template.AdditionalInstructions));
 
             // Restore skill selections
             _skillManager.SetEnabledSkills(template.ActiveSkillIds ?? new());
@@ -136,10 +136,12 @@ namespace Spritely
 
         private void ResetToNoTemplate()
         {
-            if (RemoteSessionToggle == null) return; // Called during InitializeComponent before controls exist
+            // Guard: during InitializeComponent, controls after TemplateCombo in XAML don't exist yet
+            if (SpawnTeamToggle == null || _skillManager == null || AdditionalInstructionsInput == null) return;
             ApplyFlagsToUi(new TaskConfigBase()); // TaskConfigBase defaults match the desired reset values
 
             AdditionalInstructionsInput.Text = "";
+            SetAdditionalInstructionsExpanded(false);
             ModelCombo.SelectedIndex = 0;
 
             // Clear skill selections
@@ -324,7 +326,6 @@ namespace Spritely
             });
 
             var togglePanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
-            var remoteChk = MakeTemplateCheckBox("Remote", t.RemoteSession);
             var headlessChk = MakeTemplateCheckBox("Headless", t.Headless);
             var teamChk = MakeTemplateCheckBox("Team", t.SpawnTeam);
             var featureModeChk = MakeTemplateCheckBox("Feature Mode", t.IsFeatureMode);
@@ -336,7 +337,6 @@ namespace Spritely
             var msgBusChk = MakeTemplateCheckBox("MsgBus", t.UseMessageBus);
             var autoDecompChk = MakeTemplateCheckBox("AutoDecompose", t.AutoDecompose);
 
-            togglePanel.Children.Add(remoteChk);
             togglePanel.Children.Add(headlessChk);
             togglePanel.Children.Add(teamChk);
             togglePanel.Children.Add(featureModeChk);
@@ -417,7 +417,6 @@ namespace Spritely
             {
                 t.Name = nameBox.Text?.Trim() ?? "";
                 t.Description = descBox.Text?.Trim() ?? "";
-                t.RemoteSession = remoteChk.IsChecked == true;
                 t.Headless = headlessChk.IsChecked == true;
                 t.SpawnTeam = teamChk.IsChecked == true;
                 t.IsFeatureMode = featureModeChk.IsChecked == true;
@@ -430,7 +429,7 @@ namespace Spritely
                 t.AutoDecompose = autoDecompChk.IsChecked == true;
                 t.AdditionalInstructions = instrBox.Text?.Trim() ?? "";
 
-                _settingsManager.SaveTemplates();
+                _settingsManager.SaveTemplate(t);
                 RenderTemplateCombo();
 
                 // Brief visual feedback
@@ -457,7 +456,7 @@ namespace Spritely
             deleteBtn.Click += (_, _) =>
             {
                 _settingsManager.TaskTemplates.Remove(t);
-                _settingsManager.SaveTemplates();
+                _settingsManager.DeleteTemplate(t);
                 RenderTemplateCombo();
 
                 stack.Children.Remove(card);

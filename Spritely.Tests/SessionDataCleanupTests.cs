@@ -50,8 +50,7 @@ namespace Spritely.Tests
             _messageBusManager = new MessageBusManager(_dispatcher);
             _fileLockManager = _dispatcher.Invoke(() =>
             {
-                var badge = new TextBlock();
-                return new FileLockManager(badge, _dispatcher);
+                return new FileLockManager(_dispatcher);
             });
             _settingsManager = new SettingsManager(_testAppDataDir);
         }

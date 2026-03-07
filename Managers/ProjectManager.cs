@@ -348,7 +348,7 @@ namespace Spritely.Managers
 
             _addProjectSelectedPath = "";
 
-            _ = GenerateProjectDescriptionInBackground(entry);
+            _ = InitializeNewProjectAsync(entry);
         }
 
         public void CreateProject(Action<string> updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings)
@@ -422,7 +422,7 @@ namespace Spritely.Managers
             saveSettings();
             syncSettings();
 
-            _ = GenerateProjectDescriptionInBackground(entry);
+            _ = InitializeNewProjectAsync(entry);
         }
 
         public void RemoveProject(string projectPath, Action<string> updateTerminalWorkingDirectory,
@@ -516,6 +516,74 @@ namespace Spritely.Managers
                     entry.IsInitializing = false;
                     RefreshProjectList(null, null, null);
                 });
+            }
+        }
+
+        private async System.Threading.Tasks.Task InitializeNewProjectAsync(ProjectEntry entry)
+        {
+            // Generate description first (sets IsInitializing = false when done)
+            await GenerateProjectDescriptionInBackground(entry);
+
+            // Then generate CLAUDE.md and initialize features in parallel
+            var claudeTask = EnsureClaudeMdAsync(entry);
+            var featureTask = InitializeFeaturesAsync(entry);
+            await System.Threading.Tasks.Task.WhenAll(claudeTask, featureTask);
+        }
+
+        private async System.Threading.Tasks.Task EnsureClaudeMdAsync(ProjectEntry entry)
+        {
+            try
+            {
+                var claudeMdPath = Path.Combine(entry.Path, "CLAUDE.md");
+                var claudeDir = Path.Combine(entry.Path, ".claude");
+
+                // Skip if already initialized
+                if (File.Exists(claudeMdPath) || Directory.Exists(claudeDir))
+                    return;
+
+                AppLogger.Info("ProjectManager", $"Generating CLAUDE.md for {entry.DisplayName}...");
+
+                var content = await _taskFactory!.GenerateClaudeMdAsync(entry.Path, entry.IsGame);
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    AppLogger.Warn("ProjectManager", $"CLAUDE.md generation returned empty for {entry.DisplayName}");
+                    return;
+                }
+
+                await File.WriteAllTextAsync(claudeMdPath, content);
+                AppLogger.Info("ProjectManager", $"Created CLAUDE.md for {entry.DisplayName}");
+
+                _view.ViewDispatcher.Invoke(() => RefreshProjectList(null, null, null));
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ProjectManager", $"Failed to generate CLAUDE.md for {entry.DisplayName}", ex);
+            }
+        }
+
+        private async System.Threading.Tasks.Task InitializeFeaturesAsync(ProjectEntry entry)
+        {
+            try
+            {
+                if (entry.IsFeatureRegistryInitialized)
+                    return;
+
+                AppLogger.Info("ProjectManager", $"Initializing feature registry for {entry.DisplayName}...");
+
+                var registryManager = new FeatureRegistryManager();
+                var initializer = new FeatureInitializer(registryManager);
+                initializer.ProgressChanged += msg => AppLogger.Info("FeatureInit", $"[{entry.DisplayName}] {msg}");
+
+                var result = await initializer.InitializeAsync(entry.Path);
+                if (result != null)
+                {
+                    AppLogger.Info("FeatureInit", $"Initialized {result.Features.Count} features for {entry.DisplayName}");
+                    _view.ViewDispatcher.Invoke(() => RefreshProjectList(null, null, null));
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ProjectManager", $"Feature initialization failed for {entry.DisplayName}", ex);
             }
         }
 
@@ -873,6 +941,108 @@ namespace Spritely.Managers
                 });
                 infoPanel.Children.Add(initIndicator);
 
+                // Feature registry status + inline init button
+                if (!proj.IsFeatureRegistryInitialized)
+                {
+                    var featureRow = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Margin = new Thickness(0, 4, 0, 0)
+                    };
+                    featureRow.Children.Add(new System.Windows.Shapes.Ellipse
+                    {
+                        Width = 8,
+                        Height = 8,
+                        Fill = BrushCache.Theme("WarningAmber"),
+                        Margin = new Thickness(0, 0, 4, 0),
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    featureRow.Children.Add(new TextBlock
+                    {
+                        Text = "Features not initialized",
+                        Foreground = BrushCache.Theme("WarningAmber"),
+                        FontSize = 10,
+                        FontFamily = new FontFamily("Segoe UI"),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 6, 0)
+                    });
+                    var inlineInitBtn = new Button
+                    {
+                        Content = "Init",
+                        Style = (Style)Application.Current.FindResource("SmallBtn"),
+                        Background = (Brush)Application.Current.FindResource("Accent"),
+                        FontSize = 10,
+                        Padding = new Thickness(8, 1, 8, 1),
+                        Height = 18,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        ToolTip = "Initialize Feature Registry"
+                    };
+                    var inlineInitEntry = proj;
+                    inlineInitBtn.Click += async (s, ev) =>
+                    {
+                        ev.Handled = true;
+                        if (s is not Button btn) return;
+                        btn.IsEnabled = false;
+                        var originalContent = btn.Content;
+                        btn.Content = "Initializing...";
+                        try
+                        {
+                            var registryManager = new FeatureRegistryManager();
+                            var initializer = new FeatureInitializer(registryManager);
+                            initializer.ProgressChanged += msg =>
+                            {
+                                Application.Current?.Dispatcher?.BeginInvoke(() => btn.Content = msg.Length > 30 ? msg[..30] + "…" : msg);
+                                AppLogger.Info("FeatureInit", $"[{inlineInitEntry.DisplayName}] {msg}");
+                            };
+                            var result = await initializer.InitializeAsync(inlineInitEntry.Path);
+                            if (result != null)
+                            {
+                                AppLogger.Info("FeatureInit", $"Initialized {result.Features.Count} features for {inlineInitEntry.DisplayName}");
+                                RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
+                            }
+                            else
+                            {
+                                btn.Content = "Failed";
+                                btn.IsEnabled = true;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("FeatureInit", $"Feature initialization failed for {inlineInitEntry.DisplayName}", ex);
+                            btn.Content = "Failed – Retry";
+                            btn.IsEnabled = true;
+                        }
+                    };
+                    featureRow.Children.Add(inlineInitBtn);
+                    infoPanel.Children.Add(featureRow);
+                }
+                else
+                {
+                    var featureOk = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Margin = new Thickness(0, 4, 0, 0),
+                        ToolTip = "Feature registry initialized"
+                    };
+                    featureOk.Children.Add(new System.Windows.Shapes.Ellipse
+                    {
+                        Width = 8,
+                        Height = 8,
+                        Fill = BrushCache.Theme("SuccessGreen"),
+                        Margin = new Thickness(0, 0, 4, 0),
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    featureOk.Children.Add(new TextBlock
+                    {
+                        Text = "Features initialized",
+                        Foreground = BrushCache.Theme("SuccessGreen"),
+                        FontSize = 10,
+                        FontFamily = new FontFamily("Segoe UI"),
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    infoPanel.Children.Add(featureOk);
+                }
+
                 // ── Inline project stats panel ──
                 if (_activeTasks != null && _historyTasks != null)
                 {
@@ -1115,6 +1285,65 @@ namespace Spritely.Managers
                     syncSettings?.Invoke();
                 };
                 btnPanel.Children.Add(gearBtn);
+
+                // Initialize Features button — shown when feature registry doesn't exist yet
+                if (!proj.IsFeatureRegistryInitialized)
+                {
+                    var initFeaturesBtn = new Button
+                    {
+                        Content = "\uE946", // Segoe MDL2 "Library" icon
+                        Background = Brushes.Transparent,
+                        Foreground = (Brush)Application.Current.FindResource("Accent"),
+                        FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                        FontSize = 12,
+                        Padding = new Thickness(4, 2, 4, 2),
+                        BorderThickness = new Thickness(0),
+                        Cursor = Cursors.Hand,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        ToolTip = "Initialize Feature Registry",
+                        Margin = new Thickness(0, 4, 0, 0)
+                    };
+                    var initEntry = proj;
+                    initFeaturesBtn.Click += async (s, ev) =>
+                    {
+                        ev.Handled = true;
+                        if (s is not Button btn) return;
+                        btn.IsEnabled = false;
+                        var originalContent = btn.Content;
+                        btn.Content = "\u23F3"; // hourglass
+                        btn.ToolTip = "Initializing feature registry...";
+                        try
+                        {
+                            var registryManager = new FeatureRegistryManager();
+                            var initializer = new FeatureInitializer(registryManager);
+                            initializer.ProgressChanged += msg =>
+                            {
+                                Application.Current?.Dispatcher?.BeginInvoke(() => btn.ToolTip = msg);
+                                AppLogger.Info("FeatureInit", $"[{initEntry.DisplayName}] {msg}");
+                            };
+                            var result = await initializer.InitializeAsync(initEntry.Path);
+                            if (result != null)
+                            {
+                                AppLogger.Info("FeatureInit", $"Initialized {result.Features.Count} features for {initEntry.DisplayName}");
+                                RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
+                            }
+                            else
+                            {
+                                btn.Content = "\u274C"; // X mark
+                                btn.ToolTip = "Initialization returned no results. Click to retry.";
+                                btn.IsEnabled = true;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("FeatureInit", $"Feature initialization failed for {initEntry.DisplayName}", ex);
+                            btn.Content = "\u274C"; // X mark
+                            btn.ToolTip = $"Failed: {ex.Message}. Click to retry.";
+                            btn.IsEnabled = true;
+                        }
+                    };
+                    btnPanel.Children.Add(initFeaturesBtn);
+                }
 
                 Grid.SetRow(btnPanel, 0);
                 Grid.SetColumn(btnPanel, 1);

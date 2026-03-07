@@ -630,7 +630,7 @@ namespace Spritely.Managers
             _outputProcessor.AppendOutput(task.Id,
                 $"\nPhase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
                 activeTasks, historyTasks);
-            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, phaseModel);
+            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, phaseModel);
 
             var ps1File = Path.Combine(_scriptDir, $"feature_{task.Id}.ps1");
             File.WriteAllText(ps1File,
@@ -727,7 +727,6 @@ namespace Spritely.Managers
                     step.Description,
                     parent.ProjectPath,
                     skipPermissions: true,
-                    remoteSession: false,
                     headless: false,
                     isFeatureMode: false,
                     ignoreFileLocks: false,

@@ -45,6 +45,7 @@ namespace Spritely.Managers
         public event Action<AgentTask>? TabCloseRequested;
         public event Action<AgentTask>? TabStoreRequested;
         public event Action<AgentTask>? TabResumeRequested;
+        public event Action<AgentTask>? TabExportRequested;
         public event Action<AgentTask, TextBox>? InputSent;
         public event Action<AgentTask, TextBox>? InterruptInputSent;
 
@@ -107,16 +108,16 @@ namespace Spritely.Managers
 
             sendBtn.Click += (_, _) =>
             {
-                if (Keyboard.Modifiers == ModifierKeys.Shift)
+                if (Keyboard.Modifiers == ModifierKeys.Shift && !task.IsFinished)
                     InterruptInputSent?.Invoke(task, inputBox);
                 else
                     InputSent?.Invoke(task, inputBox);
             };
 
-            // Update button appearance when Shift is held
+            // Update button appearance when Shift is held (only for non-finished tasks)
             inputBox.PreviewKeyDown += (_, ke) =>
             {
-                if (ke.Key == Key.LeftShift || ke.Key == Key.RightShift)
+                if ((ke.Key == Key.LeftShift || ke.Key == Key.RightShift) && !task.IsFinished)
                 {
                     sendBtn.Content = "Interrupt";
                     sendBtn.Background = (Brush)Application.Current.FindResource("Warning");
@@ -134,7 +135,7 @@ namespace Spritely.Managers
             {
                 if (ke.Key == Key.Enter)
                 {
-                    if (Keyboard.Modifiers == ModifierKeys.Shift)
+                    if (Keyboard.Modifiers == ModifierKeys.Shift && !task.IsFinished)
                     {
                         // Shift+Enter for interrupt send
                         InterruptInputSent?.Invoke(task, inputBox);
@@ -318,12 +319,17 @@ namespace Spritely.Managers
             var storeItem = new MenuItem { Header = "Store Task" };
             storeItem.Click += (_, _) => TabStoreRequested?.Invoke(task);
 
+            var exportItem = new MenuItem { Header = "Export Output" };
+            exportItem.Click += (_, _) => TabExportRequested?.Invoke(task);
+
             var closeItem = new MenuItem { Header = "Close Tab" };
             closeItem.Click += (_, _) => TabCloseRequested?.Invoke(task);
 
             var ctx = new ContextMenu();
             ctx.Items.Add(resumeItem);
             ctx.Items.Add(storeItem);
+            ctx.Items.Add(exportItem);
+            ctx.Items.Add(new Separator());
             ctx.Items.Add(closeItem);
 
             ctx.Opened += (_, _) =>
@@ -419,7 +425,7 @@ namespace Spritely.Managers
         public void UpdateTabHeader(AgentTask task)
         {
             // Stop typewriter and pulsing dots when task reaches a terminal state
-            if (task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled)
+            if (task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled or AgentTaskStatus.Recommendation)
                 StopTypewriterAnimation(task.Id);
 
             if (!_tabs.TryGetValue(task.Id, out var tab)) return;

@@ -12,7 +12,11 @@
       "Bash(cat:*)",
       "Bash(powershell:*)",
       "Bash(tasklist:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Read(//c/Users/fredr/RiderProjects/Unity-Agent/$LOCALAPPDATA/Spritely/**)",
+      "Read(//c/Users/fredr/RiderProjects/Unity-Agent/$LOCALAPPDATA/**)",
+      "Bash(dir=\"C:/Users/fredr/AppData/Local/Spritely/logs\")",
+      "Read(//c/Users/fredr/RiderProjects/Unity-Agent/**)"
     ]
   },
   "enableAllProjectMcpServers": true,

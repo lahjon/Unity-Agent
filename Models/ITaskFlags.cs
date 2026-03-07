@@ -8,7 +8,6 @@ namespace Spritely.Models
     /// </summary>
     public interface ITaskFlags
     {
-        bool RemoteSession { get; set; }
         bool Headless { get; set; }
         bool SpawnTeam { get; set; }
         bool IsFeatureMode { get; set; }
@@ -27,7 +26,6 @@ namespace Spritely.Models
         /// </summary>
         static void CopyFlags(ITaskFlags source, ITaskFlags target)
         {
-            target.RemoteSession = source.RemoteSession;
             target.Headless = source.Headless;
             target.SpawnTeam = source.SpawnTeam;
             target.IsFeatureMode = source.IsFeatureMode;

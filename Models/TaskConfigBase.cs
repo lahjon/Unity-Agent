@@ -7,7 +7,6 @@ namespace Spritely.Models
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Model { get; set; } = "ClaudeCode";
-        public bool RemoteSession { get; set; }
         public bool Headless { get; set; }
         public bool SpawnTeam { get; set; }
         public bool IsFeatureMode { get; set; }

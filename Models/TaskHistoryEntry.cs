@@ -7,7 +7,6 @@ namespace Spritely.Models
         public string Status { get; set; } = "";
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
-        public bool RemoteSession { get; set; }
         public bool IsFeatureMode { get; set; }
         public int MaxIterations { get; set; }
         public int CurrentIteration { get; set; }

@@ -12,24 +12,25 @@ namespace Spritely.Managers
             bool autoDecompose = false, bool spawnTeam = false,
             bool isGameProject = false, string taskId = "",
             bool applyFix = true, bool suppressOutputEfficiency = false,
-            string skillsBlock = "");
+            string skillsBlock = "", string featureContextBlock = "");
 
         string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
-            bool isGameProject = false, string skillsBlock = "");
+            bool isGameProject = false, string skillsBlock = "",
+            string featureContextBlock = "");
 
         string BuildPromptWithImages(string basePrompt, List<string> imagePaths);
 
         string BuildMessageBusBlock(string taskId, string projectPath,
             List<(string id, string summary)> siblings);
 
-        string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null, bool planMode = false);
+        string BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false);
 
         string BuildPowerShellScript(string projectPath, string promptFilePath,
             string claudeCmd);
 
         string BuildHeadlessPowerShellScript(string projectPath, string promptFilePath,
-            bool skipPermissions, bool remoteSession, string? modelId = null);
+            bool skipPermissions, string? modelId = null);
 
         ProcessStartInfo BuildProcessStartInfo(string ps1FilePath, bool headless);
 

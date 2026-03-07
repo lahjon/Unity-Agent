@@ -453,6 +453,11 @@ namespace Spritely.Controls
             _interaction.FocusOnTask(taskId, _nodePositions);
         }
 
+        public void FitToView()
+        {
+            Dispatcher.BeginInvoke(() => _interaction.FitToView(_nodePositions), DispatcherPriority.Loaded);
+        }
+
         public void Dispose()
         {
             _interaction.Dispose();

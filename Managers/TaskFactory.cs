@@ -26,7 +26,6 @@ namespace Spritely.Managers
             string description,
             string projectPath,
             bool skipPermissions,
-            bool remoteSession,
             bool headless,
             bool isFeatureMode,
             bool ignoreFileLocks,
@@ -46,7 +45,6 @@ namespace Spritely.Managers
             {
                 Description = description,
                 SkipPermissions = skipPermissions,
-                RemoteSession = remoteSession,
                 Headless = headless,
                 IsFeatureMode = isFeatureMode,
                 IgnoreFileLocks = ignoreFileLocks,
@@ -177,8 +175,28 @@ namespace Spritely.Managers
                 {
                     using var doc = JsonDocument.Parse(text);
                     var root = doc.RootElement;
-                    shortDesc = CleanDescriptionSection(root.GetProperty("short").GetString() ?? "");
-                    longDesc = CleanDescriptionSection(root.GetProperty("long").GetString() ?? "");
+
+                    // The CLI with --output-format json wraps the result; extract the "result" field
+                    JsonElement data;
+                    if (root.TryGetProperty("result", out var resultElement))
+                    {
+                        if (resultElement.ValueKind == JsonValueKind.String)
+                        {
+                            using var innerDoc = JsonDocument.Parse(resultElement.GetString()!);
+                            data = innerDoc.RootElement.Clone();
+                        }
+                        else
+                        {
+                            data = resultElement;
+                        }
+                    }
+                    else
+                    {
+                        data = root;
+                    }
+
+                    shortDesc = CleanDescriptionSection(data.GetProperty("short").GetString() ?? "");
+                    longDesc = CleanDescriptionSection(data.GetProperty("long").GetString() ?? "");
                 }
                 catch (JsonException)
                 {
@@ -217,6 +235,64 @@ namespace Spritely.Managers
             {
                 AppLogger.Warn("TaskFactory", "Failed to generate project description", ex);
                 return ("", "");
+            }
+            finally
+            {
+                process?.Dispose();
+            }
+        }
+
+        public async Task<string> GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default)
+        {
+            Process? process = null;
+            try
+            {
+                var maxTurns = isGame ? 5 : 3;
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "claude",
+                    Arguments = $"-p --max-turns {maxTurns}",
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    WorkingDirectory = projectPath
+                };
+                psi.Environment.Remove("CLAUDECODE");
+
+                process = new Process { StartInfo = psi };
+                process.Start();
+
+                await process.StandardInput.WriteAsync(PromptBuilder.ClaudeMdGenerationPrompt);
+                process.StandardInput.Close();
+
+                var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+                await process.WaitForExitAsync(cancellationToken);
+
+                var text = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
+
+                if (string.IsNullOrWhiteSpace(text) ||
+                    text.StartsWith("Error:", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Reached max turns", StringComparison.OrdinalIgnoreCase))
+                    return "";
+
+                // Strip code fences if the model wrapped its output
+                text = Regex.Replace(text, @"^```(?:markdown|md)?\s*\n", "", RegexOptions.Multiline);
+                text = Regex.Replace(text, @"\n```\s*$", "", RegexOptions.Multiline);
+
+                return text.Trim();
+            }
+            catch (OperationCanceledException)
+            {
+                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
+                return "";
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("TaskFactory", "Failed to generate CLAUDE.md", ex);
+                return "";
             }
             finally
             {

@@ -16,7 +16,6 @@ namespace Spritely
         public string Description { get; set; } = "";
         public DateTime StartTime { get; set; } = DateTime.Now;
         public bool SkipPermissions { get; set; }
-        public bool RemoteSession { get; set; }
         public bool Headless { get; set; }
         public bool IsFeatureMode { get; set; }
         public bool IgnoreFileLocks { get; set; }

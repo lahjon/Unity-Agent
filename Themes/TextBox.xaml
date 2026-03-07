@@ -1,6 +1,13 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ContextMenu x:Key="DarkTextBoxContextMenu">
+        <MenuItem Command="ApplicationCommands.Cut"/>
+        <MenuItem Command="ApplicationCommands.Copy"/>
+        <MenuItem Command="ApplicationCommands.Paste"/>
+    </ContextMenu>
+
     <Style TargetType="TextBox">
+        <Setter Property="ContextMenu" Value="{StaticResource DarkTextBoxContextMenu}"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="SelectionBrush" Value="{StaticResource Accent}"/>
         <Setter Property="Template">

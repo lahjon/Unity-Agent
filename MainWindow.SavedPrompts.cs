@@ -178,6 +178,7 @@ namespace Spritely
             // Restore toggles
             ApplyFlagsToUi(entry);
             AdditionalInstructionsInput.Text = entry.AdditionalInstructions ?? "";
+            SetAdditionalInstructionsExpanded(!string.IsNullOrWhiteSpace(entry.AdditionalInstructions));
 
             // Restore skill selections
             _skillManager.SetEnabledSkills(entry.ActiveSkillIds ?? new());

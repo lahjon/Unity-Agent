@@ -740,7 +740,7 @@ namespace Spritely.Tests
             normalTask.IgnoreFileLocks = false;
 
             var ignoreTask = _factory.CreateTask("ignore locks", @"C:\Projects\Alpha",
-                false, false, false, false, ignoreFileLocks: true, false);
+                false, false, false, ignoreFileLocks: true, useMcp: false);
 
             Assert.False(normalTask.IgnoreFileLocks);
             Assert.True(ignoreTask.IgnoreFileLocks);
@@ -816,7 +816,7 @@ namespace Spritely.Tests
         public void SpawnTeam_Task_RetainsFlag()
         {
             var task = _factory.CreateTask("team task", @"C:\Projects\Alpha",
-                false, false, false, false, false, false, spawnTeam: true);
+                false, false, false, false, false, spawnTeam: true);
 
             Assert.True(task.SpawnTeam);
         }
@@ -845,8 +845,7 @@ namespace Spritely.Tests
         {
             var images = new List<string> { @"C:\imgs\screenshot.png" };
             var task = _factory.CreateTask("with images", @"C:\Projects\Alpha",
-                false, false, false, false, false, false,
-                false, false, false, false, false, images);
+                false, false, false, false, false, imagePaths: images);
 
             Assert.Single(task.ImagePaths);
             Assert.Equal(@"C:\imgs\screenshot.png", task.ImagePaths[0]);

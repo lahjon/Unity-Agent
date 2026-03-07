@@ -53,7 +53,6 @@ namespace Spritely.Tests
                 "Do something",
                 @"C:\Projects\Test",
                 skipPermissions: true,
-                remoteSession: true,
                 headless: false,
                 isFeatureMode: true,
                 ignoreFileLocks: true,
@@ -63,7 +62,6 @@ namespace Spritely.Tests
             Assert.Equal("Do something", task.Description);
             Assert.Equal(@"C:\Projects\Test", task.ProjectPath);
             Assert.True(task.SkipPermissions);
-            Assert.True(task.RemoteSession);
             Assert.False(task.Headless);
             Assert.True(task.IsFeatureMode);
             Assert.True(task.IgnoreFileLocks);
@@ -76,7 +74,7 @@ namespace Spritely.Tests
         public void CreateTask_WithImages_CopiesImagePaths()
         {
             var images = new List<string> { "img1.png", "img2.jpg" };
-            var task = _factory.CreateTask("desc", @"C:\proj", false, false, false, false, false, false, false, false, false, false, false, images);
+            var task = _factory.CreateTask("desc", @"C:\proj", false, false, false, false, false, imagePaths: images);
 
             Assert.Equal(2, task.ImagePaths.Count);
             Assert.Contains("img1.png", task.ImagePaths);
@@ -215,44 +213,36 @@ namespace Spritely.Tests
         [Fact]
         public void BuildClaudeCommand_NoFlags_BasicCommand()
         {
-            var cmd = _prompt.BuildClaudeCommand(false, false);
+            var cmd = _prompt.BuildClaudeCommand(false);
             Assert.Equal("claude -p --verbose --output-format stream-json", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_WithModel_IncludesModelFlag()
         {
-            var cmd = _prompt.BuildClaudeCommand(false, false, AppConstants.ClaudeOpus);
+            var cmd = _prompt.BuildClaudeCommand(false, AppConstants.ClaudeOpus);
             Assert.Contains($"--model {AppConstants.ClaudeOpus}", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_SkipPermissions_IncludesFlag()
         {
-            var cmd = _prompt.BuildClaudeCommand(true, false);
+            var cmd = _prompt.BuildClaudeCommand(true);
             Assert.Contains("--dangerously-skip-permissions", cmd);
-        }
-
-        [Fact]
-        public void BuildClaudeCommand_Remote_IncludesFlag()
-        {
-            var cmd = _prompt.BuildClaudeCommand(false, true);
-            Assert.Contains("--remote", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_NoSpawnTeamFlag()
         {
-            var cmd = _prompt.BuildClaudeCommand(false, false);
+            var cmd = _prompt.BuildClaudeCommand(false);
             Assert.DoesNotContain("--spawn-team", cmd);
         }
 
         [Fact]
         public void BuildClaudeCommand_AllFlags()
         {
-            var cmd = _prompt.BuildClaudeCommand(true, true, AppConstants.ClaudeSonnet);
+            var cmd = _prompt.BuildClaudeCommand(true, AppConstants.ClaudeSonnet);
             Assert.Contains("--dangerously-skip-permissions", cmd);
-            Assert.Contains("--remote", cmd);
             Assert.Contains($"--model {AppConstants.ClaudeSonnet}", cmd);
             Assert.DoesNotContain("--spawn-team", cmd);
             Assert.Contains("--verbose", cmd);
@@ -262,7 +252,7 @@ namespace Spritely.Tests
         [Fact]
         public void BuildClaudeCommand_AlwaysContainsStreamJson()
         {
-            var cmd = _prompt.BuildClaudeCommand(false, false);
+            var cmd = _prompt.BuildClaudeCommand(false);
             Assert.Contains("stream-json", cmd);
         }
 
@@ -360,35 +350,28 @@ namespace Spritely.Tests
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsReadKey()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false);
             Assert.Contains("ReadKey", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_NoStreamJson()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false);
             Assert.DoesNotContain("stream-json", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_SkipPermissions()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", true, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", true);
             Assert.Contains("--dangerously-skip-permissions", script);
-        }
-
-        [Fact]
-        public void BuildHeadlessPowerShellScript_Remote()
-        {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, true);
-            Assert.Contains("--remote", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_NoSpawnTeamFlag()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false);
             Assert.DoesNotContain("--spawn-team", script);
         }
 
@@ -403,21 +386,21 @@ namespace Spritely.Tests
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsPressAnyKey()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false);
             Assert.Contains("Press any key to close", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsVerbose()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false);
             Assert.Contains("--verbose", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsDiagnosticMessages()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false);
             Assert.Contains("Starting Claude", script);
             Assert.Contains("Project:", script);
         }
@@ -425,14 +408,14 @@ namespace Spritely.Tests
         [Fact]
         public void BuildHeadlessPowerShellScript_ContainsErrorHandling()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false);
             Assert.Contains("LASTEXITCODE", script);
         }
 
         [Fact]
         public void BuildHeadlessPowerShellScript_PipesPromptToStdin()
         {
-            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false, false);
+            var script = _prompt.BuildHeadlessPowerShellScript(@"C:\proj", @"C:\p.txt", false);
             Assert.Contains("Get-Content -Raw", script);
             Assert.Contains("| claude -p", script);
         }

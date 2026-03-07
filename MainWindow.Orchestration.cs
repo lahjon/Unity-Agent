@@ -28,10 +28,7 @@ namespace Spritely
             if (_activeTasks.Any(t => t.Id == task.Id))
                 return;
 
-            // Pin Row 0 to pixel height to prevent layout jitter when populating the task list
-            var topRow = RootGrid.RowDefinitions[0];
-            if (topRow.ActualHeight > 0)
-                topRow.Height = new GridLength(topRow.ActualHeight);
+            PinRowHeights();
 
             task.TaskNumber = _nextTaskNumber;
             _nextTaskNumber = _nextTaskNumber >= 9999 ? 1 : _nextTaskNumber + 1;
@@ -69,7 +66,7 @@ namespace Spritely
                         insertAfter++;
                     _activeTasks.Insert(insertAfter, task);
                     RefreshActivityDashboard();
-                    RestoreStarRow();
+                    RestoreStarRows();
                     return;
                 }
             }
@@ -80,15 +77,35 @@ namespace Spritely
                 insertIndex++;
             _activeTasks.Insert(insertIndex, task);
             RefreshActivityDashboard();
-            RestoreStarRow();
+            RestoreStarRows();
         }
 
-        /// <summary>Restores Row 0 to star sizing after layout settles, preventing resize jitter.</summary>
-        private void RestoreStarRow()
+        /// <summary>
+        /// Pins both star rows (0 and 2) to their current pixel heights to prevent
+        /// layout jitter during operations that add/remove items or toggle visibility.
+        /// Call <see cref="RestoreStarRows"/> afterwards to restore proportional sizing.
+        /// </summary>
+        private void PinRowHeights()
+        {
+            var topRow = RootGrid.RowDefinitions[0];
+            var bottomRow = RootGrid.RowDefinitions[2];
+            if (topRow.ActualHeight > 0)
+                topRow.Height = new GridLength(topRow.ActualHeight);
+            if (bottomRow.ActualHeight > 0)
+                bottomRow.Height = new GridLength(bottomRow.ActualHeight);
+        }
+
+        /// <summary>Restores both star rows to proportional sizing after layout settles, preserving their current ratio.</summary>
+        private void RestoreStarRows()
         {
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
             {
-                RootGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+                var topRow = RootGrid.RowDefinitions[0];
+                var bottomRow = RootGrid.RowDefinitions[2];
+                double totalHeight = topRow.ActualHeight + bottomRow.ActualHeight;
+                if (totalHeight <= 0) return;
+                topRow.Height = new GridLength(topRow.ActualHeight / totalHeight, GridUnitType.Star);
+                bottomRow.Height = new GridLength(bottomRow.ActualHeight / totalHeight, GridUnitType.Star);
             });
         }
 
@@ -546,7 +563,16 @@ namespace Spritely
             // so auto-commit never fires and locks stay held indefinitely.
             // Recommendation tasks are always finalized (to release locks and stay in active list).
             if (task is { IsFinished: true } && (_settingsManager.AutoCommit || task.Status == AgentTaskStatus.Recommendation))
+            {
                 FinalizeTask(task, closeTab: false);
+            }
+            else if (task is { IsFinished: true })
+            {
+                // Without auto-commit, release file locks immediately so queued tasks can proceed.
+                // The task card stays in the active list for the user to review/dismiss manually.
+                _fileLockManager.ReleaseTaskLocks(task.Id);
+                _fileLockManager.CheckQueuedTasks(_activeTasks);
+            }
 
             _taskOrchestrator.OnTaskCompleted(taskId);
         }
@@ -717,7 +743,6 @@ namespace Spritely
                 retryPrompt,
                 historicTask.ProjectPath,
                 historicTask.SkipPermissions,
-                historicTask.RemoteSession,
                 historicTask.Headless,
                 historicTask.IsFeatureMode,
                 historicTask.IgnoreFileLocks,

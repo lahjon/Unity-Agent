@@ -88,7 +88,6 @@ namespace Spritely
         public string Description { get => Data.Description; set => Data.Description = value; }
         public DateTime StartTime { get => Data.StartTime; set => Data.StartTime = value; }
         public bool SkipPermissions { get => Data.SkipPermissions; set => Data.SkipPermissions = value; }
-        public bool RemoteSession { get => Data.RemoteSession; set => Data.RemoteSession = value; }
         public bool Headless { get => Data.Headless; set => Data.Headless = value; }
         public bool IsFeatureMode { get => Data.IsFeatureMode; set => Data.IsFeatureMode = value; }
         public bool UseMcp { get => Data.UseMcp; set => Data.UseMcp = value; }
@@ -479,7 +478,6 @@ namespace Spritely
                 var tags = new List<string>(4);
                 if (IsFeatureMode) tags.Add("FEAT");
                 if (ExtendedPlanning) tags.Add("EXT");
-                if (RemoteSession) tags.Add("REM");
                 if (Headless) tags.Add("HDL");
                 if (SpawnTeam) tags.Add("TEAM");
                 if (AutoDecompose) tags.Add("DEC");
@@ -495,7 +493,6 @@ namespace Spritely
                 var lines = new List<string>(4);
                 if (IsFeatureMode) lines.Add("FEAT = Feature Mode");
                 if (ExtendedPlanning) lines.Add("EXT = Extended Planning");
-                if (RemoteSession) lines.Add("REM = Remote Session");
                 if (Headless) lines.Add("HDL = Headless");
                 if (SpawnTeam) lines.Add("TEAM = Spawn Team");
                 if (AutoDecompose) lines.Add("DEC = Auto Decompose");

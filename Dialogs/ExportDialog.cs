@@ -380,15 +380,7 @@ namespace Spritely.Dialogs
                 {
                     sb.AppendLine("#### Full Output");
                     sb.AppendLine("```");
-
-                    // Limit output length for readability
-                    var output = task.FullOutput;
-                    if (output.Length > 10000)
-                    {
-                        output = output[..10000] + "\n\n[Output truncated - see original task for full output]";
-                    }
-
-                    sb.AppendLine(output);
+                    sb.AppendLine(task.FullOutput);
                     sb.AppendLine("```");
                     sb.AppendLine();
                 }

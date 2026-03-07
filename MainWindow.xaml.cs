@@ -144,9 +144,10 @@ namespace Spritely
 
             _historyManager = new HistoryManager(appDataDir, _historyTasksLock, _storedTasksLock);
 
-            _fileLockManager = new FileLockManager(FileLockBadge, Dispatcher);
+            _fileLockManager = new FileLockManager(Dispatcher);
             _fileLockManager.QueuedTaskResumed += OnQueuedTaskResumed;
             _fileLockManager.TaskNeedsPause += OnTaskNeedsPause;
+            _fileLockManager.LocksChanged += UpdateFileLocks;
 
             _outputTabManager = new OutputTabManager(OutputTabs, Dispatcher);
             _outputTabManager.TabCloseRequested += OnTabCloseRequested;
@@ -173,7 +174,6 @@ namespace Spritely
             _claudeService = new ClaudeService(appDataDir);
             _claudeUsageManager = new ClaudeUsageManager(appDataDir);
             _claudeService.SetUsageManager(_claudeUsageManager);
-            _claudeUsageManager.UsageUpdated += OnClaudeUsageUpdated;
             _modelConfigManager = new ModelConfigManager(appDataDir);
             ClaudeService.AvailableModels = _modelConfigManager.ClaudeModels;
             GeminiService.AvailableModels = _modelConfigManager.GeminiModels;
@@ -404,7 +404,7 @@ namespace Spritely
             ct.ThrowIfCancellationRequested();
             await LoadSkillsAsync();
             ct.ThrowIfCancellationRequested();
-            await _settingsManager.LoadTemplatesAsync();
+            await _settingsManager.LoadTemplatesAsync(_projectManager.ProjectPath);
             RenderTemplateCombo();
 
             foreach (ComboBoxItem item in HistoryRetentionCombo.Items)
@@ -497,16 +497,14 @@ namespace Spritely
                 var storedItems = storedTask.Result;
                 var recoveredTasks = activeQueueTask.Result;
 
-                var topRow = RootGrid.RowDefinitions[0];
-                if (topRow.ActualHeight > 0)
-                    topRow.Height = new GridLength(topRow.ActualHeight);
+                PinRowHeights();
 
                 foreach (var item in historyItems)
                     _historyTasks.Add(item);
                 foreach (var item in storedItems)
                     _storedTasks.Add(item);
 
-                RestoreStarRow();
+                RestoreStarRows();
                 RefreshFilterCombos();
                 RefreshActivityDashboard();
                 _projectTaskManager.CurrentProjectPath = _projectManager.ProjectPath;
@@ -543,9 +541,6 @@ namespace Spritely
             finally
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
-
-                // Initialize Claude usage display
-                ClaudeUsageText.Text = _claudeUsageManager.GetUsageSummary();
             }
         }
 
@@ -688,7 +683,7 @@ namespace Spritely
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to sync settings for project", ex); }
             finally
             {
-                RestoreStarRow();
+                RestoreStarRows();
             }
         }
 
@@ -696,10 +691,8 @@ namespace Spritely
         {
             App.TraceUi("SyncSettingsForProject");
 
-            // Pin Row 0 to prevent prompt panel resize jitter during layout changes
-            var topRow = RootGrid.RowDefinitions[0];
-            if (topRow.ActualHeight > 0)
-                topRow.Height = new GridLength(topRow.ActualHeight);
+            // Pin both rows to prevent prompt panel resize jitter during layout changes
+            PinRowHeights();
 
             _projectManager.RefreshProjectCombo();
             _projectManager.RefreshProjectList(
@@ -1012,14 +1005,29 @@ namespace Spritely
             AdvancedArrow.Text = _advancedPanelOpen ? "\u25BE" : "\u25B8";
         }
 
+        private void AdditionalInstructionsToggle_Click(object sender, RoutedEventArgs e)
+        {
+            SetAdditionalInstructionsExpanded(AdditionalInstructionsToggle.IsChecked == true);
+        }
+
+        private void SetAdditionalInstructionsExpanded(bool expanded)
+        {
+            AdditionalInstructionsToggle.IsChecked = expanded;
+            AdditionalInstructionsInput.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+            if (AdditionalInstructionsToggle.Template.FindName("CollapseChevron", AdditionalInstructionsToggle) is TextBlock chevron)
+            {
+                ((RotateTransform)chevron.RenderTransform).Angle = expanded ? 0 : -90;
+            }
+        }
+
         private void UpdateExecuteButtonText()
         {
             if (PlanOnlyToggle.IsChecked == true)
-                ExecuteButton.ToolTip = "Plan Task (Ctrl+Enter)";
+                ExecuteButton.ToolTip = "Plan Task";
             else if (FeatureModeToggle.IsChecked == true)
-                ExecuteButton.ToolTip = "Start Feature Mode (Ctrl+Enter)";
+                ExecuteButton.ToolTip = "Start Feature Mode";
             else
-                ExecuteButton.ToolTip = "Execute Task (Ctrl+Enter)";
+                ExecuteButton.ToolTip = "Execute Task";
         }
 
         private void HistoryRetention_Changed(object sender, SelectionChangedEventArgs e)
@@ -1557,7 +1565,6 @@ namespace Spritely
             var isGemini = tag == "Gemini" || tag == "GeminiGameArt";
             var isGameArt = tag == "GeminiGameArt";
             // Disable advanced options that don't apply to Gemini
-            if (RemoteSessionToggle != null) RemoteSessionToggle.IsEnabled = !isGemini;
             if (FeatureModeToggle != null) FeatureModeToggle.IsEnabled = !isGemini;
             if (SpawnTeamToggle != null) SpawnTeamToggle.IsEnabled = !isGemini;
             if (ExtendedPlanningToggle != null) ExtendedPlanningToggle.IsEnabled = !isGemini;
@@ -1952,6 +1959,16 @@ namespace Spritely
         private void PlanOnlyToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (ExecuteButton == null) return;
+            if (PlanOnlyToggle.IsChecked == true && ApplyFixToggle.IsChecked == true)
+                ApplyFixToggle.IsChecked = false;
+            UpdateExecuteButtonText();
+        }
+
+        private void ApplyFixToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (ExecuteButton == null) return;
+            if (ApplyFixToggle.IsChecked == true && PlanOnlyToggle.IsChecked == true)
+                PlanOnlyToggle.IsChecked = false;
             UpdateExecuteButtonText();
         }
 
@@ -2002,7 +2019,6 @@ namespace Spritely
                 task.StoredPrompt,
                 task.ProjectPath,
                 true,
-                RemoteSessionToggle.IsChecked == true,
                 false,
                 FeatureModeToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
@@ -2340,8 +2356,17 @@ namespace Spritely
             // Update no-project state (e.g. after removing the last project)
             UpdateNoProjectState();
 
+            // Reload templates for the new project
+            _ = ReloadTemplatesForProjectAsync();
+
             // Reload skills for the new project (global + project-scoped)
             _ = LoadSkillsAsync();
+        }
+
+        private async Task ReloadTemplatesForProjectAsync()
+        {
+            await _settingsManager.LoadTemplatesAsync(_projectManager.ProjectPath);
+            RenderTemplateCombo();
         }
 
         private void UpdateFileLocks()
@@ -2411,6 +2436,7 @@ namespace Spritely
             _outputTabManager.TabCloseRequested -= OnTabCloseRequested;
             _outputTabManager.TabStoreRequested -= OnTabStoreRequested;
             _outputTabManager.TabResumeRequested -= OnTabResumeRequested;
+            _outputTabManager.TabExportRequested -= OnTabExportRequested;
             _outputTabManager.InputSent -= OnTabInputSent;
             _outputTabManager.InterruptInputSent -= OnTabInterruptInputSent;
 
@@ -2632,6 +2658,8 @@ namespace Spritely
 
                 GraphCollapseBtn.Content = "\uE70D"; // ChevronDown
                 GraphCollapseBtn.ToolTip = "Collapse graph";
+
+                NodeGraphPanel.FitToView();
             }
         }
 
@@ -3706,15 +3734,15 @@ namespace Spritely
 
             if (!_projectManager.HasProjects)
             {
-                StatusText.Text = $"No project  |  Add a project to get started  |  " +
-                                  $"Completed: {completed}  |  Failed: {failed}";
+                Title = $"Spritely  |  No project  |  Add a project to get started  |  " +
+                        $"Completed: {completed}  |  Failed: {failed}";
                 return;
             }
 
             var projectName = Path.GetFileName(_projectManager.ProjectPath);
-            StatusText.Text = $"{projectName}  |  Running: {running}{planningPart}  |  Queued: {queued}{waitingPart}  |  " +
-                              $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
-                              $"Locks: {locks}  |  {_projectManager.ProjectPath}";
+            Title = $"Spritely  |  {projectName}  |  Running: {running}{planningPart}  |  Queued: {queued}{waitingPart}  |  " +
+                    $"Completed: {completed}  |  Cancelled: {cancelled}  |  Failed: {failed}  |  " +
+                    $"Locks: {locks}  |  {_projectManager.ProjectPath}";
         }
 
         private void CheckTaskTimeouts()
@@ -3761,14 +3789,6 @@ namespace Spritely
                     MoveToHistory(task);
                 }
             }
-        }
-
-        private void OnClaudeUsageUpdated(object? sender, ClaudeUsageManager.UsageData usage)
-        {
-            Dispatcher.BeginInvoke(() =>
-            {
-                ClaudeUsageText.Text = _claudeUsageManager.GetUsageSummary();
-            });
         }
 
         /// <summary>Updates the queue position for all InitQueued tasks based on their priority ordering.</summary>

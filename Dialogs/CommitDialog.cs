@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Spritely.Helpers;
 using Spritely.Managers;
 using Spritely.Models;
 
@@ -205,11 +206,11 @@ namespace Spritely.Dialogs
         {
             return status switch
             {
-                "A" or "AM" or "??" => (Brush)Application.Current.FindResource("SuccessGreen"),
-                "M" or "MM" => (Brush)Application.Current.FindResource("WarningAmber"),
-                "D" => (Brush)Application.Current.FindResource("ErrorRed"),
-                "R" => (Brush)Application.Current.FindResource("InfoBlue"),
-                _ => (Brush)Application.Current.FindResource("TextSecondary")
+                "A" or "AM" or "??" => BrushCache.Theme("SuccessGreen"),
+                "M" or "MM" => BrushCache.Theme("WarningAmber"),
+                "D" => BrushCache.Theme("ErrorRed"),
+                "R" => BrushCache.Theme("InfoBlue"),
+                _ => BrushCache.Theme("TextSecondary")
             };
         }
     }

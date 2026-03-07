@@ -41,8 +41,16 @@
                     <Border x:Name="Bd" Background="Transparent" CornerRadius="4"
                             Padding="{TemplateBinding Padding}" Margin="2,1"
                             SnapsToDevicePixels="True">
-                        <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
-                                          VerticalAlignment="Center"/>
+                        <DockPanel>
+                            <TextBlock x:Name="GestureText"
+                                       DockPanel.Dock="Right"
+                                       Text="{TemplateBinding InputGestureText}"
+                                       Foreground="{StaticResource TextMuted}"
+                                       FontSize="11" Margin="24,0,0,0"
+                                       VerticalAlignment="Center"/>
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                              VerticalAlignment="Center"/>
+                        </DockPanel>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">

@@ -53,6 +53,11 @@ namespace Spritely.Managers
         private readonly TokenLimitHandler _tokenLimitHandler;
         private readonly EarlyTerminationManager _earlyTerminationManager;
 
+        // ── Feature System ──────────────────────────────────────────────
+        private readonly FeatureRegistryManager _featureRegistryManager;
+        private readonly FeatureContextResolver _featureContextResolver;
+        private readonly FeatureUpdateAgent _featureUpdateAgent;
+
         /// <summary>Exposes the streaming tool state dictionary for external consumers.</summary>
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _processLauncher.StreamingToolState;
 
@@ -109,6 +114,11 @@ namespace Spritely.Managers
             _outputProcessor = new OutputProcessor(outputTabManager, completionAnalyzer, gitHelper, getAutoVerify);
             _processLauncher = new TaskProcessLauncher(scriptDir, fileLockManager, outputTabManager, _outputProcessor, promptBuilder, dispatcher);
             _earlyTerminationManager = new EarlyTerminationManager(new ProgressAnalyzer());
+
+            // Feature System
+            _featureRegistryManager = new FeatureRegistryManager();
+            _featureContextResolver = new FeatureContextResolver(_featureRegistryManager);
+            _featureUpdateAgent = new FeatureUpdateAgent(_featureRegistryManager);
             _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, completionAnalyzer, promptBuilder, taskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
             _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, completionAnalyzer, retryMinutesFunc);
 
@@ -131,14 +141,15 @@ namespace Spritely.Managers
         /// When <paramref name="activeTasks"/> is provided, auto-enables the message bus
         /// if sibling tasks exist on the same project.
         /// </summary>
-        private string BuildAndWritePromptFile(AgentTask task, ObservableCollection<AgentTask>? activeTasks = null)
+        private string BuildAndWritePromptFile(AgentTask task, ObservableCollection<AgentTask>? activeTasks = null, string featureContextBlock = "")
         {
             var fullPrompt = _promptBuilder.BuildFullPrompt(
                 _getSystemPrompt(), task,
                 _getProjectDescription(task),
                 _getProjectRulesBlock(task.ProjectPath),
                 _isGameProject(task.ProjectPath),
-                _getSkillsBlock());
+                _getSkillsBlock(),
+                featureContextBlock);
 
             if (activeTasks != null)
             {
@@ -195,18 +206,44 @@ namespace Spritely.Managers
                 catch (Exception ex)
                 {
                     AppLogger.Debug("TaskExecutionManager", "Haiku pre-processing failed, continuing with defaults", ex);
+                    _outputProcessor.AppendColoredOutput(task.Id,
+                        $"[Preprocessor] Skipped — {ex.GetType().Name}: {ex.Message}\n",
+                        Brushes.DarkGray, activeTasks, historyTasks);
                 }
             }
 
             if (task.IsFeatureMode)
                 _taskFactory.PrepareTaskForFeatureModeStart(task);
 
-            var promptFile = BuildAndWritePromptFile(task, activeTasks);
+            // Feature System: resolve relevant features and build context block for prompt injection
+            var featureContextBlock = "";
+            if (!task.IsSubTask)
+            {
+                try
+                {
+                    var featureResult = await _featureContextResolver.ResolveAsync(task.ProjectPath, task.Description, task.Cts.Token);
+                    if (featureResult != null && !string.IsNullOrWhiteSpace(featureResult.ContextBlock))
+                    {
+                        featureContextBlock = featureResult.ContextBlock;
+                        var featureCount = featureResult.RelevantFeatures.Count;
+                        _outputProcessor.AppendColoredOutput(task.Id,
+                            $"[Features] Matched {featureCount} feature{(featureCount != 1 ? "s" : "")} for context injection\n",
+                            Brushes.MediumAquamarine, activeTasks, historyTasks);
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TaskExecutionManager", "Feature context resolution failed, continuing without", ex);
+                }
+            }
+
+            var promptFile = BuildAndWritePromptFile(task, activeTasks, featureContextBlock);
             var projectPath = task.ProjectPath;
 
             var cliModel = PromptBuilder.GetCliModelForTask(task);
             task.Runtime.LastCliModel = cliModel;
-            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, task.RemoteSession, cliModel, task.PlanOnly);
+            var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, cliModel, task.PlanOnly);
 
             var ps1File = Path.Combine(_scriptDir, $"task_{task.Id}.ps1");
             File.WriteAllText(ps1File,
@@ -235,7 +272,6 @@ namespace Spritely.Managers
             bootLog.AppendLine($"Project: {projectPath}");
             bootLog.AppendLine($"Model: {PromptBuilder.GetFriendlyModelName(cliModel)} ({cliModel})");
             bootLog.AppendLine($"Skip permissions: {task.SkipPermissions}");
-            bootLog.AppendLine($"Remote session: {task.RemoteSession}");
             try
             {
                 var promptContent = File.ReadAllText(promptFile, Encoding.UTF8);
@@ -484,6 +520,15 @@ namespace Spritely.Managers
                 AppLogger.Error("TaskExecution", $"CompleteWithVerificationAsync failed for task {task.Id}", ex);
             }
 
+            // Feature System: update registry with task results (fire-and-forget, never blocks teardown)
+            if (exitCode == 0)
+            {
+                _ = _featureUpdateAgent.UpdateFeaturesAsync(
+                    task.ProjectPath, task.Id, task.Description,
+                    task.CompletionSummary,
+                    task.ChangedFiles?.ToList() ?? new List<string>());
+            }
+
             // If a follow-up was started during summary generation, the status will
             // have changed from Verifying to Running — don't overwrite it.
             if (task.Status == AgentTaskStatus.Verifying)
@@ -572,7 +617,7 @@ namespace Spritely.Managers
 
             var ps1File = Path.Combine(_scriptDir, $"headless_{task.Id}.ps1");
             File.WriteAllText(ps1File,
-                _promptBuilder.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, task.RemoteSession, cliModel),
+                _promptBuilder.BuildHeadlessPowerShellScript(projectPath, promptFile, task.SkipPermissions, cliModel),
                 Encoding.UTF8);
 
             var psi = _promptBuilder.BuildProcessStartInfo(ps1File, headless: true);
@@ -966,7 +1011,6 @@ namespace Spritely.Managers
                     description,
                     parent.ProjectPath,
                     parent.SkipPermissions,
-                    parent.RemoteSession,
                     parent.Headless,
                     parent.IsFeatureMode,
                     parent.IgnoreFileLocks,
@@ -981,7 +1025,6 @@ namespace Spritely.Managers
                     description,
                     parent.ProjectPath,
                     skipPermissions: false,
-                    remoteSession: false,
                     headless: false,
                     isFeatureMode: false,
                     ignoreFileLocks: false,

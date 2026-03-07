@@ -61,6 +61,8 @@
     <SolidColorBrush x:Key="WarningYellow" Color="#FFD600"/>
     <SolidColorBrush x:Key="WarningAmber" Color="#E0A030"/>
     <SolidColorBrush x:Key="WarningOrange" Color="#CC8800"/>
+    <SolidColorBrush x:Key="ErrorRed" Color="#EF5350"/>
+    <SolidColorBrush x:Key="InfoBlue" Color="#42A5F5"/>
     <SolidColorBrush x:Key="WarningDeepOrange" Color="#E08030"/>
     <SolidColorBrush x:Key="StatusOrange" Color="#FF9800"/>
     <SolidColorBrush x:Key="StatusInitQueued" Color="#FFA726"/>

@@ -93,6 +93,7 @@ namespace Spritely.Managers
 
         public static readonly string GameProjectExplorationPrompt = PromptLoader.Load("GameProjectExplorationPrompt.md");
         public static readonly string CodebaseExplorationPrompt = PromptLoader.Load("CodebaseExplorationPrompt.md");
+        public static readonly string ClaudeMdGenerationPrompt = PromptLoader.Load("ClaudeMdGenerationPrompt.md");
 
         /// <summary>Template for project analysis suggestions. Use string.Format with {0} = categoryFilter.</summary>
         public static readonly string ProjectSuggestionPromptTemplate = PromptLoader.Load("ProjectSuggestionPromptTemplate.md");
@@ -131,17 +132,18 @@ namespace Spritely.Managers
             bool autoDecompose = false, bool spawnTeam = false,
             bool isGameProject = false, string taskId = "",
             bool applyFix = true, bool suppressOutputEfficiency = false,
-            string skillsBlock = "")
+            string skillsBlock = "", string featureContextBlock = "")
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
                 descBlock = $"# PROJECT CONTEXT\n{projectDescription}\n\n";
 
+            var featureBlock = !string.IsNullOrWhiteSpace(featureContextBlock) ? featureContextBlock + "\n" : "";
             var gameBlock = isGameProject ? GameRulesBlock : "";
             var efficiencyBlock = suppressOutputEfficiency ? "" : OutputEfficiencyBlock;
 
             if (isFeatureMode)
-                return descBlock + projectRulesBlock + skillsBlock + gameBlock + efficiencyBlock + FeatureModeInitialTemplate + description;
+                return descBlock + projectRulesBlock + featureBlock + skillsBlock + gameBlock + efficiencyBlock + FeatureModeInitialTemplate + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -154,13 +156,14 @@ namespace Spritely.Managers
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;
-            return descBlock + systemPrompt + gitBlock + projectRulesBlock + skillsBlock + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
+            return descBlock + systemPrompt + gitBlock + projectRulesBlock + featureBlock + skillsBlock + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
                 "# USER PROMPT / TASK\n" + description;
         }
 
         public string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
-            bool isGameProject = false, string skillsBlock = "")
+            bool isGameProject = false, string skillsBlock = "",
+            string featureContextBlock = "")
         {
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
             if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
@@ -171,7 +174,7 @@ namespace Spritely.Managers
             var isPlanningMember = task.NoGitWrite && task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly;
             var suppressEfficiency = isPlanningMember || task.PlanOnly;
 
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency, skillsBlock);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.NoGitWrite, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency, skillsBlock, featureContextBlock);
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
                 basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);
@@ -214,13 +217,12 @@ namespace Spritely.Managers
 
         // ── Command & Script Building ────────────────────────────────
 
-        public string BuildClaudeCommand(bool skipPermissions, bool remoteSession, string? modelId = null, bool planMode = false)
+        public string BuildClaudeCommand(bool skipPermissions, string? modelId = null, bool planMode = false)
         {
             var skipFlag = skipPermissions ? " --dangerously-skip-permissions" : "";
-            var remoteFlag = remoteSession ? " --remote" : "";
             var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
             var planFlag = planMode ? " --plan" : "";
-            return $"claude -p{skipFlag}{remoteFlag}{modelFlag}{planFlag} --verbose --output-format stream-json";
+            return $"claude -p{skipFlag}{modelFlag}{planFlag} --verbose --output-format stream-json";
         }
 
         public string BuildPowerShellScript(string projectPath, string promptFilePath,
@@ -232,10 +234,9 @@ namespace Spritely.Managers
         }
 
         public string BuildHeadlessPowerShellScript(string projectPath, string promptFilePath,
-            bool skipPermissions, bool remoteSession, string? modelId = null)
+            bool skipPermissions, string? modelId = null)
         {
             var skipFlag = skipPermissions ? " --dangerously-skip-permissions" : "";
-            var remoteFlag = remoteSession ? " --remote" : "";
             var modelFlag = !string.IsNullOrEmpty(modelId) ? $" --model {modelId}" : "";
             return "$env:CLAUDECODE = $null\n" +
                    $"Set-Location -LiteralPath '{projectPath}'\n" +
@@ -243,7 +244,7 @@ namespace Spritely.Managers
                    $"Write-Host 'Prompt:  {promptFilePath}' -ForegroundColor DarkGray\n" +
                    "Write-Host 'Starting Claude...' -ForegroundColor Cyan\n" +
                    "Write-Host ''\n" +
-                   $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{remoteFlag}{modelFlag} --verbose\n" +
+                   $"Get-Content -Raw -LiteralPath '{promptFilePath}' | claude -p{skipFlag}{modelFlag} --verbose\n" +
                    "if ($LASTEXITCODE -ne 0) { Write-Host \"`nClaude exited with code $LASTEXITCODE\" -ForegroundColor Yellow }\n" +
                    "Write-Host \"`nProcess finished. Press any key to close...\" -ForegroundColor Cyan\n" +
                    "$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\n";

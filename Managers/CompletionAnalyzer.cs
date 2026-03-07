@@ -207,7 +207,30 @@ namespace Spritely.Managers
                 try
                 {
                     using var doc = JsonDocument.Parse(processedText);
-                    var root = doc.RootElement;
+                    var wrapper = doc.RootElement;
+
+                    // The CLI with --output-format json wraps the result; extract the "result" field
+                    JsonElement root;
+                    if (wrapper.TryGetProperty("result", out var resultElement) &&
+                        resultElement.ValueKind == JsonValueKind.String)
+                    {
+                        var resultStr = resultElement.GetString()!;
+                        // Check if the result is a JSON object (schema output) vs a plain string
+                        if (resultStr.TrimStart().StartsWith("{"))
+                        {
+                            using var innerDoc = JsonDocument.Parse(resultStr);
+                            root = innerDoc.RootElement.Clone();
+                        }
+                        else
+                        {
+                            root = wrapper;
+                        }
+                    }
+                    else
+                    {
+                        root = wrapper;
+                    }
+
                     var result = root.GetProperty("result").GetString() ?? "";
                     var summary = root.GetProperty("summary").GetString() ?? "";
                     var nextSteps = root.TryGetProperty("next_steps", out var ns) ? ns.GetString() ?? "" : "";

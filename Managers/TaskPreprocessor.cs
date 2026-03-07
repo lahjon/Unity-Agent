@@ -92,7 +92,26 @@ USER TASK:
                 using var doc = JsonDocument.Parse(text);
                 var root = doc.RootElement;
 
-                var header = root.GetProperty("header").GetString() ?? "";
+                // The CLI with --output-format json wraps the result; extract the "result" field
+                JsonElement data;
+                if (root.TryGetProperty("result", out var resultElement))
+                {
+                    if (resultElement.ValueKind == JsonValueKind.String)
+                    {
+                        using var innerDoc = JsonDocument.Parse(resultElement.GetString()!);
+                        data = innerDoc.RootElement.Clone();
+                    }
+                    else
+                    {
+                        data = resultElement;
+                    }
+                }
+                else
+                {
+                    data = root;
+                }
+
+                var header = data.GetProperty("header").GetString() ?? "";
                 // Enforce 2-5 words
                 var words = header.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (words.Length > 5)
@@ -101,14 +120,14 @@ USER TASK:
                 return new PreprocessResult
                 {
                     Header = header,
-                    EnhancedPrompt = root.GetProperty("enhanced_prompt").GetString() ?? taskDescription,
-                    ApplyFix = root.GetProperty("apply_fix").GetBoolean(),
-                    ExtendedPlanning = root.GetProperty("extended_planning").GetBoolean(),
-                    IsFeatureMode = root.GetProperty("feature_mode").GetBoolean(),
-                    AutoDecompose = root.GetProperty("auto_decompose").GetBoolean(),
-                    SpawnTeam = root.GetProperty("spawn_team").GetBoolean(),
-                    UseMcp = root.GetProperty("use_mcp").GetBoolean(),
-                    Iterations = root.TryGetProperty("iterations", out var iter) ? iter.GetInt32() : 2
+                    EnhancedPrompt = data.GetProperty("enhanced_prompt").GetString() ?? taskDescription,
+                    ApplyFix = data.GetProperty("apply_fix").GetBoolean(),
+                    ExtendedPlanning = data.GetProperty("extended_planning").GetBoolean(),
+                    IsFeatureMode = data.GetProperty("feature_mode").GetBoolean(),
+                    AutoDecompose = data.GetProperty("auto_decompose").GetBoolean(),
+                    SpawnTeam = data.GetProperty("spawn_team").GetBoolean(),
+                    UseMcp = data.GetProperty("use_mcp").GetBoolean(),
+                    Iterations = data.TryGetProperty("iterations", out var iter) ? iter.GetInt32() : 2
                 };
             }
             catch (OperationCanceledException) { throw; }
@@ -152,7 +171,6 @@ USER TASK:
             sb.AppendLine($"  Use MCP:           {(task.UseMcp ? "ON" : "OFF")}");
             sb.AppendLine($"  No Git Write:      {(task.NoGitWrite ? "ON" : "OFF")}");
             sb.AppendLine($"  Message Bus:       {(task.UseMessageBus ? "ON" : "OFF")}");
-            sb.AppendLine($"  Remote Session:    {(task.RemoteSession ? "ON" : "OFF")}");
             sb.AppendLine($"  Plan Only:         {(task.PlanOnly ? "ON" : "OFF")}");
             sb.AppendLine("─────────────────────────────────────────────");
             return sb.ToString();

@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Spritely.Constants;
 
 namespace Spritely.Managers
 {
@@ -30,6 +31,9 @@ namespace Spritely.Managers
 
     public class HelperManager : IDisposable
     {
+        private const string SuggestionJsonSchema =
+            """{"type":"object","properties":{"suggestions":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"description":{"type":"string"}},"required":["title","description"]}}},"required":["suggestions"]}""";
+
         private readonly string _appDataDir;
         private string _currentProjectPath;
         private string _suggestionsFile;
@@ -142,7 +146,7 @@ namespace Spritely.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = "-p --max-turns 15 --output-format json --output-schema {\"type\":\"object\",\"properties\":{\"suggestions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}},\"required\":[\"title\",\"description\"]}}},\"required\":[\"suggestions\"]}",
+                    Arguments = $"-p --max-turns 15 --output-format json --model {AppConstants.ClaudeSonnet} --output-schema '{SuggestionJsonSchema}'",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,

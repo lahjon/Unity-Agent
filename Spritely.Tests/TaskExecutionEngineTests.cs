@@ -76,11 +76,10 @@ namespace Spritely.Tests
             var tempDir = Path.Combine(Path.GetTempPath(), $"SpritelyTest_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
 
-            var textBlock = new TextBlock();
             var dispatcher = Dispatcher.CurrentDispatcher;
             var tabControl = new TabControl();
 
-            var flm = new FileLockManager(textBlock, dispatcher);
+            var flm = new FileLockManager(dispatcher);
             var otm = new OutputTabManager(tabControl, dispatcher);
             var gitOperationGuard = new GitOperationGuard(flm);
 
@@ -390,7 +389,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
 
@@ -406,7 +405,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
 
@@ -423,7 +422,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { taskA, taskB };
@@ -441,7 +440,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { taskA, taskB };
@@ -460,7 +459,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 taskB.IgnoreFileLocks = true;
@@ -479,7 +478,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
 
@@ -497,7 +496,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { taskA, taskB };
@@ -515,7 +514,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
                 var normalized = FormatHelpers.NormalizePath("src/file.cs", task.ProjectPath);
@@ -531,7 +530,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
                 var normalized = FormatHelpers.NormalizePath("src/file.cs", task.ProjectPath);
@@ -548,7 +547,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 taskA.TaskNumber = 1001; // Set task number for test
                 var taskB = MakeTask();
@@ -575,7 +574,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 taskB.StoredPrompt = "Execute this plan...";
@@ -597,7 +596,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 taskB.StoredPrompt = "Execute plan...";
@@ -633,7 +632,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 taskB.StoredPrompt = "Execute plan...";
@@ -654,7 +653,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 var taskC = MakeTask(); // Will hold the lock after taskA is done
@@ -681,7 +680,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 task.Status = AgentTaskStatus.Queued;
                 task.QueuedReason = "Waiting for file lock";
@@ -707,7 +706,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
 
@@ -726,7 +725,7 @@ namespace Spritely.Tests
             RunOnSta(() =>
             {
                 var dispatcher = Dispatcher.CurrentDispatcher;
-                var flm = new FileLockManager(new TextBlock(), dispatcher);
+                var flm = new FileLockManager(dispatcher);
                 var task = MakeTask();
                 var activeTasks = new ObservableCollection<AgentTask> { task };
 
@@ -1374,7 +1373,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 taskB.StoredPrompt = "Execute my plan";
@@ -1410,7 +1409,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 var taskB = MakeTask();
                 var taskC = MakeTask();
@@ -1449,7 +1448,7 @@ namespace Spritely.Tests
             // Test the direct queue workflow
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var taskA = MakeTask();
                 taskA.TaskNumber = 1001; // Set task number for test
                 var taskB = MakeTask();
@@ -1656,7 +1655,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
 
                 // Should not throw
                 flm.ReleaseTaskLocks("nonexistent_id");
@@ -1670,7 +1669,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var activeTasks = new ObservableCollection<AgentTask>();
 
                 // Should not throw
@@ -1683,7 +1682,7 @@ namespace Spritely.Tests
         {
             RunOnSta(() =>
             {
-                var flm = new FileLockManager(new TextBlock(), Dispatcher.CurrentDispatcher);
+                var flm = new FileLockManager(Dispatcher.CurrentDispatcher);
                 var activeTasks = new ObservableCollection<AgentTask>();
 
                 // Should not throw — task not found returns early

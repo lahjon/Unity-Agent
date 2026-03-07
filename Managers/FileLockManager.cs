@@ -6,8 +6,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Threading;
 using Spritely.Helpers;
 
@@ -25,20 +23,19 @@ namespace Spritely.Managers
         private readonly Dictionary<string, QueuedTaskInfo> _queuedTaskInfo = new();
         private readonly Dictionary<string, FileLock> _waitingLocks = new();
         private readonly object _lockSync = new();
-        private readonly TextBlock _fileLockBadge;
         private readonly Dispatcher _dispatcher;
         private bool _gitOperationInProgress = false;
 
         public event Action<string>? QueuedTaskResumed;
         public event Action<string>? TaskNeedsPause;
+        public event Action? LocksChanged;
 
         public Dictionary<string, QueuedTaskInfo> QueuedTaskInfos => _queuedTaskInfo;
         public int LockCount { get { lock (_lockSync) { return _fileLocks.Count; } } }
         public ObservableCollection<FileLock> FileLocksView => _fileLocksView;
 
-        public FileLockManager(TextBlock fileLockBadge, Dispatcher dispatcher)
+        public FileLockManager(Dispatcher dispatcher)
         {
-            _fileLockBadge = fileLockBadge;
             _dispatcher = dispatcher;
         }
 
@@ -162,8 +159,6 @@ namespace Spritely.Managers
             }
             files.Add(normalized);
 
-            var count = _fileLocks.Count;
-
             // Skip adding agent bus files to the UI view (but they're still tracked internally)
             bool isAgentBusFile = normalized.Contains("agent-bus", StringComparison.OrdinalIgnoreCase) ||
                                  filePath.Contains("agent-bus", StringComparison.OrdinalIgnoreCase);
@@ -173,15 +168,14 @@ namespace Spritely.Managers
                 _dispatcher.BeginInvoke(() =>
                 {
                     _fileLocksView.Add(fileLock);
-                    UpdateFileLockBadge(count);
+                    LocksChanged?.Invoke();
                 });
             }
             else
             {
-                // Still update the badge count even if we don't show the file
                 _dispatcher.BeginInvoke(() =>
                 {
-                    UpdateFileLockBadge(count);
+                    LocksChanged?.Invoke();
                 });
             }
             return true;
@@ -206,6 +200,7 @@ namespace Spritely.Managers
                     _dispatcher.BeginInvoke(() =>
                     {
                         _fileLocksView.Remove(waitingLock);
+                        LocksChanged?.Invoke();
                     });
                 }
                 return;
@@ -229,12 +224,11 @@ namespace Spritely.Managers
                 removedLocks.Add(waiting);
             }
 
-            var count = _fileLocks.Count;
             _dispatcher.BeginInvoke(() =>
             {
                 foreach (var fl in removedLocks)
                     _fileLocksView.Remove(fl);
-                UpdateFileLockBadge(count);
+                LocksChanged?.Invoke();
             });
         }
 
@@ -354,13 +348,12 @@ namespace Spritely.Managers
             bool isAgentBusFile = normalized.Contains("agent-bus", StringComparison.OrdinalIgnoreCase) ||
                                  filePath.Contains("agent-bus", StringComparison.OrdinalIgnoreCase);
 
-            if (!isAgentBusFile)
+            _dispatcher.BeginInvoke(() =>
             {
-                _dispatcher.BeginInvoke(() =>
-                {
+                if (!isAgentBusFile)
                     _fileLocksView.Add(waitingLock);
-                });
-            }
+                LocksChanged?.Invoke();
+            });
         }
 
         public void CheckQueuedTasks(ObservableCollection<AgentTask> activeTasks)
@@ -416,6 +409,7 @@ namespace Spritely.Managers
                         _dispatcher.BeginInvoke(() =>
                         {
                             _fileLocksView.Remove(waitingLock);
+                            LocksChanged?.Invoke();
                         });
                     }
                 }
@@ -439,6 +433,7 @@ namespace Spritely.Managers
                     _dispatcher.BeginInvoke(() =>
                     {
                         _fileLocksView.Remove(waitingLock);
+                        LocksChanged?.Invoke();
                     });
                 }
             }
@@ -480,15 +475,10 @@ namespace Spritely.Managers
             _dispatcher.BeginInvoke(() =>
             {
                 _fileLocksView.Clear();
-                UpdateFileLockBadge(0);
+                LocksChanged?.Invoke();
             });
         }
 
-        private void UpdateFileLockBadge(int count)
-        {
-            _fileLockBadge.Text = count.ToString();
-            _fileLockBadge.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        }
 
         /// <summary>
         /// Sets the git operation in progress flag to prevent new lock acquisitions.

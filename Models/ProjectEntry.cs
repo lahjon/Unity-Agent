@@ -50,5 +50,10 @@ namespace Spritely.Models
             !string.IsNullOrEmpty(Path) &&
             (System.IO.Directory.Exists(System.IO.Path.Combine(Path, ".claude")) ||
              System.IO.File.Exists(System.IO.Path.Combine(Path, "CLAUDE.md")));
+
+        [JsonIgnore]
+        public bool IsFeatureRegistryInitialized =>
+            !string.IsNullOrEmpty(Path) &&
+            System.IO.File.Exists(System.IO.Path.Combine(Path, ".spritely", "features", "_index.json"));
     }
 }

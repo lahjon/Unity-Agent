@@ -10,7 +10,8 @@ namespace Spritely.Managers
     public class SettingsManager
     {
         private readonly string _settingsFile;
-        private readonly string _templatesFile;
+        private string? _templatesDir;
+        private readonly string _globalTemplatesFile;
         private int _historyRetentionHours = 24;
         private string? _lastSelectedProject;
         private bool _settingsPanelCollapsed;
@@ -101,7 +102,7 @@ namespace Spritely.Managers
         public SettingsManager(string appDataDir)
         {
             _settingsFile = Path.Combine(appDataDir, "settings.json");
-            _templatesFile = Path.Combine(appDataDir, "task_templates.json");
+            _globalTemplatesFile = Path.Combine(appDataDir, "task_templates.json");
         }
 
         public async Task LoadSettingsAsync()
@@ -166,31 +167,86 @@ namespace Spritely.Managers
             catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to save settings", ex); }
         }
 
-        public async Task LoadTemplatesAsync()
+        public async Task LoadTemplatesAsync(string? projectPath)
         {
+            TaskTemplates.Clear();
+            _templatesDir = ResolveTemplatesDir(projectPath);
+            if (_templatesDir == null || !Directory.Exists(_templatesDir)) return;
+
             try
             {
-                if (!File.Exists(_templatesFile)) return;
-                var json = await File.ReadAllTextAsync(_templatesFile).ConfigureAwait(false);
-                var entries = JsonSerializer.Deserialize<List<TaskTemplate>>(json);
-                if (entries != null)
+                foreach (var file in Directory.GetFiles(_templatesDir, "*.json"))
                 {
-                    TaskTemplates.Clear();
-                    TaskTemplates.AddRange(entries);
+                    try
+                    {
+                        var json = await File.ReadAllTextAsync(file).ConfigureAwait(false);
+                        var entry = JsonSerializer.Deserialize<TaskTemplate>(json);
+                        if (entry != null)
+                            TaskTemplates.Add(entry);
+                    }
+                    catch (Exception ex) { AppLogger.Warn("SettingsManager", $"Failed to load template {file}", ex); }
                 }
             }
             catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to load task templates", ex); }
         }
 
-        public void SaveTemplates()
+        public void SaveTemplate(TaskTemplate template)
         {
+            if (_templatesDir == null) return;
             try
             {
-                var json = JsonSerializer.Serialize(TaskTemplates,
+                if (!Directory.Exists(_templatesDir))
+                    Directory.CreateDirectory(_templatesDir);
+
+                var filePath = Path.Combine(_templatesDir, $"{template.Id}.json");
+                var json = JsonSerializer.Serialize(template,
                     new JsonSerializerOptions { WriteIndented = true });
-                SafeFileWriter.WriteInBackground(_templatesFile, json, "SettingsManager");
+                SafeFileWriter.WriteInBackground(filePath, json, "SettingsManager");
             }
-            catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to save task templates", ex); }
+            catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to save template", ex); }
+        }
+
+        public void DeleteTemplate(TaskTemplate template)
+        {
+            if (_templatesDir == null) return;
+            try
+            {
+                var filePath = Path.Combine(_templatesDir, $"{template.Id}.json");
+                if (File.Exists(filePath))
+                    File.Delete(filePath);
+            }
+            catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to delete template", ex); }
+        }
+
+        private string? ResolveTemplatesDir(string? projectPath)
+        {
+            if (string.IsNullOrEmpty(projectPath)) return null;
+            var dir = Path.Combine(projectPath, ".spritely", "templates");
+
+            // One-time migration: copy global templates into project as individual files
+            if (!Directory.Exists(dir) && File.Exists(_globalTemplatesFile))
+            {
+                try
+                {
+                    Directory.CreateDirectory(dir);
+                    var json = File.ReadAllText(_globalTemplatesFile);
+                    var entries = JsonSerializer.Deserialize<List<TaskTemplate>>(json);
+                    if (entries != null)
+                    {
+                        foreach (var entry in entries)
+                        {
+                            var filePath = Path.Combine(dir, $"{entry.Id}.json");
+                            var entryJson = JsonSerializer.Serialize(entry,
+                                new JsonSerializerOptions { WriteIndented = true });
+                            File.WriteAllText(filePath, entryJson);
+                        }
+                    }
+                    AppLogger.Info("SettingsManager", $"Migrated {entries?.Count ?? 0} global templates to {dir}");
+                }
+                catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to migrate templates", ex); }
+            }
+
+            return dir;
         }
     }
 }

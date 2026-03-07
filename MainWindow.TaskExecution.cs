@@ -19,7 +19,6 @@ namespace Spritely
 
         private void ResetPerTaskToggles()
         {
-            RemoteSessionToggle.IsChecked = false;
             SpawnTeamToggle.IsChecked = false;
             FeatureModeToggle.IsChecked = false;
             ExtendedPlanningToggle.IsChecked = false;
@@ -39,7 +38,6 @@ namespace Spritely
         /// <summary>Reads the main-window toggle controls into a <see cref="TaskConfigBase"/>.</summary>
         private void ReadUiFlagsInto(TaskConfigBase target)
         {
-            target.RemoteSession = RemoteSessionToggle.IsChecked == true;
             target.SpawnTeam = SpawnTeamToggle.IsChecked == true;
             target.IsFeatureMode = FeatureModeToggle.IsChecked == true;
             target.ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true;
@@ -56,7 +54,6 @@ namespace Spritely
         /// <summary>Applies flags from a <see cref="TaskConfigBase"/> to the main-window toggle controls.</summary>
         private void ApplyFlagsToUi(TaskConfigBase source)
         {
-            RemoteSessionToggle.IsChecked = source.RemoteSession;
             SpawnTeamToggle.IsChecked = source.SpawnTeam;
             FeatureModeToggle.IsChecked = source.IsFeatureMode;
             ExtendedPlanningToggle.IsChecked = source.ExtendedPlanning;
@@ -96,7 +93,6 @@ namespace Spritely
                 description,
                 _projectManager.ProjectPath,
                 skipPermissions: true,
-                remoteSession: RemoteSessionToggle.IsChecked == true,
                 headless: false,
                 isFeatureMode: FeatureModeToggle.IsChecked == true,
                 ignoreFileLocks: IgnoreFileLocksToggle.IsChecked == true,
@@ -164,6 +160,9 @@ namespace Spritely
                 _currentLoadedPrompt = null;
             }
 
+            // Pin both rows to prevent prompt area rescaling during the clear+launch+reset sequence
+            PinRowHeights();
+
             // Capture UI state before clearing
             var additionalInstructions = AdditionalInstructionsInput.Text?.Trim() ?? "";
             var imagePaths = _imageManager.DetachImages();
@@ -182,6 +181,7 @@ namespace Spritely
                 additionalInstructions);
 
             ResetPerTaskToggles();
+            RestoreStarRows();
         }
 
         private async void ComposeWorkflow_Click(object sender, RoutedEventArgs e)
@@ -201,7 +201,6 @@ namespace Spritely
                     step.Description,
                     _projectManager.ProjectPath,
                     skipPermissions: true,
-                    remoteSession: false,
                     headless: false,
                     isFeatureMode: false,
                     ignoreFileLocks: IgnoreFileLocksToggle.IsChecked == true,
@@ -687,11 +686,9 @@ TextureImporter:
             if (_historyTasks.Contains(task))
             {
                 _historyTasks.Remove(task);
-                var topRow = RootGrid.RowDefinitions[0];
-                if (topRow.ActualHeight > 0)
-                    topRow.Height = new GridLength(topRow.ActualHeight);
+                PinRowHeights();
                 _activeTasks.Insert(0, task);
-                RestoreStarRow();
+                RestoreStarRows();
             }
 
             var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "fresh session (no session ID)";
@@ -701,6 +698,15 @@ TextureImporter:
 
             OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
             UpdateStatus();
+        }
+
+        private void OnTabExportRequested(AgentTask task)
+        {
+            if (string.IsNullOrEmpty(task.FullOutput) && task.OutputBuilder.Length > 0)
+                task.FullOutput = task.OutputBuilder.ToString();
+
+            var exportDialog = new Dialogs.ExportDialog(new List<AgentTask> { task });
+            exportDialog.ShowDialog();
         }
 
         private void OnTabInputSent(AgentTask task, TextBox inputBox) =>
@@ -906,6 +912,13 @@ TextureImporter:
                 tasksToExport.Add(task);
             }
 
+            // Snapshot OutputBuilder for active tasks that don't have FullOutput yet
+            foreach (var t in tasksToExport)
+            {
+                if (string.IsNullOrEmpty(t.FullOutput) && t.OutputBuilder.Length > 0)
+                    t.FullOutput = t.OutputBuilder.ToString();
+            }
+
             var exportDialog = new Dialogs.ExportDialog(tasksToExport);
             exportDialog.ShowDialog();
         }
@@ -919,7 +932,6 @@ TextureImporter:
                 sourceTask.Description,
                 sourceTask.ProjectPath,
                 sourceTask.SkipPermissions,
-                sourceTask.RemoteSession,
                 sourceTask.Headless,
                 sourceTask.IsFeatureMode,
                 sourceTask.IgnoreFileLocks,
@@ -1045,16 +1057,22 @@ TextureImporter:
             CancelTask(task, el);
         }
 
+        private void TaskCard_PreviewMiddleDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Middle) return;
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+
+            // Handle during tunneling phase to prevent the ScrollViewer from
+            // capturing the mouse for auto-scroll, which would swallow MouseUp.
+            CancelTask(task, el);
+            e.Handled = true;
+        }
+
         private void TaskCard_MouseUp(object sender, MouseButtonEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
 
-            if (e.ChangedButton == MouseButton.Middle)
-            {
-                CancelTask(task, el);
-                e.Handled = true;
-            }
-            else if (e.ChangedButton == MouseButton.Left && _outputTabManager.HasTab(task.Id))
+            if (e.ChangedButton == MouseButton.Left && _outputTabManager.HasTab(task.Id))
             {
                 OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
             }
@@ -1202,11 +1220,9 @@ TextureImporter:
             _outputTabManager.AppendOutput(task.Id, $"\nType a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
 
             _historyTasks.Remove(task);
-            var topRow = RootGrid.RowDefinitions[0];
-            if (topRow.ActualHeight > 0)
-                topRow.Height = new GridLength(topRow.ActualHeight);
+            PinRowHeights();
             _activeTasks.Insert(0, task);
-            RestoreStarRow();
+            RestoreStarRows();
             UpdateStatus();
         }
 
@@ -1246,11 +1262,9 @@ TextureImporter:
             if (_historyTasks.Contains(task))
             {
                 _historyTasks.Remove(task);
-                var topRow = RootGrid.RowDefinitions[0];
-                if (topRow.ActualHeight > 0)
-                    topRow.Height = new GridLength(topRow.ActualHeight);
+                PinRowHeights();
                 _activeTasks.Insert(0, task);
-                RestoreStarRow();
+                RestoreStarRows();
             }
 
             // Send the follow-up with recommendations
