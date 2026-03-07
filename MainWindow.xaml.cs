@@ -578,7 +578,6 @@ namespace Spritely
             {
                 try
                 {
-                    // Get all saved projects from the project manager
                     var projects = _projectManager.SavedProjects;
                     var migratedCount = 0;
 
@@ -622,14 +621,12 @@ namespace Spritely
             {
                 foreach (var task in recoveredTasks)
                 {
-                    // Reset to a fresh state — LaunchTask will assign the correct
-                    // status (Running or InitQueued) based on concurrency limits
                     task.StartTime = DateTime.Now;
                     LaunchTask(task);
                 }
             }
 
-            // Always clear the recovery file — either tasks were re-queued or the user dismissed them
+            // Always clear the recovery file
             _historyManager.ClearActiveQueue();
         }
 
@@ -660,40 +657,6 @@ namespace Spritely
             }
             catch (OperationCanceledException) { /* window closing */ }
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to load system prompt", ex); }
-        }
-
-        private void EditSystemPromptToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            var editing = EditSystemPromptToggle.IsChecked == true;
-            SystemPromptBox.IsReadOnly = !editing;
-            SystemPromptBox.Opacity = editing ? 1.0 : 0.6;
-            PromptEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void SavePrompt_Click(object sender, RoutedEventArgs e)
-        {
-            SystemPrompt = SystemPromptBox.Text;
-            var content = SystemPrompt;
-            var path = SystemPromptFile;
-            Managers.SafeFileWriter.WriteInBackground(path, content, "MainWindow");
-            EditSystemPromptToggle.IsChecked = false;
-        }
-
-        private void ResetPrompt_Click(object sender, RoutedEventArgs e)
-        {
-            var path = SystemPromptFile;
-            _ = System.Threading.Tasks.Task.Run(() =>
-            {
-                try
-                {
-                    if (File.Exists(path))
-                        File.Delete(path);
-                }
-                catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to delete system prompt file", ex); }
-            }, System.Threading.CancellationToken.None);
-            SystemPrompt = DefaultSystemPrompt;
-            SystemPromptBox.Text = SystemPrompt;
-            EditSystemPromptToggle.IsChecked = false;
         }
 
         // ── Settings Sync ──────────────────────────────────────────
@@ -731,7 +694,6 @@ namespace Spritely
             SyncMcpSettingsFields();
 
             // All critical UI updates must happen synchronously (before any await)
-            // so they complete before the swap handler hides the loading overlay.
             RefreshFilterCombos();
             ActiveFilter_Changed(ActiveFilterCombo, null!);
             HistoryFilter_Changed(HistoryFilterCombo, null!);
@@ -743,7 +705,7 @@ namespace Spritely
             }
 
             UpdateStatus();
-            UpdateFileLocks(); // Update file locks display for the new project
+            UpdateFileLocks();
             UpdateNoProjectState();
 
             ct.ThrowIfCancellationRequested();
@@ -771,428 +733,7 @@ namespace Spritely
             handler(combo, null!);
         }
 
-        // ── Project Description Editing ────────────────────────────
-
-        private void EditShortDescToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            var editing = EditShortDescToggle.IsChecked == true;
-            ShortDescBox.IsReadOnly = !editing;
-            ShortDescBox.Opacity = editing ? 1.0 : 0.6;
-            ShortDescEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void EditLongDescToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            var editing = EditLongDescToggle.IsChecked == true;
-            LongDescBox.IsReadOnly = !editing;
-            LongDescBox.Opacity = editing ? 1.0 : 0.6;
-            LongDescEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void SaveShortDesc_Click(object sender, RoutedEventArgs e) => _projectManager.SaveShortDesc();
-
-        private void SaveLongDesc_Click(object sender, RoutedEventArgs e) => _projectManager.SaveLongDesc();
-
-        private void EditRuleInstructionToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            var editing = EditRuleInstructionToggle.IsChecked == true;
-            RuleInstructionBox.IsReadOnly = !editing;
-            RuleInstructionBox.Opacity = editing ? 1.0 : 0.6;
-            RuleInstructionEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void SaveRuleInstruction_Click(object sender, RoutedEventArgs e) => _projectManager.SaveRuleInstruction();
-
-        private void EditCrashLogPathsToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            var editing = EditCrashLogPathsToggle.IsChecked == true;
-            CrashLogPathBox.IsReadOnly = !editing;
-            CrashLogPathBox.Opacity = editing ? 1.0 : 0.6;
-            AppLogPathBox.IsReadOnly = !editing;
-            AppLogPathBox.Opacity = editing ? 1.0 : 0.6;
-            HangLogPathBox.IsReadOnly = !editing;
-            HangLogPathBox.Opacity = editing ? 1.0 : 0.6;
-            CrashLogPathsEditButtons.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void SaveCrashLogPaths_Click(object sender, RoutedEventArgs e)
-        {
-            _projectManager.SaveCrashLogPaths(
-                CrashLogPathBox.Text.Trim(),
-                AppLogPathBox.Text.Trim(),
-                HangLogPathBox.Text.Trim());
-        }
-
-        private void ResetCrashLogPaths_Click(object sender, RoutedEventArgs e)
-        {
-            CrashLogPathBox.Text = ProjectManager.GetDefaultCrashLogPath();
-            AppLogPathBox.Text = ProjectManager.GetDefaultAppLogPath();
-            HangLogPathBox.Text = ProjectManager.GetDefaultHangLogPath();
-        }
-
-        private void ProjectTypeGameToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
-            if (entry != null)
-            {
-                entry.IsGame = ProjectTypeGameToggle.IsChecked == true;
-                _projectManager.SaveProjects();
-                UpdateMcpVisibility(entry.IsGame);
-            }
-        }
-
-        private void UpdateMcpVisibility(bool isGame)
-        {
-            UseMcpToggle.Visibility = isGame ? Visibility.Visible : Visibility.Collapsed;
-            McpProjectTabItem.Visibility = isGame ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        // ── MCP Settings ────────────────────────────────────────────
-
-        private void SyncMcpSettingsFields()
-        {
-            var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
-            if (entry != null)
-            {
-                McpServerNameBox.Text = entry.McpServerName;
-                McpAddressBox.Text = entry.McpAddress;
-                McpStartCommandBox.Text = entry.McpStartCommand;
-                McpConnectionStatus.Text = entry.McpStatus switch
-                {
-                    Models.McpStatus.Enabled => "Connected",
-                    Models.McpStatus.Initialized => "Initialized",
-                    Models.McpStatus.Investigating => "Investigating...",
-                    _ => "Disconnected"
-                };
-                McpConnectionStatus.Foreground = entry.McpStatus switch
-                {
-                    Models.McpStatus.Enabled => FindResource("Success") as System.Windows.Media.Brush,
-                    Models.McpStatus.Investigating => FindResource("WarningOrange") as System.Windows.Media.Brush,
-                    _ => FindResource("TextMuted") as System.Windows.Media.Brush
-                } ?? FindResource("TextMuted") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Gray;
-
-                // Update MCP output display
-                McpOutputTextBox.Text = entry.McpOutput?.ToString() ?? "";
-            }
-        }
-
-        private void McpSettings_Changed(object sender, RoutedEventArgs e)
-        {
-            var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
-            if (entry == null) return;
-            entry.McpServerName = McpServerNameBox.Text?.Trim() ?? "mcp-for-unity-server";
-            entry.McpAddress = McpAddressBox.Text?.Trim() ?? "http://127.0.0.1:8080/mcp";
-            entry.McpStartCommand = McpStartCommandBox.Text?.Trim() ?? "";
-            _projectManager.SaveProjects();
-        }
-
-        private async void McpTestConnection_Click(object sender, RoutedEventArgs e)
-        {
-            McpConnectionStatus.Text = "Testing...";
-            McpConnectionStatus.Foreground = FindResource("TextMuted") as System.Windows.Media.Brush
-                ?? System.Windows.Media.Brushes.Gray;
-            McpTestConnectionBtn.IsEnabled = false;
-            try
-            {
-                var address = McpAddressBox.Text?.Trim();
-                if (string.IsNullOrEmpty(address)) { McpConnectionStatus.Text = "No address"; return; }
-
-                if (!Uri.TryCreate(address, UriKind.Absolute, out var uri)
-                    || (uri.Scheme != "http" && uri.Scheme != "https"))
-                {
-                    McpConnectionStatus.Text = "Invalid URL";
-                    McpConnectionStatus.Foreground = FindResource("Danger") as System.Windows.Media.Brush
-                        ?? System.Windows.Media.Brushes.Red;
-                    return;
-                }
-
-                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(_windowCts.Token);
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(2));
-
-                // MCP servers expect JSON-RPC requests
-                var jsonRequest = new
-                {
-                    jsonrpc = "2.0",
-                    method = "initialize",
-                    @params = new
-                    {
-                        protocolVersion = "2024-11-05",
-                        capabilities = new
-                        {
-                            experimental = new { }
-                        },
-                        clientInfo = new
-                        {
-                            name = "Spritely",
-                            version = "1.0.0"
-                        }
-                    },
-                    id = 1
-                };
-
-                var json = System.Text.Json.JsonSerializer.Serialize(jsonRequest);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-                using var request = new HttpRequestMessage(HttpMethod.Post, uri);
-                request.Content = content;
-                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-
-                var response = await SharedHttpClient.SendAsync(request, timeoutCts.Token);
-
-                // For MCP test, accept any response that's not a server error or not found
-                if (response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable &&
-                    response.StatusCode != System.Net.HttpStatusCode.NotFound)
-                {
-                    McpConnectionStatus.Text = "Connected";
-                    McpConnectionStatus.Foreground = FindResource("Success") as System.Windows.Media.Brush
-                        ?? System.Windows.Media.Brushes.Green;
-                }
-                else
-                {
-                    McpConnectionStatus.Text = $"Error: {(int)response.StatusCode}";
-                    McpConnectionStatus.Foreground = FindResource("Danger") as System.Windows.Media.Brush
-                        ?? System.Windows.Media.Brushes.Red;
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("MCP", "Connection test failed", ex);
-                McpConnectionStatus.Text = "Unreachable";
-                McpConnectionStatus.Foreground = FindResource("Danger") as System.Windows.Media.Brush
-                    ?? System.Windows.Media.Brushes.Red;
-            }
-            finally
-            {
-                McpTestConnectionBtn.IsEnabled = true;
-            }
-        }
-
-        private void AddProjectRule_Click(object sender, RoutedEventArgs e)
-        {
-            var rule = NewRuleInput.Text?.Trim();
-            if (string.IsNullOrWhiteSpace(rule)) return;
-            _projectManager.AddProjectRule(rule);
-            NewRuleInput.Clear();
-        }
-
-        private void NewRuleInput_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control))
-            {
-                AddProjectRule_Click(sender, e);
-                e.Handled = true;
-            }
-        }
-
-        private void RemoveProjectRule_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Button btn && btn.Tag is string rule)
-                _projectManager.RemoveProjectRule(rule);
-        }
-
-        private void RegenerateDescriptions_Click(object sender, RoutedEventArgs e) => _projectManager.RegenerateDescriptions();
-
-        // ── Toggle Handlers ────────────────────────────────────────
-
-        private void DefaultToggle_Changed(object sender, RoutedEventArgs e)
-        {
-        }
-
-        private void FeatureModeToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            if (ExecuteButton == null) return;
-            UpdateExecuteButtonText();
-            if (FeatureModeIterationsPanel != null)
-                FeatureModeIterationsPanel.Visibility = FeatureModeToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void IterationsBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
-        {
-            e.Handled = !int.TryParse(e.Text, out _);
-        }
-
-        private void TimeoutBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
-        {
-            e.Handled = !int.TryParse(e.Text, out _);
-        }
-
-        private void AutoVerifyToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            _settingsManager.AutoVerify = AutoVerifyToggle.IsChecked == true;
-        }
-
-
-        private bool _advancedPanelOpen = true;
-        private void AdvancedToggle_Click(object sender, RoutedEventArgs e)
-        {
-            _advancedPanelOpen = !_advancedPanelOpen;
-            AdvancedScrollViewer.Visibility = _advancedPanelOpen ? Visibility.Visible : Visibility.Collapsed;
-            AdvancedArrow.Text = _advancedPanelOpen ? "\u25BE" : "\u25B8";
-        }
-
-        private void AdditionalInstructionsToggle_Click(object sender, RoutedEventArgs e)
-        {
-            SetAdditionalInstructionsExpanded(AdditionalInstructionsToggle.IsChecked == true);
-        }
-
-        private void SetAdditionalInstructionsExpanded(bool expanded)
-        {
-            AdditionalInstructionsToggle.IsChecked = expanded;
-            AdditionalInstructionsInput.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-            if (AdditionalInstructionsToggle.Template.FindName("CollapseChevron", AdditionalInstructionsToggle) is TextBlock chevron)
-            {
-                var angle = expanded ? 0.0 : -90.0;
-                if (chevron.RenderTransform is RotateTransform rt && !rt.IsFrozen)
-                    rt.Angle = angle;
-                else
-                    chevron.RenderTransform = new RotateTransform(angle);
-            }
-        }
-
-        private void UpdateExecuteButtonText()
-        {
-            if (PlanOnlyToggle == null || ExecuteButton == null) return;
-            if (PlanOnlyToggle.IsChecked == true)
-                ExecuteButton.ToolTip = "Plan Task";
-            else if (FeatureModeToggle.IsChecked == true)
-                ExecuteButton.ToolTip = "Start Feature Mode";
-            else
-                ExecuteButton.ToolTip = "Execute Task";
-        }
-
-        private void HistoryRetention_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_settingsManager == null || _projectManager == null) return;
-            if (HistoryRetentionCombo?.SelectedItem is not ComboBoxItem item) return;
-            if (int.TryParse(item.Tag?.ToString(), out var hours))
-            {
-                _settingsManager.HistoryRetentionHours = hours;
-                _settingsManager.SaveSettings(_projectManager.ProjectPath);
-            }
-        }
-
-        private void MaxConcurrentTasks_Changed(object sender, RoutedEventArgs e)
-        {
-            ApplyMaxConcurrentTasks();
-        }
-
-        private void MaxConcurrentTasks_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control)) ApplyMaxConcurrentTasks();
-        }
-
-        private void ApplyMaxConcurrentTasks()
-        {
-            if (_settingsManager == null || _projectManager == null) return;
-            if (int.TryParse(MaxConcurrentTasksBox.Text?.Trim(), out var val) && val >= 1)
-            {
-                _settingsManager.MaxConcurrentTasks = val;
-                MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
-                _settingsManager.SaveSettings(_projectManager.ProjectPath);
-                DrainInitQueue();
-            }
-            else
-            {
-                MaxConcurrentTasksBox.Text = _settingsManager.MaxConcurrentTasks.ToString();
-            }
-        }
-
-        private void TokenLimitRetry_Changed(object sender, RoutedEventArgs e)
-        {
-            ApplyTokenLimitRetry();
-        }
-
-        private void TokenLimitRetry_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control)) ApplyTokenLimitRetry();
-        }
-
-        private void ApplyTokenLimitRetry()
-        {
-            if (_settingsManager == null || _projectManager == null) return;
-            if (int.TryParse(TokenLimitRetryBox.Text?.Trim(), out var val) && val >= 1)
-            {
-                _settingsManager.TokenLimitRetryMinutes = val;
-                TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
-                _settingsManager.SaveSettings(_projectManager.ProjectPath);
-            }
-            else
-            {
-                TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
-            }
-        }
-
-        private void TaskTimeout_Changed(object sender, RoutedEventArgs e)
-        {
-            ApplyTaskTimeout();
-        }
-
-        private void TaskTimeout_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control)) ApplyTaskTimeout();
-        }
-
-        private void ApplyTaskTimeout()
-        {
-            if (_settingsManager == null || _projectManager == null) return;
-            if (int.TryParse(TaskTimeoutBox.Text?.Trim(), out var val) && val >= 1)
-            {
-                _settingsManager.TaskTimeoutMinutes = val;
-                TaskTimeoutBox.Text = _settingsManager.TaskTimeoutMinutes.ToString();
-                _settingsManager.SaveSettings(_projectManager.ProjectPath);
-            }
-            else
-            {
-                TaskTimeoutBox.Text = _settingsManager.TaskTimeoutMinutes.ToString();
-            }
-        }
-
-        private void OpusEffort_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_settingsManager == null || _projectManager == null) return;
-            if (OpusEffortCombo?.SelectedItem is not ComboBoxItem item) return;
-            var level = item.Tag?.ToString();
-            if (!string.IsNullOrEmpty(level))
-            {
-                _settingsManager.OpusEffortLevel = level;
-                _settingsManager.SaveSettings(_projectManager.ProjectPath);
-            }
-        }
-
-        private void DefaultMcpSettings_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_settingsManager == null || _projectManager == null) return;
-
-            _settingsManager.DefaultMcpServerName = DefaultMcpServerNameBox.Text?.Trim() ?? "mcp-for-unity-server";
-            _settingsManager.DefaultMcpAddress = DefaultMcpAddressBox.Text?.Trim() ?? "http://127.0.0.1:8080/mcp";
-            _settingsManager.DefaultMcpStartCommand = DefaultMcpStartCommandBox.Text?.Trim() ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
-
-            _settingsManager.SaveSettings(_projectManager.ProjectPath);
-        }
-
-        private void ViewLogs_Click(object sender, RoutedEventArgs e)
-        {
-            Dialogs.LogViewerDialog.Show();
-        }
-
-        private void ViewActivity_Click(object sender, RoutedEventArgs e)
-        {
-            Dialogs.ActivityDashboardDialog.Show(_activeTasks, _historyTasks, _projectManager.SavedProjects);
-        }
-
-        private void ClearIgnoredSuggestions_Click(object sender, RoutedEventArgs e)
-        {
-            var count = _helperManager.IgnoredCount;
-            if (count == 0)
-            {
-                DarkDialog.ShowAlert("There are no ignored suggestions to clear.", "No Ignored Suggestions");
-                return;
-            }
-            if (!DarkDialog.ShowConfirm(
-                $"This will clear {count} ignored suggestion(s).\n\nPreviously ignored suggestions may reappear on the next generation. Continue?",
-                "Clear Ignored Suggestions")) return;
-            _helperManager.ClearIgnoredTitles();
-        }
+        // ── Node Graph ──────────────────────────────────────────────
 
         private void InitializeNodeGraphPanel()
         {
@@ -1311,7 +852,6 @@ namespace Spritely
             };
             NodeGraphPanel.DependenciesRemoved += task =>
             {
-                // Remove this task's own dependencies
                 if (task.DependencyTaskIdCount > 0)
                 {
                     _taskOrchestrator.MarkResolved(task.Id);
@@ -1342,7 +882,6 @@ namespace Spritely
                     }
                 }
 
-                // Remove this task from other tasks' dependency lists
                 foreach (var other in _activeTasks)
                 {
                     if (other.Id == task.Id) continue;
@@ -1379,7 +918,6 @@ namespace Spritely
                 return;
             }
 
-            // Validate git hash to prevent command injection
             if (!_gitHelper.IsValidGitHash(task.GitStartHash))
             {
                 Dialogs.DarkDialog.ShowAlert("Invalid git hash format detected. Cannot perform revert.", "Invalid Git Hash");
@@ -1412,208 +950,6 @@ namespace Spritely
             {
                 Dialogs.DarkDialog.ShowAlert($"Revert failed: {ex.Message}", "Revert Error");
             }
-        }
-
-        // ── Gemini Settings ─────────────────────────────────────────
-
-        private void SaveGeminiKey_Click(object sender, RoutedEventArgs e)
-        {
-            var key = GeminiApiKeyBox.Text?.Trim();
-            if (string.IsNullOrEmpty(key) || key.Contains('*'))
-            {
-                GeminiKeyStatus.Text = "Enter a valid API key";
-                GeminiKeyStatus.Foreground = (Brush)FindResource("DangerBright");
-                return;
-            }
-            if (!Managers.GeminiService.IsValidApiKeyFormat(key))
-            {
-                GeminiKeyStatus.Text = "Invalid key format — expected 39 chars starting with 'AIza'";
-                GeminiKeyStatus.Foreground = (Brush)FindResource("DangerBright");
-                return;
-            }
-
-            try
-            {
-                _geminiService.SaveApiKey(key);
-                GeminiApiKeyBox.Text = _geminiService.GetMaskedApiKey();
-                GeminiKeyStatus.Text = "API key saved successfully";
-                GeminiKeyStatus.Foreground = (Brush)FindResource("Success");
-                _chatManager.PopulateModelCombo();
-            }
-            catch (Exception ex)
-            {
-                GeminiKeyStatus.Text = $"Error saving key: {ex.Message}";
-                GeminiKeyStatus.Foreground = (Brush)FindResource("DangerBright");
-            }
-        }
-
-        private void GeminiApiLink_Click(object sender, MouseButtonEventArgs e)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://ai.google.dev/gemini-api/docs/api-key") { UseShellExecute = true });
-            }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to open Gemini API link", ex); }
-        }
-
-        private void OpenGeminiImages_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var dir = _geminiService.GetImageDirectory();
-                System.IO.Directory.CreateDirectory(dir);
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dir) { UseShellExecute = true });
-            }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to open Gemini images folder", ex); }
-        }
-
-        private void GeminiModelCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (GeminiModelCombo?.SelectedItem is not string model) return;
-            _geminiService.SelectedModel = model;
-        }
-
-        // ── Claude Settings ─────────────────────────────────────────
-
-        private void SaveClaudeKey_Click(object sender, RoutedEventArgs e)
-        {
-            var key = ClaudeApiKeyBox.Text?.Trim();
-            if (string.IsNullOrEmpty(key) || key.Contains('*'))
-            {
-                ClaudeKeyStatus.Text = "Enter a valid API key";
-                ClaudeKeyStatus.Foreground = (Brush)FindResource("DangerBright");
-                return;
-            }
-
-            try
-            {
-                _claudeService.SaveApiKey(key);
-                ClaudeApiKeyBox.Text = _claudeService.GetMaskedApiKey();
-                ClaudeKeyStatus.Text = "API key saved successfully";
-                ClaudeKeyStatus.Foreground = (Brush)FindResource("Success");
-                _chatManager.PopulateModelCombo();
-            }
-            catch (Exception ex)
-            {
-                ClaudeKeyStatus.Text = $"Error saving key: {ex.Message}";
-                ClaudeKeyStatus.Foreground = (Brush)FindResource("DangerBright");
-            }
-        }
-
-        private void ClaudeApiLink_Click(object sender, MouseButtonEventArgs e)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://console.anthropic.com/settings/keys") { UseShellExecute = true });
-            }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to open Claude API link", ex); }
-        }
-
-        private async void RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
-        {
-            await RefreshModelsFromApi(geminiOnly: true);
-        }
-
-        private async void RefreshClaudeModels_Click(object sender, RoutedEventArgs e)
-        {
-            await RefreshModelsFromApi(claudeOnly: true);
-        }
-
-        private async Task RefreshModelsFromApi(bool geminiOnly = false, bool claudeOnly = false)
-        {
-            RefreshGeminiModelsBtn.IsEnabled = false;
-            RefreshClaudeModelsBtn.IsEnabled = false;
-
-            var statusBlock = claudeOnly ? ClaudeRefreshStatus : GeminiRefreshStatus;
-            statusBlock.Text = "Fetching models from API...";
-            statusBlock.Foreground = (Brush)FindResource("TextMuted");
-
-            try
-            {
-                var claudeKey = claudeOnly ? _claudeService.GetApiKeyForRefresh() : null;
-                var geminiKey = geminiOnly ? _geminiService.GetApiKeyForRefresh() : null;
-
-                var (claudeCount, geminiCount, error) = await _modelConfigManager.RefreshFromApisAsync(claudeKey, geminiKey);
-
-                // Apply updated models to services
-                Managers.ClaudeService.AvailableModels = _modelConfigManager.ClaudeModels;
-                Managers.GeminiService.AvailableModels = _modelConfigManager.GeminiModels;
-
-                // Refresh Gemini model combo
-                var prevGeminiModel = GeminiModelCombo.SelectedItem as string;
-                GeminiModelCombo.Items.Clear();
-                foreach (var model in Managers.GeminiService.AvailableModels)
-                    GeminiModelCombo.Items.Add(model);
-                if (prevGeminiModel != null && GeminiModelCombo.Items.Contains(prevGeminiModel))
-                    GeminiModelCombo.SelectedItem = prevGeminiModel;
-                else if (GeminiModelCombo.Items.Count > 0)
-                    GeminiModelCombo.SelectedIndex = 0;
-
-                // Refresh chat model combo
-                _chatManager.PopulateModelCombo();
-
-                var parts = new List<string>();
-                if (claudeCount > 0) parts.Add($"{claudeCount} Claude models");
-                if (geminiCount > 0) parts.Add($"{geminiCount} Gemini models");
-
-                if (parts.Count > 0)
-                {
-                    statusBlock.Text = $"Loaded {string.Join(" + ", parts)}";
-                    statusBlock.Foreground = (Brush)FindResource("Success");
-                }
-                else if (error != null)
-                {
-                    statusBlock.Text = $"Failed: {error}";
-                    statusBlock.Foreground = (Brush)FindResource("DangerBright");
-                }
-                else
-                {
-                    statusBlock.Text = "No API key configured";
-                    statusBlock.Foreground = (Brush)FindResource("TextMuted");
-                }
-            }
-            catch (Exception ex)
-            {
-                statusBlock.Text = $"Error: {ex.Message}";
-                statusBlock.Foreground = (Brush)FindResource("DangerBright");
-            }
-            finally
-            {
-                RefreshGeminiModelsBtn.IsEnabled = true;
-                RefreshClaudeModelsBtn.IsEnabled = true;
-            }
-        }
-
-        // ── Project Events ─────────────────────────────────────────
-
-        private void AddProjectBtn_Click(object sender, RoutedEventArgs e) =>
-            _projectManager.HandleAddProjectPathClick(
-                p => _terminalManager?.UpdateWorkingDirectory(p),
-                () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
-                SyncSettingsForProject);
-
-        private void CreateProject_Click(object sender, RoutedEventArgs e) =>
-            _projectManager.CreateProject(
-                p => _terminalManager?.UpdateWorkingDirectory(p),
-                () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
-                SyncSettingsForProject);
-
-        private void ProjectCombo_Changed(object sender, SelectionChangedEventArgs e) { }
-
-        private void ModelCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (ModelCombo?.SelectedItem is not ComboBoxItem item) return;
-            var tag = item.Tag?.ToString();
-            var isGemini = tag == "Gemini" || tag == "GeminiGameArt";
-            var isGameArt = tag == "GeminiGameArt";
-            // Disable advanced options that don't apply to Gemini
-            if (FeatureModeToggle != null) FeatureModeToggle.IsEnabled = !isGemini;
-            if (SpawnTeamToggle != null) SpawnTeamToggle.IsEnabled = !isGemini;
-            if (ExtendedPlanningToggle != null) ExtendedPlanningToggle.IsEnabled = !isGemini;
-            if (AutoDecomposeToggle != null) AutoDecomposeToggle.IsEnabled = !isGemini;
-            // Show/hide asset type selector for Game Art mode
-            if (AssetTypeLabel != null) AssetTypeLabel.Visibility = isGameArt ? Visibility.Visible : Visibility.Collapsed;
-            if (AssetTypeCombo != null) AssetTypeCombo.Visibility = isGameArt ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ── Input Events ───────────────────────────────────────────
@@ -1650,14 +986,12 @@ namespace Spritely
 
         private void TaskInput_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // If we have a loaded prompt and the text is different, mark it as modified
             if (_currentLoadedPrompt != null)
             {
                 var currentText = TaskInput.Text?.Trim() ?? "";
                 var originalText = _currentLoadedPrompt.PromptText?.Trim() ?? "";
                 _loadedPromptModified = currentText != originalText;
 
-                // If user cleared the text or changed it completely, clear the loaded prompt reference
                 if (string.IsNullOrEmpty(currentText) || _loadedPromptModified)
                 {
                     if (string.IsNullOrEmpty(currentText))
@@ -1687,7 +1021,6 @@ namespace Spritely
 
         private void TaskCard_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            // Skip drag setup when clicking on buttons so their Click events aren't swallowed
             if (IsInsideButton(e.OriginalSource as DependencyObject))
             {
                 _dragStartedOnButton = true;
@@ -1716,7 +1049,6 @@ namespace Spritely
             if (task.IsFinished) return;
             if (_dragStartedOnButton) return;
 
-            // Double-check: don't drag if mouse is currently over a button
             if (IsInsideButton(e.OriginalSource as DependencyObject)) return;
 
             var pos = e.GetPosition(null);
@@ -1853,7 +1185,6 @@ namespace Spritely
                 return;
             }
 
-            // Reorder mode when both tasks are queued
             e.Effects = IsReorderablePair(dragged, target) ? DragDropEffects.Move : DragDropEffects.Link;
             e.Handled = true;
         }
@@ -1868,7 +1199,6 @@ namespace Spritely
             if (e.Data.GetData("AgentTask") is not AgentTask dragged) return;
             if (dragged.Id == target.Id || target.IsFinished || dragged.IsFinished) return;
 
-            // Reorder queued tasks instead of adding dependency
             if (IsReorderablePair(dragged, target))
             {
                 ReorderQueuedTask(dragged, target);
@@ -1876,17 +1206,14 @@ namespace Spritely
                 return;
             }
 
-            // Prevent duplicate dependency
             if (dragged.ContainsDependencyTaskId(target.Id)) return;
 
-            // Prevent circular dependency (use orchestrator if both tracked, else local check)
             if (_taskOrchestrator.ContainsTask(dragged.Id) && _taskOrchestrator.ContainsTask(target.Id))
             {
                 if (_taskOrchestrator.DetectCycle(dragged.Id, target.Id)) return;
             }
             else if (WouldCreateCircularDependency(dragged, target)) return;
 
-            // Add dependency: dragged waits for target — register with orchestrator
             dragged.AddDependencyTaskId(target.Id);
             dragged.DependencyTaskNumbers.Add(target.TaskNumber);
             _taskOrchestrator.AddTask(dragged, new List<string> { target.Id });
@@ -1894,21 +1221,19 @@ namespace Spritely
             dragged.BlockedByTaskNumber = target.TaskNumber;
             dragged.QueuedReason = $"Waiting for #{target.TaskNumber} to complete";
 
-            // Suspend the dragged task's process if it's currently running
             if (dragged.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning)
             {
                 _taskExecutionManager.PauseTask(dragged);
-                dragged.Status = AgentTaskStatus.Queued; // override Paused → Queued
+                dragged.Status = AgentTaskStatus.Queued;
             }
             else if (dragged.Status is AgentTaskStatus.Paused)
             {
-                dragged.Status = AgentTaskStatus.Queued; // process already suspended
+                dragged.Status = AgentTaskStatus.Queued;
             }
             else if (dragged.Status is AgentTaskStatus.InitQueued)
             {
                 dragged.Status = AgentTaskStatus.Queued;
             }
-            // If already Queued, dependency was added above — status stays Queued
 
             _outputTabManager.AppendOutput(dragged.Id,
                 $"\nTask #{dragged.TaskNumber} queued — waiting for #{target.TaskNumber} to complete.\n",
@@ -1943,8 +1268,6 @@ namespace Spritely
                 .Where(t => t.IsQueued || t.IsInitQueued)
                 .ToList();
 
-            // Sort by PriorityLevel descending (Critical=3, High=2, Normal=1, Low=0),
-            // then by original list position (stable sort preserves relative order).
             var sorted = queuedTasks
                 .Select((t, i) => (Task: t, Index: i))
                 .OrderByDescending(x => (int)x.Task.PriorityLevel)
@@ -1973,20 +1296,16 @@ namespace Spritely
                 return;
             }
 
-            // Sort queued tasks: Critical first, then High, Normal, Low.
-            // Stable sort preserves relative order within the same priority level.
             var sorted = queuedTasks
                 .OrderByDescending(t => (int)t.PriorityLevel)
                 .ToList();
 
-            // Collect the indices currently occupied by queued tasks (these are the "slots")
             var queuedSlots = _activeTasks
                 .Select((t, i) => (Task: t, Index: i))
                 .Where(x => x.Task.IsQueued || x.Task.IsInitQueued)
                 .Select(x => x.Index)
                 .ToList();
 
-            // Place sorted tasks into those slots
             for (int i = 0; i < sorted.Count; i++)
             {
                 var currentIdx = _activeTasks.IndexOf(sorted[i]);
@@ -2079,7 +1398,6 @@ namespace Spritely
             if (ModelCombo?.SelectedItem is ComboBoxItem modelItem && modelItem.Tag?.ToString() == "Gemini")
                 selectedModel = ModelType.Gemini;
 
-            // Create a new task using the stored prompt as the description
             var newTask = _taskFactory.CreateTask(
                 task.StoredPrompt,
                 task.ProjectPath,
@@ -2100,7 +1418,6 @@ namespace Spritely
 
             newTask.TimeoutMinutes = _settingsManager.TaskTimeoutMinutes;
 
-            // Remove the stored task from the list after extracting its data
             _storedTasks.Remove(task);
             _historyManager.SaveStoredTasks(_storedTasks);
 
@@ -2178,7 +1495,6 @@ namespace Spritely
             var startIdx = output.IndexOf(startMarker, StringComparison.OrdinalIgnoreCase);
             if (startIdx < 0) return null;
 
-            // Move past the marker line
             startIdx = output.IndexOf('\n', startIdx);
             if (startIdx < 0) return null;
             startIdx++;
@@ -2194,7 +1510,6 @@ namespace Spritely
             var output = planTask.OutputBuilder.ToString();
             var extractedPrompt = ExtractExecutionPrompt(output);
 
-            // Fall back to using the completion summary or the original description
             var storedPrompt = extractedPrompt ?? planTask.CompletionSummary;
             if (string.IsNullOrWhiteSpace(storedPrompt))
                 storedPrompt = planTask.Description;
@@ -2260,10 +1575,8 @@ namespace Spritely
                 return;
             }
 
-            // Recreate the output tab so the user can view the finished task's output
             _outputTabManager.CreateTab(task);
 
-            // Populate with the task's buffered output (still in memory) or persisted FullOutput
             var existingOutput = task.OutputBuilder.Length > 0
                 ? task.OutputBuilder.ToString()
                 : task.FullOutput;
@@ -2287,7 +1600,6 @@ namespace Spritely
         {
             _dragStartPoint = e.GetPosition(null);
 
-            // Find the clicked task item
             var hitTest = e.OriginalSource as DependencyObject;
             while (hitTest != null && !(hitTest is ListBoxItem))
             {
@@ -2296,7 +1608,6 @@ namespace Spritely
 
             if (hitTest is ListBoxItem item && item.DataContext is AgentTask task)
             {
-                // Only allow dragging of Queued or InitQueued tasks
                 if (task.Status == AgentTaskStatus.Queued || task.Status == AgentTaskStatus.InitQueued)
                 {
                     _draggedTask = task;
@@ -2357,7 +1668,6 @@ namespace Spritely
                 !(droppedTask.Status == AgentTaskStatus.Queued || droppedTask.Status == AgentTaskStatus.InitQueued))
                 return;
 
-            // Find the target position
             var targetIndex = -1;
             var hitTest = VisualTreeHelper.HitTest(ActiveTasksList, e.GetPosition(ActiveTasksList))?.VisualHit;
 
@@ -2403,1424 +1713,6 @@ namespace Spritely
             return null;
         }
 
-        // ── Named handlers for anonymous lambdas (needed for cleanup) ──
-
-        private void OnProjectSwapStarted() => LoadingOverlay.Visibility = Visibility.Visible;
-        private void OnProjectSwapCompleted()
-        {
-            LoadingOverlay.Visibility = Visibility.Collapsed;
-
-            // Mark all panels as dirty to force refresh with new project
-            _gitPanelManager.MarkDirty();
-            _activityDashboard.MarkDirty();
-
-            // Always initialize git panel on project set so data is ready before tab click
-            _gitPanelManager.RefreshIfNeeded(GitTabContent);
-
-            // Refresh activity tab if currently selected
-            if (StatisticsTabs.SelectedItem == ActivityTabItem)
-                _activityDashboard.RefreshIfNeeded(ActivityTabContent, _projectManager.ProjectPath);
-
-            // Update file locks display
-            UpdateFileLocks();
-
-            // Reload tasks for the new project
-            LoadTasksForDisplay();
-
-            // Update no-project state (e.g. after removing the last project)
-            UpdateNoProjectState();
-
-            // Reload templates for the new project
-            _ = ReloadTemplatesForProjectAsync();
-
-            // Reload skills for the new project (global + project-scoped)
-            _ = LoadSkillsAsync();
-
-            // Reload features for the new project
-            _ = LoadFeaturesAsync();
-        }
-
-        private async Task ReloadTemplatesForProjectAsync()
-        {
-            await _settingsManager.LoadTemplatesAsync(_projectManager.ProjectPath);
-            RenderTemplateCombo();
-        }
-
-        private void UpdateFileLocks()
-        {
-            if (_fileLocksView != null)
-            {
-                var currentProjectPath = _projectManager.ProjectPath;
-                _fileLocksView.Filter = (obj) =>
-                {
-                    if (obj is FileLock fileLock)
-                    {
-                        // Skip any file locks with "null" as the path
-                        if (fileLock.OriginalPath.Equals("null", StringComparison.OrdinalIgnoreCase))
-                            return false;
-
-                        // Find the task that owns this lock
-                        var ownerTask = _activeTasks.FirstOrDefault(t => t.Id == fileLock.OwnerTaskId);
-                        if (ownerTask != null)
-                        {
-                            // Only show file locks for tasks in the current project
-                            return NormalizePath(ownerTask.ProjectPath) == NormalizePath(currentProjectPath);
-                        }
-                    }
-                    return false;
-                };
-                _fileLocksView.Refresh();
-
-                // Update the badge to show only the count of visible locks for current project
-                var visibleCount = 0;
-                foreach (var item in _fileLocksView)
-                {
-                    visibleCount++;
-                }
-
-                FileLockBadge.Text = visibleCount.ToString();
-                FileLockBadge.Visibility = visibleCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-            }
-        }
-
-        private static string NormalizePath(string path)
-        {
-            if (string.IsNullOrEmpty(path)) return "";
-            return path.Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
-        }
-
-        private void OnCollectionChangedUpdateTabs(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        {
-            UpdateTabCounts();
-            // Also update file locks filter when active tasks change
-            if (sender == _activeTasks)
-                UpdateFileLocks();
-        }
-
-        // ── Window Close ───────────────────────────────────────────
-
-        /// <summary>
-        /// Unsubscribes every event handler subscribed in the constructor / LoadStartupDataAsync,
-        /// mirroring the subscription order to prevent memory leaks.
-        /// </summary>
-        private void UnsubscribeAllEvents()
-        {
-            // FileLockManager
-            _fileLockManager.QueuedTaskResumed -= OnQueuedTaskResumed;
-            _fileLockManager.TaskNeedsPause -= OnTaskNeedsPause;
-
-            // OutputTabManager
-            _outputTabManager.TabCloseRequested -= OnTabCloseRequested;
-            _outputTabManager.TabStoreRequested -= OnTabStoreRequested;
-            _outputTabManager.TabResumeRequested -= OnTabResumeRequested;
-            _outputTabManager.TabExportRequested -= OnTabExportRequested;
-            _outputTabManager.InputSent -= OnTabInputSent;
-            _outputTabManager.InterruptInputSent -= OnTabInterruptInputSent;
-
-            // ProjectManager
-            _projectManager.McpInvestigationRequested -= OnMcpInvestigationRequested;
-            _projectManager.McpOutputChanged -= OnMcpOutputChanged;
-            _projectManager.ProjectSwapStarted -= OnProjectSwapStarted;
-            _projectManager.ProjectSwapCompleted -= OnProjectSwapCompleted;
-            _projectManager.ProjectRenamed -= OnProjectRenamed;
-
-            // HelperManager
-            _helperManager.GenerationStarted -= OnHelperGenerationStarted;
-            _helperManager.GenerationCompleted -= OnHelperGenerationCompleted;
-            _helperManager.GenerationFailed -= OnHelperGenerationFailed;
-
-            // TaskExecutionManager
-            _taskExecutionManager.TaskCompleted -= OnTaskProcessCompleted;
-            _taskExecutionManager.SubTaskSpawned -= OnSubTaskSpawned;
-
-            // TaskOrchestrator
-            _taskOrchestrator.TaskReady -= OnOrchestratorTaskReady;
-
-            // TaskGroupTracker
-            _taskGroupTracker.GroupCompleted -= OnTaskGroupCompleted;
-
-            // CollectionChanged
-            _activeTasks.CollectionChanged -= OnCollectionChangedUpdateTabs;
-            _historyTasks.CollectionChanged -= OnCollectionChangedUpdateTabs;
-            _storedTasks.CollectionChanged -= OnCollectionChangedUpdateTabs;
-
-            // MainTabs
-            MainTabs.SelectionChanged -= MainTabs_SelectionChanged;
-            StatisticsTabs.SelectionChanged -= StatisticsTabs_SelectionChanged;
-        }
-
-        private void OnWindowClosing(object? sender, CancelEventArgs e)
-        {
-            var runningCount = _activeTasks.Count(t =>
-                t.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused);
-
-            if (runningCount > 0)
-            {
-                if (!DarkDialog.ShowConfirm(
-                    $"There are {runningCount} task(s) still running.\n\n" +
-                    "Closing will terminate all of them. Continue?",
-                    "Active Tasks Running"))
-                {
-                    e.Cancel = true;
-                    return;
-                }
-            }
-
-            Dispose();
-        }
-
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-
-            // ── 1. Unsubscribe all event handlers to prevent leaks ──
-            UnsubscribeAllEvents();
-
-            // ── 2. Stop all timers so no callbacks fire during teardown ──
-            _statusTimer.Stop();
-            _periodicSaveTimer.Stop();
-            _helperAnimTimer?.Stop();
-
-            // ── 3. Cancel in-flight async work ──
-            _windowCts.Cancel();
-            _chatManager.Dispose();
-
-            _helperManager?.Dispose();
-
-            // ── 4. Persist state (queues background writes via SafeFileWriter) ──
-            _projectManager.SaveProjects();
-            _settingsManager.SaveSettings(_projectManager.ProjectPath);
-            _historyManager.SaveHistory(_historyTasks);
-            _historyManager.SaveActiveQueue(_activeTasks, _activeTasksLock);
-            PersistSavedPrompts();
-
-            // ── 5. Wait for all background file writes to complete ──
-            Managers.SafeFileWriter.FlushAll(timeoutMs: 5000);
-
-            // ── 6. Stop all MCP servers and kill stale port processes ──
-            _projectManager.StopAllMcpServers();
-            _mcpHealthMonitor?.Stop();
-            _mcpHealthMonitor?.Dispose();
-
-            // ── 7. Cancel CTS, stop feature mode timers, kill & dispose processes ──
-            foreach (var task in _activeTasks)
-            {
-                TaskExecutionManager.KillProcess(task);
-                task.Runtime.Dispose();
-            }
-
-            // ── 8. Clean up remaining state ──
-            _messageBusManager.Dispose();
-            _fileLockManager.ClearAll();
-            _taskExecutionManager.StreamingToolState.Clear();
-
-            _terminalManager?.Dispose();
-
-            _claudeService.Dispose();
-            _geminiService.Dispose();
-
-            _windowCts.Dispose();
-        }
-
-        // ── Splitter drag (Thumb-based, avoids GridSplitter star-sizing jitter) ──
-
-        private void TopMiddleSplitter_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
-        {
-            // Snapshot BOTH star rows to pixel so both rows are pixel-based during drag
-            var topRow = RootGrid.RowDefinitions[0];
-            var bottomRow = RootGrid.RowDefinitions[2];
-
-            topRow.Height = new GridLength(topRow.ActualHeight);
-            bottomRow.Height = new GridLength(bottomRow.ActualHeight);
-        }
-
-        private void TopMiddleSplitter_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
-        {
-            var topRow = RootGrid.RowDefinitions[0];
-            var bottomRow = RootGrid.RowDefinitions[2];
-
-            double newTop = topRow.Height.Value + e.VerticalChange;
-            double newBottom = bottomRow.Height.Value - e.VerticalChange;
-
-            // Clamp to MinHeight instead of returning, so Thumb position stays in sync with rows
-            if (newTop < topRow.MinHeight)
-            {
-                newBottom += newTop - topRow.MinHeight;
-                newTop = topRow.MinHeight;
-            }
-            if (newBottom < bottomRow.MinHeight)
-            {
-                newTop += newBottom - bottomRow.MinHeight;
-                newBottom = bottomRow.MinHeight;
-            }
-
-            if (newTop < topRow.MinHeight || newBottom < bottomRow.MinHeight)
-                return;
-
-            topRow.Height = new GridLength(newTop);
-            bottomRow.Height = new GridLength(newBottom);
-        }
-
-        private void TopMiddleSplitter_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
-        {
-            // Restore star sizing based on current proportions so both rows flex with window resizes
-            var topRow = RootGrid.RowDefinitions[0];
-            var bottomRow = RootGrid.RowDefinitions[2];
-
-            // Calculate the total height and proportions
-            double totalHeight = topRow.ActualHeight + bottomRow.ActualHeight;
-            double topProportion = topRow.ActualHeight / totalHeight;
-            double bottomProportion = bottomRow.ActualHeight / totalHeight;
-
-            // Apply the proportions as star values
-            topRow.Height = new GridLength(topProportion, GridUnitType.Star);
-            bottomRow.Height = new GridLength(bottomProportion, GridUnitType.Star);
-        }
-
-        // ── Right splitter drag (Thumb-based, avoids GridSplitter targeting collapsed Col 4) ──
-
-        private void RightSplitter_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
-        {
-            double newWidth = RightPanelCol.Width.Value - e.HorizontalChange;
-            if (newWidth < RightPanelCol.MinWidth) newWidth = RightPanelCol.MinWidth;
-            RightPanelCol.Width = new GridLength(newWidth);
-        }
-
-        // ── Chat splitter drag (Thumb-based, avoids GridSplitter star-sizing inversion) ──
-
-        private void ChatSplitter_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
-        {
-            double newChat = ChatPanelCol.Width.Value - e.HorizontalChange;
-            if (newChat < 60) newChat = 60;
-            ChatPanelCol.Width = new GridLength(newChat);
-        }
-
-        // ── Terminal ───────────────────────────────────────────────
-
-        private void TerminalSend_Click(object sender, RoutedEventArgs e) => _terminalManager?.SendCommand();
-
-        private void TerminalInput_PreviewKeyDown(object sender, KeyEventArgs e) => _terminalManager?.HandleKeyDown(e);
-
-        private void TerminalInterrupt_Click(object sender, RoutedEventArgs e) => _terminalManager?.SendInterrupt();
-
-        // ── Graph Collapse ────────────────────────────────────────────
-
-        private void GraphCollapse_Click(object sender, RoutedEventArgs e) => ToggleGraphCollapse();
-
-        private void GraphHeader_MouseDown(object sender, MouseButtonEventArgs e) => ToggleGraphCollapse();
-
-        private void ToggleGraphCollapse()
-        {
-            _graphCollapsed = !_graphCollapsed;
-
-            if (_graphCollapsed)
-            {
-                _graphExpandedHeight = GraphPanelRow.Height;
-
-                GraphPanelRow.MinHeight = 0;
-                GraphPanelRow.Height = GridLength.Auto;
-                GraphSplitter.Visibility = Visibility.Collapsed;
-                NodeGraphPanel.Visibility = Visibility.Collapsed;
-
-                GraphCollapseBtn.Content = "\uE70E"; // ChevronUp
-                GraphCollapseBtn.ToolTip = "Expand graph";
-            }
-            else
-            {
-                GraphPanelRow.MinHeight = 60;
-                GraphPanelRow.Height = _graphExpandedHeight;
-                GraphSplitter.Visibility = Visibility.Visible;
-                NodeGraphPanel.Visibility = Visibility.Visible;
-
-                GraphCollapseBtn.Content = "\uE70D"; // ChevronDown
-                GraphCollapseBtn.ToolTip = "Collapse graph";
-
-                NodeGraphPanel.FitToView();
-            }
-        }
-
-        private void TerminalCollapse_Click(object sender, RoutedEventArgs e) => ToggleTerminalCollapse();
-
-        private void TerminalHeader_MouseDown(object sender, MouseButtonEventArgs e) => ToggleTerminalCollapse();
-
-        private void ToggleTerminalCollapse()
-        {
-            _terminalCollapsed = !_terminalCollapsed;
-
-            if (_terminalCollapsed)
-            {
-                // Save current height before collapsing
-                _terminalExpandedHeight = TerminalRow.Height;
-
-                TerminalRow.MinHeight = 0;
-                TerminalRow.Height = GridLength.Auto;
-                TerminalSplitter.Visibility = Visibility.Collapsed;
-                TerminalOutput.Visibility = Visibility.Collapsed;
-                TerminalInputBar.Visibility = Visibility.Collapsed;
-                TerminalRootBar.Visibility = Visibility.Collapsed;
-                TerminalTabBar.Visibility = Visibility.Collapsed;
-
-                TerminalCollapseBtn.Content = "\uE70E"; // ChevronUp
-                TerminalCollapseBtn.ToolTip = "Expand terminal";
-            }
-            else
-            {
-                TerminalRow.MinHeight = 60;
-                TerminalRow.Height = _terminalExpandedHeight;
-                TerminalSplitter.Visibility = Visibility.Visible;
-                TerminalOutput.Visibility = Visibility.Visible;
-                TerminalInputBar.Visibility = Visibility.Visible;
-                TerminalRootBar.Visibility = Visibility.Visible;
-                TerminalTabBar.Visibility = Visibility.Visible;
-
-                TerminalCollapseBtn.Content = "\uE70D"; // ChevronDown
-                TerminalCollapseBtn.ToolTip = "Collapse terminal";
-            }
-        }
-
-        // ── Filters ────────────────────────────────────────────────
-
-        private void RefreshFilterCombos()
-        {
-            if (ActiveFilterCombo == null || HistoryFilterCombo == null) return;
-
-            var allPaths = new HashSet<string>();
-            foreach (var p in _projectManager.SavedProjects)
-                allPaths.Add(p.Path);
-            foreach (var t in _activeTasks)
-                if (!string.IsNullOrEmpty(t.ProjectPath)) allPaths.Add(t.ProjectPath);
-            foreach (var t in _historyTasks)
-                if (!string.IsNullOrEmpty(t.ProjectPath)) allPaths.Add(t.ProjectPath);
-            foreach (var t in _storedTasks)
-                if (!string.IsNullOrEmpty(t.ProjectPath)) allPaths.Add(t.ProjectPath);
-
-            var projectNames = allPaths
-                .Select(p => new { Path = p, Name = Path.GetFileName(p) })
-                .OrderBy(x => x.Name)
-                .ToList();
-
-            var activeSelection = ActiveFilterCombo.SelectedItem as ComboBoxItem;
-            var activeTag = activeSelection?.Tag as string;
-            var historySelection = HistoryFilterCombo.SelectedItem as ComboBoxItem;
-            var historyTag = historySelection?.Tag as string;
-
-            ActiveFilterCombo.SelectionChanged -= ActiveFilter_Changed;
-            ActiveFilterCombo.Items.Clear();
-            ActiveFilterCombo.Items.Add(new ComboBoxItem { Content = "All Projects", Tag = "" });
-            foreach (var p in projectNames)
-                ActiveFilterCombo.Items.Add(new ComboBoxItem { Content = p.Name, Tag = p.Path });
-            var found = false;
-            if (!string.IsNullOrEmpty(activeTag))
-            {
-                foreach (ComboBoxItem item in ActiveFilterCombo.Items)
-                {
-                    if (item.Tag as string == activeTag) { ActiveFilterCombo.SelectedItem = item; found = true; break; }
-                }
-            }
-            if (!found) ActiveFilterCombo.SelectedIndex = 0;
-            ActiveFilterCombo.SelectionChanged += ActiveFilter_Changed;
-
-            HistoryFilterCombo.SelectionChanged -= HistoryFilter_Changed;
-            HistoryFilterCombo.Items.Clear();
-            HistoryFilterCombo.Items.Add(new ComboBoxItem { Content = "All Projects", Tag = "" });
-            foreach (var p in projectNames)
-                HistoryFilterCombo.Items.Add(new ComboBoxItem { Content = p.Name, Tag = p.Path });
-            found = false;
-            if (!string.IsNullOrEmpty(historyTag))
-            {
-                foreach (ComboBoxItem item in HistoryFilterCombo.Items)
-                {
-                    if (item.Tag as string == historyTag) { HistoryFilterCombo.SelectedItem = item; found = true; break; }
-                }
-            }
-            if (!found) HistoryFilterCombo.SelectedIndex = 0;
-            HistoryFilterCombo.SelectionChanged += HistoryFilter_Changed;
-
-            if (StoredFilterCombo != null)
-            {
-                var storedSelection = StoredFilterCombo.SelectedItem as ComboBoxItem;
-                var storedTag = storedSelection?.Tag as string;
-
-                StoredFilterCombo.SelectionChanged -= StoredFilter_Changed;
-                StoredFilterCombo.Items.Clear();
-                StoredFilterCombo.Items.Add(new ComboBoxItem { Content = "All Projects", Tag = "" });
-                foreach (var p in projectNames)
-                    StoredFilterCombo.Items.Add(new ComboBoxItem { Content = p.Name, Tag = p.Path });
-                found = false;
-                if (!string.IsNullOrEmpty(storedTag))
-                {
-                    foreach (ComboBoxItem item in StoredFilterCombo.Items)
-                    {
-                        if (item.Tag as string == storedTag) { StoredFilterCombo.SelectedItem = item; found = true; break; }
-                    }
-                }
-                if (!found) StoredFilterCombo.SelectedIndex = 0;
-                StoredFilterCombo.SelectionChanged += StoredFilter_Changed;
-            }
-
-
-            RefreshStatusFilterCombos();
-        }
-
-        private void RefreshStatusFilterCombos()
-        {
-            if (ActiveStatusFilterCombo == null || HistoryStatusFilterCombo == null) return;
-
-            var statusOptions = new[] { "All Status", "Running", "Queued", "Completed", "Failed", "Cancelled" };
-
-            var activeStatusTag = (ActiveStatusFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
-            var historyStatusTag = (HistoryStatusFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
-
-            ActiveStatusFilterCombo.SelectionChanged -= ActiveStatusFilter_Changed;
-            ActiveStatusFilterCombo.Items.Clear();
-            foreach (var s in statusOptions)
-                ActiveStatusFilterCombo.Items.Add(new ComboBoxItem { Content = s, Tag = s == "All Status" ? "" : s });
-            var found = false;
-            if (!string.IsNullOrEmpty(activeStatusTag))
-            {
-                foreach (ComboBoxItem item in ActiveStatusFilterCombo.Items)
-                {
-                    if (item.Tag as string == activeStatusTag) { ActiveStatusFilterCombo.SelectedItem = item; found = true; break; }
-                }
-            }
-            if (!found) ActiveStatusFilterCombo.SelectedIndex = 0;
-            ActiveStatusFilterCombo.SelectionChanged += ActiveStatusFilter_Changed;
-
-            HistoryStatusFilterCombo.SelectionChanged -= HistoryStatusFilter_Changed;
-            HistoryStatusFilterCombo.Items.Clear();
-            foreach (var s in statusOptions)
-                HistoryStatusFilterCombo.Items.Add(new ComboBoxItem { Content = s, Tag = s == "All Status" ? "" : s });
-            found = false;
-            if (!string.IsNullOrEmpty(historyStatusTag))
-            {
-                foreach (ComboBoxItem item in HistoryStatusFilterCombo.Items)
-                {
-                    if (item.Tag as string == historyStatusTag) { HistoryStatusFilterCombo.SelectedItem = item; found = true; break; }
-                }
-            }
-            if (!found) HistoryStatusFilterCombo.SelectedIndex = 0;
-            HistoryStatusFilterCombo.SelectionChanged += HistoryStatusFilter_Changed;
-        }
-
-        private static bool TaskMatchesSearch(AgentTask t, string search)
-        {
-            if (string.IsNullOrEmpty(search)) return true;
-            if (t.Description != null && t.Description.Contains(search, StringComparison.OrdinalIgnoreCase)) return true;
-            if (t.Summary != null && t.Summary.Contains(search, StringComparison.OrdinalIgnoreCase)) return true;
-            return false;
-        }
-
-        private void ApplyActiveFilters()
-        {
-            if (_activeView == null) return;
-            var projectTag = (ActiveFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string;
-            var statusTag = (ActiveStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
-            var hasProject = !string.IsNullOrEmpty(projectTag);
-            var hasStatus = !string.IsNullOrEmpty(statusTag);
-            var searchText = ActiveSearchBox?.Text?.Trim() ?? "";
-            var hasSearch = searchText.Length > 0;
-
-            if (!hasProject && !hasStatus && !hasSearch)
-                _activeView.Filter = null;
-            else
-                _activeView.Filter = obj =>
-                {
-                    if (obj is not AgentTask t) return false;
-                    if (hasProject && t.ProjectPath != projectTag) return false;
-                    if (hasStatus && t.Status.ToString() != statusTag) return false;
-                    if (hasSearch && !TaskMatchesSearch(t, searchText)) return false;
-                    return true;
-                };
-        }
-
-        private void ApplyHistoryFilters()
-        {
-            if (_historyView == null) return;
-            var projectTag = (HistoryFilterCombo.SelectedItem as ComboBoxItem)?.Tag as string;
-            var statusTag = (HistoryStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
-            var hasProject = !string.IsNullOrEmpty(projectTag);
-            var hasStatus = !string.IsNullOrEmpty(statusTag);
-            var searchText = HistorySearchBox?.Text?.Trim() ?? "";
-            var hasSearch = searchText.Length > 0;
-
-            if (!hasProject && !hasStatus && !hasSearch)
-                _historyView.Filter = null;
-            else
-                _historyView.Filter = obj =>
-                {
-                    if (obj is not AgentTask t) return false;
-                    if (hasProject && t.ProjectPath != projectTag) return false;
-                    if (hasStatus && t.Status.ToString() != statusTag) return false;
-                    if (hasSearch && !TaskMatchesSearch(t, searchText)) return false;
-                    return true;
-                };
-        }
-
-        private void ActiveFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyActiveFilters();
-
-        private void HistoryFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
-
-        private void ActiveStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyActiveFilters();
-
-        private void HistoryStatusFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyHistoryFilters();
-
-        private void ActiveSearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyActiveFilters();
-
-        private void HistorySearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyHistoryFilters();
-
-        private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (e.Source != MainTabs) return;
-        }
-
-        private void StatisticsTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (e.Source != StatisticsTabs) return;
-            if (StatisticsTabs.SelectedItem == ActivityTabItem)
-                _activityDashboard.RefreshIfNeeded(ActivityTabContent, _projectManager.ProjectPath);
-            else if (StatisticsTabs.SelectedItem == GitTabItem)
-                _gitPanelManager.RefreshIfNeeded(GitTabContent);
-            else if (StatisticsTabs.SelectedItem == TasksTabItem)
-                LoadTasksForDisplay();
-        }
-
-        private void SetupMainTabsOverflow()
-        {
-            MainTabs.ApplyTemplate();
-            var btn = MainTabs.Template.FindName("PART_OverflowButton", MainTabs) as Button;
-            if (btn != null)
-                btn.Click += MainTabsOverflow_Click;
-        }
-
-        private void MainTabsOverflow_Click(object sender, RoutedEventArgs e)
-        {
-            var btn = sender as Button;
-            var popup = new System.Windows.Controls.Primitives.Popup
-            {
-                PlacementTarget = btn,
-                Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
-                StaysOpen = false,
-                AllowsTransparency = true
-            };
-
-            var border = new Border
-            {
-                Background = (Brush)FindResource("BgPopup"),
-                BorderBrush = (Brush)FindResource("BorderMedium"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(4),
-                MinWidth = 130,
-                MaxHeight = 350
-            };
-
-            var stack = new StackPanel();
-
-            foreach (var item in MainTabs.Items)
-            {
-                if (item is TabItem tab && tab.Visibility == Visibility.Visible)
-                {
-                    string text = GetTabHeaderText(tab);
-                    bool isSelected = tab == MainTabs.SelectedItem;
-
-                    var itemBorder = new Border
-                    {
-                        Background = isSelected
-                            ? (Brush)FindResource("BgHover")
-                            : Brushes.Transparent,
-                        CornerRadius = new CornerRadius(4),
-                        Padding = new Thickness(10, 6, 10, 6),
-                        Margin = new Thickness(0, 1, 0, 1),
-                        Cursor = Cursors.Hand
-                    };
-
-                    var textBlock = new TextBlock
-                    {
-                        Text = text,
-                        Foreground = isSelected
-                            ? (Brush)FindResource("Accent")
-                            : (Brush)FindResource("TextBody"),
-                        FontFamily = new FontFamily("Segoe UI"),
-                        FontSize = 12,
-                        FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal
-                    };
-
-                    itemBorder.Child = textBlock;
-
-                    var capturedTab = tab;
-                    itemBorder.MouseEnter += (_, _) =>
-                    {
-                        if (capturedTab != MainTabs.SelectedItem)
-                            itemBorder.Background = (Brush)FindResource("BgElevated");
-                    };
-                    itemBorder.MouseLeave += (_, _) =>
-                    {
-                        if (capturedTab != MainTabs.SelectedItem)
-                            itemBorder.Background = Brushes.Transparent;
-                    };
-                    itemBorder.MouseLeftButtonDown += (_, _) =>
-                    {
-                        MainTabs.SelectedItem = capturedTab;
-                        popup.IsOpen = false;
-                    };
-
-                    stack.Children.Add(itemBorder);
-                }
-            }
-
-            border.Child = stack;
-            popup.Child = border;
-            popup.IsOpen = true;
-        }
-
-        private static string GetTabHeaderText(TabItem tab)
-        {
-            if (tab.Header is TextBlock tb) return tb.Text;
-            if (tab.Header is StackPanel sp)
-            {
-                foreach (var child in sp.Children)
-                    if (child is TextBlock t) return t.Text;
-            }
-            if (tab.Header is string s) return s;
-            return "Tab";
-        }
-
-        private void RefreshActivityDashboard()
-        {
-            _activityDashboard.MarkDirty();
-            _gitPanelManager.MarkDirty();
-            if (StatisticsTabs.SelectedItem == ActivityTabItem)
-                _activityDashboard.RefreshIfNeeded(ActivityTabContent, _projectManager.ProjectPath);
-            else if (StatisticsTabs.SelectedItem == GitTabItem)
-                _gitPanelManager.RefreshIfNeeded(GitTabContent);
-        }
-
-        private void RefreshInlineProjectStats()
-        {
-            _projectManager.RefreshProjectList(
-                p => _terminalManager?.UpdateWorkingDirectory(p),
-                () => _settingsManager.SaveSettings(_projectManager.ProjectPath),
-                SyncSettingsForProject);
-        }
-
-        // ── Settings Panel Collapse ───────────────────────────────
-
-        private void ToggleSettingsPanel_Click(object sender, RoutedEventArgs e)
-        {
-            bool collapse = SettingsExpandedPanel.Visibility == Visibility.Visible;
-            ApplySettingsPanelCollapsed(collapse);
-            _settingsManager.SettingsPanelCollapsed = collapse;
-            _settingsManager.SaveSettings(_projectManager.ProjectPath);
-        }
-
-        private void ApplySettingsPanelCollapsed(bool collapsed)
-        {
-            if (collapsed)
-            {
-                SettingsExpandedPanel.Visibility = Visibility.Collapsed;
-                ProjectsPanelGrid.Visibility = Visibility.Collapsed;
-                RightSplitter.Visibility = Visibility.Collapsed;
-                SettingsCollapsedStrip.Visibility = Visibility.Visible;
-                RightPanelCol.Width = new GridLength(0);
-                RightPanelCol.MinWidth = 0;
-            }
-            else
-            {
-                SettingsCollapsedStrip.Visibility = Visibility.Collapsed;
-                SettingsExpandedPanel.Visibility = Visibility.Visible;
-                ProjectsPanelGrid.Visibility = Visibility.Visible;
-                RightSplitter.Visibility = Visibility.Visible;
-                RightPanelCol.Width = new GridLength(285);
-                RightPanelCol.MinWidth = 150;
-            }
-        }
-
-        // ── Left Panel Collapse ───────────────────────────────
-
-        private void ToggleLeftPanel_Click(object sender, RoutedEventArgs e)
-        {
-            bool collapse = TaskListPanelBorder.Visibility == Visibility.Visible;
-            ApplyLeftPanelCollapsed(collapse);
-            _settingsManager.LeftPanelCollapsed = collapse;
-            _settingsManager.SaveSettings(_projectManager.ProjectPath);
-        }
-
-        private void ApplyLeftPanelCollapsed(bool collapsed)
-        {
-            if (collapsed)
-            {
-                TaskListPanelBorder.Visibility = Visibility.Collapsed;
-                LeftSplitter.Visibility = Visibility.Collapsed;
-                LeftPanelCollapsedStrip.Visibility = Visibility.Visible;
-                LeftPanelCol.Width = new GridLength(0);
-                LeftPanelCol.MinWidth = 0;
-            }
-            else
-            {
-                LeftPanelCollapsedStrip.Visibility = Visibility.Collapsed;
-                TaskListPanelBorder.Visibility = Visibility.Visible;
-                LeftSplitter.Visibility = Visibility.Visible;
-                LeftPanelCol.Width = new GridLength(285);
-                LeftPanelCol.MinWidth = 150;
-            }
-        }
-
-        private static string WrapTooltipText(string text, int maxLineLength)
-        {
-            if (string.IsNullOrEmpty(text) || text.Length <= maxLineLength)
-                return text;
-
-            var sb = new System.Text.StringBuilder();
-            foreach (var line in text.Split('\n'))
-            {
-                if (sb.Length > 0) sb.Append('\n');
-                var remaining = line;
-                while (remaining.Length > maxLineLength)
-                {
-                    int breakAt = remaining.LastIndexOf(' ', maxLineLength);
-                    if (breakAt <= 0) breakAt = maxLineLength;
-                    sb.Append(remaining, 0, breakAt);
-                    sb.Append('\n');
-                    remaining = remaining.Substring(breakAt).TrimStart();
-                }
-                sb.Append(remaining);
-            }
-            return sb.ToString();
-        }
-
-        // ── Automation ─────────────────────────────────────────────
-
-        private void BuildInvestigation_Click(object sender, RoutedEventArgs e)
-        {
-            var projectPath = _projectManager.ProjectPath;
-            if (string.IsNullOrEmpty(projectPath)) return;
-
-            var crashPaths = _projectManager.GetCrashLogPaths(projectPath);
-            var pathsList = string.Join("\n", crashPaths.Select(p => $"- `{p}`"));
-
-            var desc = "Investigate recent build failures and crashes for this project.\n\n" +
-                       "## Instructions\n\n" +
-                       "1. Read the following crash/error log files and analyze their contents:\n" +
-                       $"{pathsList}\n\n" +
-                       "2. Identify the root cause of the most recent errors or crashes.\n" +
-                       "3. Propose and implement fixes for the issues found.\n" +
-                       "4. If a log file does not exist or is empty, note it and continue with the others.\n\n" +
-                       "Focus on the most recent entries first. Provide a clear summary of what went wrong and what was fixed.";
-
-            LaunchTaskFromDescription(
-                desc,
-                "Crash Log Investigation",
-                imagePaths: _imageManager.DetachImages(),
-                planOnly: false,
-                header: "Crash Log Investigation");
-
-            ResetPerTaskToggles();
-        }
-
-        private void BuildTest_Click(object sender, RoutedEventArgs e)
-        {
-            var projectPath = _projectManager.ProjectPath;
-            if (string.IsNullOrEmpty(projectPath)) return;
-
-            var desc = "Build this project and fix all build errors until it compiles successfully.\n\n" +
-                       "## Instructions\n\n" +
-                       "1. Determine the build system used by this project (e.g. `dotnet build`, Unity, CMake, npm, etc.).\n" +
-                       "2. Run a full build of the project.\n" +
-                       "3. If the build succeeds, report success.\n" +
-                       "4. If the build fails:\n" +
-                       "   a. Analyze each build error to determine the root cause.\n" +
-                       "   b. Implement fixes for the errors.\n" +
-                       "   c. Re-run the build to verify the fixes.\n" +
-                       "   d. Repeat until the build succeeds with no errors.\n\n" +
-                       "Provide a clear summary of what errors were found and how they were fixed.";
-
-            LaunchTaskFromDescription(
-                desc,
-                "Build Test",
-                imagePaths: _imageManager.DetachImages(),
-                planOnly: false,
-                header: "Build Test");
-
-            ResetPerTaskToggles();
-        }
-
-        private void TestVerification_Click(object sender, RoutedEventArgs e)
-        {
-            var projectPath = _projectManager.ProjectPath;
-            if (string.IsNullOrEmpty(projectPath)) return;
-
-            var desc = "Run all tests in this project and fix any failures.\n\n" +
-                       "## Instructions\n\n" +
-                       "1. Discover the test framework used by this project (e.g. NUnit, xUnit, MSTest, Jest, pytest, etc.).\n" +
-                       "2. Run the full test suite using the appropriate command (e.g. `dotnet test`, `npm test`, `pytest`, etc.).\n" +
-                       "3. If all tests pass, report success and provide a summary of the test results.\n" +
-                       "4. If any tests fail:\n" +
-                       "   a. Analyze each failure to determine the root cause.\n" +
-                       "   b. Determine whether the issue is in the test itself or in the source code being tested.\n" +
-                       "   c. Implement fixes for the failing tests or the underlying code.\n" +
-                       "   d. Re-run the tests to verify the fixes resolve the failures.\n" +
-                       "   e. Repeat until all tests pass.\n\n" +
-                       "Provide a clear summary of which tests failed, why they failed, and what was done to fix them.";
-
-            LaunchTaskFromDescription(
-                desc,
-                "Test Verification",
-                imagePaths: _imageManager.DetachImages(),
-                planOnly: false,
-                header: "Test Verification");
-
-            ResetPerTaskToggles();
-        }
-
-        private void RestartProject_Click(object sender, RoutedEventArgs e)
-        {
-            var buildBatPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "build.bat");
-            if (!System.IO.File.Exists(buildBatPath))
-            {
-                Managers.AppLogger.Warn("RestartProject", "build.bat not found at " + buildBatPath);
-                return;
-            }
-
-            RestartProjectBtn.IsEnabled = false;
-            RestartProjectBtn.Content = "Restarting...";
-
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c \"{buildBatPath}\"",
-                    WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
-                    UseShellExecute = true,
-                };
-                System.Diagnostics.Process.Start(psi);
-            }
-            catch (Exception ex)
-            {
-                Managers.AppLogger.Warn("RestartProject", $"Failed to launch build.bat: {ex.Message}", ex);
-                RestartProjectBtn.IsEnabled = true;
-                RestartProjectBtn.Content = "Restart Project";
-            }
-        }
-
-        private async void GenerateSuggestions_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_projectManager.HasProjects) return;
-            if (_helperManager.IsGenerating) return;
-
-            var category = SuggestionCategory.General;
-            if (HelperCategoryCombo.SelectedItem is ComboBoxItem catItem)
-            {
-                var tag = catItem.Tag?.ToString() ?? "General";
-                Enum.TryParse(tag, out category);
-            }
-
-            var guidance = SuggestionGuidanceInput.Text?.Trim();
-            if (!string.IsNullOrEmpty(guidance))
-                SuggestionGuidanceInput.Clear();
-            await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance, _windowCts.Token);
-        }
-
-        private void SuggestionGuidanceInput_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                GenerateSuggestions_Click(sender, e);
-                e.Handled = true;
-            }
-        }
-
-        private void ClearSuggestions_Click(object sender, RoutedEventArgs e)
-        {
-            _helperManager.ClearSuggestions();
-            HelperStatusText.Text = "";
-        }
-
-        private void RunSuggestion_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.Tag is not Suggestion suggestion) return;
-
-            // For Rules category, add to project rules instead of running a task
-            if (suggestion.Category == SuggestionCategory.Rules)
-            {
-                _projectManager.AddProjectRule($"{suggestion.Title}: {suggestion.Description}");
-                _helperManager.RemoveSuggestion(suggestion);
-                return;
-            }
-
-            var desc = $"Implement the following improvement:\n\n" +
-                       $"## {suggestion.Title}\n\n" +
-                       $"{suggestion.Description}\n\n" +
-                       "You MUST fully implement this change — write the actual code, do not just analyze or produce a plan.";
-
-            var selectedModel = ModelType.ClaudeCode;
-            if (ModelCombo?.SelectedItem is ComboBoxItem modelItem && modelItem.Tag?.ToString() == "Gemini")
-                selectedModel = ModelType.Gemini;
-
-            // Helper suggestions must always implement — never plan-only
-            LaunchTaskFromDescription(
-                desc,
-                suggestion.Title,
-                selectedModel,
-                imagePaths: _imageManager.DetachImages(),
-                planOnly: false);
-
-            ResetPerTaskToggles();
-            _helperManager.RemoveSuggestion(suggestion);
-        }
-
-        private void RemoveSuggestion_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.Tag is not Suggestion suggestion) return;
-            _helperManager.RemoveSuggestion(suggestion);
-        }
-
-        private void CopySuggestion_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.Tag is not Suggestion suggestion) return;
-            var text = $"{suggestion.Title}\n\n{suggestion.Description}";
-            Clipboard.SetText(text);
-        }
-
-        private void IgnoreSuggestion_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.Tag is not Suggestion suggestion) return;
-            _helperManager.IgnoreSuggestion(suggestion);
-        }
-
-        private void SaveSuggestion_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement el || el.Tag is not Suggestion suggestion) return;
-            var text = $"{suggestion.Title}\n\n{suggestion.Description}";
-            var entry = new SavedPromptEntry
-            {
-                PromptText = text,
-                DisplayName = suggestion.Title.Length > 40 ? suggestion.Title.Substring(0, 40) + "..." : suggestion.Title,
-            };
-            _savedPrompts.Insert(0, entry);
-            PersistSavedPrompts();
-            _helperManager.RemoveSuggestion(suggestion);
-        }
-
-        private static readonly string[] _helperAnimPhases = [
-            "Analyzing project",
-            "Scanning files",
-            "Generating suggestions",
-            "Thinking",
-        ];
-
-        private void StartHelperAnimation()
-        {
-            _helperAnimTick = 0;
-            _helperAnimTimer?.Stop();
-            _helperAnimTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-            _helperAnimTimer.Tick += (_, _) =>
-            {
-                var dots = new string('.', (_helperAnimTick % 3) + 1);
-                var phase = _helperAnimPhases[(_helperAnimTick / 6) % _helperAnimPhases.Length];
-                HelperStatusText.Text = phase + dots;
-                _helperAnimTick++;
-            };
-            _helperAnimTimer.Start();
-        }
-
-        private void StopHelperAnimation()
-        {
-            _helperAnimTimer?.Stop();
-            _helperAnimTimer = null;
-            GenerateSuggestionsBtn.BeginAnimation(OpacityProperty, null);
-            GenerateSuggestionsBtn.Opacity = 1.0;
-        }
-
-        private void OnHelperGenerationStarted()
-        {
-            Dispatcher.BeginInvoke(() =>
-            {
-                App.TraceUi("HelperGenerationStarted");
-                GenerateSuggestionsBtn.IsEnabled = false;
-                GenerateSuggestionsBtn.Content = "Generating...";
-                HelperStatusText.Text = "Analyzing project...";
-
-                var pulse = new DoubleAnimation(1.0, 0.5, TimeSpan.FromSeconds(0.8))
-                {
-                    AutoReverse = true,
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    EasingFunction = new SineEase()
-                };
-                GenerateSuggestionsBtn.BeginAnimation(OpacityProperty, pulse);
-
-                StartHelperAnimation();
-            });
-        }
-
-        private void OnHelperGenerationCompleted()
-        {
-            Dispatcher.BeginInvoke(() =>
-            {
-                StopHelperAnimation();
-                GenerateSuggestionsBtn.IsEnabled = true;
-                GenerateSuggestionsBtn.Content = "Generate Suggestions";
-                HelperStatusText.Text = $"{_helperManager.Suggestions.Count} suggestions generated";
-            });
-        }
-
-        private void OnHelperGenerationFailed(string error)
-        {
-            Dispatcher.BeginInvoke(() =>
-            {
-                StopHelperAnimation();
-                GenerateSuggestionsBtn.IsEnabled = true;
-                GenerateSuggestionsBtn.Content = "Generate Suggestions";
-                HelperStatusText.Text = error;
-            });
-        }
-
-        private void OnBusMessageReceived(string projectPath, BusMessage message)
-        {
-            // Bus status messages are internal coordination noise — suppress from task output
-        }
-
-        // ── Chat Panel (delegated to ChatManager) ─────────────────
-
-        private void NewChat_Click(object sender, RoutedEventArgs e) => _chatManager.HandleNewChat();
-        private void ChatSend_Click(object sender, RoutedEventArgs e) => _chatManager.HandleSendClick();
-        private void ChatInput_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                if (_chatManager.HandlePaste())
-                {
-                    e.Handled = true;
-                    return;
-                }
-            }
-            _chatManager.HandleInputKeyDown(e);
-        }
-        private void ChatInput_DragOver(object sender, DragEventArgs e) => _chatManager.HandleDragOver(e);
-        private void ChatInput_Drop(object sender, DragEventArgs e) => _chatManager.HandleDrop(e);
-        private void ChatModelCombo_Changed(object sender, SelectionChangedEventArgs e) => _chatManager.HandleModelComboChanged();
-
-        // ── Export Build ─────────────────────────────────────────────
-
-        private async void ExportBuild_Click(object sender, RoutedEventArgs e)
-        {
-            var button = sender as Button;
-            if (button == null) return;
-
-            try
-            {
-                button.IsEnabled = false;
-                ExportStatusText.Text = "Building application...";
-                ExportStatusText.Foreground = (Brush)Application.Current.FindResource("TextMuted");
-                ExportStatusText.Visibility = Visibility.Visible;
-
-                // Run dotnet publish command
-                // Use AppDomain.CurrentDomain.BaseDirectory which is more reliable than Assembly.Location
-                var baseDir = AppDomain.CurrentDomain.BaseDirectory ?? Environment.CurrentDirectory;
-
-                // Debug output
-                System.Diagnostics.Debug.WriteLine($"Export Build - Base directory: {baseDir}");
-                System.Diagnostics.Debug.WriteLine($"Export Build - Current directory: {Environment.CurrentDirectory}");
-
-                // Find the project file by navigating up from the base directory
-                var projectFile = FindProjectFile(baseDir);
-                if (projectFile == null)
-                {
-                    ExportStatusText.Text = $"Could not find Spritely.csproj file.\nSearched from: {baseDir}";
-                    ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
-                    ExportStatusText.Visibility = Visibility.Visible;
-                    button.IsEnabled = true;
-                    return;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"Export Build - Found project file: {projectFile}");
-                var projectDir = System.IO.Path.GetDirectoryName(projectFile)!;
-                var publishDir = System.IO.Path.Combine(projectDir, "publish");
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "dotnet",
-                        Arguments = $"publish \"{projectFile}\" -c Release -r win-x64 --self-contained true",
-                        WorkingDirectory = projectDir,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
-                };
-
-                var outputLines = new List<string>();
-                process.OutputDataReceived += (s, args) => { if (args.Data != null) outputLines.Add(args.Data); };
-                process.ErrorDataReceived += (s, args) => { if (args.Data != null) outputLines.Add(args.Data); };
-
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-
-                await Task.Run(() => process.WaitForExit());
-
-                if (process.ExitCode == 0)
-                {
-                    // Build succeeded - verify the output directory exists
-                    var expectedPath = System.IO.Path.Combine(projectDir, @"bin\Release\net9.0-windows\win-x64\publish\");
-                    var fullPath = System.IO.Path.GetFullPath(expectedPath);
-
-                    if (System.IO.Directory.Exists(fullPath))
-                    {
-                        ExportStatusText.Text = $"Build completed successfully! Opening folder...";
-                        ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Success");
-
-                        // Open the folder in Windows Explorer
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = "explorer.exe",
-                            Arguments = fullPath,
-                            UseShellExecute = true
-                        });
-                    }
-                    else
-                    {
-                        ExportStatusText.Text = $"Build completed but output directory not found at: {fullPath}";
-                        ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
-                    }
-                }
-                else
-                {
-                    // Build failed
-                    ExportStatusText.Text = $"Build failed with exit code {process.ExitCode}. Check output for errors.";
-                    ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
-
-                    // Log output for debugging
-                    if (outputLines.Count > 0)
-                    {
-                        ExportStatusText.Text += "\n\nBuild output:\n" + string.Join("\n", outputLines.TakeLast(10));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ExportStatusText.Text = $"Export failed: {ex.Message}";
-                ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
-                ExportStatusText.Visibility = Visibility.Visible;
-            }
-            finally
-            {
-                button.IsEnabled = true;
-            }
-        }
-
-        private string? FindProjectFile(string startDirectory)
-        {
-            // Look for Spritely.csproj file by traversing up the directory tree
-            var dir = new System.IO.DirectoryInfo(startDirectory);
-
-            // Try up to 10 levels to avoid infinite loops
-            int levels = 0;
-            while (dir != null && levels < 10)
-            {
-                var projectFile = System.IO.Path.Combine(dir.FullName, "Spritely.csproj");
-                if (System.IO.File.Exists(projectFile))
-                {
-                    return projectFile;
-                }
-
-                // Also check if we're in a bin folder structure and jump to the root
-                if (dir.Name == "bin" && dir.Parent != null)
-                {
-                    var rootProjectFile = System.IO.Path.Combine(dir.Parent.FullName, "Spritely.csproj");
-                    if (System.IO.File.Exists(rootProjectFile))
-                    {
-                        return rootProjectFile;
-                    }
-                }
-
-                dir = dir.Parent;
-                levels++;
-            }
-
-            // As a fallback, try some common locations relative to the executable
-            string[] fallbackPaths = new[]
-            {
-                System.IO.Path.Combine(startDirectory, "..", "..", "..", "Spritely.csproj"),
-                System.IO.Path.Combine(startDirectory, "..", "..", "..", "..", "Spritely.csproj"),
-                System.IO.Path.Combine(startDirectory, "..", "Spritely.csproj"),
-                System.IO.Path.Combine(Environment.CurrentDirectory, "Spritely.csproj")
-            };
-
-            foreach (var path in fallbackPaths)
-            {
-                try
-                {
-                    var fullPath = System.IO.Path.GetFullPath(path);
-                    if (System.IO.File.Exists(fullPath))
-                    {
-                        return fullPath;
-                    }
-                }
-                catch { /* Ignore invalid paths */ }
-            }
-
-            return null;
-        }
-
-        // ── Tasks Panel ─────────────────────────────────────────────
-
-        private void InitializeTaskList()
-        {
-            // Defer task list initialization until the tab is actually shown
-            // to prevent UI freeze during startup
-        }
-
-        private void LoadTasksForDisplay()
-        {
-            if (_projectTaskManager == null) return;
-
-            // Update the project filter
-            _projectTaskManager.CurrentProjectPath = _projectManager.ProjectPath;
-
-            // Always rebuild the list from the filtered Tasks property
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
-            {
-                TaskListControl.ItemsSource = new ObservableCollection<ProjectTaskItem>(_projectTaskManager.Tasks);
-            }));
-        }
-
-        private void AddTask_Click(object sender, RoutedEventArgs e)
-        {
-            AddTaskItem();
-        }
-
-        private void TaskInput_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter)
-            {
-                e.Handled = true;
-                AddTaskItem();
-            }
-        }
-
-        private void AddTaskItem()
-        {
-            var text = TaskInputBox.Text?.Trim();
-            if (string.IsNullOrEmpty(text) || text == TaskInputBox.Tag?.ToString())
-                return;
-
-            if (!_projectManager.HasProjects)
-                return;
-
-            try
-            {
-                _projectTaskManager.CurrentProjectPath = _projectManager.ProjectPath;
-                var newTask = _projectTaskManager.AddTask(text);
-                TaskInputBox.Clear();
-
-                // Add to UI
-                if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
-                {
-                    tasks.Add(newTask);
-                }
-                else
-                {
-                    // ItemsSource not yet initialized — load from scratch
-                    LoadTasksForDisplay();
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("Tasks", "Failed to add task", ex);
-            }
-        }
-
-        private async void TaskItem_Click(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is Border border && border.DataContext is ProjectTaskItem task)
-            {
-                // Toggle the task completion status
-                task.IsCompleted = !task.IsCompleted;
-
-                if (task.IsCompleted)
-                {
-                    task.CompletedAt = DateTime.UtcNow;
-                }
-                else
-                {
-                    task.CompletedAt = null;
-                }
-
-                // Save the updated task list
-                await _projectTaskManager.SaveTasksAsync();
-
-                // Ensure UI updates through property change notification
-                if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
-                {
-                    // Force refresh of the item in the collection
-                    var index = tasks.IndexOf(task);
-                    if (index >= 0)
-                    {
-                        tasks[index] = task;
-                    }
-                }
-            }
-        }
-
-        private async void RemoveTask_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button button && button.DataContext is ProjectTaskItem task)
-            {
-                // Find the parent Border for animation
-                DependencyObject? current = button;
-                while (current != null && current is not Border)
-                {
-                    current = VisualTreeHelper.GetParent(current);
-                }
-
-                if (current is Border border)
-                {
-                    // Animate fade out before removing
-                    var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200));
-                    fadeOut.Completed += async (s, args) =>
-                    {
-                        if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
-                        {
-                            tasks.Remove(task);
-                        }
-                        _projectTaskManager.RemoveTask(task);
-                        await _projectTaskManager.SaveTasksAsync();
-                    };
-                    border.BeginAnimation(OpacityProperty, fadeOut);
-                }
-                else
-                {
-                    // If can't find border for animation, just remove immediately
-                    if (TaskListControl.ItemsSource is ObservableCollection<ProjectTaskItem> tasks)
-                    {
-                        tasks.Remove(task);
-                    }
-                    _projectTaskManager.RemoveTask(task);
-                    await _projectTaskManager.SaveTasksAsync();
-                }
-
-                e.Handled = true; // Prevent the click from bubbling to the task item
-            }
-        }
-
-        private static T? FindVisualChild<T>(DependencyObject parent, string name) where T : FrameworkElement
-        {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T element && element.Name == name)
-                    return element;
-
-                var result = FindVisualChild<T>(child, name);
-                if (result != null)
-                    return result;
-            }
-            return null;
-        }
-
         // ── Status ─────────────────────────────────────────────────
 
         /// <summary>
@@ -3831,30 +1723,24 @@ namespace Spritely
         {
             var hasProjects = _projectManager.HasProjects;
 
-            // Prompt area overlay
             NoProjectOverlay.Visibility = hasProjects ? Visibility.Collapsed : Visibility.Visible;
 
-            // Disable task execution controls
             ExecuteButton.IsEnabled = hasProjects;
             TaskInput.IsEnabled = hasProjects;
             AdditionalInstructionsInput.IsEnabled = hasProjects;
 
-            // Prompt project label
             if (!hasProjects)
             {
                 PromptProjectLabel.Text = "";
                 PromptProjectLabel.ToolTip = null;
             }
 
-            // Disable project-dependent tabs in the right settings panel
             HelperTabItem.IsEnabled = hasProjects;
             HelperTabItem.ToolTip = hasProjects ? null : "Add a project to use automation features";
 
-            // Git tab in the project info panel
             GitTabItem.IsEnabled = hasProjects;
             GitTabItem.ToolTip = hasProjects ? null : "Add a project to view git information";
 
-            // Tasks tab — show/hide overlay and content
             TasksTabItem.IsEnabled = hasProjects;
             TasksTabItem.ToolTip = hasProjects ? null : "Add a project to manage tasks";
             NoProjectTasksOverlay.Visibility = hasProjects ? Visibility.Collapsed : Visibility.Visible;
@@ -3897,7 +1783,6 @@ namespace Spritely
                 var elapsed = DateTime.UtcNow - task.StartTime.ToUniversalTime();
                 var elapsedMinutes = elapsed.TotalMinutes;
 
-                // Check for warning threshold (80%)
                 var warningThreshold = timeoutMinutes * Constants.AppConstants.TaskTimeoutWarningPercent;
                 if (elapsedMinutes >= warningThreshold && elapsedMinutes < timeoutMinutes && !task.HasTimeoutWarning)
                 {
@@ -3906,10 +1791,8 @@ namespace Spritely
                     _outputTabManager.AppendColoredOutput(task.Id, warningMessage, Brushes.Orange, _activeTasks, _historyTasks);
                 }
 
-                // Check for timeout
                 if (elapsedMinutes >= timeoutMinutes)
                 {
-                    // Kill the process
                     try
                     {
                         task.Process?.Kill();
@@ -3919,15 +1802,12 @@ namespace Spritely
                         AppLogger.Error("MainWindow", $"Failed to kill timed-out process for task {task.Id}: {ex.Message}", ex);
                     }
 
-                    // Set status to failed
                     task.Status = AgentTaskStatus.Failed;
                     task.EndTime = DateTime.Now;
 
-                    // Add timeout message to output
                     var timeoutMessage = $"\n\n❌ Task timed out after {timeoutMinutes} minutes and was automatically cancelled.\n\n";
                     _outputTabManager.AppendColoredOutput(task.Id, timeoutMessage, Brushes.Red, _activeTasks, _historyTasks);
 
-                    // Move to history
                     MoveToHistory(task);
                 }
             }
@@ -3936,14 +1816,12 @@ namespace Spritely
         /// <summary>Updates the queue position for all InitQueued tasks based on their priority ordering.</summary>
         private void UpdateQueuePositions()
         {
-            // Get all InitQueued tasks sorted by priority (same order as DrainInitQueue uses)
             var initQueuedTasks = _activeTasks
                 .Where(t => t.Status == AgentTaskStatus.InitQueued)
                 .OrderByDescending(t => (int)t.PriorityLevel)
                 .ThenByDescending(t => t.Priority)
                 .ToList();
 
-            // Update queue positions (1-based)
             for (int i = 0; i < initQueuedTasks.Count; i++)
             {
                 var task = initQueuedTasks[i];
@@ -3955,7 +1833,6 @@ namespace Spritely
                 }
             }
 
-            // Clear queue position for non-InitQueued tasks
             foreach (var task in _activeTasks.Where(t => t.Status != AgentTaskStatus.InitQueued && t.QueuePosition > 0))
             {
                 task.QueuePosition = 0;

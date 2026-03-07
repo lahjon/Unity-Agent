@@ -44,8 +44,8 @@
         "content": "class DarkDialog\n  ShowConfirm(string message, string title) -\u003E bool\n  ShowAlert(string message, string title) -\u003E void\n  ShowTextInput(string title, string prompt, string defaultValue = \u0022\u0022) -\u003E string?"
       },
       "Dialogs/DarkDialogWindow.xaml.cs": {
-        "hash": "cb361ba5b325",
-        "content": "class DarkDialogWindow\n  SetBodyContent(UIElement content) -\u003E void"
+        "hash": "786fb061650a",
+        "content": "class DarkDialogWindow : Window\n  L36: Create(string title, double width, double height, ResizeMode resizeMode = ResizeMode.NoResize, bool topmost = false, string backgroundResource = \u0022BgSurface\u0022, string titleColorResource = \u0022Accent\u0022) -\u003E DarkDialogWindow  // Creates a configured DarkDialogWindow, mirroring the old DialogFactory.Create...\n  L88: SetBodyContent(UIElement content) -\u003E void  // Sets the dialog body content (the area below the title bar)."
       },
       "Helpers/BrushCache.cs": {
         "hash": "325a57e5fe0a",

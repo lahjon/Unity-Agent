@@ -84,8 +84,8 @@
         "content": "class AppConstants"
       },
       "MainWindow.xaml.cs": {
-        "hash": "9113e5d95cf4",
-        "content": "class MainWindow\n  Dispose() -\u003E void"
+        "hash": "2968c77f4e35",
+        "content": "class MainWindow : Window, IDisposable, IProjectPanelView\n  L36: DefaultSystemPrompt: string = PromptBuilder.DefaultSystemPrompt\n  L2572: Dispose() -\u003E void"
       }
     },
     "keyTypes": [

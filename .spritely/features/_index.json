@@ -32,9 +32,9 @@
     {
       "id": "app-startup-config",
       "name": "App Startup \u0026 Configuration",
-      "category": "",
+      "category": "config",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "chat",
@@ -319,9 +319,9 @@
     {
       "id": "task-orchestration",
       "name": "Task Orchestration \u0026 Lifecycle",
-      "category": "",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 4
     },
     {
       "id": "task-preprocessing",
@@ -361,9 +361,9 @@
     {
       "id": "theming-ui-shared",
       "name": "Theming \u0026 Shared UI Components",
-      "category": "",
+      "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "ui-theming",
