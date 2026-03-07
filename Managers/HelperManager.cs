@@ -164,15 +164,39 @@ namespace Spritely.Managers
 
                 var text = StripAnsi(output).Trim();
 
-                // Parse suggestions — try structured JSON object first, then legacy array fallback
+                // Parse suggestions — handle CLI JSON envelope, structured output, and legacy formats
                 List<SuggestionJson>? items = null;
                 var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
                 try
                 {
-                    // Structured output: {"suggestions": [...]}
                     using var doc = JsonDocument.Parse(text);
-                    if (doc.RootElement.TryGetProperty("suggestions", out var sugArr))
+                    var root = doc.RootElement;
+
+                    // Unwrap CLI JSON envelope: {"type":"result","result":"..."}
+                    if (root.TryGetProperty("result", out var resultElem) && !root.TryGetProperty("suggestions", out _))
+                    {
+                        var innerText = resultElem.ValueKind == JsonValueKind.String
+                            ? resultElem.GetString() ?? ""
+                            : resultElem.GetRawText();
+
+                        try
+                        {
+                            using var innerDoc = JsonDocument.Parse(innerText);
+                            if (innerDoc.RootElement.TryGetProperty("suggestions", out var innerSugArr))
+                                items = JsonSerializer.Deserialize<List<SuggestionJson>>(innerSugArr.GetRawText(), jsonOpts);
+                        }
+                        catch (JsonException)
+                        {
+                            // result field wasn't parseable JSON — try extracting array
+                            var arrStart = innerText.IndexOf('[');
+                            var arrEnd = innerText.LastIndexOf(']');
+                            if (arrStart >= 0 && arrEnd > arrStart)
+                                items = JsonSerializer.Deserialize<List<SuggestionJson>>(innerText[arrStart..(arrEnd + 1)], jsonOpts);
+                        }
+                    }
+                    // Direct structured output: {"suggestions": [...]}
+                    else if (root.TryGetProperty("suggestions", out var sugArr))
                     {
                         items = JsonSerializer.Deserialize<List<SuggestionJson>>(sugArr.GetRawText(), jsonOpts);
                     }
@@ -191,6 +215,8 @@ namespace Spritely.Managers
 
                 if (items == null || items.Count == 0)
                 {
+                    var preview = text.Length > 300 ? text[..300] + "..." : text;
+                    AppLogger.Warn("HelperManager", $"Could not parse suggestions. Raw output: {preview}");
                     GenerationFailed?.Invoke("Could not parse suggestions from AI response.");
                     return;
                 }

@@ -140,8 +140,7 @@ namespace Spritely
             // Check if we should enter the Committing phase for Auto-Commit
             var shouldAutoCommit = _settingsManager.AutoCommit &&
                                    task.Status == AgentTaskStatus.Completed &&
-                                   !task.IsCommitted &&
-                                   !task.NoGitWrite;
+                                   !task.IsCommitted;
 
             if (shouldAutoCommit)
             {
@@ -242,6 +241,14 @@ namespace Spritely
         /// </summary>
         private void PerformTaskTeardown(AgentTask task, bool closeTab = true)
         {
+            // Persist changed files before releasing locks so manual commit can find them later
+            if (task.ChangedFiles.Count == 0)
+            {
+                var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
+                if (lockedFiles.Count > 0)
+                    PersistChangedFiles(task, lockedFiles);
+            }
+
             // Release all resources associated with this task
             _fileLockManager.ReleaseTaskLocks(task.Id);
             _fileLockManager.RemoveQueuedInfo(task.Id);
@@ -499,6 +506,12 @@ namespace Spritely
             // Auto-recovery: spawn a diagnostic child task for failed tasks
             if (task is { Status: AgentTaskStatus.Failed })
                 _failureRecoveryManager.TrySpawnRecoveryTask(task, _activeTasks, _historyTasks);
+
+            // Auto-finalize when auto-commit is on: trigger git commit and release file locks.
+            // Without this, FinalizeTask only runs when the user manually dismisses the card,
+            // so auto-commit never fires and locks stay held indefinitely.
+            if (task is { IsFinished: true } && _settingsManager.AutoCommit)
+                FinalizeTask(task, closeTab: false);
 
             _taskOrchestrator.OnTaskCompleted(taskId);
         }

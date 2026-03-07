@@ -1309,8 +1309,7 @@ TextureImporter:
             var (success, errorMessage) = await CommitTaskAsync(task);
             if (!success)
             {
-                MessageBox.Show($"Failed to commit changes for task #{task.TaskNumber}\n\nError: {errorMessage}", "Commit Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                Dialogs.DarkDialog.ShowAlert($"Failed to commit changes for task #{task.TaskNumber}\n\nError: {errorMessage}", "Commit Error");
             }
         }
 
@@ -1321,11 +1320,10 @@ TextureImporter:
         /// <returns>Tuple of (success, errorMessage) - success is true if commit was successful, errorMessage contains details if failed</returns>
         public async Task<(bool success, string? errorMessage)> CommitTaskAsync(AgentTask task)
         {
-            if (task == null || task.IsCommitted || task.NoGitWrite)
+            if (task == null || task.IsCommitted)
             {
                 if (task == null) return (false, "Task is null");
                 if (task.IsCommitted) return (false, "Task is already committed");
-                if (task.NoGitWrite) return (false, "Task has NoGitWrite flag set");
                 return (false, "Unknown pre-condition failure");
             }
 

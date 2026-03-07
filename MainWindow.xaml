@@ -1156,13 +1156,14 @@
         <!-- Collapsed strip for left panel (shown when left panel is collapsed). Lives in the left splitter column. -->
         <Border x:Name="LeftPanelCollapsedStrip" Grid.Row="0" Grid.Column="1" Grid.RowSpan="3"
                 Background="{StaticResource BgSurface}" CornerRadius="8" Padding="0" Visibility="Collapsed"
-                BorderThickness="1" BorderBrush="{StaticResource BgElevated}" Width="32">
+                BorderThickness="1" BorderBrush="{StaticResource BgElevated}" Width="32"
+                Margin="0,0,3,0">
             <Button x:Name="ExpandLeftPanelBtn" Click="ToggleLeftPanel_Click"
                     ToolTip="Expand Left Panel" VerticalAlignment="Top" HorizontalAlignment="Center"
                     Margin="0,6,0,0">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
-                        <Setter Property="Content" Value="&#xE76B;"/>
+                        <Setter Property="Content" Value="&#xE76C;"/>
                         <Setter Property="FontSize" Value="12"/>
                         <Setter Property="Foreground" Value="{StaticResource Accent}"/>
                     </Style>
@@ -1590,7 +1591,7 @@
                                 HorizontalAlignment="Right" DockPanel.Dock="Right">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
-                                    <Setter Property="Content" Value="&#xE76C;"/>
+                                    <Setter Property="Content" Value="&#xE76B;"/>
                                     <Setter Property="FontSize" Value="12"/>
                                     <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
                                 </Style>
@@ -1839,7 +1840,7 @@
                Style="{StaticResource VerticalSplitterThumb}"
                DragDelta="ChatSplitter_DragDelta" Visibility="Collapsed"/>
 
-        <Grid Grid.Column="6" Grid.Row="2" Grid.RowSpan="3">
+        <Grid x:Name="ProjectsPanelGrid" Grid.Column="6" Grid.Row="2" Grid.RowSpan="3">
             <!-- Project Info panel -->
             <Border x:Name="FileLocksPanel" Background="{StaticResource BgSurface}" CornerRadius="8"
                     BorderBrush="{StaticResource BgElevated}" BorderThickness="1" Padding="8">
@@ -2195,13 +2196,14 @@
         <!-- Collapsed strip (shown when panel is collapsed). Lives in the splitter column so the right panel column can fully collapse. -->
         <Border x:Name="SettingsCollapsedStrip" Grid.Row="0" Grid.Column="5"
                 Background="{StaticResource BgSurface}" CornerRadius="8" Padding="0" Visibility="Collapsed"
-                BorderThickness="1" BorderBrush="{StaticResource BgElevated}" Width="32">
+                BorderThickness="1" BorderBrush="{StaticResource BgElevated}" Width="32"
+                Margin="3,0,0,0">
             <Button x:Name="ExpandSettingsBtn" Click="ToggleSettingsPanel_Click"
                     ToolTip="Expand Settings" VerticalAlignment="Top" HorizontalAlignment="Center"
                     Margin="0,6,0,0">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
-                        <Setter Property="Content" Value="&#xE76B;"/>
+                        <Setter Property="Content" Value="&#xE76C;"/>
                         <Setter Property="FontSize" Value="12"/>
                         <Setter Property="Foreground" Value="{StaticResource Accent}"/>
                     </Style>
@@ -2242,7 +2244,7 @@
                                 HorizontalAlignment="Right">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
-                                    <Setter Property="Content" Value="&#xE76C;"/>
+                                    <Setter Property="Content" Value="&#xE76B;"/>
                                     <Setter Property="FontSize" Value="12"/>
                                     <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
                                 </Style>

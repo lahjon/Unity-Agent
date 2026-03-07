@@ -3008,6 +3008,7 @@ namespace Spritely
             if (collapsed)
             {
                 SettingsExpandedPanel.Visibility = Visibility.Collapsed;
+                ProjectsPanelGrid.Visibility = Visibility.Collapsed;
                 RightSplitter.Visibility = Visibility.Collapsed;
                 SettingsCollapsedStrip.Visibility = Visibility.Visible;
                 RightPanelCol.Width = new GridLength(0);
@@ -3017,6 +3018,7 @@ namespace Spritely
             {
                 SettingsCollapsedStrip.Visibility = Visibility.Collapsed;
                 SettingsExpandedPanel.Visibility = Visibility.Visible;
+                ProjectsPanelGrid.Visibility = Visibility.Visible;
                 RightSplitter.Visibility = Visibility.Visible;
                 RightPanelCol.Width = new GridLength(285);
                 RightPanelCol.MinWidth = 150;
