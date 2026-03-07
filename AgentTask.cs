@@ -216,6 +216,14 @@ namespace Spritely
             set { if (Data.Summary == value) return; Data.Summary = value; NotifyAll(nameof(Summary), nameof(ShortDescription)); }
         }
 
+        public string Header
+        {
+            get => Data.Header;
+            set { if (Data.Header == value) return; Data.Header = value; NotifyAll(nameof(Header), nameof(HasHeader), nameof(ShortDescription)); }
+        }
+
+        public bool HasHeader => !string.IsNullOrEmpty(Header);
+
         public AgentTaskStatus Status
         {
             get => Data.Status;
@@ -385,15 +393,18 @@ namespace Spritely
         {
             get
             {
+                var prefix = HasHeader ? $"[{Header}] " : "";
                 if (!string.IsNullOrWhiteSpace(Summary))
                 {
                     var line = Summary.Split('\n')[0].TrimEnd('\r').Trim();
-                    return line.Length > 80 ? line[..80] + "..." : line;
+                    var full = prefix + line;
+                    return full.Length > 80 ? full[..80] + "..." : full;
                 }
                 if (string.IsNullOrWhiteSpace(Description))
-                    return $"Task #{TaskNumber}";
+                    return HasHeader ? $"[{Header}] Task #{TaskNumber}" : $"Task #{TaskNumber}";
                 var desc = Description.Split('\n')[0].TrimEnd('\r').Trim();
-                return desc.Length > 45 ? desc[..45] + "..." : desc;
+                var result = prefix + desc;
+                return result.Length > 60 ? result[..60] + "..." : result;
             }
         }
 

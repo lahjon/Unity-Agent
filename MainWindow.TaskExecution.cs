@@ -1072,6 +1072,14 @@ TextureImporter:
         {
             if (task.IsFinished)
             {
+                // Dismiss Recommendation tasks: transition to Completed so FinalizeTask
+                // performs normal teardown instead of keeping the task in the active list.
+                if (task.Status == AgentTaskStatus.Recommendation)
+                {
+                    task.Recommendations = "";
+                    task.Status = AgentTaskStatus.Completed;
+                }
+
                 _outputTabManager.UpdateTabHeader(task);
                 if (sender != null)
                 {

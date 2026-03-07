@@ -56,13 +56,16 @@ namespace Spritely.Managers
         private StackPanel? _cachedUncommittedSection;
         private bool _uiCacheValid = false;
 
+        private readonly SettingsManager _settingsManager;
+
         public GitPanelManager(
             IGitHelper gitHelper,
             Func<string> getProjectPath,
             Func<bool> getNoGitWrite,
             FileLockManager fileLockManager,
             GitOperationGuard gitOperationGuard,
-            Dispatcher dispatcher)
+            Dispatcher dispatcher,
+            SettingsManager settingsManager)
         {
             _gitHelper = gitHelper;
             _getProjectPath = getProjectPath;
@@ -70,6 +73,7 @@ namespace Spritely.Managers
             _fileLockManager = fileLockManager;
             _gitOperationGuard = gitOperationGuard;
             _dispatcher = dispatcher;
+            _settingsManager = settingsManager;
         }
 
         public void MarkDirty() => _isDirty = true;
@@ -155,12 +159,21 @@ namespace Spritely.Managers
                     : null;
 
                 // Get unpushed commits
+                var previousUnpushedCount = _unpushedCommits.Count;
                 await LoadUnpushedCommitsAsync(projectPath, ct);
                 if (ct.IsCancellationRequested) return;
 
                 // Get uncommitted changes (for NoGitWrite mode)
+                var previousUncommittedCount = _uncommittedChanges.Count;
                 await LoadUncommittedChangesAsync(projectPath, ct);
                 if (ct.IsCancellationRequested) return;
+
+                // Invalidate cache if change counts changed (buttons need rebuilding)
+                if (_uncommittedChanges.Count != previousUncommittedCount ||
+                    _unpushedCommits.Count != previousUnpushedCount)
+                {
+                    _uiCacheValid = false;
+                }
 
                 _dispatcher.Invoke(() =>
                 {
@@ -280,6 +293,13 @@ namespace Spritely.Managers
             // Action buttons row - cache it
             _cachedActionButtons = BuildActionButtonsInternal();
             _cachedRoot.Children.Add(_cachedActionButtons);
+
+            // Auto-Commit toggle
+            var autoCommitToggle = MakeToggleSwitch(_settingsManager.AutoCommit, "Auto-Commit");
+            autoCommitToggle.Margin = new Thickness(0, 0, 0, 6);
+            autoCommitToggle.Checked += (_, _) => _settingsManager.AutoCommit = true;
+            autoCommitToggle.Unchecked += (_, _) => _settingsManager.AutoCommit = false;
+            _cachedRoot.Children.Add(autoCommitToggle);
 
             // Status message container - create placeholder
             _cachedStatusBorder = new Border();

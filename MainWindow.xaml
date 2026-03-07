@@ -24,6 +24,8 @@
                     ToolTipService.InitialShowDelay="500">
                 <Border.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Header="Continue Recommendations" Click="ContinueTask_Click"
+                                  Visibility="{Binding IsContinuable, Converter={StaticResource BoolToVisibility}}"/>
                         <MenuItem Header="Copy Prompt" Click="CopyPrompt_Click"/>
                         <MenuItem Header="Revert Changes" Click="RevertTask_Click"/>
                         <Separator/>
@@ -70,6 +72,7 @@
                 </Border.Triggers>
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -340,6 +343,31 @@
                                                     <StopStoryboard BeginStoryboardName="UncommittedPulseStoryboard"/>
                                                 </DataTrigger.ExitActions>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsContinuable}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="RecommendationPulseStoryboard">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(BlurEffect.Radius)"
+                                                                             From="0" To="8" Duration="0:0:1.5"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.5" To="1.0" Duration="0:0:1.5"
+                                                                             AutoReverse="True">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="RecommendationPulseStoryboard"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Ellipse.Style>
@@ -489,7 +517,29 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </StackPanel>
-                    <Grid Grid.Row="3" Margin="0,6,0,0">
+                    <!-- Recommendations / Next Steps (visible when task has recommendations) -->
+                    <TextBlock Grid.Row="3" Text="{Binding Recommendations}"
+                               Foreground="#80CBC4" FontSize="10" FontFamily="Segoe UI"
+                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                               MaxHeight="40" Margin="0,4,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasRecommendations}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                        <TextBlock.ToolTip>
+                            <ToolTip MaxWidth="600" Placement="Bottom">
+                                <TextBlock Text="{Binding Recommendations}" TextWrapping="Wrap" MaxWidth="580"
+                                           Foreground="#B2DFDB"/>
+                            </ToolTip>
+                        </TextBlock.ToolTip>
+                    </TextBlock>
+                    <Grid Grid.Row="4" Margin="0,6,0,0">
                         <TextBlock Text="{Binding TimeInfo}" Foreground="{StaticResource TextMuted}"
                                    FontSize="10" VerticalAlignment="Center" FontFamily="Segoe UI"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -1262,15 +1312,125 @@
                         </DockPanel>
                     </Border>
 
-                    <!-- Prompt input area + collapsible Advanced side panel -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                    <!-- Top: Advanced toggles strip -->
+                    <Border x:Name="AdvancedBorder" DockPanel.Dock="Top"
+                            Background="{StaticResource BgSurface}" CornerRadius="4"
+                            BorderBrush="{StaticResource BgElevated}" BorderThickness="1"
+                            Margin="0,0,0,6" Padding="6,4">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Left" Click="AdvancedToggle_Click"
+                                    Style="{StaticResource GhostBtn}"
+                                    Padding="0" Margin="0,0,6,0" VerticalAlignment="Top">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="AdvancedArrow" Text="&#x25BE;" Foreground="{StaticResource Accent}"
+                                               FontSize="11" FontWeight="Bold" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="ADVANCED" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                               FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <ScrollViewer x:Name="AdvancedScrollViewer" VerticalScrollBarVisibility="Disabled"
+                                          HorizontalScrollBarVisibility="Auto" MaxHeight="62">
+                                <WrapPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Ignore file locks when launching tasks">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE785;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Ignore Locks" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="UseMcpToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Use MCP connection">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="MCP" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                            <Ellipse x:Name="McpHealthIndicator" Width="6" Height="6" Fill="{StaticResource TextMuted}" Margin="4,0,0,0" VerticalAlignment="Center"
+                                                     ToolTip="MCP connection status"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="AutoVerifyToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Automatically verify task output"
+                                                  Checked="AutoVerifyToggle_Changed" Unchecked="AutoVerifyToggle_Changed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Auto-Verify" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="ApplyFixToggle" IsChecked="True"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Apply fixes directly">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Apply Fix" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Run as remote session">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Remote" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="SpawnTeamToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" Visibility="Collapsed" ToolTip="Spawn team for task">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Team" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="FeatureModeToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Enable feature mode with iterations"
+                                                  Checked="FeatureModeToggle_Changed" Unchecked="FeatureModeToggle_Changed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Feature" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <StackPanel x:Name="FeatureModeIterationsPanel" Orientation="Horizontal" Margin="0,0,4,4" Visibility="Collapsed">
+                                        <TextBlock Text="×" Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                        <TextBox x:Name="FeatureModeIterationsBox" Text="50" Width="36" FontSize="10" FontFamily="Segoe UI"
+                                                 Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
+                                                 CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
+                                                 BorderThickness="1" Padding="4,2" VerticalContentAlignment="Center"
+                                                 PreviewTextInput="IterationsBox_PreviewTextInput"/>
+                                    </StackPanel>
+                                    <ToggleButton x:Name="ExtendedPlanningToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Use extended planning phase">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Ext. Plan" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="PlanOnlyToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Generate plan without executing"
+                                                  Checked="PlanOnlyToggle_Changed" Unchecked="PlanOnlyToggle_Changed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE70F;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Plan Only" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="AutoDecomposeToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Auto-decompose into subtasks">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8AB;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Decompose" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                </WrapPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
 
-                    <!-- Prompt area -->
-                <DockPanel Grid.Column="1">
+                    <!-- Prompt input area -->
+                <DockPanel>
                     <!-- Bottom: Advanced toggle + Execute button (always visible) -->
                     <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
                         <StackPanel DockPanel.Dock="Right" Margin="10,0,0,0" VerticalAlignment="Top">
@@ -1301,16 +1461,7 @@
                                            FontSize="10"/>
                             </StackPanel>
                         </StackPanel>
-                        <Button x:Name="AdvancedToggleBtn" Click="AdvancedToggle_Click"
-                                Style="{StaticResource GhostBtn}"
-                                HorizontalAlignment="Left" VerticalAlignment="Center" Padding="0,4">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="AdvancedArrow" Text="&#x25C2;" Foreground="{StaticResource Accent}"
-                                           FontSize="11" FontWeight="Bold" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="ADVANCED" Foreground="{StaticResource Accent}" FontWeight="Bold" FontSize="10"
-                                           FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
+                        <!-- spacer -->
                     </DockPanel>
                     <!-- Top: Prompt label, model selector, text input -->
                     <DockPanel>
@@ -1318,28 +1469,20 @@
                         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                             <TextBlock Text="PROMPT" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                        FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                            <TextBlock Text="MODEL" Foreground="{StaticResource TextMuted}" FontWeight="Bold"
-                                       FontSize="9" FontFamily="Segoe UI" VerticalAlignment="Center"
-                                       Margin="20,0,6,0"/>
-                            <ComboBox x:Name="ModelCombo" SelectedIndex="0"
-                                      FontSize="11" Padding="6,3" MinWidth="170"
-                                      HorizontalAlignment="Left"
+                            <!-- Model combo (hidden, used by code) -->
+                            <ComboBox x:Name="ModelCombo" SelectedIndex="0" Visibility="Collapsed"
                                       SelectionChanged="ModelCombo_Changed">
                                 <ComboBoxItem Content="Claude Code" Tag="ClaudeCode"/>
                                 <ComboBoxItem Content="Gemini (Image Gen)" Tag="Gemini"/>
                                 <ComboBoxItem Content="Gemini (Game Art)" Tag="GeminiGameArt"/>
                             </ComboBox>
-                            <TextBlock x:Name="AssetTypeLabel" Text="ASSET" Foreground="{StaticResource TextMuted}" FontWeight="Bold"
-                                       FontSize="9" FontFamily="Segoe UI" VerticalAlignment="Center"
-                                       Margin="12,0,6,0" Visibility="Collapsed"/>
-                            <ComboBox x:Name="AssetTypeCombo" SelectedIndex="0"
-                                      FontSize="11" Padding="6,3" MinWidth="120"
-                                      HorizontalAlignment="Left" Visibility="Collapsed">
+                            <ComboBox x:Name="AssetTypeCombo" SelectedIndex="0" Visibility="Collapsed">
                                 <ComboBoxItem Content="Sprite" Tag="Sprite"/>
                                 <ComboBoxItem Content="Texture" Tag="Texture"/>
                                 <ComboBoxItem Content="UI Icon" Tag="UIIcon"/>
                                 <ComboBoxItem Content="Tilemap" Tag="Tilemap"/>
                             </ComboBox>
+                            <TextBlock x:Name="AssetTypeLabel" Visibility="Collapsed"/>
                             <TextBlock Text="TEMPLATE" Foreground="{StaticResource TextMuted}" FontWeight="Bold"
                                        FontSize="9" FontFamily="Segoe UI" VerticalAlignment="Center"
                                        Margin="20,0,6,0"/>
@@ -1428,101 +1571,6 @@
                     </DockPanel>
                 </DockPanel>
 
-                    <!-- Advanced side panel (Column 0, collapsible) -->
-                    <Border x:Name="AdvancedSidePanel" Grid.Column="0" Visibility="Collapsed"
-                            Background="{StaticResource BgSurface}" CornerRadius="6"
-                            BorderBrush="{StaticResource BgElevated}" BorderThickness="1"
-                            Margin="0,0,10,0" Padding="10" Width="200">
-                        <DockPanel>
-                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                <TextBlock Text="ADVANCED" Foreground="{StaticResource Accent}" FontWeight="Bold"
-                                           FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                                <Button Content="&#xE711;" Click="AdvancedToggle_Click"
-                                        FontFamily="Segoe MDL2 Assets" FontSize="10"
-                                        Style="{StaticResource IconBtn}" Foreground="{StaticResource TextMuted}"
-                                        HorizontalAlignment="Right" Padding="2" ToolTip="Close" Cursor="Hand"/>
-                            </DockPanel>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <StackPanel>
-                                    <!-- Permanent toggles -->
-                                    <TextBlock Text="PERSISTENT" Foreground="{StaticResource TextDisabled}" FontSize="9"
-                                               FontFamily="Segoe UI" FontWeight="Bold" Margin="0,0,0,4"/>
-                                    <ToggleButton x:Name="IgnoreFileLocksToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
-                                        <TextBlock Text="Ignore File Locks" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <DockPanel Margin="0,0,0,6">
-                                        <Ellipse x:Name="McpHealthIndicator"
-                                                Width="8" Height="8"
-                                                Fill="{StaticResource TextMuted}"
-                                                DockPanel.Dock="Right"
-                                                Margin="8,0,0,0"
-                                                VerticalAlignment="Center"
-                                                ToolTip="MCP connection status"/>
-                                        <ToggleButton x:Name="UseMcpToggle" IsChecked="False"
-                                                      Style="{StaticResource ToggleSwitch}">
-                                            <TextBlock Text="Use MCP" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                        </ToggleButton>
-                                    </DockPanel>
-                                    <ToggleButton x:Name="AutoVerifyToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
-                                                  Checked="AutoVerifyToggle_Changed" Unchecked="AutoVerifyToggle_Changed">
-                                        <TextBlock Text="Auto-Verify" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <ToggleButton x:Name="AutoCommitToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
-                                                  Checked="AutoCommitToggle_Changed" Unchecked="AutoCommitToggle_Changed">
-                                        <TextBlock Text="Auto-Commit" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <!-- Separator -->
-                                    <Border BorderBrush="{StaticResource SeparatorDark}" BorderThickness="0,1,0,0" Margin="0,4,0,8"/>
-                                    <!-- Per-task toggles -->
-                                    <TextBlock Text="PER-TASK" Foreground="{StaticResource TextDisabled}" FontSize="9"
-                                               FontFamily="Segoe UI" FontWeight="Bold" Margin="0,0,0,4"/>
-                                    <ToggleButton x:Name="ApplyFixToggle" IsChecked="True"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
-                                        <TextBlock Text="Apply Fix" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <ToggleButton x:Name="RemoteSessionToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
-                                        <TextBlock Text="Remote Session" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <ToggleButton x:Name="SpawnTeamToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
-                                                  Visibility="Collapsed">
-                                        <TextBlock Text="Spawn Team" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <ToggleButton x:Name="FeatureModeToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
-                                                  Checked="FeatureModeToggle_Changed" Unchecked="FeatureModeToggle_Changed">
-                                        <TextBlock Text="Feature Mode" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <StackPanel x:Name="FeatureModeIterationsPanel" Orientation="Horizontal" Margin="20,0,0,6" Visibility="Collapsed">
-                                        <TextBlock Text="Iterations:" Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBox x:Name="FeatureModeIterationsBox" Text="50" Width="50" FontSize="11" FontFamily="Segoe UI"
-                                                 Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
-                                                 CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
-                                                 BorderThickness="1" Padding="4,2" VerticalContentAlignment="Center"
-                                                 PreviewTextInput="IterationsBox_PreviewTextInput"/>
-                                    </StackPanel>
-                                    <ToggleButton x:Name="ExtendedPlanningToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
-                                        <TextBlock Text="Extended Planning" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <ToggleButton x:Name="PlanOnlyToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6"
-                                                  Checked="PlanOnlyToggle_Changed" Unchecked="PlanOnlyToggle_Changed">
-                                        <TextBlock Text="Plan Only" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                    <ToggleButton x:Name="AutoDecomposeToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}" Margin="0,0,0,6">
-                                        <TextBlock Text="Auto-Decompose" Foreground="{StaticResource TextLight}" FontSize="11" FontFamily="Segoe UI"/>
-                                    </ToggleButton>
-                                </StackPanel>
-                            </ScrollViewer>
-                        </DockPanel>
-                    </Border>
-                </Grid>
 
                 </DockPanel>
                 <!-- No-project overlay: shown when no projects are loaded -->

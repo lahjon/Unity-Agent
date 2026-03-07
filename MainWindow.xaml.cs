@@ -234,7 +234,8 @@ namespace Spritely
                 () => false, // Always show uncommitted changes in git tab
                 _fileLockManager,
                 _gitOperationGuard,
-                Dispatcher);
+                Dispatcher,
+                _settingsManager);
 
             _projectManager.SetTaskCollections(_activeTasks, _historyTasks);
 
@@ -419,7 +420,6 @@ namespace Spritely
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
             TimeoutMinutesBox.Text = Constants.AppConstants.DefaultTaskTimeoutMinutes.ToString();
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
-            AutoCommitToggle.IsChecked = _settingsManager.AutoCommit;
             DefaultMcpServerNameBox.Text = _settingsManager.DefaultMcpServerName;
             DefaultMcpAddressBox.Text = _settingsManager.DefaultMcpAddress;
             DefaultMcpStartCommandBox.Text = _settingsManager.DefaultMcpStartCommand;
@@ -1003,17 +1003,13 @@ namespace Spritely
             _settingsManager.AutoVerify = AutoVerifyToggle.IsChecked == true;
         }
 
-        private void AutoCommitToggle_Changed(object sender, RoutedEventArgs e)
-        {
-            _settingsManager.AutoCommit = AutoCommitToggle.IsChecked == true;
-        }
 
-        private bool _advancedPanelOpen;
+        private bool _advancedPanelOpen = true;
         private void AdvancedToggle_Click(object sender, RoutedEventArgs e)
         {
             _advancedPanelOpen = !_advancedPanelOpen;
-            AdvancedSidePanel.Visibility = _advancedPanelOpen ? Visibility.Visible : Visibility.Collapsed;
-            AdvancedArrow.Text = _advancedPanelOpen ? "\u25BE" : "\u25C2";
+            AdvancedScrollViewer.Visibility = _advancedPanelOpen ? Visibility.Visible : Visibility.Collapsed;
+            AdvancedArrow.Text = _advancedPanelOpen ? "\u25BE" : "\u25B8";
         }
 
         private void UpdateExecuteButtonText()

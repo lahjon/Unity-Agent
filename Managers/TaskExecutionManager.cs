@@ -173,6 +173,31 @@ namespace Spritely.Managers
 
             task.GitStartHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
 
+            // Haiku pre-processing: enhance prompt, generate header, auto-detect toggles
+            if (!task.HasHeader && !task.IsSubTask)
+            {
+                try
+                {
+                    var preprocessor = new TaskPreprocessor();
+                    var result = await preprocessor.PreprocessAsync(task.Description, task.Cts.Token);
+                    if (result != null)
+                    {
+                        TaskPreprocessor.ApplyToTask(task, result);
+                        _outputProcessor.AppendColoredOutput(task.Id,
+                            $"[Preprocessor] Header: {result.Header}\n",
+                            Brushes.MediumPurple, activeTasks, historyTasks);
+                        _outputProcessor.AppendOutput(task.Id,
+                            TaskPreprocessor.FormatActiveToggles(task),
+                            activeTasks, historyTasks);
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TaskExecutionManager", "Haiku pre-processing failed, continuing with defaults", ex);
+                }
+            }
+
             if (task.IsFeatureMode)
                 _taskFactory.PrepareTaskForFeatureModeStart(task);
 
@@ -486,14 +511,23 @@ namespace Spritely.Managers
         private async System.Threading.Tasks.Task CompleteFollowUpWithVerificationAsync(AgentTask task, int exitCode,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
+            // If the task was already cancelled/finalized while the async completion was pending,
+            // skip all verification to avoid recreating closed tabs or overwriting status.
+            if (task.IsFinished)
+            {
+                AppLogger.Info("FollowUp", $"[{task.Id}] Task already finalized (status={task.Status}), skipping follow-up verification");
+                _fileLockManager.CheckQueuedTasks(activeTasks);
+                TaskCompleted?.Invoke(task.Id);
+                return;
+            }
+
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            // Only release locks for failed tasks here.
-            // For successful tasks, FinalizeTask handles the Committing → Completed flow.
-            if (exitCode != 0)
-            {
-                _fileLockManager.ReleaseTaskLocks(task.Id);
-            }
+            // Follow-ups skip the Recommendation status and don't re-enter the
+            // FinalizeTask → Committing flow, so locks must be released here for
+            // both success and failure. Without this, successful follow-up locks
+            // stay held until the task is manually removed from the active tab.
+            _fileLockManager.ReleaseTaskLocks(task.Id);
 
             // Always handle message bus cleanup
             if (task.UseMessageBus)
@@ -769,6 +803,15 @@ namespace Spritely.Managers
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
                 AppLogger.Info("FollowUp", $"[{task.Id}] Follow-up process exited with code {exitCode}");
+
+                // If the task was already cancelled/finalized (e.g. user removed the task
+                // while follow-up was running), don't overwrite its status or recreate tabs.
+                if (task.IsFinished)
+                {
+                    AppLogger.Info("FollowUp", $"[{task.Id}] Task already finalized (status={task.Status}), skipping follow-up completion");
+                    return;
+                }
+
                 task.Status = AgentTaskStatus.Verifying;
                 _outputTabManager.UpdateTabHeader(task);
                 _ = CompleteFollowUpWithVerificationAsync(task, exitCode, activeTasks, historyTasks);

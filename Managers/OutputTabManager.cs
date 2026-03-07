@@ -483,6 +483,16 @@ namespace Spritely.Managers
 
                 if (missingTask != null)
                 {
+                    // Only recreate tabs for tasks that are actively running.
+                    // Don't recreate tabs that were intentionally closed for finished/cancelled tasks
+                    // (e.g. from stale follow-up process exit callbacks firing after removal).
+                    if (missingTask.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning
+                        or AgentTaskStatus.Queued or AgentTaskStatus.InitQueued or AgentTaskStatus.Paused))
+                    {
+                        AppLogger.Debug("FollowUp", $"[{taskId}] Skipping tab recreation — task status is {missingTask.Status}");
+                        return;
+                    }
+
                     AppLogger.Info("FollowUp", $"[{taskId}] Creating tab for task: {missingTask.Description}");
                     CreateTab(missingTask);
 
@@ -524,6 +534,15 @@ namespace Spritely.Managers
 
                 if (missingTask != null)
                 {
+                    // Only recreate tabs for tasks that are actively running.
+                    // Don't recreate tabs that were intentionally closed for finished/cancelled tasks.
+                    if (missingTask.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning
+                        or AgentTaskStatus.Queued or AgentTaskStatus.InitQueued or AgentTaskStatus.Paused))
+                    {
+                        AppLogger.Debug("FollowUp", $"[{taskId}] Skipping tab recreation — task status is {missingTask.Status}");
+                        return;
+                    }
+
                     CreateTab(missingTask);
 
                     if (!_outputBoxes.TryGetValue(taskId, out box))

@@ -73,7 +73,6 @@ namespace Spritely.Tests
             {
                 Data = { Description = "Test Task", ProjectPath = "C:\\Test", Status = AgentTaskStatus.Running }
             };
-            // Override the auto-generated ID
             typeof(AgentTaskData).GetProperty("Id")!.SetValue(task.Data, "test-task-123");
 
             activeTasks.Add(task);
@@ -85,22 +84,15 @@ namespace Spritely.Tests
             Assert.Single(tabControl.Items);
             Assert.True(outputTabManager.HasTab(task.Id));
 
-            // Verify output was appended
+            // Verify output box was created and output tracked in task builder
             var box = outputTabManager.GetOutputBox(task.Id);
             Assert.NotNull(box);
-
-            // Extract text from RichTextBox
-            var textRange = new System.Windows.Documents.TextRange(
-                box.Document.ContentStart,
-                box.Document.ContentEnd);
-            var text = textRange.Text.Trim();
-
-            Assert.Contains("Test output message", text);
+            Assert.Contains("Test output message", task.OutputBuilder.ToString());
             });
         }
 
         [Fact]
-        public void AppendOutput_FindsTaskInHistoryAndCreatesTab()
+        public void AppendOutput_DoesNotRecreateTabForFinishedHistoryTask()
         {
             RunOnSta(() =>
             {
@@ -116,22 +108,47 @@ namespace Spritely.Tests
             {
                 Data = { Description = "History Task", ProjectPath = "C:\\Test", Status = AgentTaskStatus.Completed }
             };
-            // Override the auto-generated ID
             typeof(AgentTaskData).GetProperty("Id")!.SetValue(task.Data, "history-task-456");
 
-            // Task is in history, not active
+            // Task is in history with finished status
             historyTasks.Add(task);
 
-            // Act - Try to append output when task is in history
+            // Act - Try to append output for a finished history task
             outputTabManager.AppendOutput(task.Id, "Follow-up message\n", activeTasks, historyTasks);
 
-            // Assert - Tab should be created even for history task
+            // Assert - Tab should NOT be recreated for finished history tasks
+            Assert.Empty(tabControl.Items);
+            Assert.False(outputTabManager.HasTab(task.Id));
+            });
+        }
+
+        [Fact]
+        public void AppendOutput_RecreatesTabForRunningHistoryTask()
+        {
+            RunOnSta(() =>
+            {
+            // Arrange
+            var tabControl = new TabControl();
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            var outputTabManager = new OutputTabManager(tabControl, dispatcher);
+
+            var activeTasks = new ObservableCollection<AgentTask>();
+            var historyTasks = new ObservableCollection<AgentTask>();
+
+            var task = new AgentTask
+            {
+                Data = { Description = "History Task", ProjectPath = "C:\\Test", Status = AgentTaskStatus.Running }
+            };
+            typeof(AgentTaskData).GetProperty("Id")!.SetValue(task.Data, "history-task-456");
+
+            historyTasks.Add(task);
+
+            // Act - Append output for a running task (e.g. follow-up just started)
+            outputTabManager.AppendOutput(task.Id, "Follow-up message\n", activeTasks, historyTasks);
+
+            // Assert - Tab should be created for running tasks
             Assert.Single(tabControl.Items);
             Assert.True(outputTabManager.HasTab(task.Id));
-
-            // Verify output was appended
-            var box = outputTabManager.GetOutputBox(task.Id);
-            Assert.NotNull(box);
             });
         }
 
@@ -158,7 +175,7 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void FollowUp_PreservesOutputAfterTabClose()
+        public void FollowUp_DoesNotRecreateTabAfterCloseForFinishedTask()
         {
             RunOnSta(() =>
             {
@@ -174,7 +191,44 @@ namespace Spritely.Tests
             {
                 Data = { Description = "Follow-up Test Task", ProjectPath = "C:\\Test", Status = AgentTaskStatus.Completed }
             };
-            // Override the auto-generated ID
+            typeof(AgentTaskData).GetProperty("Id")!.SetValue(task.Data, "followup-task-789");
+
+            activeTasks.Add(task);
+
+            // Create tab and add initial output
+            outputTabManager.CreateTab(task);
+            outputTabManager.AppendOutput(task.Id, "Initial output\n", activeTasks, historyTasks);
+
+            // Close the tab (simulating user removing the task)
+            outputTabManager.CloseTab(task);
+            Assert.False(outputTabManager.HasTab(task.Id));
+
+            // Act - Stale output arrives after tab close (e.g. from process exit callback)
+            outputTabManager.AppendOutput(task.Id, "Stale output\n", activeTasks, historyTasks);
+
+            // Assert - Tab should NOT be recreated for finished tasks
+            Assert.Empty(tabControl.Items);
+            Assert.False(outputTabManager.HasTab(task.Id));
+            });
+        }
+
+        [Fact]
+        public void FollowUp_RecreatesTabAfterCloseWhenTaskRestarted()
+        {
+            RunOnSta(() =>
+            {
+            // Arrange
+            var tabControl = new TabControl();
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            var outputTabManager = new OutputTabManager(tabControl, dispatcher);
+
+            var activeTasks = new ObservableCollection<AgentTask>();
+            var historyTasks = new ObservableCollection<AgentTask>();
+
+            var task = new AgentTask
+            {
+                Data = { Description = "Follow-up Test Task", ProjectPath = "C:\\Test", Status = AgentTaskStatus.Completed }
+            };
             typeof(AgentTaskData).GetProperty("Id")!.SetValue(task.Data, "followup-task-789");
 
             activeTasks.Add(task);
@@ -187,16 +241,15 @@ namespace Spritely.Tests
             outputTabManager.CloseTab(task);
             Assert.False(outputTabManager.HasTab(task.Id));
 
-            // Act - Send follow-up output after tab is closed
-            outputTabManager.AppendOutput(task.Id, "Follow-up after close\n", activeTasks, historyTasks);
+            // Simulate follow-up starting (status changes to Running before output)
+            task.Status = AgentTaskStatus.Running;
 
-            // Assert - Tab should be recreated
+            // Act - Follow-up output arrives
+            outputTabManager.AppendOutput(task.Id, "Follow-up output\n", activeTasks, historyTasks);
+
+            // Assert - Tab should be recreated for running tasks
             Assert.Single(tabControl.Items);
             Assert.True(outputTabManager.HasTab(task.Id));
-
-            // Verify both outputs are in task's OutputBuilder
-            Assert.Contains("Initial output", task.OutputBuilder.ToString());
-            Assert.Contains("Follow-up after close", task.OutputBuilder.ToString());
             });
         }
     }

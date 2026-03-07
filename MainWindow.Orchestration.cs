@@ -133,6 +133,40 @@ namespace Spritely
         /// </summary>
         private void FinalizeTask(AgentTask task, bool closeTab = true)
         {
+            // Recommendation tasks stay in the active list so the user can click Continue
+            // without restarting a new session. The task's ConversationId is preserved for --resume.
+            if (task.Status == AgentTaskStatus.Recommendation)
+            {
+                // Release file locks so other tasks aren't blocked, but keep the task active
+                _fileLockManager.ReleaseTaskLocks(task.Id);
+                _fileLockManager.RemoveQueuedInfo(task.Id);
+                _taskExecutionManager.RemoveStreamingState(task.Id);
+                _outputTabManager.UpdateTabHeader(task);
+                RefreshActivityDashboard();
+                UpdateStatus();
+
+                // Show notification if window is in background
+                try
+                {
+                    var foregroundWindow = GetForegroundWindow();
+                    var currentWindowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                    if (foregroundWindow != currentWindowHandle && foregroundWindow != IntPtr.Zero)
+                    {
+                        var title = $"Task #{task.TaskNumber} has recommendations";
+                        var message = task.Description.Length > 100
+                            ? task.Description.Substring(0, 97) + "..."
+                            : task.Description;
+                        App.ShowBalloonNotification(title, message, System.Windows.Forms.ToolTipIcon.Info);
+                    }
+                }
+                catch { /* notification is best-effort */ }
+
+                // Resume tasks waiting on file locks or dependencies
+                _fileLockManager.CheckQueuedTasks(_activeTasks);
+                DrainInitQueue();
+                return;
+            }
+
             // If this was a plan-only task that completed successfully, create a stored task
             if (task.PlanOnly && task.Status == AgentTaskStatus.Completed)
                 CreateStoredTaskFromPlan(task);
@@ -510,7 +544,8 @@ namespace Spritely
             // Auto-finalize when auto-commit is on: trigger git commit and release file locks.
             // Without this, FinalizeTask only runs when the user manually dismisses the card,
             // so auto-commit never fires and locks stay held indefinitely.
-            if (task is { IsFinished: true } && _settingsManager.AutoCommit)
+            // Recommendation tasks are always finalized (to release locks and stay in active list).
+            if (task is { IsFinished: true } && (_settingsManager.AutoCommit || task.Status == AgentTaskStatus.Recommendation))
                 FinalizeTask(task, closeTab: false);
 
             _taskOrchestrator.OnTaskCompleted(taskId);

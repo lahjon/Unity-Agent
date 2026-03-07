@@ -31,6 +31,7 @@ namespace Spritely.Managers
         private static readonly Random _rng = new();
         private ObservableCollection<AgentTask>? _activeTasks;
         private ObservableCollection<AgentTask>? _historyTasks;
+        private readonly RulesManager _rulesManager = new();
 
         private static readonly string[] ProjectColorPalette =
         {
@@ -623,24 +624,42 @@ namespace Spritely.Managers
 
         public string GetProjectRulesBlock(string projectPath)
         {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            if (entry == null) return "";
-
             var sb = new System.Text.StringBuilder();
 
-            if (!string.IsNullOrWhiteSpace(entry.RuleInstruction))
-                sb.Append(entry.RuleInstruction.Trim()).Append("\n");
+            // 1. CLAUDE.md / .claude/rules/ discovered from the target project
+            var claudeRules = _rulesManager.GetRulesBlock(projectPath);
+            if (!string.IsNullOrWhiteSpace(claudeRules))
+                sb.Append(claudeRules);
 
-            if (entry.ProjectRules.Count > 0)
+            // 2. Spritely-managed per-project rules (UI-configured)
+            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
+            if (entry != null)
             {
-                if (sb.Length > 0) sb.Append("\n");
-                foreach (var rule in entry.ProjectRules)
-                    sb.Append("- ").Append(rule).Append("\n");
+                var hasInstruction = !string.IsNullOrWhiteSpace(entry.RuleInstruction);
+                var hasRules = entry.ProjectRules.Count > 0;
+
+                if (hasInstruction || hasRules)
+                {
+                    sb.Append("# PROJECT RULES\n");
+                    if (hasInstruction)
+                        sb.Append(entry.RuleInstruction.Trim()).Append("\n");
+                    if (hasRules)
+                    {
+                        if (hasInstruction) sb.Append("\n");
+                        foreach (var rule in entry.ProjectRules)
+                            sb.Append("- ").Append(rule).Append("\n");
+                    }
+                    sb.Append("\n");
+                }
             }
 
-            if (sb.Length == 0) return "";
-            return "# PROJECT RULES\n" + sb + "\n";
+            return sb.ToString();
         }
+
+        /// <summary>
+        /// Invalidates cached CLAUDE.md rules for a project (e.g., after files change).
+        /// </summary>
+        public void InvalidateRulesCache(string projectPath) => _rulesManager.InvalidateCache(projectPath);
 
         public void RefreshProjectList(
             Action<string>? updateTerminalWorkingDirectory,

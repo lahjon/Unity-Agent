@@ -50,6 +50,7 @@ namespace Spritely
         public string CompletionSummary { get; set; } = "";
         public string Recommendations { get; set; } = "";
         public string Summary { get; set; } = "";
+        public string Header { get; set; } = "";
         public string? DependencyContext { get; set; }
         public AgentTaskStatus Status { get; set; } = AgentTaskStatus.Running;
         public DateTime? EndTime { get; set; }
