@@ -81,9 +81,9 @@
     {
       "id": "feature-context-resolution",
       "name": "Feature Context Resolution",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
+      "category": "core",
+      "touchCount": 2,
+      "primaryFileCount": 2
     },
     {
       "id": "feature-initialization",
@@ -102,9 +102,9 @@
     {
       "id": "feature-mode-execution",
       "name": "Feature Mode Execution",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
+      "category": "core",
+      "touchCount": 1,
+      "primaryFileCount": 4
     },
     {
       "id": "feature-output-close-button",
@@ -220,10 +220,10 @@
     },
     {
       "id": "output-processing",
-      "name": "Output Processing \u0026 Display",
-      "category": "",
+      "name": "Output Processing \u0026 Subtask Extraction",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
     },
     {
       "id": "pause-remove-button-hover",
@@ -236,8 +236,8 @@
       "id": "preprocessor-skip-rules",
       "name": "Preprocessor Skip Rules for Task Types",
       "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
+      "touchCount": 1,
+      "primaryFileCount": 1
     },
     {
       "id": "project-management",
@@ -278,7 +278,7 @@
       "id": "stored-task-viewer",
       "name": "Stored Task Viewer",
       "category": "ui",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 1
     },
     {
@@ -292,7 +292,7 @@
       "id": "task-execution",
       "name": "Task Execution Engine",
       "category": "core",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 3
     },
     {
@@ -326,9 +326,9 @@
     {
       "id": "task-preprocessing",
       "name": "Task Preprocessing",
-      "category": "",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
     },
     {
       "id": "task-templates",
@@ -348,8 +348,8 @@
       "id": "task-ui",
       "name": "Task UI \u0026 Graph Visualization",
       "category": "ui",
-      "touchCount": 1,
-      "primaryFileCount": 7
+      "touchCount": 2,
+      "primaryFileCount": 8
     },
     {
       "id": "terminal",

@@ -24,6 +24,7 @@
   "secondaryFiles": [
     "Managers/TokenLimitHandler.cs",
     "Models/ProgressMetrics.cs",
+    "Models/ResultVerification.cs",
     "Models/TokenBudgetConfig.cs",
     "Spritely.Tests/TaskExecutionEngineTests.cs"
   ],
@@ -57,8 +58,8 @@
   "context": {
     "signatures": {
       "Managers/CompletionAnalyzer.cs": {
-        "hash": "10e9ed71b8f5",
-        "content": "class CompletionAnalyzer\n  IsTaskOutputComplete(string[] lines, int recommendationLine) -\u003E bool\n  ExtractRecommendations(string output) -\u003E string?\n  CheckFeatureModeComplete(string output) -\u003E bool\n  IsTokenLimitError(string output) -\u003E bool"
+        "hash": "3defff14d154",
+        "content": "class CompletionAnalyzer : ICompletionAnalyzer\n  L55: IsTaskOutputComplete(string[] lines, int recommendationLine) -\u003E bool\n  L89: ExtractRecommendations(string output) -\u003E string?\n  L168: VerifyResultAsync(string outputTail, string taskDescription, string? completionSummary, CancellationToken ct = default, string? modelOverride = null) -\u003E Task\u003CResultVerification?\u003E\n  L307: FormatCompletionSummary(AgentTaskStatus status, TimeSpan duration, List\u003C(string name, int added, int removed) -\u003E string\n  L318: GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash, AgentTaskStatus status, TimeSpan duration, long inputTokens = 0, long outputTokens = 0, long cacheReadTokens = 0, long cacheCreationTokens = 0, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E\n  L342: CheckFeatureModeComplete(string output) -\u003E bool\n  L355: IsTokenLimitError(string output) -\u003E bool"
       },
       "Managers/EarlyTerminationManager.cs": {
         "hash": "633462048714",
@@ -141,6 +142,7 @@
     "VelocityAnalysis",
     "VelocityTrend"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.3903554Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-08T20:39:56.2487493Z",
+  "lastUpdatedByTaskId": "29d6f606277649ad"
 }

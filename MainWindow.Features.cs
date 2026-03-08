@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -37,7 +38,7 @@ namespace Spritely
                    || feature.Keywords.Any(k => k.Contains(query, StringComparison.OrdinalIgnoreCase));
         }
 
-        private async System.Threading.Tasks.Task LoadFeaturesAsync()
+        private async Task LoadFeaturesAsync()
         {
             if (!_projectManager.HasProjects) return;
 
@@ -50,6 +51,7 @@ namespace Spritely
                 _allFeaturesCache = null;
                 UpdateFeatureDetail(null);
                 UpdateFeaturesTabCount();
+                UpdateFeatureHealthBar(null, null);
                 return;
             }
 
@@ -61,11 +63,105 @@ namespace Spritely
                 foreach (var f in features.OrderBy(f => f.Category).ThenBy(f => f.Name))
                     _featureEntries.Add(f);
                 UpdateFeaturesTabCount();
+
+                _ = ComputeFeatureHealthAsync(features, projectPath);
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("FeaturesTab", $"Failed to load features: {ex.Message}", ex);
             }
+        }
+
+        private async Task ComputeFeatureHealthAsync(List<FeatureEntry> features, string projectPath)
+        {
+            try
+            {
+                var (placeholderCount, staleCount) = await Task.Run(() =>
+                {
+                    int placeholders = 0;
+                    int stale = 0;
+
+                    foreach (var feature in features)
+                    {
+                        if (feature.PrimaryFiles.Count == 0 && feature.SecondaryFiles.Count == 0)
+                        {
+                            placeholders++;
+                            continue;
+                        }
+
+                        foreach (var sig in feature.Context.Signatures)
+                        {
+                            var absPath = System.IO.Path.Combine(projectPath, sig.Key);
+                            if (!System.IO.File.Exists(absPath))
+                            {
+                                stale++;
+                                break;
+                            }
+                            var currentHash = SignatureExtractor.ComputeFileHash(absPath);
+                            if (currentHash != sig.Value.Hash)
+                            {
+                                stale++;
+                                break;
+                            }
+                        }
+                    }
+
+                    return (placeholders, stale);
+                });
+
+                var lastUpdated = features.Count > 0
+                    ? features.Max(f => f.LastUpdatedAt)
+                    : (DateTime?)null;
+
+                Dispatcher.Invoke(() => UpdateFeatureHealthBar(
+                    new FeatureHealthMetrics
+                    {
+                        Total = features.Count,
+                        Placeholders = placeholderCount,
+                        Stale = staleCount,
+                        LastUpdated = lastUpdated
+                    }, projectPath));
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeaturesTab", $"Failed to compute feature health: {ex.Message}", ex);
+            }
+        }
+
+        private void UpdateFeatureHealthBar(FeatureHealthMetrics? metrics, string? projectPath)
+        {
+            if (metrics == null || metrics.Total == 0)
+            {
+                FeatureHealthBar.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var parts = new List<string>();
+            parts.Add($"{metrics.Total} features");
+
+            if (metrics.Placeholders > 0)
+                parts.Add($"{metrics.Placeholders} empty");
+
+            if (metrics.Stale > 0)
+                parts.Add($"{metrics.Stale} stale");
+
+            var healthy = metrics.Total - metrics.Placeholders - metrics.Stale;
+            if (healthy > 0 && healthy < metrics.Total)
+                parts.Add($"{healthy} current");
+
+            if (metrics.LastUpdated.HasValue)
+                parts.Add($"updated {metrics.LastUpdated.Value:yyyy-MM-dd HH:mm}");
+
+            FeatureHealthText.Text = string.Join("  ·  ", parts);
+            FeatureHealthBar.Visibility = Visibility.Visible;
+        }
+
+        private class FeatureHealthMetrics
+        {
+            public int Total { get; init; }
+            public int Placeholders { get; init; }
+            public int Stale { get; init; }
+            public DateTime? LastUpdated { get; init; }
         }
 
         private void FeatureSearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -192,8 +288,18 @@ namespace Spritely
             FeaturesPanelContent.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
             FeaturesListBox.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
             FeatureDetailPanel.Visibility = _featuresPanelExpanded && _selectedFeature != null ? Visibility.Visible : Visibility.Collapsed;
-            FeaturesPanelRow.Height = _featuresPanelExpanded ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
-            // E70D = chevron down, E70E = chevron up
+            TaskFeaturesSplitter.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
+
+            if (_featuresPanelExpanded)
+            {
+                TaskListRow.Height = new GridLength(1, GridUnitType.Star);
+                FeaturesPanelRow.Height = new GridLength(1, GridUnitType.Star);
+            }
+            else
+            {
+                FeaturesPanelRow.Height = GridLength.Auto;
+            }
+
             FeaturesPanelToggleBtn.Content = _featuresPanelExpanded ? "\uE70D" : "\uE70E";
         }
 
@@ -211,6 +317,31 @@ namespace Spritely
         private void RefreshFeatures_Click(object sender, RoutedEventArgs e)
         {
             _ = LoadFeaturesAsync();
+        }
+
+        private async void ReindexSymbols_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_projectManager.HasProjects) return;
+
+            var projectPath = _projectManager.ProjectPath;
+            var registry = new FeatureRegistryManager();
+
+            if (!registry.RegistryExists(projectPath))
+            {
+                AppLogger.Info("FeaturesTab", "No feature registry found — initialize features first.");
+                return;
+            }
+
+            try
+            {
+                AppLogger.Info("FeaturesTab", "Rebuilding codebase symbol index...");
+                await registry.RebuildSymbolIndexAsync(projectPath);
+                AppLogger.Info("FeaturesTab", "Symbol index rebuilt successfully.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("FeaturesTab", $"Failed to rebuild symbol index: {ex.Message}", ex);
+            }
         }
 
         private async void UpdateFeature_Click(object sender, RoutedEventArgs e)

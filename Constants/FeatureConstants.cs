@@ -26,6 +26,9 @@ namespace Spritely.Constants
         /// <summary>File extension for individual module JSON files.</summary>
         public const string ModuleFileExtension = ".module.json";
 
+        /// <summary>Filename for the pending feature update queue (failed fire-and-forget updates).</summary>
+        public const string PendingUpdatesFileName = "_pending_updates.json";
+
         // ── Context Budget ─────────────────────────────────────────────
 
         /// <summary>Maximum number of primary features that can be injected into a single task prompt.</summary>
@@ -78,6 +81,11 @@ namespace Spritely.Constants
 
         /// <summary>Maximum candidate count eligible for the fast-path (skip Haiku) shortcut.</summary>
         public const int FastPathMaxCandidates = 3;
+
+        // ── Placeholder Lifecycle ────────────────────────────────────────
+
+        /// <summary>Days after which a placeholder feature with zero files is automatically removed.</summary>
+        public const int PlaceholderExpiryDays = 7;
 
         // ── Concurrency & Safety ───────────────────────────────────────
 

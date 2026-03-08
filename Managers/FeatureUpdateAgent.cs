@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Spritely.Constants;
 using Spritely.Models;
 
 namespace Spritely.Managers
@@ -13,6 +15,7 @@ namespace Spritely.Managers
     /// <summary>
     /// After task completion, updates the feature registry with changes detected during the task.
     /// Fire-and-forget — never blocks task teardown and never propagates exceptions.
+    /// Failed updates are queued to <c>_pending_updates.json</c> and drained on the next success.
     /// </summary>
     public class FeatureUpdateAgent
     {
@@ -20,6 +23,17 @@ namespace Spritely.Managers
             """{"type":"object","properties":{"updated_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"add_primary_files":{"type":"array","items":{"type":"string"}},"add_secondary_files":{"type":"array","items":{"type":"string"}},"remove_files":{"type":"array","items":{"type":"string"}},"updated_description":{"type":"string"}},"required":["id"]}},"new_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"category":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"primary_files":{"type":"array","items":{"type":"string"}},"secondary_files":{"type":"array","items":{"type":"string"}},"depends_on":{"type":"array","items":{"type":"string"}},"module_id":{"type":"string"}},"required":["id","name","description","keywords","primary_files"]}}},"required":["updated_features","new_features"]}""";
 
         private static readonly TimeSpan HaikuTimeout = TimeSpan.FromMinutes(2);
+        private static readonly JsonSerializerOptions PendingJsonOptions = new()
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            PropertyNameCaseInsensitive = true
+        };
+
+        /// <summary>Maximum queued entries to prevent unbounded growth from repeated failures.</summary>
+        private const int MaxPendingUpdates = 20;
+
         private readonly FeatureRegistryManager _registryManager;
         private readonly CodebaseIndexManager? _codebaseIndexManager;
         private readonly ModuleRegistryManager? _moduleRegistryManager;
@@ -36,6 +50,8 @@ namespace Spritely.Managers
 
         /// <summary>
         /// Analyzes task completion data and updates the feature registry accordingly.
+        /// On success, drains any previously queued (failed) updates first.
+        /// On failure, queues the update request to <c>_pending_updates.json</c> for retry.
         /// This method catches all exceptions internally — it is safe to call fire-and-forget.
         /// </summary>
         public async Task UpdateFeaturesAsync(
@@ -59,6 +75,9 @@ namespace Spritely.Managers
                 var index = await _registryManager.LoadIndexAsync(projectPath);
                 if (index.Features.Count == 0 && changedFiles.Count == 0)
                     return;
+
+                // Drain any previously failed updates before processing the current one
+                await DrainPendingUpdatesAsync(projectPath, ct);
 
                 // Load all features once upfront — used for both the prompt and post-processing
                 var allFeatures = await _registryManager.LoadAllFeaturesAsync(projectPath);
@@ -96,7 +115,11 @@ namespace Spritely.Managers
                     prompt, UpdateJsonSchema, "FeatureUpdateAgent", HaikuTimeout, ct);
 
                 if (rootResult is null)
+                {
+                    // Haiku call failed or returned nothing — queue for retry
+                    await EnqueuePendingUpdateAsync(projectPath, taskId, taskDescription, completionSummary, relativeFiles);
                     return;
+                }
 
                 var root = rootResult.Value;
 
@@ -139,6 +162,7 @@ namespace Spritely.Managers
                             Name = resolverSuggestion.SuggestedNewFeatureName,
                             Description = $"New feature identified from task: {taskDescription}",
                             Keywords = resolverSuggestion.SuggestedKeywords ?? new List<string>(),
+                            PlaceholderCreatedAt = DateTime.UtcNow,
                             TouchCount = 1,
                             LastUpdatedAt = DateTime.UtcNow,
                             LastUpdatedByTaskId = taskId
@@ -152,6 +176,21 @@ namespace Spritely.Managers
             catch (Exception ex)
             {
                 AppLogger.Warn("FeatureUpdateAgent", $"Feature update failed (fire-and-forget): {ex.Message}", ex);
+
+                // Queue for retry so registry doesn't drift
+                try
+                {
+                    var relativeFiles = changedFiles
+                        .Select(f => ToRelativePath(f, projectPath))
+                        .Where(f => !string.IsNullOrWhiteSpace(f))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    await EnqueuePendingUpdateAsync(projectPath, taskId, taskDescription, completionSummary, relativeFiles);
+                }
+                catch (Exception queueEx)
+                {
+                    AppLogger.Debug("FeatureUpdateAgent", $"Failed to queue pending update: {queueEx.Message}");
+                }
             }
         }
 
@@ -521,6 +560,183 @@ namespace Spritely.Managers
             feature.Keywords.Sort(StringComparer.OrdinalIgnoreCase);
         }
 
+        // ── Pending Update Queue ─────────────────────────────────────────
+
+        /// <summary>Returns the path to the pending updates file for a project.</summary>
+        private static string GetPendingUpdatesPath(string projectPath)
+            => Path.Combine(projectPath, FeatureConstants.SpritelyDir, FeatureConstants.PendingUpdatesFileName);
+
+        /// <summary>
+        /// Queues a failed update request for later retry.
+        /// Caps the queue at <see cref="MaxPendingUpdates"/> entries (oldest dropped).
+        /// </summary>
+        private static async Task EnqueuePendingUpdateAsync(
+            string projectPath,
+            string taskId,
+            string taskDescription,
+            string? completionSummary,
+            List<string> changedFiles)
+        {
+            try
+            {
+                var filePath = GetPendingUpdatesPath(projectPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+                var queue = await LoadPendingQueueAsync(filePath);
+
+                queue.Add(new PendingFeatureUpdate
+                {
+                    TaskId = taskId,
+                    TaskDescription = taskDescription,
+                    CompletionSummary = completionSummary,
+                    ChangedFiles = changedFiles,
+                    QueuedAt = DateTime.UtcNow
+                });
+
+                // Cap at MaxPendingUpdates — drop oldest entries
+                if (queue.Count > MaxPendingUpdates)
+                    queue = queue.Skip(queue.Count - MaxPendingUpdates).ToList();
+
+                var json = JsonSerializer.Serialize(queue, PendingJsonOptions);
+                await File.WriteAllTextAsync(filePath, json);
+
+                AppLogger.Info("FeatureUpdateAgent",
+                    $"Queued pending feature update for task '{taskId}' ({queue.Count} total pending)");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeatureUpdateAgent", $"Failed to enqueue pending update: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Drains the pending update queue by re-running each queued update through Haiku.
+        /// Entries that fail again are re-queued. Successful entries are removed.
+        /// </summary>
+        private async Task DrainPendingUpdatesAsync(string projectPath, CancellationToken ct)
+        {
+            var filePath = GetPendingUpdatesPath(projectPath);
+            if (!File.Exists(filePath))
+                return;
+
+            List<PendingFeatureUpdate> queue;
+            try
+            {
+                queue = await LoadPendingQueueAsync(filePath);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeatureUpdateAgent", $"Failed to load pending queue: {ex.Message}");
+                return;
+            }
+
+            if (queue.Count == 0)
+                return;
+
+            AppLogger.Info("FeatureUpdateAgent", $"Draining {queue.Count} pending feature update(s)");
+
+            // Clear the file first — successfully processed entries won't be re-added,
+            // failures during drain will be re-queued by the individual calls
+            try { File.Delete(filePath); }
+            catch { /* best-effort */ }
+
+            var allFeatures = await _registryManager.LoadAllFeaturesAsync(projectPath);
+
+            foreach (var pending in queue)
+            {
+                try
+                {
+                    if (ct.IsCancellationRequested)
+                    {
+                        // Re-queue remaining items
+                        var remaining = queue.SkipWhile(q => q != pending).ToList();
+                        await SavePendingQueueAsync(filePath, remaining);
+                        return;
+                    }
+
+                    var featureSummaries = allFeatures.Select(f => new
+                    {
+                        id = f.Id,
+                        name = f.Name,
+                        description = f.Description,
+                        primaryFiles = f.PrimaryFiles
+                    });
+                    var indexJson = JsonSerializer.Serialize(featureSummaries,
+                        new JsonSerializerOptions { WriteIndented = false });
+
+                    var template = PromptLoader.Load("FeatureUpdatePrompt.md");
+                    var prompt = string.Format(template,
+                        pending.TaskDescription,
+                        pending.CompletionSummary ?? "No summary",
+                        string.Join("\n", pending.ChangedFiles),
+                        indexJson);
+
+                    var rootResult = await FeatureSystemCliRunner.RunAsync(
+                        prompt, UpdateJsonSchema, "FeatureUpdateAgent-drain", HaikuTimeout, ct);
+
+                    if (rootResult is null)
+                    {
+                        // Still failing — re-queue this entry
+                        await EnqueuePendingUpdateAsync(projectPath, pending.TaskId,
+                            pending.TaskDescription, pending.CompletionSummary, pending.ChangedFiles);
+                        continue;
+                    }
+
+                    var root = rootResult.Value;
+
+                    if (root.TryGetProperty("updated_features", out var updatedArray))
+                    {
+                        foreach (var item in updatedArray.EnumerateArray())
+                            await ProcessUpdatedFeatureAsync(
+                                projectPath, pending.TaskId, pending.TaskDescription, item, allFeatures);
+                    }
+
+                    if (root.TryGetProperty("new_features", out var newArray))
+                    {
+                        foreach (var item in newArray.EnumerateArray())
+                            await ProcessNewFeatureAsync(projectPath, pending.TaskId, item, allFeatures);
+                    }
+
+                    AppLogger.Info("FeatureUpdateAgent",
+                        $"Successfully drained pending update for task '{pending.TaskId}'");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("FeatureUpdateAgent",
+                        $"Failed to drain pending update for task '{pending.TaskId}': {ex.Message}");
+                    // Re-queue on exception
+                    await EnqueuePendingUpdateAsync(projectPath, pending.TaskId,
+                        pending.TaskDescription, pending.CompletionSummary, pending.ChangedFiles);
+                }
+            }
+        }
+
+        private static async Task<List<PendingFeatureUpdate>> LoadPendingQueueAsync(string filePath)
+        {
+            if (!File.Exists(filePath))
+                return new List<PendingFeatureUpdate>();
+
+            var json = await File.ReadAllTextAsync(filePath);
+            return JsonSerializer.Deserialize<List<PendingFeatureUpdate>>(json, PendingJsonOptions)
+                   ?? new List<PendingFeatureUpdate>();
+        }
+
+        private static async Task SavePendingQueueAsync(string filePath, List<PendingFeatureUpdate> queue)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+                var json = JsonSerializer.Serialize(queue, PendingJsonOptions);
+                await File.WriteAllTextAsync(filePath, json);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeatureUpdateAgent", $"Failed to save pending queue: {ex.Message}");
+            }
+        }
+
+        // ── Helpers ─────────────────────────────────────────────────────────
+
         /// <summary>
         /// Converts an absolute file path to a path relative to the project root.
         /// Returns the original path if it is already relative or cannot be made relative.
@@ -539,6 +755,19 @@ namespace Spritely.Managers
 
             // Already relative or from a different root — return as-is
             return filePath.Replace('\\', '/');
+        }
+
+        /// <summary>
+        /// Lightweight DTO representing a feature update that failed and was queued for retry.
+        /// Persisted to <c>.spritely/_pending_updates.json</c>.
+        /// </summary>
+        internal sealed class PendingFeatureUpdate
+        {
+            public string TaskId { get; set; } = "";
+            public string TaskDescription { get; set; } = "";
+            public string? CompletionSummary { get; set; }
+            public List<string> ChangedFiles { get; set; } = new();
+            public DateTime QueuedAt { get; set; }
         }
     }
 }

@@ -61,6 +61,12 @@ namespace Spritely.Models
         /// <summary>Number of times this feature has been touched by tasks.</summary>
         public int TouchCount { get; set; }
 
+        /// <summary>
+        /// UTC timestamp when a placeholder feature was created. Null for fully initialized features.
+        /// Used to auto-expire or auto-promote stale placeholders.
+        /// </summary>
+        public DateTime? PlaceholderCreatedAt { get; set; }
+
         /// <summary>When this feature entry was last updated.</summary>
         public DateTime LastUpdatedAt { get; set; }
 

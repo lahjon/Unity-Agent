@@ -56,8 +56,8 @@
       "shortSignature": "TaskNumber: int"
     },
     "description": {
-      "featureId": "task-templates-storage",
-      "filePath": "Models/TaskTemplate.cs",
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Property",
       "shortSignature": "Description: string"
     },
@@ -231,7 +231,7 @@
     },
     "mainwindow": {
       "featureId": "task-ui",
-      "filePath": "MainWindow.Features.cs",
+      "filePath": "MainWindow.UiLayout.cs",
       "kind": "Class",
       "shortSignature": "class MainWindow"
     },
@@ -788,10 +788,10 @@
       "shortSignature": "TaskName: string"
     },
     "dependson": {
-      "featureId": "feature-registry",
-      "filePath": "Models/FeatureEntry.cs",
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Property",
-      "shortSignature": "DependsOn: List\u003Cstring\u003E"
+      "shortSignature": "DependsOn: List\u003Cint\u003E?"
     },
     "workflowcomposerresult": {
       "featureId": "task-ui",
@@ -1819,11 +1819,11 @@
       "kind": "Class",
       "shortSignature": "class ChatMessage"
     },
-    "role": {
-      "featureId": "task-orchestration",
+    "spawnsubtaskandqueue": {
+      "featureId": "preprocessor-skip-rules",
       "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Property",
-      "shortSignature": "Role: string"
+      "kind": "Method",
+      "shortSignature": "SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask"
     },
     "imagepaths": {
       "featureId": "llm-services",
@@ -2491,11 +2491,11 @@
       "kind": "Class",
       "shortSignature": "class OutputProcessor"
     },
-    "injectsubtaskresult": {
-      "featureId": "task-orchestration",
+    "spawnsubtask": {
+      "featureId": "preprocessor-skip-rules",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
-      "shortSignature": "InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void"
+      "shortSignature": "SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask"
     },
     "outputtabmanager": {
       "featureId": "task-ui",
@@ -3254,64 +3254,64 @@
       "shortSignature": "ImportanceScore: double"
     },
     "taskexecutionmanager": {
-      "featureId": "codebase-indexing",
-      "filePath": "Models/SymbolEntry.cs",
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Class",
       "shortSignature": "class TaskExecutionManager"
     },
-    "launchheadless": {
-      "featureId": "task-orchestration",
+    "resumetask": {
+      "featureId": "preprocessor-skip-rules",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
-      "shortSignature": "LaunchHeadless(AgentTask task) -\u003E void"
+      "shortSignature": "ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
     },
     "canceltaskimmediate": {
-      "featureId": "task-orchestration",
+      "featureId": "preprocessor-skip-rules",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
       "shortSignature": "CancelTaskImmediate(AgentTask task) -\u003E void"
     },
     "killprocess": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskProcessLauncher.cs",
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
       "shortSignature": "KillProcess(AgentTask task) -\u003E void"
     },
     "removestreamingstate": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskProcessLauncher.cs",
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
       "shortSignature": "RemoveStreamingState(string taskId) -\u003E void"
     },
     "pausetask": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskProcessLauncher.cs",
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
       "shortSignature": "PauseTask(AgentTask task) -\u003E void"
     },
-    "spawnsubtask": {
-      "featureId": "task-orchestration",
+    "sendfollowup": {
+      "featureId": "preprocessor-skip-rules",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
-      "shortSignature": "SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask"
+      "shortSignature": "SendFollowUp(AgentTask task, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, bool isInterrupt = false) -\u003E void"
     },
-    "spawnsubtaskandqueue": {
-      "featureId": "task-orchestration",
+    "sendinput": {
+      "featureId": "preprocessor-skip-rules",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
-      "shortSignature": "SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask"
+      "shortSignature": "SendInput(AgentTask task, TextBox inputBox, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
     },
-    "extractandspawnsubtasks": {
-      "featureId": "task-orchestration",
+    "processqueuedmessages": {
+      "featureId": "preprocessor-skip-rules",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
-      "shortSignature": "ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?"
+      "shortSignature": "ProcessQueuedMessages(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
     },
-    "extractandspawnteam": {
-      "featureId": "task-orchestration",
+    "launchheadless": {
+      "featureId": "preprocessor-skip-rules",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
-      "shortSignature": "ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?"
+      "shortSignature": "LaunchHeadless(AgentTask task) -\u003E void"
     },
     "taskfactory": {
       "featureId": "task-preprocessing",
@@ -5586,6 +5586,48 @@
       "filePath": "Themes/ToggleSwitch.xaml",
       "kind": "Property",
       "shortSignature": "ChipBg: SolidColorBrush"
+    },
+    "extractandspawnsubtasks": {
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?"
+    },
+    "handledecompositioncompletion": {
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "HandleDecompositionCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
+    },
+    "injectsubtaskresult": {
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void"
+    },
+    "extractandspawnteam": {
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?"
+    },
+    "handleteamcompletion": {
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "HandleTeamCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
+    },
+    "role": {
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Property",
+      "shortSignature": "Role: string"
+    },
+    "checkfeaturemodephasecompletion": {
+      "featureId": "preprocessor-skip-rules",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "CheckFeatureModePhaseCompletion(AgentTask featureParent, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
     }
   }
 }

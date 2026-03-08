@@ -23,6 +23,9 @@ namespace Spritely.Managers
         public bool SpawnTeam { get; set; }
         public bool UseMcp { get; set; }
         public int Iterations { get; set; } = 2;
+
+        /// <summary>The formatted prompt that was sent to Haiku for preprocessing.</summary>
+        public string SentPrompt { get; set; } = "";
     }
 
     /// <summary>
@@ -44,6 +47,7 @@ namespace Spritely.Managers
             try
             {
                 var prompt = string.Format(PreprocessPrompt, taskDescription);
+                var sentPrompt = prompt; // Capture for diagnostics
 
                 var psi = new ProcessStartInfo
                 {
@@ -129,7 +133,8 @@ namespace Spritely.Managers
                     AutoDecompose = data.TryGetProperty("auto_decompose", out var ad) && ad.GetBoolean(),
                     SpawnTeam = data.TryGetProperty("spawn_team", out var st) && st.GetBoolean(),
                     UseMcp = data.TryGetProperty("use_mcp", out var um) && um.GetBoolean(),
-                    Iterations = data.TryGetProperty("iterations", out var iter) ? iter.GetInt32() : 2
+                    Iterations = data.TryGetProperty("iterations", out var iter) ? iter.GetInt32() : 2,
+                    SentPrompt = sentPrompt
                 };
             }
             catch (OperationCanceledException) { throw; }

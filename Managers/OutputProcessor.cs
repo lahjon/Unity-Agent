@@ -115,6 +115,15 @@ namespace Spritely.Managers
                     }
                 }
 
+                // Append verification prompt to OutputBuilder for pipeline diagnostics (not displayed in tab)
+                if (!string.IsNullOrWhiteSpace(task.Runtime.VerificationPrompt))
+                {
+                    task.OutputBuilder.AppendLine();
+                    task.OutputBuilder.AppendLine("── Verification Prompt (sent to Haiku) ─────");
+                    task.OutputBuilder.AppendLine(task.Runtime.VerificationPrompt);
+                    task.OutputBuilder.AppendLine("── End Verification Prompt ──────────────────");
+                }
+
                 CompletionSummaryGenerated?.Invoke(task.Id);
             }
             catch (Exception ex)
@@ -154,6 +163,11 @@ namespace Spritely.Managers
                 {
                     task.IsVerified = result.Passed;
                     task.VerificationResult = result.Summary;
+
+                    // Store verification prompt for pipeline diagnostics
+                    if (!string.IsNullOrWhiteSpace(result.SentPrompt))
+                        task.Runtime.VerificationPrompt = result.SentPrompt;
+
                     var label = result.Passed ? "PASSED" : "FAILED";
                     AppendOutput(task.Id,
                         $"\nResult Verification: {label} — {result.Summary}\n",

@@ -53,8 +53,8 @@
   "context": {
     "signatures": {
       "Managers/OutputProcessor.cs": {
-        "hash": "239a07f76b5f",
-        "content": "class OutputProcessor\n  InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void"
+        "hash": "221dd828cebb",
+        "content": "class OutputProcessor\n  L36: AppendOutput(string taskId, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L42: AppendColoredOutput(string taskId, string text, Brush foreground, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L223: TryInjectSubtaskResult(AgentTask child, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Synchronous wrapper kept for backward compatibility (non-UI-thread callers).\n  L299: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // Synchronous wrapper kept for backward compatibility (non-UI-thread callers)."
       },
       "Managers/TokenLimitHandler.cs": {
         "hash": "436fb2e2015e",

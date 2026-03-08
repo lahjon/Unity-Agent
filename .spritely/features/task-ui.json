@@ -32,6 +32,7 @@
     "Controls/TaskNodeGraphPanel.cs",
     "Dialogs/WorkflowComposerDialog.cs",
     "MainWindow.Features.cs",
+    "MainWindow.UiLayout.cs",
     "Managers/OutputTabManager.cs"
   ],
   "secondaryFiles": [
@@ -110,7 +111,11 @@
         "content": "class OutputTabManager\n  CreateTab(AgentTask task) -\u003E void\n  CreateGeminiTab(AgentTask task, string imageFolder) -\u003E void\n  AddGeminiImage(string taskId, string imagePath) -\u003E void\n  CloseTab(AgentTask task) -\u003E void\n  UpdateTabHeader(AgentTask task) -\u003E void\n  StopTypewriterAnimation(string taskId) -\u003E void\n  HasTab(string taskId) -\u003E bool\n  GetTab(string taskId) -\u003E TabItem?\n  GetOutputBox(string taskId) -\u003E RichTextBox?\n  EnsureOverflowButton() -\u003E void\n  UpdateOutputTabWidths() -\u003E void"
       },
       "MainWindow.Features.cs": {
-        "hash": "258f19d3a765",
+        "hash": "7672ffd8c917",
+        "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
+      },
+      "MainWindow.UiLayout.cs": {
+        "hash": "6430ca8b683f",
         "content": "class MainWindow"
       }
     },
@@ -186,7 +191,7 @@
     "WorkflowStep",
     "WouldCreateCycle"
   ],
-  "touchCount": 1,
-  "lastUpdatedAt": "2026-03-07T22:25:40.7349496Z",
-  "lastUpdatedByTaskId": "2f9473c007ed43ca"
+  "touchCount": 2,
+  "lastUpdatedAt": "2026-03-08T20:47:47.1881759Z",
+  "lastUpdatedByTaskId": "7389f34d551249d1"
 }

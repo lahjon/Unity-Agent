@@ -1642,7 +1642,8 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition x:Name="TaskListRow" Height="*"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition x:Name="FeaturesPanelRow" Height="*"/>
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Margin="4,2,4,6">
@@ -1805,10 +1806,15 @@
                         </Grid>
                     </TabItem>
                 </TabControl>
+                <!-- Splitter: Task List ↔ Features Panel -->
+                <Thumb x:Name="TaskFeaturesSplitter" Grid.Row="2"
+                       Style="{StaticResource HorizontalSplitterThumb}"
+                       DragDelta="TaskFeaturesSplitter_DragDelta"/>
                 <!-- ═══ FEATURES PANEL (docked below task list) ═══ -->
-                <Border Grid.Row="2" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,1,0,0" Margin="0,6,0,0">
+                <Border Grid.Row="3" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,1,0,0" Margin="0,6,0,0">
                     <Grid x:Name="FeaturesPanelGrid">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition x:Name="FeaturesListRow" Height="*"/>
@@ -1819,6 +1825,8 @@
                                    MouseLeftButtonDown="ToggleFeaturesPanel_Click">
                             <Button DockPanel.Dock="Right" Content="Refresh" Click="RefreshFeatures_Click"
                                     Style="{StaticResource GhostBtn}"/>
+                            <Button DockPanel.Dock="Right" Content="Re-index" Click="ReindexSymbols_Click"
+                                    Style="{StaticResource GhostBtn}" ToolTip="Rebuild codebase symbol index from all features"/>
                             <Button x:Name="FeaturesPanelToggleBtn" DockPanel.Dock="Right"
                                     Content="&#xE70D;" Click="ToggleFeaturesPanel_Click"
                                     Margin="0,0,4,0">
@@ -1863,14 +1871,33 @@
                                 </TextBlock>
                             </Grid>
                         </Grid>
+                        <!-- Feature health status bar -->
+                        <Border x:Name="FeatureHealthBar" Grid.Row="2" Visibility="Collapsed"
+                                Background="{StaticResource BgElevated}" CornerRadius="4"
+                                Padding="6,3" Margin="0,0,0,4">
+                            <TextBlock x:Name="FeatureHealthText"
+                                       FontSize="10" FontFamily="Segoe UI"
+                                       Foreground="{StaticResource TextSecondary}"
+                                       TextWrapping="Wrap"/>
+                        </Border>
                         <!-- Feature list -->
-                        <ListBox x:Name="FeaturesListBox" Grid.Row="2"
+                        <ListBox x:Name="FeaturesListBox" Grid.Row="3"
                                  Style="{StaticResource TaskListStyle}"
                                  SelectionChanged="FeaturesListBox_SelectionChanged"
                                  PreviewMouseWheel="TaskList_PreviewMouseWheel">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border Padding="6,4" CornerRadius="4">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource BgElevated}"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
                                         <Border.ContextMenu>
                                             <ContextMenu>
                                                 <MenuItem Header="Update Signatures" Click="UpdateFeature_Click"/>
@@ -1898,7 +1925,7 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <!-- Feature detail panel -->
-                        <Border x:Name="FeatureDetailPanel" Grid.Row="3" Visibility="Collapsed"
+                        <Border x:Name="FeatureDetailPanel" Grid.Row="4" Visibility="Collapsed"
                                 Background="{StaticResource BgDeep}" CornerRadius="6" Padding="10"
                                 Margin="0,6,0,0" MaxHeight="280"
                                 BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">

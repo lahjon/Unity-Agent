@@ -250,7 +250,8 @@ namespace Spritely.Managers
                     {
                         Passed = result.Equals("PASS", StringComparison.OrdinalIgnoreCase),
                         Summary = summary,
-                        NextSteps = nextSteps
+                        NextSteps = nextSteps,
+                        SentPrompt = prompt
                     };
                 }
                 catch (JsonException)
@@ -269,7 +270,8 @@ namespace Spritely.Managers
                             {
                                 Passed = true,
                                 Summary = parts[0].Trim(),
-                                NextSteps = nextStepsFallback
+                                NextSteps = nextStepsFallback,
+                                SentPrompt = prompt
                             };
                         }
                         if (trimmed.StartsWith("FAIL|", StringComparison.OrdinalIgnoreCase))
@@ -282,7 +284,8 @@ namespace Spritely.Managers
                             {
                                 Passed = false,
                                 Summary = parts[0].Trim(),
-                                NextSteps = nextStepsFallback
+                                NextSteps = nextStepsFallback,
+                                SentPrompt = prompt
                             };
                         }
                     }

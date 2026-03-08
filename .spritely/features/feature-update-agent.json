@@ -66,11 +66,11 @@
   "context": {
     "signatures": {
       "Managers/FeatureUpdateAgent.cs": {
-        "hash": "6118638ac4e5",
-        "content": "class FeatureUpdateAgent"
+        "hash": "05573645bb9a",
+        "content": "class FeatureUpdateAgent\n  L25: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L35: MaxPendingUpdates: int = 20\n  L480: MaxKeywords: int = 20\n  L481: CamelCaseSplitRegex: Regex = new(@\u0022(?\u003C=[a-z])(?=[A-Z])|(?\u003C=[A-Z])(..."
       },
       "MainWindow.Features.cs": {
-        "hash": "258f19d3a765",
+        "hash": "c49bdb41da89",
         "content": "class MainWindow"
       }
     },

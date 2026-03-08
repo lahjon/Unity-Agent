@@ -40,8 +40,8 @@
   "context": {
     "signatures": {
       "Managers/FeatureContextResolver.cs": {
-        "hash": "a5f09f364322",
-        "content": "class FeatureContextResolver"
+        "hash": "6ed23b091a92",
+        "content": "class FeatureContextResolver\n  L72: MinConfidenceThreshold: double = 0.3\n  L73: TreeExpansionConfidenceThreshold: double = 0.7\n  L74: SiblingScoreMultiplier: double = 0.5\n  L75: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L96: ResolveAsync(string projectPath, string taskDescription, CancellationToken ct = default) -\u003E Task\u003CFeatureContextResult?\u003E  // Resolves which features are relevant to the given task and builds a context b..."
       },
       "Models/FeatureContextResult.cs": {
         "hash": "b37d0e21ac66",

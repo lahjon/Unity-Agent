@@ -38,6 +38,11 @@ namespace Spritely
         // Feature system: resolver suggestion for deferred new-feature creation
         public Spritely.Models.FeatureContextResult? ResolverSuggestion { get; set; }
 
+        // Prompt pipeline diagnostics: captured for display in full output view
+        public string? PreprocessorPrompt { get; set; }
+        public string? FeatureContextBlock { get; set; }
+        public string? VerificationPrompt { get; set; }
+
         // Queue / dependency tracking
         public string? QueuedReason { get; set; }
         public string? BlockedByTaskId { get; set; }

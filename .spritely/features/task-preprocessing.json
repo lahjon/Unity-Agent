@@ -47,8 +47,8 @@
         "content": "class TaskFactory\n  ValidateTaskInput(string? description) -\u003E bool\n  PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  GenerateLocalSummary(string description) -\u003E string\n  GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
       },
       "Managers/TaskPreprocessor.cs": {
-        "hash": "1d38c2c57a54",
-        "content": "class PreprocessResult\n  Header: string\n  EnhancedPrompt: string\n  ApplyFix: bool\n  ExtendedPlanning: bool\n  IsFeatureMode: bool\n  AutoDecompose: bool\n  SpawnTeam: bool\n  UseMcp: bool\n  Iterations: int\nclass TaskPreprocessor\n  ApplyToTask(AgentTask task, PreprocessResult result) -\u003E void\n  FormatActiveToggles(AgentTask task) -\u003E string"
+        "hash": "4a4ea2928a65",
+        "content": "class PreprocessResult\n  Header: string\n  EnhancedPrompt: string\n  ApplyFix: bool\n  ExtendedPlanning: bool\n  IsFeatureMode: bool\n  AutoDecompose: bool\n  SpawnTeam: bool\n  UseMcp: bool\n  Iterations: int\n  SentPrompt: string\nclass TaskPreprocessor\n  L42: PreprocessPrompt: string = PromptLoader.Load(\u0022TaskPreprocessorPr...\n  L44: PreprocessAsync(string taskDescription, CancellationToken ct = default) -\u003E Task\u003CPreprocessResult?\u003E\n  L153: ApplyToTask(AgentTask task, PreprocessResult result) -\u003E void  // Applies preprocessor results to an AgentTask. Only overrides toggles the user...\n  L180: FormatActiveToggles(AgentTask task) -\u003E string  // Formats the active toggles for display in task output."
       }
     },
     "keyTypes": [

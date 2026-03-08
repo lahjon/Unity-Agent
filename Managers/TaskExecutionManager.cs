@@ -198,7 +198,7 @@ namespace Spritely.Managers
             // (before enhancement) since that better represents the user's intent for matching.
             var originalDescription = task.Description;
             var needsPreprocess = !task.HasHeader && !task.IsSubTask && !IsKnownTaskType(task.Summary);
-            var needsFeatures = !task.IsSubTask && _featureRegistryManager.RegistryExists(task.ProjectPath);
+            var needsFeatures = !task.IsSubTask && !IsKnownTaskType(task.Summary) && _featureRegistryManager.RegistryExists(task.ProjectPath);
 
             if (needsPreprocess || needsFeatures)
             {
@@ -236,6 +236,7 @@ namespace Spritely.Managers
                     preprocessResult = await preprocessTask;
                     if (preprocessResult != null)
                     {
+                        task.Runtime.PreprocessorPrompt = preprocessResult.SentPrompt;
                         TaskPreprocessor.ApplyToTask(task, preprocessResult);
                         _outputTabManager.UpdateTabHeader(task);
                         if (string.IsNullOrEmpty(task.OriginalFeatureDescription))
@@ -293,6 +294,7 @@ namespace Spritely.Managers
                         if (!string.IsNullOrWhiteSpace(featureResult.ContextBlock))
                         {
                             featureContextBlock = featureResult.ContextBlock;
+                            task.Runtime.FeatureContextBlock = featureContextBlock;
                             var featureCount = featureResult.RelevantFeatures.Count;
                             _outputProcessor.AppendColoredOutput(task.Id,
                                 $"[Features] Matched {featureCount} feature{(featureCount != 1 ? "s" : "")} for context injection\n",
@@ -350,6 +352,23 @@ namespace Spritely.Managers
                 bootLog.AppendLine($"── End Prompt ───────────────────────────────");
             }
             catch { /* non-critical */ }
+
+            // Append pipeline diagnostics: preprocessor prompt and feature context block
+            if (!string.IsNullOrWhiteSpace(task.Runtime.PreprocessorPrompt))
+            {
+                bootLog.AppendLine();
+                bootLog.AppendLine($"── Preprocessor Prompt (sent to Haiku) ──────");
+                bootLog.AppendLine(task.Runtime.PreprocessorPrompt);
+                bootLog.AppendLine($"── End Preprocessor Prompt ──────────────────");
+            }
+            if (!string.IsNullOrWhiteSpace(task.Runtime.FeatureContextBlock))
+            {
+                bootLog.AppendLine();
+                bootLog.AppendLine($"── Feature Context Block (injected) ────────");
+                bootLog.AppendLine(task.Runtime.FeatureContextBlock);
+                bootLog.AppendLine($"── End Feature Context Block ────────────────");
+            }
+
             task.OutputBuilder.Append(bootLog);
 
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>

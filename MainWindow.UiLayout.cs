@@ -62,6 +62,20 @@ namespace Spritely
             bottomRow.Height = new GridLength(bottomProportion, GridUnitType.Star);
         }
 
+        // ── Task List ↔ Features splitter drag ──
+
+        private void TaskFeaturesSplitter_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            double newTask = TaskListRow.ActualHeight + e.VerticalChange;
+            double newFeatures = FeaturesPanelRow.ActualHeight - e.VerticalChange;
+
+            const double minHeight = 60;
+            if (newTask < minHeight || newFeatures < minHeight) return;
+
+            TaskListRow.Height = new GridLength(newTask);
+            FeaturesPanelRow.Height = new GridLength(newFeatures);
+        }
+
         // ── Right splitter drag ──
 
         private void RightSplitter_DragDelta(object sender, DragDeltaEventArgs e)

@@ -17,6 +17,55 @@ namespace Spritely.Managers
     /// </summary>
     public class FeatureContextResolver
     {
+        /// <summary>
+        /// Builds a module-level preamble when two or more resolved features share a module.
+        /// Returns null if no modules qualify or module lookup fails.
+        /// </summary>
+        private async Task<string?> BuildModulePreambleAsync(
+            string projectPath,
+            List<FeatureEntry> primaryFeatures)
+        {
+            if (_moduleRegistryManager == null || primaryFeatures.Count < 2)
+                return null;
+
+            try
+            {
+                // Group features by module, ignoring those without a parent module
+                var byModule = primaryFeatures
+                    .Where(f => !string.IsNullOrEmpty(f.ParentModuleId))
+                    .GroupBy(f => f.ParentModuleId!)
+                    .Where(g => g.Count() >= 2)
+                    .ToList();
+
+                if (byModule.Count == 0)
+                    return null;
+
+                var sb = new System.Text.StringBuilder();
+
+                foreach (var group in byModule)
+                {
+                    var module = await _moduleRegistryManager.LoadModuleAsync(projectPath, group.Key);
+                    if (module == null)
+                        continue;
+
+                    sb.AppendLine($"## Module: {module.Name}");
+                    if (!string.IsNullOrWhiteSpace(module.Description))
+                        sb.AppendLine(module.Description);
+                    sb.AppendLine($"**Features in this task:** {string.Join(", ", group.Select(f => f.Name))}");
+                    sb.AppendLine();
+                }
+
+                var result = sb.ToString();
+                return string.IsNullOrWhiteSpace(result) ? null : result;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeatureContextResolver",
+                    $"Module preamble build failed, continuing without: {ex.Message}");
+                return null;
+            }
+        }
+
         private const string ResolverJsonSchema =
             """{"type":"object","properties":{"relevant_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"confidence":{"type":"number"}},"required":["id","confidence"]}},"is_new_feature":{"type":"boolean"},"new_feature_name":{"type":"string"},"new_feature_id":{"type":"string"},"new_feature_keywords":{"type":"array","items":{"type":"string"}}},"required":["relevant_features","is_new_feature"]}""";
 
@@ -158,8 +207,9 @@ namespace Spritely.Managers
                             AppLogger.Debug("FeatureContextResolver", $"Fast-path tree expansion failed: {ex.Message}");
                         }
 
+                        var fpModulePreamble = await BuildModulePreambleAsync(projectPath, candidates);
                         var fastContextBlock = _registryManager.BuildFeatureContextBlock(
-                            candidates, fpSecondary.Count > 0 ? fpSecondary : null);
+                            candidates, fpSecondary.Count > 0 ? fpSecondary : null, fpModulePreamble);
 
                         return new FeatureContextResult
                         {
@@ -311,9 +361,12 @@ namespace Spritely.Managers
                     }
                 }
 
+                // Build module-level preamble when multiple features share a module
+                var modulePreamble = await BuildModulePreambleAsync(projectPath, primaryFeatures);
+
                 // Build context block with primary and secondary features
                 var contextBlock = _registryManager.BuildFeatureContextBlock(
-                    primaryFeatures, secondaryFeatures.Count > 0 ? secondaryFeatures : null);
+                    primaryFeatures, secondaryFeatures.Count > 0 ? secondaryFeatures : null, modulePreamble);
 
                 // Check if Haiku identified a new feature
                 var isNewFeature = root.TryGetProperty("is_new_feature", out var newFlag) && newFlag.GetBoolean();

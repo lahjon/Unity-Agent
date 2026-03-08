@@ -18,6 +18,8 @@
   ],
   "secondaryFiles": [
     "Managers/HistoryManager.cs",
+    "Models/ResultVerification.cs",
+    "Models/RuntimeTaskContext.cs",
     "Models/StoredTaskEntry.cs"
   ],
   "relatedFeatureIds": [
@@ -55,6 +57,7 @@
   "symbolNames": [
     "StoredTaskViewerDialog"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.6196289Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-08T20:39:56.2629886Z",
+  "lastUpdatedByTaskId": "29d6f606277649ad"
 }

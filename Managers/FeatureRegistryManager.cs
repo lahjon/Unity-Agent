@@ -106,7 +106,101 @@ namespace Spritely.Managers
             var tasks = index.Features.Select(entry => LoadFeatureAsync(projectPath, entry.Id));
             var loaded = await Task.WhenAll(tasks);
 
-            return loaded.Where(f => f != null).ToList()!;
+            var features = loaded.Where(f => f != null).Cast<FeatureEntry>().ToList();
+
+            await CleanupStalePlaceholdersAsync(projectPath, features);
+
+            return features;
+        }
+
+        /// <summary>
+        /// Removes placeholders older than <see cref="FeatureConstants.PlaceholderExpiryDays"/>
+        /// with zero files. Placeholders with files are promoted via signature extraction.
+        /// </summary>
+        private async Task CleanupStalePlaceholdersAsync(string projectPath, List<FeatureEntry> features)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-FeatureConstants.PlaceholderExpiryDays);
+            var toRemove = new List<FeatureEntry>();
+
+            foreach (var feature in features)
+            {
+                if (feature.PlaceholderCreatedAt is null || feature.PlaceholderCreatedAt > cutoff)
+                    continue;
+
+                var hasFiles = feature.PrimaryFiles.Count > 0 || feature.SecondaryFiles.Count > 0;
+
+                if (!hasFiles)
+                {
+                    toRemove.Add(feature);
+                    continue;
+                }
+
+                // Placeholder has files — promote to full feature
+                try
+                {
+                    await PromotePlaceholderAsync(projectPath, feature);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("FeatureRegistry",
+                        $"Failed to promote placeholder '{feature.Id}': {ex.Message}", ex);
+                }
+            }
+
+            foreach (var feature in toRemove)
+            {
+                try
+                {
+                    await RemoveFeatureAsync(projectPath, feature.Id);
+                    features.Remove(feature);
+                    AppLogger.Info("FeatureRegistry",
+                        $"Expired stale placeholder '{feature.Id}' (no files, created {feature.PlaceholderCreatedAt:u})");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("FeatureRegistry",
+                        $"Failed to remove expired placeholder '{feature.Id}': {ex.Message}", ex);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Promotes a placeholder to a full feature by extracting signatures and clearing PlaceholderCreatedAt.
+        /// </summary>
+        private async Task PromotePlaceholderAsync(string projectPath, FeatureEntry feature)
+        {
+            foreach (var relPath in feature.PrimaryFiles)
+            {
+                if (feature.Context.Signatures.ContainsKey(relPath))
+                    continue;
+
+                var absPath = Path.Combine(projectPath, relPath);
+                if (!File.Exists(absPath))
+                    continue;
+
+                var content = SignatureExtractor.ExtractSignatures(absPath);
+                if (!string.IsNullOrEmpty(content))
+                {
+                    feature.Context.Signatures[relPath] = new FileSignature
+                    {
+                        Hash = SignatureExtractor.ComputeFileHash(absPath),
+                        Content = content
+                    };
+                }
+
+                foreach (var sym in SignatureExtractor.GetSymbolNames(absPath))
+                {
+                    if (!feature.SymbolNames.Contains(sym, StringComparer.OrdinalIgnoreCase))
+                        feature.SymbolNames.Add(sym);
+                }
+            }
+
+            feature.PlaceholderCreatedAt = null;
+            feature.LastUpdatedAt = DateTime.UtcNow;
+            await SaveFeatureAsync(projectPath, feature);
+
+            AppLogger.Info("FeatureRegistry",
+                $"Promoted placeholder '{feature.Id}' to full feature ({feature.PrimaryFiles.Count} files)");
         }
 
         /// <summary>
@@ -196,6 +290,17 @@ namespace Spritely.Managers
         {
             using var guard = AcquireMutex(projectPath);
             await SaveIndexInternalAsync(projectPath, index);
+        }
+
+        /// <summary>
+        /// Rebuilds the codebase symbol index from all known features without
+        /// resetting feature metadata. Delegates to <see cref="CodebaseIndexManager.BuildIndexAsync"/>.
+        /// </summary>
+        public async Task RebuildSymbolIndexAsync(string projectPath, CancellationToken ct = default)
+        {
+            var features = await LoadAllFeaturesAsync(projectPath);
+            var indexManager = new CodebaseIndexManager();
+            await indexManager.BuildIndexAsync(projectPath, features, ct);
         }
 
         // ── Search ───────────────────────────────────────────────────────
@@ -397,7 +502,8 @@ namespace Spritely.Managers
         /// </summary>
         public string BuildFeatureContextBlock(
             List<FeatureEntry> features,
-            List<FeatureEntry>? secondaryFeatures = null)
+            List<FeatureEntry>? secondaryFeatures = null,
+            string? modulePreamble = null)
         {
             if (features.Count == 0)
                 return string.Empty;
@@ -407,6 +513,12 @@ namespace Spritely.Managers
             sb.AppendLine("The following features are relevant to this task. Use this context to understand");
             sb.AppendLine("the architecture before making changes. Read the listed files for full details.");
             sb.AppendLine();
+
+            if (!string.IsNullOrWhiteSpace(modulePreamble))
+            {
+                sb.Append(modulePreamble);
+                sb.AppendLine();
+            }
 
             var totalCharsUsed = 0;
             var totalCharBudget = FeatureConstants.MaxTotalFeatureContextTokens * 4;
@@ -418,7 +530,7 @@ namespace Spritely.Managers
                 var featureCharBudget = FeatureConstants.MaxTokensPerFeature * 4;
 
                 if (featureBlock.Length > featureCharBudget)
-                    featureBlock = featureBlock[..featureCharBudget];
+                    featureBlock = TruncateAtMemberBoundary(featureBlock, featureCharBudget);
 
                 if (totalCharsUsed + featureBlock.Length > totalCharBudget)
                     break;
@@ -445,7 +557,7 @@ namespace Spritely.Managers
                     var compactBlock = BuildCompactFeatureBlock(feature);
 
                     if (compactBlock.Length > secondaryCharBudget)
-                        compactBlock = compactBlock[..secondaryCharBudget];
+                        compactBlock = TruncateAtMemberBoundary(compactBlock, secondaryCharBudget);
 
                     if (totalCharsUsed + compactBlock.Length > totalCharBudget)
                         break;
@@ -806,6 +918,50 @@ namespace Spritely.Managers
             sb.AppendLine();
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Truncates a feature block at the last complete member boundary (class/method signature line)
+        /// before the character budget, appending a trailer indicating how many members were omitted.
+        /// </summary>
+        private static string TruncateAtMemberBoundary(string block, int charBudget)
+        {
+            if (block.Length <= charBudget)
+                return block;
+
+            // Find all line boundaries up to the budget
+            var cutoff = -1;
+            var pos = 0;
+            while (pos < charBudget)
+            {
+                var nextNewline = block.IndexOf('\n', pos);
+                if (nextNewline < 0 || nextNewline >= charBudget)
+                    break;
+                cutoff = nextNewline + 1;
+                pos = cutoff;
+            }
+
+            if (cutoff <= 0)
+                cutoff = charBudget;
+
+            var truncated = block[..cutoff];
+
+            // Count remaining signature-like lines (class/method declarations) after cutoff
+            var remaining = block[cutoff..];
+            var truncatedMemberCount = 0;
+            foreach (var line in remaining.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("class ") || trimmed.StartsWith("struct ") ||
+                    trimmed.StartsWith("interface ") || trimmed.StartsWith("enum ") ||
+                    trimmed.Contains('(') && trimmed.Contains(')') && !trimmed.StartsWith("//") && !trimmed.StartsWith('#'))
+                    truncatedMemberCount++;
+            }
+
+            if (truncatedMemberCount > 0)
+                truncated += $"// ... {truncatedMemberCount} more members truncated\n";
+
+            return truncated;
         }
 
         /// <summary>
