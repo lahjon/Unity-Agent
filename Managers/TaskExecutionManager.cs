@@ -59,6 +59,7 @@ namespace Spritely.Managers
         private readonly FeatureRegistryManager _featureRegistryManager;
         private readonly FeatureContextResolver _featureContextResolver;
         private readonly FeatureUpdateAgent _featureUpdateAgent;
+        private readonly HybridSearchManager? _hybridSearchManager;
 
         /// <summary>Exposes the streaming tool state dictionary for external consumers.</summary>
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _processLauncher.StreamingToolState;
@@ -97,7 +98,8 @@ namespace Spritely.Managers
             Func<string>? getOpusEffortLevel = null,
             FeatureRegistryManager? featureRegistryManager = null,
             FeatureContextResolver? featureContextResolver = null,
-            FeatureUpdateAgent? featureUpdateAgent = null)
+            FeatureUpdateAgent? featureUpdateAgent = null,
+            HybridSearchManager? hybridSearchManager = null)
         {
             _scriptDir = scriptDir;
             _fileLockManager = fileLockManager;
@@ -128,6 +130,7 @@ namespace Spritely.Managers
             _featureRegistryManager = featureRegistryManager ?? new FeatureRegistryManager();
             _featureContextResolver = featureContextResolver ?? new FeatureContextResolver(_featureRegistryManager);
             _featureUpdateAgent = featureUpdateAgent ?? new FeatureUpdateAgent(_featureRegistryManager);
+            _hybridSearchManager = hybridSearchManager;
             _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, completionAnalyzer, promptBuilder, taskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
             _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, completionAnalyzer, retryMinutesFunc);
 
@@ -211,9 +214,19 @@ namespace Spritely.Managers
                 ? _taskPreprocessor.PreprocessAsync(task.Description, task.Cts.Token)
                 : System.Threading.Tasks.Task.FromResult<PreprocessResult?>(null);
 
-            System.Threading.Tasks.Task<FeatureContextResult?> featureTask = needsFeatures
-                ? _featureContextResolver.ResolveAsync(task.ProjectPath, originalDescription, task.Cts.Token)
-                : System.Threading.Tasks.Task.FromResult<FeatureContextResult?>(null);
+            System.Threading.Tasks.Task<FeatureContextResult?> featureTask;
+            if (needsFeatures && _hybridSearchManager != null)
+            {
+                featureTask = ResolveWithHybridSearchAsync(task.ProjectPath, originalDescription, task.Cts.Token);
+            }
+            else if (needsFeatures)
+            {
+                featureTask = _featureContextResolver.ResolveAsync(task.ProjectPath, originalDescription, task.Cts.Token);
+            }
+            else
+            {
+                featureTask = System.Threading.Tasks.Task.FromResult<FeatureContextResult?>(null);
+            }
 
             // Await both in parallel
             PreprocessResult? preprocessResult = null;
@@ -633,6 +646,17 @@ namespace Spritely.Managers
                     task.CompletionSummary,
                     changedFilesList,
                     resolverSuggestion: task.Runtime.ResolverSuggestion);
+
+                // Hybrid search: index task completion and re-embed changed files
+                if (_hybridSearchManager != null && _hybridSearchManager.IsAvailable)
+                {
+                    var featureIds = task.Runtime.ResolverSuggestion?.RelevantFeatures?
+                        .Select(f => f.FeatureId).ToList() ?? new List<string>();
+                    _ = _hybridSearchManager.IndexTaskCompletionAsync(
+                        task.Id, task.Description, task.CompletionSummary, featureIds, "success");
+                    _ = _hybridSearchManager.UpdateChangedFileEmbeddingsAsync(
+                        task.ProjectPath, changedFilesList);
+                }
             }
 
             // If a follow-up was started during summary generation, the status will
@@ -1724,6 +1748,30 @@ namespace Spritely.Managers
 
         private static bool IsKnownTaskType(string? summary) =>
             !string.IsNullOrEmpty(summary) && _skipPreprocessSummaries.Contains(summary);
+
+        /// <summary>
+        /// Lazily initializes the hybrid search manager for the project, then performs
+        /// a hybrid search. Falls back to the standard feature resolver on any failure.
+        /// </summary>
+        private async System.Threading.Tasks.Task<FeatureContextResult?> ResolveWithHybridSearchAsync(
+            string projectPath, string taskDescription, CancellationToken ct)
+        {
+            try
+            {
+                if (!_hybridSearchManager!.IsAvailable)
+                    await _hybridSearchManager.InitializeAsync(projectPath);
+
+                var searchRequest = new HybridSearchRequest { Query = taskDescription };
+                return await _hybridSearchManager.SearchAsync(searchRequest, projectPath, ct);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("TaskExecutionManager",
+                    $"Hybrid search failed, falling back to feature resolver: {ex.Message}");
+                return await _featureContextResolver.ResolveAsync(projectPath, taskDescription, ct);
+            }
+        }
     }
 }
 
