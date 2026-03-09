@@ -105,6 +105,9 @@ namespace Spritely
         {
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
             {
+                // Don't restore star sizing while the user is actively dragging the splitter
+                if (_isSplitterDragging) return;
+
                 var topRow = RootGrid.RowDefinitions[0];
                 var bottomRow = RootGrid.RowDefinitions[2];
                 double totalHeight = topRow.ActualHeight + bottomRow.ActualHeight;

@@ -1,7 +1,7 @@
 {
   "id": "mcp-integration",
   "name": "MCP Server Integration",
-  "description": "Manages MCP-for-Unity server connections: starting/stopping server processes, health monitoring with auto-restart, and per-project connection state. Enables AI tasks to interact directly with the Unity Editor.",
+  "description": "Manages MCP-for-Unity server connections: starting/stopping server processes, health monitoring with auto-restart, and per-project connection state. Automatically enables MCP when auto-mode is disabled in a game project.",
   "category": "integration",
   "keywords": [
     "ConnectMcpAsync",
@@ -12,10 +12,22 @@
     "McpHealthMonitor",
     "McpHealthStatus",
     "McpStatus",
-    "Unity Editor"
+    "Unity Editor",
+    "async",
+    "changed",
+    "check",
+    "client",
+    "config",
+    "connect",
+    "disconnect",
+    "dispose",
+    "health",
+    "last",
+    "project"
   ],
   "primaryFiles": [
     "MainWindow.Features.cs",
+    "MainWindow.Settings.cs",
     "Managers/McpConfigManager.cs",
     "Managers/McpHealthMonitor.cs"
   ],
@@ -35,6 +47,7 @@
     "codebase-indexing",
     "completion-analysis",
     "context-optimization",
+    "export-task-data",
     "feature-context-resolution",
     "feature-initialization",
     "feature-mode",
@@ -64,6 +77,7 @@
     "settings-management",
     "skill-management",
     "skills-system",
+    "stored-task-viewer",
     "task-decomposition",
     "task-execution",
     "task-factory",
@@ -86,12 +100,16 @@
         "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
       },
       "Managers/McpConfigManager.cs": {
-        "hash": "ed9fc31011d8",
-        "content": "class McpConfigManager\n  L16: _httpClient: HttpClient = new() { Timeout = TimeSpan.FromSecond...\n  L30: UpdateMcpToggleForProject() -\u003E void\n  L51: ConnectMcpAsync(string projectPath) -\u003E Task\n  L106: DisconnectMcp(string projectPath) -\u003E void\n  L115: IsUnityRunning() -\u003E bool\n  L152: FindUnityPidForProject(string projectPath) -\u003E int  // Finds the Unity Editor PID that has the given project path open. Uses WMI to ...\n  L238: CheckMcpHealth(string url) -\u003E Task\u003Cbool\u003E\n  L761: StopMcpServer(ProjectEntry entry) -\u003E void\n  L806: StopAllMcpServers() -\u003E void\n  L814: NotifyMcpOutputChanged(string projectPath) -\u003E void"
+        "hash": "ae85037aee77",
+        "content": "class McpConfigManager\n  L16: _httpClient: HttpClient = new() { Timeout = TimeSpan.FromSecond...\n  L30: UpdateMcpToggleForProject() -\u003E void\n  L51: ConnectMcpAsync(string projectPath) -\u003E Task\n  L106: DisconnectMcp(string projectPath) -\u003E void\n  L115: IsUnityRunning() -\u003E bool\n  L152: FindUnityPidForProject(string projectPath) -\u003E int  // Finds the Unity Editor PID that has the given project path open. Uses WMI to ...\n  L238: CheckMcpHealth(string url) -\u003E Task\u003Cbool\u003E\n  L757: StopMcpServer(ProjectEntry entry) -\u003E void\n  L802: StopAllMcpServers() -\u003E void\n  L810: NotifyMcpOutputChanged(string projectPath) -\u003E void"
       },
       "Managers/McpHealthMonitor.cs": {
         "hash": "c7b64e940a84",
         "content": "enum McpHealthStatus\n    Connected, Disconnected\nclass McpHealthMonitor : IDisposable\n  L25: _httpClient: HttpClient = new() { Timeout = TimeSpan.FromSecond...\n  L43: Start() -\u003E void\n  L50: Stop() -\u003E void\n  L233: Dispose() -\u003E void"
+      },
+      "MainWindow.Settings.cs": {
+        "hash": "ec060fc2e486",
+        "content": "class MainWindow"
       }
     },
     "keyTypes": [
@@ -134,6 +152,7 @@
     "UpdateMcpToggleForProject",
     "_httpClient"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.1092939Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-09T11:49:49.7376867Z",
+  "lastUpdatedByTaskId": "acfc6dee8e9745aa"
 }

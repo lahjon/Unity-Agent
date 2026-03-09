@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -34,6 +35,14 @@ namespace Spritely
             AdvancedBorder.Visibility = autoMode ? Visibility.Collapsed : Visibility.Visible;
             if (AdvancedTabItem != null)
                 AdvancedTabItem.Visibility = autoMode ? Visibility.Collapsed : Visibility.Visible;
+
+            // When disabling Auto-Mode on a game project, default MCP toggle to enabled
+            if (!autoMode)
+            {
+                var entry = _projectManager?.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
+                if (entry?.IsGame == true)
+                    UseMcpToggle.IsChecked = true;
+            }
         }
 
         private void AutoFeatureModeToggle_Changed(object sender, RoutedEventArgs e)

@@ -90,11 +90,11 @@
   "context": {
     "signatures": {
       "Constants/FeatureConstants.cs": {
-        "hash": "fe81862d13cb",
-        "content": "class FeatureConstants\n  L12: SpritelyDir: string = \u0022.spritely\u0022\n  L15: FeaturesDir: string = \u0022features\u0022\n  L18: IndexFileName: string = \u0022_index.json\u0022\n  L21: CodebaseIndexFileName: string = \u0022_codebase_index.json\u0022\n  L24: ModuleIndexFileName: string = \u0022_module_index.json\u0022\n  L27: ModuleFileExtension: string = \u0022.module.json\u0022\n  L30: PendingUpdatesFileName: string = \u0022_pending_updates.json\u0022\n  L35: MaxFeaturesPerTask: int = 8\n  L38: MaxSecondaryFeaturesPerTask: int = 5\n  L41: MaxTokensPerSecondaryFeature: int = 150\n  L44: MaxTokensPerFeature: int = 500\n  L47: MaxTotalFeatureContextTokens: int = 3000\n  L52: SignatureHashLength: int = 12\n  L55: MaxFilesPerSonnetChunk: int = 400\n  L58: MaxFilesPerChunk: int = MaxFilesPerSonnetChunk\n  L61: MaxSignatureLinesPerFile: int = 30\n  L66: MaxModulesPerProject: int = 20\n  L69: MaxFeaturesPerModule: int = 30\n  L74: SymbolMatchScoreBoost: double = 0.4\n  L80: FastPathConfidenceThreshold: double = 0.85\n  L83: FastPathMaxCandidates: int = 3\n  L88: PlaceholderExpiryDays: int = 7\n  L93: MutexTimeoutMs: int = 5000\n  L96: MutexRetryCount: int = 3"
+        "hash": "19831fda295e",
+        "content": "class FeatureConstants\n  L15: SpritelyDir: string = \u0022.spritely\u0022\n  L18: FeaturesDir: string = \u0022features\u0022\n  L21: IndexFileName: string = \u0022_index.json\u0022\n  L24: CodebaseIndexFileName: string = \u0022_codebase_index.json\u0022\n  L27: ModuleIndexFileName: string = \u0022_module_index.json\u0022\n  L30: ModuleFileExtension: string = \u0022.module.json\u0022\n  L33: PendingUpdatesFileName: string = \u0022_pending_updates.json\u0022\n  L38: MaxFeaturesPerTask: int = 8\n  L41: MaxSecondaryFeaturesPerTask: int = 5\n  L44: MaxTokensPerSecondaryFeature: int = 150\n  L47: MaxTokensPerFeature: int = 500\n  L50: MaxTotalFeatureContextTokens: int = 3000\n  L55: SignatureHashLength: int = 12\n  L58: MaxFilesPerSonnetChunk: int = 400\n  L61: MaxFilesPerChunk: int = MaxFilesPerSonnetChunk\n  L64: MaxSignatureLinesPerFile: int = 30\n  L69: MaxModulesPerProject: int = 20\n  L72: MaxFeaturesPerModule: int = 30\n  L77: SymbolMatchScoreBoost: double = 0.4\n  L83: FastPathConfidenceThreshold: double = 0.85\n  L86: FastPathMaxCandidates: int = 3\n  L91: PlaceholderExpiryDays: int = 7\n  L96: MutexTimeoutMs: int = 5000\n  L99: MutexRetryCount: int = 3"
       },
       "MainWindow.Features.cs": {
-        "hash": "e990d0c40e91",
+        "hash": "36c90f7287e5",
         "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
       },
       "Managers/FeatureRegistryManager.cs": {

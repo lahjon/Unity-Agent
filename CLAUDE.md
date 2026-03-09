@@ -136,6 +136,14 @@ When adding new functionality, prefer extending these existing areas over invent
 
 ---
 
+## Build verification
+
+- **Every task must attempt a build** (`dotnet build`) before completing to check for compilation errors.
+  - If build errors are **related to the task's changes**, fix them before finishing.
+  - If build errors are **unrelated to the task**, note them in the output but do not attempt to fix them — unless this is the **last running task** (no other active tasks remain). In that case, spawn a dedicated **"Build Test"** agent task to investigate and fix the remaining build errors.
+
+---
+
 ## How to behave when unsure
 
 - If you are uncertain about an intended behavior:

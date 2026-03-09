@@ -316,6 +316,8 @@ namespace Spritely
 
         private bool _featuresPanelExpanded = true;
         private bool _featureOperationRunning;
+        private double _savedTaskListProportion = 1;
+        private double _savedFeaturesProportion = 1;
 
         private void ToggleFeaturesPanel_Click(object sender, RoutedEventArgs e)
         {
@@ -327,11 +329,18 @@ namespace Spritely
 
             if (_featuresPanelExpanded)
             {
-                TaskListRow.Height = new GridLength(1, GridUnitType.Star);
-                FeaturesPanelRow.Height = new GridLength(1, GridUnitType.Star);
+                TaskListRow.Height = new GridLength(_savedTaskListProportion, GridUnitType.Star);
+                FeaturesPanelRow.Height = new GridLength(_savedFeaturesProportion, GridUnitType.Star);
             }
             else
             {
+                // Save proportions before collapsing
+                double total = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
+                if (total > 0)
+                {
+                    _savedTaskListProportion = TaskListRow.ActualHeight / total;
+                    _savedFeaturesProportion = FeaturesPanelRow.ActualHeight / total;
+                }
                 FeaturesPanelRow.Height = GridLength.Auto;
             }
 

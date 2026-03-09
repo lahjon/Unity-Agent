@@ -365,7 +365,7 @@ namespace Spritely.Managers
             }
         }
 
-        private string GetPortListenerInfo(int port)
+        private string? GetPortListenerInfo(int port)
         {
             try
             {
@@ -448,7 +448,7 @@ namespace Spritely.Managers
             }
         }
 
-        private string BuildDiagnosticReport(ProjectEntry entry, string lastHealthError)
+        private string BuildDiagnosticReport(ProjectEntry entry, string? lastHealthError)
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("=== MCP Startup Diagnostic Report ===");
@@ -466,6 +466,12 @@ namespace Spritely.Managers
             sb.AppendLine($"[{(cmdAccessible ? "PASS" : "FAIL")}] Start command executable found: {(cmdAccessible ? "Yes" : "No")}");
             sb.AppendLine($"  Command: {entry.McpStartCommand}");
             sb.AppendLine($"  Expanded: {expanded}");
+            var resolvedCommand = BuildStartCommand(entry);
+            if (!string.IsNullOrWhiteSpace(resolvedCommand) &&
+                !string.Equals(resolvedCommand, expanded, StringComparison.Ordinal))
+            {
+                sb.AppendLine($"  Resolved (with MCP address): {resolvedCommand}");
+            }
             if (!cmdAccessible)
                 sb.AppendLine("  → The executable in the start command was not found. Verify the path and that the tool is installed.");
 
@@ -513,11 +519,69 @@ namespace Spritely.Managers
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Builds the effective MCP start command for a project entry, aligning the
+        /// server's <c>--http-url</c> with the configured <see cref="ProjectEntry.McpAddress"/>
+        /// and ensuring <c>--project-scoped-tools</c> is present.
+        /// This mirrors the behavior of MCP for Unity's <c>ServerCommandBuilder</c> so that
+        /// Spritely launches the server with settings consistent with the HTTP endpoint.
+        /// </summary>
+        private string BuildStartCommand(ProjectEntry entry)
+        {
+            var raw = entry.McpStartCommand ?? string.Empty;
+            var expanded = Environment.ExpandEnvironmentVariables(raw);
+            if (string.IsNullOrWhiteSpace(expanded))
+            {
+                return expanded;
+            }
+
+            if (!Uri.TryCreate(entry.McpAddress, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                // If the MCP address is not a valid HTTP/HTTPS URL, fall back to the raw command.
+                return expanded;
+            }
+
+            // Derive the base HTTP URL (scheme + host + port) from the configured MCP address.
+            var baseBuilder = new UriBuilder(uri.Scheme, uri.Host, uri.Port);
+            var httpBaseUrl = baseBuilder.Uri.ToString().TrimEnd('/');
+
+            var updated = expanded;
+            const string httpUrlFlag = "--http-url";
+            string pattern = @"--http-url\s+(""(?:[^""]*)""|\S+)";
+
+            if (System.Text.RegularExpressions.Regex.IsMatch(
+                    updated,
+                    pattern,
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                // Replace any existing --http-url value so it always matches McpAddress.
+                updated = System.Text.RegularExpressions.Regex.Replace(
+                    updated,
+                    pattern,
+                    $"{httpUrlFlag} {httpBaseUrl}",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+            else
+            {
+                // No explicit --http-url flag present; append one derived from McpAddress.
+                updated = $"{updated} {httpUrlFlag} {httpBaseUrl}";
+            }
+
+            // Ensure project-scoped tools are enabled to mirror the Unity editor default.
+            if (!updated.Contains("--project-scoped-tools", StringComparison.OrdinalIgnoreCase))
+            {
+                updated = $"{updated} --project-scoped-tools";
+            }
+
+            return updated;
+        }
+
         private async Task<bool> StartMcpServerAsync(ProjectEntry entry)
         {
             const int MAX_RETRIES = 3;
             const int SERVER_START_TIMEOUT_SECONDS = 30;
-            string lastHealthError = null;
+            string? lastHealthError = null;
 
             try
             {
@@ -587,7 +651,7 @@ namespace Spritely.Managers
                     AppLogger.Info("McpConfigManager", $"Attempting to start MCP server (attempt {retry}/{MAX_RETRIES})");
                     entry.McpOutput.AppendLine($"Starting MCP server (attempt {retry}/{MAX_RETRIES})...");
 
-                    var startCommand = entry.McpStartCommand;
+                    var startCommand = BuildStartCommand(entry);
                     AppLogger.Info("McpConfigManager", $"Start command: {startCommand}");
 
                     var processInfo = new System.Diagnostics.ProcessStartInfo

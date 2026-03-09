@@ -298,6 +298,11 @@ namespace Spritely.Managers
                     AppLogger.Debug("TaskExecutionManager", "Feature context resolution failed, continuing without", ex);
                 }
             }
+            // Subtasks inherit feature context from their parent (set during spawn)
+            else if (task.IsSubTask && !string.IsNullOrWhiteSpace(task.Runtime.FeatureContextBlock))
+            {
+                featureContextBlock = task.Runtime.FeatureContextBlock;
+            }
 
             var promptFile = BuildAndWritePromptFile(task, activeTasks, featureContextBlock);
             var projectPath = task.ProjectPath;

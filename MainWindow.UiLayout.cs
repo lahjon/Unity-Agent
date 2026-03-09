@@ -64,16 +64,32 @@ namespace Spritely
 
         // ── Task List ↔ Features splitter drag ──
 
+        private void TaskFeaturesSplitter_DragStarted(object sender, DragStartedEventArgs e)
+        {
+            TaskListRow.Height = new GridLength(TaskListRow.ActualHeight);
+            FeaturesPanelRow.Height = new GridLength(FeaturesPanelRow.ActualHeight);
+        }
+
         private void TaskFeaturesSplitter_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            double newTask = TaskListRow.ActualHeight + e.VerticalChange;
-            double newFeatures = FeaturesPanelRow.ActualHeight - e.VerticalChange;
+            double newTask = TaskListRow.Height.Value + e.VerticalChange;
+            double newFeatures = FeaturesPanelRow.Height.Value - e.VerticalChange;
 
             const double minHeight = 60;
             if (newTask < minHeight || newFeatures < minHeight) return;
 
             TaskListRow.Height = new GridLength(newTask);
             FeaturesPanelRow.Height = new GridLength(newFeatures);
+        }
+
+        private void TaskFeaturesSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            double totalHeight = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
+            if (totalHeight <= 0) return;
+            double taskProportion = TaskListRow.ActualHeight / totalHeight;
+            double featuresProportion = FeaturesPanelRow.ActualHeight / totalHeight;
+            TaskListRow.Height = new GridLength(taskProportion, GridUnitType.Star);
+            FeaturesPanelRow.Height = new GridLength(featuresProportion, GridUnitType.Star);
         }
 
         // ── Right splitter drag ──

@@ -106,6 +106,9 @@ namespace Spritely
         private bool _terminalCollapsed = true;
         private GridLength _terminalExpandedHeight = new(120);
 
+        // Track when the top-middle splitter is being dragged to prevent RestoreStarRows interference
+        private bool _isSplitterDragging;
+
 
         // IProjectPanelView — expose named XAML controls to ProjectManager
         TextBlock IProjectPanelView.PromptProjectLabel => PromptProjectLabel;

@@ -79,8 +79,8 @@
         "content": "class EarlyTerminationManager\n  ClearTaskState(string taskId) -\u003E void\n  GetStatistics() -\u003E TerminationStatistics\nclass TerminationState\n  TaskId: string\n  LastEvaluation: DateTime\n  ConsecutiveStallIterations: int\n  RecentErrorCounts: List\u003Cint\u003E\nclass TerminationCheck\n  Type: TerminationCheckType\n  Severity: CheckSeverity\n  Description: string\n  Evidence: List\u003Cstring\u003E\nenum TerminationCheckType\n    Stalled, LowVelocity, BudgetExceeded, BudgetWarning, IterationLimit, CatastrophicError\nenum CheckSeverity\n    Info, Warning\nclass TerminationDecision\n  TaskId: string\n  Iteration: int"
       },
       "Managers/FeatureModeHandler.cs": {
-        "hash": "09d43ad514b7",
-        "content": "class FeatureModeHandler\n  Description: string\n  DependsOn: List\u003Cint\u003E?\nenum FeatureModeAction\n    newFailures, Action, ConsecutiveFailures, TrimOutput"
+        "hash": "01370135ec9f",
+        "content": "class FeatureModeHandler\n  L37: FeatureModeMaxRuntimeHours: int = 12\n  L38: FeatureModeIterationTimeoutMinutes: int = 60\n  L39: FeatureModeMaxConsecutiveFailures: int = 3\n  L40: FeatureModeOutputCapChars: int = 100_000\n  L41: PlanningTeamMemberTimeoutMinutes: int = 30\n  L87: HandleFeatureModeIteration(AgentTask task, int exitCode, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void\n  L337: OnFeatureModePhaseComplete(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Called when all children of the current phase have completed. Routes to the n...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L804: MaxPerChildChars: int = 2_000\n  L805: MaxTotalResultsChars: int = 12_000\nenum FeatureModeAction\n    newFailures, Action, ConsecutiveFailures, TrimOutput"
       },
       "Managers/ProgressAnalyzer.cs": {
         "hash": "12172ec57ec9",

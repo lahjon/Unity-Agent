@@ -103,7 +103,7 @@
       "id": "feature-mode",
       "name": "Feature Mode Orchestration",
       "category": "core",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 3
     },
     {
@@ -201,8 +201,8 @@
       "id": "mcp-integration",
       "name": "MCP Server Integration",
       "category": "integration",
-      "touchCount": 0,
-      "primaryFileCount": 3
+      "touchCount": 1,
+      "primaryFileCount": 4
     },
     {
       "id": "message-bus",

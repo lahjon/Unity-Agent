@@ -161,9 +161,13 @@ namespace Spritely.Managers
             }
 
             // ── Early termination check ──────────────────────────────────
-            // Evaluate whether the task should be stopped early based on
-            // progress velocity, stall detection, token budget, and error patterns.
-            var terminationDecision = _earlyTerminationManager.EvaluateTermination(task, iterationOutput);
+            // Only evaluate during Evaluation phase (end of a full logical iteration).
+            // Planning/consolidation phases are read-only by design and produce no file
+            // changes, which would falsely trigger stall detection.
+            var shouldEvaluateTermination = task.FeatureModePhase == FeatureModePhase.Evaluation;
+            var terminationDecision = shouldEvaluateTermination
+                ? _earlyTerminationManager.EvaluateTermination(task, iterationOutput)
+                : new TerminationDecision { ShouldTerminate = false, Reason = TerminationReason.None };
             if (terminationDecision.ShouldTerminate)
             {
                 var reason = terminationDecision.Reason switch
@@ -265,6 +269,9 @@ namespace Spritely.Managers
                 child.IsFeatureMode = false;
                 child.UseMessageBus = true;
                 child.SkipPermissions = true;
+                // Propagate parent's feature context so planning members know which files to explore
+                if (!string.IsNullOrWhiteSpace(task.Runtime.FeatureContextBlock))
+                    child.Runtime.FeatureContextBlock = task.Runtime.FeatureContextBlock;
                 // Inject planning-only restriction so team members don't write files
                 // (e.g., ARCHITECTURE.md) that could conflict between concurrent agents
                 child.AdditionalInstructions = PromptBuilder.PlanningTeamMemberBlock +
@@ -593,7 +600,13 @@ namespace Spritely.Managers
                 AppLogger.Warn("FeatureMode", $"[{task.Id}] Failed to build iteration context", ex);
             }
 
-            var prompt = PromptBuilder.FeatureModeInitialTemplate +
+            // Include feature context so iteration planning knows which files/features are relevant
+            var featureCtx = !string.IsNullOrWhiteSpace(task.Runtime.FeatureContextBlock)
+                ? task.Runtime.FeatureContextBlock + "\n"
+                : "";
+
+            var prompt = featureCtx +
+                PromptBuilder.FeatureModeInitialTemplate +
                 task.OriginalFeatureDescription +
                 iterationContext +
                 "\n\n" + PromptBuilder.FeatureModeIterationPlanningTemplate +
@@ -741,6 +754,9 @@ namespace Spritely.Managers
                 child.ProjectDisplayName = parent.ProjectDisplayName;
                 child.Summary = _taskFactory.GenerateLocalSummary(step.Description);
                 child.AutoDecompose = false;
+                // Propagate parent's feature context so execution steps don't re-search
+                if (!string.IsNullOrWhiteSpace(parent.Runtime.FeatureContextBlock))
+                    child.Runtime.FeatureContextBlock = parent.Runtime.FeatureContextBlock;
                 // Add autonomous execution instructions + output efficiency
                 child.AdditionalInstructions = PromptBuilder.AutonomousExecutionBlock +
                     PromptBuilder.OutputEfficiencyBlock +

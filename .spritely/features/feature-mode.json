@@ -21,6 +21,7 @@
   ],
   "secondaryFiles": [
     "MainWindow.Features.cs",
+    "MainWindow.xaml",
     "Managers/EarlyTerminationManager.cs",
     "Managers/IterationMemoryManager.cs",
     "Managers/ModelComplexityAnalyzer.cs",
@@ -65,8 +66,8 @@
         "content": "class CompletionAnalyzer : ICompletionAnalyzer\n  L55: IsTaskOutputComplete(string[] lines, int recommendationLine) -\u003E bool\n  L89: ExtractRecommendations(string output) -\u003E string?\n  L168: VerifyResultAsync(string outputTail, string taskDescription, string? completionSummary, CancellationToken ct = default, string? modelOverride = null) -\u003E Task\u003CResultVerification?\u003E\n  L307: FormatCompletionSummary(AgentTaskStatus status, TimeSpan duration, List\u003C(string name, int added, int removed) -\u003E string\n  L318: GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash, AgentTaskStatus status, TimeSpan duration, long inputTokens = 0, long outputTokens = 0, long cacheReadTokens = 0, long cacheCreationTokens = 0, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E\n  L342: CheckFeatureModeComplete(string output) -\u003E bool\n  L355: IsTokenLimitError(string output) -\u003E bool"
       },
       "Managers/FeatureModeHandler.cs": {
-        "hash": "09d43ad514b7",
-        "content": "class FeatureModeHandler\n  L37: FeatureModeMaxRuntimeHours: int = 12\n  L38: FeatureModeIterationTimeoutMinutes: int = 60\n  L39: FeatureModeMaxConsecutiveFailures: int = 3\n  L40: FeatureModeOutputCapChars: int = 100_000\n  L41: PlanningTeamMemberTimeoutMinutes: int = 30\n  L87: HandleFeatureModeIteration(AgentTask task, int exitCode, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void\n  L330: OnFeatureModePhaseComplete(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Called when all children of the current phase have completed. Routes to the n...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L788: MaxPerChildChars: int = 2_000\n  L789: MaxTotalResultsChars: int = 12_000\nenum FeatureModeAction\n    newFailures, Action, ConsecutiveFailures, TrimOutput"
+        "hash": "01370135ec9f",
+        "content": "class FeatureModeHandler\n  L37: FeatureModeMaxRuntimeHours: int = 12\n  L38: FeatureModeIterationTimeoutMinutes: int = 60\n  L39: FeatureModeMaxConsecutiveFailures: int = 3\n  L40: FeatureModeOutputCapChars: int = 100_000\n  L41: PlanningTeamMemberTimeoutMinutes: int = 30\n  L87: HandleFeatureModeIteration(AgentTask task, int exitCode, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void\n  L337: OnFeatureModePhaseComplete(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Called when all children of the current phase have completed. Routes to the n...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L804: MaxPerChildChars: int = 2_000\n  L805: MaxTotalResultsChars: int = 12_000\nenum FeatureModeAction\n    newFailures, Action, ConsecutiveFailures, TrimOutput"
       },
       "Models/TokenBudgetConfig.cs": {
         "hash": "f7f6d3f29dbd",
@@ -138,6 +139,7 @@
     "TotalTokenBudget",
     "VerifyResultAsync"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:26.9849332Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-09T11:48:36.3456003Z",
+  "lastUpdatedByTaskId": "8c705ee158bb4453"
 }

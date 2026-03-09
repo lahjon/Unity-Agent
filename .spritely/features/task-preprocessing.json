@@ -41,11 +41,11 @@
   "context": {
     "signatures": {
       "Managers/TaskFactory.cs": {
-        "hash": "ebcbad3cb14f",
-        "content": "class TaskFactory : ITaskFactory\n  L18: ValidateTaskInput(string? description) -\u003E bool\n  L69: PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  L89: GenerateLocalSummary(string description) -\u003E string\n  L251: GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
+        "hash": "9f70c9830722",
+        "content": "class TaskFactory : ITaskFactory\n  L18: ValidateTaskInput(string? description) -\u003E bool\n  L73: PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  L93: GenerateLocalSummary(string description) -\u003E string\n  L255: GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
       },
       "Managers/TaskPreprocessor.cs": {
-        "hash": "ef684f743c06",
+        "hash": "23f15582737d",
         "content": "class PreprocessResult\n  Header: string\n  EnhancedPrompt: string\n  ApplyFix: bool\n  ExtendedPlanning: bool\n  IsFeatureMode: bool\n  AutoDecompose: bool\n  SpawnTeam: bool\n  UseMcp: bool\n  Iterations: int\n  SentPrompt: string\nclass TaskPreprocessor\n  L42: PreprocessPrompt: string = PromptLoader.Load(\u0022TaskPreprocessorPr...\n  L44: PreprocessAsync(string taskDescription, CancellationToken ct = default) -\u003E Task\u003CPreprocessResult?\u003E\n  L153: ApplyToTask(AgentTask task, PreprocessResult result) -\u003E void  // Applies preprocessor results to an AgentTask. Only overrides toggles the user...\n  L180: FormatActiveToggles(AgentTask task) -\u003E string  // Formats the active toggles for display in task output."
       }
     },

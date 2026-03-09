@@ -308,7 +308,7 @@
       "shortSignature": "Dispose() -\u003E void"
     },
     "mainwindow": {
-      "featureId": "main-window-ui",
+      "featureId": "mcp-integration",
       "filePath": "MainWindow.Settings.cs",
       "kind": "Class",
       "shortSignature": "class MainWindow"

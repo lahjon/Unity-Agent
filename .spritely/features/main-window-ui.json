@@ -139,7 +139,7 @@
         "content": "class MainWindow : Window, IDisposable, IProjectPanelView\n  L36: DefaultSystemPrompt: string = PromptBuilder.DefaultSystemPrompt"
       },
       "MainWindow.Settings.cs": {
-        "hash": "dc1dc03c41e7",
+        "hash": "ec060fc2e486",
         "content": "class MainWindow"
       }
     },

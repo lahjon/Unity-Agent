@@ -29,6 +29,12 @@ namespace Spritely.Managers
         private ObservableCollection<AgentTask>? _activeTasks;
         private ObservableCollection<AgentTask>? _historyTasks;
 
+        // Stored callbacks so background RefreshProjectList(null,null,null) calls
+        // don't wipe the swap handler's ability to sync the UI.
+        private Action<string>? _storedUpdateTerminal;
+        private Action? _storedSaveSettings;
+        private Action? _storedSyncSettings;
+
         private static readonly JsonSerializerOptions _projectJsonOptions = new()
         {
             WriteIndented = true,
@@ -503,6 +509,12 @@ namespace Spritely.Managers
             Action? saveSettings,
             Action? syncSettings)
         {
+            // Persist non-null callbacks so background refreshes (null,null,null)
+            // don't break the project-swap click handler.
+            if (updateTerminalWorkingDirectory != null) _storedUpdateTerminal = updateTerminalWorkingDirectory;
+            if (saveSettings != null) _storedSaveSettings = saveSettings;
+            if (syncSettings != null) _storedSyncSettings = syncSettings;
+
             if (_view.ProjectListPanel == null) return;
 
             _view.ViewDispatcher.Invoke(() =>
@@ -976,8 +988,11 @@ namespace Spritely.Managers
                 closeBtn.Click += (s, ev) =>
                 {
                     ev.Handled = true;
-                    if (s is Button b && b.Tag is string path && updateTerminalWorkingDirectory != null && saveSettings != null && syncSettings != null)
-                        RemoveProject(path, updateTerminalWorkingDirectory, saveSettings, syncSettings);
+                    var termCb = updateTerminalWorkingDirectory ?? _storedUpdateTerminal;
+                    var saveCb = saveSettings ?? _storedSaveSettings;
+                    var syncCb = syncSettings ?? _storedSyncSettings;
+                    if (s is Button b && b.Tag is string path && termCb != null && saveCb != null && syncCb != null)
+                        RemoveProject(path, termCb, saveCb, syncCb);
                 };
                 btnPanel.Children.Add(closeBtn);
 
@@ -999,13 +1014,14 @@ namespace Spritely.Managers
                 gearBtn.Click += (s, ev) =>
                 {
                     ev.Handled = true;
+                    var syncCb = syncSettings ?? _storedSyncSettings;
                     ProjectSettingsDialog.Show(gearEntry, SaveProjects, () =>
                     {
-                        RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
-                        syncSettings?.Invoke();
+                        RefreshProjectList(null, null, null);
+                        syncCb?.Invoke();
                     }, this);
-                    RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
-                    syncSettings?.Invoke();
+                    RefreshProjectList(null, null, null);
+                    syncCb?.Invoke();
                 };
                 btnPanel.Children.Add(gearBtn);
 
@@ -1096,16 +1112,23 @@ namespace Spritely.Managers
                     _isSwapping = true;
                     _projectPath = projPath;
                     ProjectSwapStarted?.Invoke();
+
+                    // Use stored callbacks — the local captures may be null if a background
+                    // refresh (feature-init, MCP config, etc.) rebuilt the card list.
+                    var termCb = _storedUpdateTerminal;
+                    var saveCb = _storedSaveSettings;
+                    var syncCb = _storedSyncSettings;
+
                     _view.ViewDispatcher.BeginInvoke(new Action(async () =>
                     {
                         try
                         {
-                            try { updateTerminalWorkingDirectory?.Invoke(projPath); }
+                            try { termCb?.Invoke(projPath); }
                             catch (Exception ex) { AppLogger.Warn("ProjectManager", "Terminal update failed during project swap", ex); }
 
                             await Task.Yield();
-                            saveSettings?.Invoke();
-                            syncSettings?.Invoke();
+                            saveCb?.Invoke();
+                            syncCb?.Invoke();
                         }
                         catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed during project swap", ex); }
                         finally

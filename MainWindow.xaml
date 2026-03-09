@@ -1429,7 +1429,7 @@
                                     </ToggleButton>
                                     <StackPanel x:Name="FeatureModeIterationsPanel" Orientation="Horizontal" Margin="0,0,4,4" Visibility="Collapsed">
                                         <TextBlock Text="×" Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center" Margin="0,0,2,0"/>
-                                        <TextBox x:Name="FeatureModeIterationsBox" Text="50" Width="36" FontSize="10" FontFamily="Segoe UI"
+                                        <TextBox x:Name="FeatureModeIterationsBox" Text="2" Width="36" FontSize="10" FontFamily="Segoe UI"
                                                  Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
                                                  CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
                                                  BorderThickness="1" Padding="4,2" VerticalContentAlignment="Center"
@@ -1855,7 +1855,9 @@
                 <!-- Splitter: Task List ↔ Features Panel -->
                 <Thumb x:Name="TaskFeaturesSplitter" Grid.Row="2"
                        Style="{StaticResource HorizontalSplitterThumb}"
-                       DragDelta="TaskFeaturesSplitter_DragDelta"/>
+                       DragStarted="TaskFeaturesSplitter_DragStarted"
+                       DragDelta="TaskFeaturesSplitter_DragDelta"
+                       DragCompleted="TaskFeaturesSplitter_DragCompleted"/>
                 <!-- ═══ FEATURES PANEL (docked below task list) ═══ -->
                 <Border Grid.Row="3" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,1,0,0" Margin="0,6,0,0">
                     <Grid x:Name="FeaturesPanelGrid">

@@ -50,7 +50,7 @@
   "context": {
     "signatures": {
       "Managers/SettingsManager.cs": {
-        "hash": "475750ca02c7",
+        "hash": "cd54fe418fe1",
         "content": "class SettingsManager\n  TaskTemplates: List\u003CTaskTemplate\u003E\n  L115: LoadSettingsAsync() -\u003E Task\n  L154: SaveSettings(string? projectPath) -\u003E void\n  L180: LoadTemplatesAsync(string? projectPath) -\u003E Task\n  L203: SaveTemplate(TaskTemplate template) -\u003E void\n  L219: DeleteTemplate(TaskTemplate template) -\u003E void"
       },
       "Models/SavedPromptEntry.cs": {
