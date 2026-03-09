@@ -1,0 +1,149 @@
+{
+  "id": "task-decomposition",
+  "name": "Task Decomposition \u0026 Team Spawning",
+  "description": "Handles automatic decomposition of complex tasks into subtasks and spawning of parallel agent teams. Parses SUBTASKS and TEAM JSON blocks from agent output, creates child tasks with dependencies, and coordinates phase completion.",
+  "category": "core",
+  "keywords": [
+    "AutoDecompose",
+    "ExtractAndSpawnSubtasks",
+    "ExtractAndSpawnTeam",
+    "HandleDecompositionCompletion",
+    "SpawnTeam",
+    "WorkflowComposer",
+    "subtask",
+    "task decomposition",
+    "team member"
+  ],
+  "primaryFiles": [
+    "Dialogs/WorkflowComposerDialog.cs",
+    "Managers/TaskExecutionManager.cs"
+  ],
+  "secondaryFiles": [
+    "MainWindow.Orchestration.cs",
+    "Spritely.Tests/TaskExecutionEngineTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "message-bus",
+    "task-execution",
+    "task-lifecycle",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
+    "app-settings",
+    "app-startup",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "completion-analysis",
+    "context-optimization",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "history-management",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-management",
+    "module-registry",
+    "output-management",
+    "output-processing",
+    "preprocessor-skip-rules",
+    "progress-tracking",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "semantic-search",
+    "settings-management",
+    "skill-management",
+    "skills-system",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-group-tracking",
+    "task-history",
+    "task-lifecycle",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "terminal",
+    "theming-ui-shared"
+  ],
+  "context": {
+    "signatures": {
+      "Dialogs/WorkflowComposerDialog.cs": {
+        "hash": "db2330818589",
+        "content": "class WorkflowStep\n  TaskName: string\n  Description: string\n  DependsOn: List\u003Cstring\u003E\nclass WorkflowComposerResult\n  Steps: List\u003CWorkflowStep\u003E\nclass WorkflowComposerDialog\n  L28: SystemPrompt: string = PromptBuilder.WorkflowDecompositionSy...\n  L30: ShowAsync(ClaudeService claudeService, string projectPath) -\u003E Task\u003CWorkflowComposerResult?\u003E\n  L329: ParseWorkflowAsync(ClaudeService claudeService, string workflowDescription, CancellationToken cancellationToken = default) -\u003E Task\u003CList\u003CWorkflowStep\u003E?\u003E  // Sends the workflow description to Claude and parses the response into a list ..."
+      },
+      "Managers/TaskExecutionManager.cs": {
+        "hash": "b5ad7dcfa204",
+        "content": "class TaskExecutionManager\n  L730: LaunchHeadless(AgentTask task) -\u003E void\n  L761: ProcessQueuedMessages(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Processes any messages that were queued while the task was busy. Should be ca...\n  L777: SendInput(AgentTask task, TextBox inputBox, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L786: SendFollowUp(AgentTask task, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, bool isInterrupt = false) -\u003E void\n  L1001: CancelTaskImmediate(AgentTask task) -\u003E void\n  L1044: KillProcess(AgentTask task) -\u003E void\n  L1046: RemoveStreamingState(string taskId) -\u003E void\n  L1056: PauseTask(AgentTask task) -\u003E void\n  L1058: SoftStopTask(AgentTask task) -\u003E void\n  L1060: ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L1129: SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask  // Creates a new subtask from a parent task, inheriting project path, permission...\n  L1206: SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask  // Creates a subtask and sets it to Queued status, blocked by the parent task. T...\n  L1226: ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060SUBTASKS\u0060\u0060\u0060 JSON block from agent output, spawns child tasks, a...\n  L1301: HandleDecompositionCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the decomposition phase: extracts subtasks from output,...\n  L1342: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // If the completing task has a ParentTaskId, finds the parent and injects the s...\n  L1373: ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060TEAM\u0060\u0060\u0060 JSON block from agent output, spawns child tasks with r...\n  L1451: HandleTeamCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the team decomposition phase: extracts team members fro...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L1615: CheckFeatureModePhaseCompletion(AgentTask featureParent, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Checks whether all children of a feature mode phase are complete. If so, trig..."
+      }
+    },
+    "keyTypes": [
+      "class WorkflowComposerDialog",
+      "class WorkflowComposerResult",
+      "class WorkflowStep"
+    ],
+    "patterns": [
+      "JSON block parsing from agent output",
+      "Parent-child task relationships",
+      "Phase-gated team completion"
+    ],
+    "dependencies": [
+      "Child results injected into parent output",
+      "Spawns child AgentTask instances",
+      "Uses ClaudeService for workflow parsing"
+    ]
+  },
+  "parentModuleId": "task-engine",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "CancelTaskImmediate",
+    "CheckFeatureModePhaseCompletion",
+    "DependsOn",
+    "Description",
+    "ExtractAndSpawnSubtasks",
+    "ExtractAndSpawnTeam",
+    "HandleDecompositionCompletion",
+    "HandleTeamCompletion",
+    "InjectSubtaskResult",
+    "KillProcess",
+    "LaunchHeadless",
+    "ParseWorkflowAsync",
+    "PauseTask",
+    "ProcessQueuedMessages",
+    "RemoveStreamingState",
+    "ResumeTask",
+    "Role",
+    "SendFollowUp",
+    "SendInput",
+    "ShowAsync",
+    "SoftStopTask",
+    "SpawnSubtask",
+    "SpawnSubtaskAndQueue",
+    "Steps",
+    "SystemPrompt",
+    "TaskExecutionManager",
+    "TaskName",
+    "WorkflowComposerDialog",
+    "WorkflowComposerResult",
+    "WorkflowStep"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-09T07:18:26.9720476Z"
+}

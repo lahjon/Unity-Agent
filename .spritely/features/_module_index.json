@@ -24,6 +24,20 @@
       ]
     },
     {
+      "id": "codebase-intelligence",
+      "name": "Codebase Intelligence",
+      "featureIds": [
+        "codebase-indexing",
+        "feature-context-resolution",
+        "feature-initialization",
+        "feature-registry",
+        "feature-update-agent",
+        "module-management",
+        "module-registry",
+        "semantic-search"
+      ]
+    },
+    {
       "id": "data-persistence",
       "name": "Data \u0026 History",
       "featureIds": [
@@ -57,11 +71,75 @@
     },
     {
       "id": "git-integration",
-      "name": "Git Integration \u0026 File Safety",
+      "name": "Git Integration",
       "featureIds": [
-        "file-lock-management",
         "git-operations",
         "git-ui"
+      ]
+    },
+    {
+      "id": "history-persistence",
+      "name": "History \u0026 Persistence",
+      "featureIds": [
+        "history-analytics",
+        "history-management",
+        "project-tasks",
+        "settings-management",
+        "task-history",
+        "task-templates-storage"
+      ]
+    },
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure \u0026 Logging",
+      "featureIds": [
+        "app-infrastructure",
+        "app-startup",
+        "logging-diagnostics",
+        "logging-infrastructure"
+      ]
+    },
+    {
+      "id": "project-config",
+      "name": "Project \u0026 Configuration",
+      "featureIds": [
+        "app-settings",
+        "app-startup-config",
+        "project-management",
+        "skill-management",
+        "skills-system",
+        "task-templates"
+      ]
+    },
+    {
+      "id": "prompt-ai",
+      "name": "Prompt Building \u0026 AI Services",
+      "featureIds": [
+        "context-optimization",
+        "feature-mode",
+        "feature-mode-execution",
+        "llm-services",
+        "mcp-integration",
+        "message-bus",
+        "prompt-building"
+      ]
+    },
+    {
+      "id": "task-engine",
+      "name": "Core Task Engine",
+      "featureIds": [
+        "completion-analysis",
+        "file-lock-management",
+        "output-processing",
+        "preprocessor-skip-rules",
+        "progress-tracking",
+        "task-decomposition",
+        "task-execution",
+        "task-factory",
+        "task-group-tracking",
+        "task-lifecycle",
+        "task-orchestration",
+        "task-preprocessing"
       ]
     },
     {
@@ -80,20 +158,18 @@
     },
     {
       "id": "ui",
-      "name": "User Interface",
+      "name": "UI \u0026 Visualization",
       "featureIds": [
         "activity-dashboard",
         "chat",
         "chat-interface",
         "export-task-data",
-        "finished-task-output-viewer",
+        "feature-context-menu",
         "helper-suggestions",
-        "hide-active-toggles",
-        "pause-remove-button-hover",
+        "main-window-ui",
+        "output-management",
         "stored-task-viewer",
-        "task-continuation-button",
         "task-graph-ui",
-        "task-templates",
         "task-ui",
         "terminal",
         "theming-ui-shared",

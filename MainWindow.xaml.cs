@@ -211,23 +211,30 @@ namespace Spritely
             var featureUpdateAgent = new FeatureUpdateAgent(
                 featureRegistryManager, codebaseIndexManager, moduleRegistryManager);
 
-            _taskExecutionManager = new TaskExecutionManager(
-                scriptDir, _fileLockManager, _outputTabManager,
-                _gitHelper, _completionAnalyzer, _promptBuilder, _taskFactory,
-                _gitOperationGuard,
-                () => SystemPrompt,
-                task => _projectManager.GetProjectDescription(task),
-                path => _projectManager.GetProjectRulesBlock(path),
-                path => _projectManager.IsGameProject(path),
-                _messageBusManager,
-                Dispatcher,
-                getTokenLimitRetryMinutes: () => _settingsManager.TokenLimitRetryMinutes,
-                getAutoVerify: () => _settingsManager.AutoVerify,
-                getSkillsBlock: () => GetActiveSkillsBlock(),
-                getOpusEffortLevel: () => _settingsManager.OpusEffortLevel,
-                featureRegistryManager: featureRegistryManager,
-                featureContextResolver: featureContextResolver,
-                featureUpdateAgent: featureUpdateAgent);
+            _taskExecutionManager = new TaskExecutionManager(new TaskExecutionServices
+            {
+                ScriptDir = scriptDir,
+                Dispatcher = Dispatcher,
+                FileLockManager = _fileLockManager,
+                OutputTabManager = _outputTabManager,
+                MessageBusManager = _messageBusManager,
+                GitOperationGuard = _gitOperationGuard,
+                GitHelper = _gitHelper,
+                CompletionAnalyzer = _completionAnalyzer,
+                PromptBuilder = _promptBuilder,
+                TaskFactory = _taskFactory,
+                GetSystemPrompt = () => SystemPrompt,
+                GetProjectDescription = task => _projectManager.GetProjectDescription(task),
+                GetProjectRulesBlock = path => _projectManager.GetProjectRulesBlock(path),
+                IsGameProject = path => _projectManager.IsGameProject(path),
+                GetTokenLimitRetryMinutes = () => _settingsManager.TokenLimitRetryMinutes,
+                GetAutoVerify = () => _settingsManager.AutoVerify,
+                GetSkillsBlock = () => GetActiveSkillsBlock(),
+                GetOpusEffortLevel = () => _settingsManager.OpusEffortLevel,
+                FeatureRegistryManager = featureRegistryManager,
+                FeatureContextResolver = featureContextResolver,
+                FeatureUpdateAgent = featureUpdateAgent,
+            });
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
 
@@ -335,7 +342,8 @@ namespace Spritely
                         lastSelected = sp.GetString();
                 }
             }
-            catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to read settings.json: {ex.Message}"); }
+            catch (IOException ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to read settings.json: {ex.Message}"); }
+            catch (System.Text.Json.JsonException ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to parse settings.json: {ex.Message}"); }
 
             var projectsFile = Path.Combine(appDataDir, "projects.json");
             var savedProjects = new List<ProjectEntry>();
@@ -348,7 +356,8 @@ namespace Spritely
                         new System.Text.Json.JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }) ?? new();
                 }
             }
-            catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to read projects.json: {ex.Message}"); }
+            catch (IOException ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to read projects.json: {ex.Message}"); }
+            catch (System.Text.Json.JsonException ex) { Managers.AppLogger.Debug("MainWindow", $"Failed to parse projects.json: {ex.Message}"); }
 
             var restored = lastSelected != null && savedProjects.Any(p => p.Path == lastSelected);
             return restored ? lastSelected! :
@@ -367,7 +376,7 @@ namespace Spritely
                 var value = 1;
                 DwmSetWindowAttribute(hwnd, 20, ref value, sizeof(int));
             }
-            catch (Exception ex) { Managers.AppLogger.Debug("MainWindow", "DWM dark mode attribute failed", ex); }
+            catch (System.Runtime.InteropServices.ExternalException ex) { Managers.AppLogger.Debug("MainWindow", "DWM dark mode attribute failed", ex); }
 
             await LoadSystemPromptAsync(ct);
             ct.ThrowIfCancellationRequested();
@@ -484,7 +493,11 @@ namespace Spritely
                     ShowClaudeNotFoundWarning();
             }
             catch (OperationCanceledException) { /* window closing — abandon check */ }
-            catch (Exception)
+            catch (System.ComponentModel.Win32Exception)
+            {
+                ShowClaudeNotFoundWarning();
+            }
+            catch (InvalidOperationException)
             {
                 ShowClaudeNotFoundWarning();
             }
@@ -559,7 +572,15 @@ namespace Spritely
                     RecoverActiveQueue(recoveredTasks);
             }
             catch (OperationCanceledException) { /* window closing — stop startup */ }
-            catch (Exception ex)
+            catch (IOException ex)
+            {
+                Managers.AppLogger.Warn("MainWindow", "Failed during async startup loading (I/O)", ex);
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                Managers.AppLogger.Warn("MainWindow", "Failed during async startup loading (JSON parse)", ex);
+            }
+            catch (InvalidOperationException ex)
             {
                 Managers.AppLogger.Warn("MainWindow", "Failed during async startup loading", ex);
             }
@@ -595,9 +616,13 @@ namespace Spritely
                         Managers.AppLogger.Info("MainWindow", $"Successfully migrated {migratedCount} project bus(es) to appData");
                     }
                 }
-                catch (Exception ex)
+                catch (IOException ex)
                 {
-                    Managers.AppLogger.Error("MainWindow", "Failed to migrate project buses", ex);
+                    Managers.AppLogger.Error("MainWindow", "Failed to migrate project buses (I/O)", ex);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Managers.AppLogger.Error("MainWindow", "Failed to migrate project buses (access denied)", ex);
                 }
             });
         }
@@ -656,7 +681,7 @@ namespace Spritely
                 }
             }
             catch (OperationCanceledException) { /* window closing */ }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to load system prompt", ex); }
+            catch (IOException ex) { Managers.AppLogger.Warn("MainWindow", "Failed to load system prompt", ex); }
         }
 
         // ── Settings Sync ──────────────────────────────────────────
@@ -668,7 +693,9 @@ namespace Spritely
                 await SyncSettingsForProjectAsync(_windowCts.Token);
             }
             catch (OperationCanceledException) { /* window closing */ }
-            catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to sync settings for project", ex); }
+            catch (IOException ex) { Managers.AppLogger.Warn("MainWindow", "Failed to sync settings for project (I/O)", ex); }
+            catch (System.Text.Json.JsonException ex) { Managers.AppLogger.Warn("MainWindow", "Failed to sync settings for project (JSON)", ex); }
+            catch (InvalidOperationException ex) { Managers.AppLogger.Warn("MainWindow", "Failed to sync settings for project", ex); }
             finally
             {
                 RestoreStarRows();
@@ -903,6 +930,28 @@ namespace Spritely
                 _outputTabManager.UpdateTabHeader(task);
                 UpdateStatus();
             };
+            NodeGraphPanel.TaskScrollRequested += taskId =>
+            {
+                var task = _activeTasks.FirstOrDefault(t => t.Id == taskId);
+                if (task != null)
+                {
+                    ActiveTasksList.SelectedItem = task;
+                    ActiveTasksList.ScrollIntoView(task);
+                }
+            };
+        }
+
+        /// <summary>
+        /// Auto-expands the graph panel when feature mode tasks are present,
+        /// and collapses it when no tasks remain.
+        /// </summary>
+        private void CheckAutoExpandGraph()
+        {
+            bool hasFeatureModeTasks = _activeTasks.Any(t => t.IsFeatureMode && !t.IsFinished);
+            bool hasDependencyTasks = _activeTasks.Any(t => t.DependencyTaskIdCount > 0 || t.BlockedByTaskId != null);
+
+            if ((hasFeatureModeTasks || hasDependencyTasks) && _graphCollapsed)
+                ToggleGraphCollapse();
         }
 
         private async void RevertTaskFromGraph(AgentTask task)
@@ -946,8 +995,14 @@ namespace Spritely
                     Dialogs.DarkDialog.ShowAlert("Git reset failed. The commit may no longer exist or the repository state may have changed.", "Revert Failed");
                 }
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex)
             {
+                AppLogger.Error("MainWindow", "Git revert failed", ex);
+                Dialogs.DarkDialog.ShowAlert($"Revert failed: {ex.Message}", "Revert Error");
+            }
+            catch (IOException ex)
+            {
+                AppLogger.Error("MainWindow", "Git revert failed (I/O)", ex);
                 Dialogs.DarkDialog.ShowAlert($"Revert failed: {ex.Message}", "Revert Error");
             }
         }
@@ -1797,7 +1852,11 @@ namespace Spritely
                     {
                         task.Process?.Kill();
                     }
-                    catch (Exception ex)
+                    catch (InvalidOperationException ex)
+                    {
+                        AppLogger.Error("MainWindow", $"Failed to kill timed-out process for task {task.Id}: {ex.Message}", ex);
+                    }
+                    catch (System.ComponentModel.Win32Exception ex)
                     {
                         AppLogger.Error("MainWindow", $"Failed to kill timed-out process for task {task.Id}: {ex.Message}", ex);
                     }

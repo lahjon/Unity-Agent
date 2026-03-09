@@ -1,94 +1,169 @@
 {
   "id": "codebase-indexing",
-  "name": "Codebase Symbol Index",
-  "description": "Builds and maintains a symbol-level index of the project codebase mapping class/method names to features. Enables fast symbol lookup without re-scanning all files.",
+  "name": "Codebase Symbol Indexing",
+  "description": "Extracts symbols (classes, methods, properties, enums) from source files and maintains a codebase-wide symbol index mapping symbol names to features. Supports multi-language extraction, incremental updates, and filters out non-code asset files (.png, .meta) to improve indexing performance on large projects.",
   "category": "data",
   "keywords": [
-    "BuildIndex",
+    "CodeChunker",
     "CodebaseIndexManager",
     "CodebaseSymbolIndex",
-    "LookupSymbol",
-    "SymbolEntry",
+    "ExtractedSymbol",
+    "SignatureExtractor",
     "SymbolIndexEntry",
-    "symbol index",
-    "symbol lookup"
+    "file signatures",
+    "symbol extraction"
   ],
   "primaryFiles": [
+    "Managers/CodeChunker.cs",
     "Managers/CodebaseIndexManager.cs",
+    "Managers/SignatureExtractor.cs",
     "Models/SymbolEntry.cs"
   ],
   "secondaryFiles": [
-    "Managers/SignatureExtractor.cs"
+    "Managers/SignatureExtractor.cs",
+    "Spritely.Tests/FeatureSystemTests.cs"
   ],
   "relatedFeatureIds": [
-    "feature-initialization",
-    "feature-registry"
+    "feature-registry",
+    "semantic-search"
   ],
   "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
     "app-settings",
     "app-startup-config",
+    "chat",
+    "chat-interface",
+    "completion-analysis",
+    "context-optimization",
     "feature-context-resolution",
     "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
     "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "history-management",
+    "llm-services",
     "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-management",
     "module-registry",
-    "project-management"
+    "output-management",
+    "output-processing",
+    "preprocessor-skip-rules",
+    "progress-tracking",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "semantic-search",
+    "settings-management",
+    "skill-management",
+    "skills-system",
+    "task-decomposition",
+    "task-execution",
+    "task-factory",
+    "task-group-tracking",
+    "task-history",
+    "task-lifecycle",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "terminal"
   ],
   "context": {
     "signatures": {
       "Managers/CodebaseIndexManager.cs": {
-        "hash": "04feb5cf5c82",
-        "content": "class CodebaseIndexManager\n  BuildIndexAsync(string projectPath, List\u003CFeatureEntry\u003E features, CancellationToken ct) -\u003E Task\n  LoadIndexAsync(string projectPath) -\u003E Task\u003CCodebaseSymbolIndex?\u003E\n  SaveIndexAsync(string projectPath, CodebaseSymbolIndex index) -\u003E Task\n  LookupSymbol(CodebaseSymbolIndex index, string symbolName) -\u003E List\u003CSymbolSearchResult\u003E\n  UpdateSymbolsForFeature(string projectPath, string featureId, List\u003Cstring\u003E filePaths) -\u003E Task\n  GetSymbolsInFeature(CodebaseSymbolIndex index, string featureId) -\u003E List\u003CSymbolIndexEntry\u003E\n  Dispose() -\u003E void"
+        "hash": "fdc2fe71694e",
+        "content": "class CodebaseIndexManager\n  L37: BuildIndexAsync(string projectPath, List\u003CFeatureEntry\u003E features, CancellationToken ct, IProgress\u003Cstring\u003E? progress = null) -\u003E Task  // Full rebuild: scans all source files, extracts symbols, maps to features, wri...\n  L81: LoadIndexAsync(string projectPath) -\u003E Task\u003CCodebaseSymbolIndex?\u003E  // Loads the codebase symbol index from disk. Returns null if missing or unreada...\n  L102: SaveIndexAsync(string projectPath, CodebaseSymbolIndex index) -\u003E Task  // Persists the codebase symbol index to disk under mutex protection.\n  L123: LookupSymbol(CodebaseSymbolIndex index, string symbolName) -\u003E List\u003CSymbolSearchResult\u003E  // Case-insensitive symbol lookup with fuzzy matching. Returns matches sorted by...\n  L162: UpdateSymbolsForFeature(string projectPath, string featureId, List\u003Cstring\u003E filePaths) -\u003E Task  // Incremental update: re-extracts symbols only for the given files, updates the...\n  L203: GetSymbolsInFeature(CodebaseSymbolIndex index, string featureId) -\u003E List\u003CSymbolIndexEntry\u003E  // Reverse lookup: returns all symbol entries belonging to a specific feature.\n  L362: Dispose() -\u003E void"
+      },
+      "Managers/CodeChunker.cs": {
+        "hash": "c347bda75fb2",
+        "content": "class CodeChunk\n  FilePath: string\n  ChunkIndex: int\n  LineStart: int\n  LineEnd: int\n  Content: string\n  ContainingSymbol: string?\nclass CodeChunker\n  L56: ChunkFile(string filePath, string content) -\u003E List\u003CCodeChunk\u003E  // Chunk a source file into semantically meaningful pieces. Tries to split at cl...\n  L88: ChunkFiles(IEnumerable\u003C(string path, string content) -\u003E List\u003CCodeChunk\u003E  // Chunk multiple files, returning all chunks with file path metadata."
+      },
+      "Managers/SignatureExtractor.cs": {
+        "hash": "7c72ce24cde3",
+        "content": "enum SymbolKind\n    Class, Interface, Enum, Struct, Record, Method, Property, Signal, ExportVar, Function, Const\nclass ExtractedSymbol\n  Kind: SymbolKind\n  Name: string\n  Signature: string\n  LineNumber: int\n  Summary: string?\n  BaseTypes: string?\nclass SignatureExtractor\n  L51: SupportedExtensions: HashSet\u003Cstring\u003E = [\u0022.cs\u0022, \u0022.ts\u0022, \u0022.tsx\u0022, \u0022.js\u0022, \u0022.jsx\u0022,...\n  L131: ExtractSignatures(string filePath) -\u003E string  // Reads a source file and returns a compact signature block. Returns an empty s...\n  L150: ComputeFileHash(string filePath) -\u003E string  // Returns first 12 hex characters of the SHA-256 hash of the file content. Used...\n  L170: GetSupportedExtensions() -\u003E HashSet\u003Cstring\u003E  // Returns the set of file extensions this extractor can handle.\n  L176: ExtractStructuredSymbols(string filePath) -\u003E List\u003CExtractedSymbol\u003E  // Extracts structured symbols from a source file. Returns the same symbols as \u003C...\n  L195: GetSymbolNames(string filePath) -\u003E List\u003Cstring\u003E  // Returns just the symbol names from a source file. Useful for populating \u003Cc\u003EFe...\n  L207: ExtractImports(string filePath) -\u003E List\u003Cstring\u003E  // Extracts import/using/dependency references from a source file. Returns names..."
       },
       "Models/SymbolEntry.cs": {
         "hash": "877d7a6fb5b3",
-        "content": "class ExtractedSymbol\n  Kind: SymbolKind\n  Name: string\nclass TaskExecutionManager\n  Signature: string\n  FilePath: string\nclass CodebaseSymbolIndex\n  Version: int\n  Symbols: Dictionary\u003Cstring, SymbolIndexEntry\u003E\nclass SymbolIndexEntry\n  FeatureId: string\n  FilePath: string\n  Kind: string\n  ShortSignature: string\nclass SymbolSearchResult\n  SymbolName: string\n  FeatureId: string\n  Confidence: double"
+        "content": "class ExtractedSymbol\n  Kind: SymbolKind\n  Name: string\n  Signature: string\n  FilePath: string\nclass CodebaseSymbolIndex\n  Version: int\n  Symbols: Dictionary\u003Cstring, SymbolIndexEntry\u003E\nclass SymbolIndexEntry\n  FeatureId: string\n  FilePath: string\n  Kind: string\n  ShortSignature: string\nclass SymbolSearchResult\n  SymbolName: string\n  FeatureId: string\n  Confidence: double"
       }
     },
     "keyTypes": [
+      "class CodeChunker",
       "class CodebaseIndexManager",
       "class CodebaseSymbolIndex",
-      "class SymbolIndexEntry",
-      "class SymbolSearchResult"
+      "class ExtractedSymbol",
+      "class SignatureExtractor",
+      "enum SymbolKind"
     ],
     "patterns": [
-      "Incremental index update per feature on task completion",
-      "Version-stamped index for staleness detection"
+      "Hash-based staleness detection for incremental updates",
+      "Multi-language support via extension dispatch"
     ],
     "dependencies": [
-      "Index stored in .spritely/ directory",
-      "Uses SignatureExtractor to parse source files"
+      "Results consumed by FeatureRegistryManager for symbol lookup",
+      "Writes _codebase_index.json under .spritely/"
     ]
   },
-  "parentModuleId": "feature-registry",
+  "parentModuleId": "codebase-intelligence",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "BaseTypes",
     "BuildIndexAsync",
+    "ChunkFile",
+    "ChunkFiles",
+    "ChunkIndex",
+    "CodeChunk",
+    "CodeChunker",
     "CodebaseIndexManager",
     "CodebaseSymbolIndex",
+    "ComputeFileHash",
     "Confidence",
+    "ContainingSymbol",
+    "Content",
     "Dispose",
+    "ExtractImports",
+    "ExtractSignatures",
+    "ExtractStructuredSymbols",
     "ExtractedSymbol",
     "FeatureId",
     "FilePath",
+    "GetSupportedExtensions",
+    "GetSymbolNames",
     "GetSymbolsInFeature",
     "Kind",
+    "LineEnd",
+    "LineNumber",
+    "LineStart",
     "LoadIndexAsync",
     "LookupSymbol",
     "Name",
     "SaveIndexAsync",
     "ShortSignature",
     "Signature",
+    "SignatureExtractor",
+    "Summary",
+    "SupportedExtensions",
     "SymbolIndexEntry",
     "SymbolKind",
     "SymbolName",
     "SymbolSearchResult",
     "Symbols",
-    "TaskExecutionManager",
     "UpdateSymbolsForFeature",
     "Version"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.3744009Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-09T07:56:38.4673905Z",
+  "lastUpdatedByTaskId": "f83fc38a6d4b4ff6"
 }

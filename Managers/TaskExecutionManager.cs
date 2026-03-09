@@ -76,63 +76,40 @@ namespace Spritely.Managers
         /// <summary>Fires when a task transitions to Queued with unresolved dependencies after planning, so the orchestrator can track it.</summary>
         public event Action<AgentTask, List<string>>? TaskNeedsOrchestratorRegistration;
 
-        public TaskExecutionManager(
-            string scriptDir,
-            FileLockManager fileLockManager,
-            OutputTabManager outputTabManager,
-            IGitHelper gitHelper,
-            ICompletionAnalyzer completionAnalyzer,
-            IPromptBuilder promptBuilder,
-            ITaskFactory taskFactory,
-            GitOperationGuard gitOperationGuard,
-            Func<string> getSystemPrompt,
-            Func<AgentTask, string> getProjectDescription,
-            Func<string, string> getProjectRulesBlock,
-            Func<string, bool> isGameProject,
-            MessageBusManager messageBusManager,
-            Dispatcher dispatcher,
-            TaskPreprocessor? taskPreprocessor = null,
-            Func<int>? getTokenLimitRetryMinutes = null,
-            Func<bool>? getAutoVerify = null,
-            Func<string>? getSkillsBlock = null,
-            Func<string>? getOpusEffortLevel = null,
-            FeatureRegistryManager? featureRegistryManager = null,
-            FeatureContextResolver? featureContextResolver = null,
-            FeatureUpdateAgent? featureUpdateAgent = null,
-            HybridSearchManager? hybridSearchManager = null)
+        public TaskExecutionManager(TaskExecutionServices services)
         {
-            _scriptDir = scriptDir;
-            _fileLockManager = fileLockManager;
-            _outputTabManager = outputTabManager;
-            _gitHelper = gitHelper;
-            _completionAnalyzer = completionAnalyzer;
-            _promptBuilder = promptBuilder;
-            _taskFactory = taskFactory;
-            _gitOperationGuard = gitOperationGuard;
-            _getSystemPrompt = getSystemPrompt;
-            _getProjectDescription = getProjectDescription;
-            _getProjectRulesBlock = getProjectRulesBlock;
-            _isGameProject = isGameProject;
-            _getSkillsBlock = getSkillsBlock ?? (() => "");
-            _getOpusEffortLevel = getOpusEffortLevel ?? (() => "high");
-            _messageBusManager = messageBusManager;
-            _dispatcher = dispatcher;
-            _taskPreprocessor = taskPreprocessor ?? new TaskPreprocessor();
+            _scriptDir = services.ScriptDir;
+            _fileLockManager = services.FileLockManager;
+            _outputTabManager = services.OutputTabManager;
+            _gitHelper = services.GitHelper;
+            _completionAnalyzer = services.CompletionAnalyzer;
+            _promptBuilder = services.PromptBuilder;
+            _taskFactory = services.TaskFactory;
+            _gitOperationGuard = services.GitOperationGuard;
+            _getSystemPrompt = services.GetSystemPrompt;
+            _getProjectDescription = services.GetProjectDescription;
+            _getProjectRulesBlock = services.GetProjectRulesBlock;
+            _isGameProject = services.IsGameProject;
+            _getSkillsBlock = services.GetSkillsBlock ?? (() => "");
+            _getOpusEffortLevel = services.GetOpusEffortLevel ?? (() => "high");
+            _messageBusManager = services.MessageBusManager;
+            _dispatcher = services.Dispatcher;
+            _taskPreprocessor = services.TaskPreprocessor ?? new TaskPreprocessor();
 
-            var retryMinutesFunc = getTokenLimitRetryMinutes ?? (() => 30);
+            var retryMinutesFunc = services.GetTokenLimitRetryMinutes ?? (() => 30);
 
             // Wire up sub-handlers
-            _outputProcessor = new OutputProcessor(outputTabManager, completionAnalyzer, gitHelper, getAutoVerify);
-            _processLauncher = new TaskProcessLauncher(scriptDir, fileLockManager, outputTabManager, _outputProcessor, promptBuilder, dispatcher);
+            _outputProcessor = new OutputProcessor(services.OutputTabManager, services.CompletionAnalyzer, services.GitHelper, services.GetAutoVerify);
+            _processLauncher = new TaskProcessLauncher(services.ScriptDir, services.FileLockManager, services.OutputTabManager, _outputProcessor, services.PromptBuilder, services.Dispatcher);
             _earlyTerminationManager = new EarlyTerminationManager(new ProgressAnalyzer());
 
             // Feature System (injectable for testability)
-            _featureRegistryManager = featureRegistryManager ?? new FeatureRegistryManager();
-            _featureContextResolver = featureContextResolver ?? new FeatureContextResolver(_featureRegistryManager);
-            _featureUpdateAgent = featureUpdateAgent ?? new FeatureUpdateAgent(_featureRegistryManager);
-            _hybridSearchManager = hybridSearchManager;
-            _featureModeHandler = new FeatureModeHandler(scriptDir, _processLauncher, _outputProcessor, messageBusManager, outputTabManager, completionAnalyzer, promptBuilder, taskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
-            _tokenLimitHandler = new TokenLimitHandler(scriptDir, _processLauncher, _outputProcessor, fileLockManager, messageBusManager, outputTabManager, completionAnalyzer, retryMinutesFunc);
+            _featureRegistryManager = services.FeatureRegistryManager ?? new FeatureRegistryManager();
+            _featureContextResolver = services.FeatureContextResolver ?? new FeatureContextResolver(_featureRegistryManager);
+            _featureUpdateAgent = services.FeatureUpdateAgent ?? new FeatureUpdateAgent(_featureRegistryManager);
+            _hybridSearchManager = services.HybridSearchManager;
+            _featureModeHandler = new FeatureModeHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, services.PromptBuilder, services.TaskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
+            _tokenLimitHandler = new TokenLimitHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.FileLockManager, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, retryMinutesFunc);
 
             // Set callback to process queued messages when task becomes ready
             _processLauncher.ProcessQueuedMessagesCallback = ProcessQueuedMessages;
@@ -430,6 +407,18 @@ namespace Spritely.Managers
                 if (task.SpawnTeam && task.Status == AgentTaskStatus.Running)
                 {
                     HandleTeamCompletion(task, activeTasks, historyTasks, moveToHistory);
+                    _fileLockManager.CheckQueuedTasks(activeTasks);
+                    TaskCompleted?.Invoke(task.Id);
+                    return;
+                }
+
+                // Soft-stopped task: treat as completed regardless of exit code
+                if (task.Status == AgentTaskStatus.SoftStop)
+                {
+                    task.Status = AgentTaskStatus.Completed;
+                    task.EndTime = DateTime.Now;
+                    _ = CompleteWithVerificationAsync(task, 0, activeTasks, historyTasks);
+                    moveToHistory(task);
                     _fileLockManager.CheckQueuedTasks(activeTasks);
                     TaskCompleted?.Invoke(task.Id);
                     return;
@@ -1065,6 +1054,8 @@ namespace Spritely.Managers
         // ── Pause / Resume (delegated) ───────────────────────────────
 
         public void PauseTask(AgentTask task) => _processLauncher.PauseTask(task);
+
+        public void SoftStopTask(AgentTask task) => _processLauncher.SoftStopTask(task);
 
         public void ResumeTask(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)

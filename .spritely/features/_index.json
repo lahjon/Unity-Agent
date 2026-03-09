@@ -4,23 +4,23 @@
     {
       "id": "activity-dashboard",
       "name": "Activity Dashboard",
-      "category": "",
+      "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
-      "id": "agent-bus-operation-logging",
-      "name": "Agent Bus Operation Logging",
-      "category": "",
-      "touchCount": 2,
-      "primaryFileCount": 0
+      "id": "app-infrastructure",
+      "name": "App Infrastructure \u0026 Logging",
+      "category": "infrastructure",
+      "touchCount": 0,
+      "primaryFileCount": 4
     },
     {
       "id": "app-settings",
       "name": "Application Settings \u0026 Constants",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
+      "category": "config",
+      "touchCount": 1,
+      "primaryFileCount": 3
     },
     {
       "id": "app-startup",
@@ -39,30 +39,37 @@
     {
       "id": "chat",
       "name": "Chat Interface",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
-    },
-    {
-      "id": "chat-interface",
-      "name": "Chat Interface",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
-    },
-    {
-      "id": "codebase-indexing",
-      "name": "Codebase Symbol Index",
-      "category": "data",
+      "category": "ui",
       "touchCount": 0,
       "primaryFileCount": 2
     },
     {
-      "id": "context-optimization",
-      "name": "Context \u0026 Token Optimization",
-      "category": "",
+      "id": "chat-interface",
+      "name": "Chat Interface",
+      "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
+    },
+    {
+      "id": "codebase-indexing",
+      "name": "Codebase Symbol Indexing",
+      "category": "data",
+      "touchCount": 1,
+      "primaryFileCount": 4
+    },
+    {
+      "id": "completion-analysis",
+      "name": "Task Completion Analysis",
+      "category": "core",
+      "touchCount": 0,
+      "primaryFileCount": 3
+    },
+    {
+      "id": "context-optimization",
+      "name": "Context Optimization",
+      "category": "core",
+      "touchCount": 0,
+      "primaryFileCount": 4
     },
     {
       "id": "export-task-data",
@@ -75,29 +82,29 @@
       "id": "feature-context-menu",
       "name": "Feature Context Menu",
       "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
+      "touchCount": 2,
+      "primaryFileCount": 2
     },
     {
       "id": "feature-context-resolution",
       "name": "Feature Context Resolution",
       "category": "core",
       "touchCount": 2,
-      "primaryFileCount": 2
+      "primaryFileCount": 3
     },
     {
       "id": "feature-initialization",
-      "name": "Feature Registry Initialization",
+      "name": "Feature Initialization \u0026 Discovery",
       "category": "core",
-      "touchCount": 0,
-      "primaryFileCount": 2
+      "touchCount": 1,
+      "primaryFileCount": 3
     },
     {
       "id": "feature-mode",
-      "name": "Feature Mode (Multi-Iteration Execution)",
-      "category": "",
+      "name": "Feature Mode Orchestration",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "feature-mode-execution",
@@ -107,18 +114,11 @@
       "primaryFileCount": 4
     },
     {
-      "id": "feature-output-close-button",
-      "name": "Feature Output Tab Close Button",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
-    },
-    {
       "id": "feature-registry",
       "name": "Feature Registry",
       "category": "data",
-      "touchCount": 1,
-      "primaryFileCount": 5
+      "touchCount": 2,
+      "primaryFileCount": 6
     },
     {
       "id": "feature-update-agent",
@@ -130,93 +130,107 @@
     {
       "id": "file-lock-management",
       "name": "File Lock Management",
-      "category": "",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
-    },
-    {
-      "id": "finished-task-output-viewer",
-      "name": "Task Output Context Menu",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 1
     },
     {
       "id": "git-operations",
       "name": "Git Operations",
-      "category": "",
+      "category": "integration",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 4
     },
     {
       "id": "git-ui",
       "name": "Git Panel UI",
-      "category": "",
+      "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "helper-suggestions",
-      "name": "AI Project Suggestions",
-      "category": "",
+      "name": "AI Helper \u0026 Suggestions",
+      "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 0
-    },
-    {
-      "id": "hide-active-toggles",
-      "name": "Hide Active Toggles",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 1
     },
     {
       "id": "history-analytics",
       "name": "Task History \u0026 Analytics",
-      "category": "",
+      "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
+    },
+    {
+      "id": "history-management",
+      "name": "Task History \u0026 Persistence",
+      "category": "data",
+      "touchCount": 0,
+      "primaryFileCount": 4
     },
     {
       "id": "llm-services",
-      "name": "LLM Service Configuration",
-      "category": "",
+      "name": "LLM Services (Claude \u0026 Gemini)",
+      "category": "integration",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 6
     },
     {
       "id": "logging-diagnostics",
       "name": "Logging \u0026 Diagnostics",
-      "category": "",
+      "category": "infrastructure",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "logging-infrastructure",
       "name": "Logging \u0026 Safe File Writing",
-      "category": "",
+      "category": "infrastructure",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
+    },
+    {
+      "id": "main-window-ui",
+      "name": "Main Window \u0026 UI Composition",
+      "category": "ui",
+      "touchCount": 0,
+      "primaryFileCount": 5
     },
     {
       "id": "mcp-integration",
-      "name": "MCP-for-Unity Integration",
-      "category": "",
+      "name": "MCP Server Integration",
+      "category": "integration",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "message-bus",
       "name": "Inter-Task Message Bus",
-      "category": "",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 1
+    },
+    {
+      "id": "module-management",
+      "name": "Module Registry",
+      "category": "data",
+      "touchCount": 0,
+      "primaryFileCount": 2
     },
     {
       "id": "module-registry",
       "name": "Module Registry",
-      "category": "",
+      "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
+    },
+    {
+      "id": "output-management",
+      "name": "Task Output Management",
+      "category": "ui",
+      "touchCount": 0,
+      "primaryFileCount": 2
     },
     {
       "id": "output-processing",
@@ -226,13 +240,6 @@
       "primaryFileCount": 2
     },
     {
-      "id": "pause-remove-button-hover",
-      "name": "Pause/Remove Button Hover Feedback",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
-    },
-    {
       "id": "preprocessor-skip-rules",
       "name": "Preprocessor Skip Rules for Task Types",
       "category": "",
@@ -240,39 +247,60 @@
       "primaryFileCount": 1
     },
     {
+      "id": "progress-tracking",
+      "name": "Progress Tracking \u0026 Early Termination",
+      "category": "core",
+      "touchCount": 0,
+      "primaryFileCount": 4
+    },
+    {
       "id": "project-management",
       "name": "Project Management",
+      "category": "core",
+      "touchCount": 0,
+      "primaryFileCount": 8
+    },
+    {
+      "id": "project-tasks",
+      "name": "Project Task List",
+      "category": "data",
+      "touchCount": 0,
+      "primaryFileCount": 2
+    },
+    {
+      "id": "prompt-building",
+      "name": "Prompt Building \u0026 Context Assembly",
+      "category": "core",
+      "touchCount": 0,
+      "primaryFileCount": 5
+    },
+    {
+      "id": "semantic-search",
+      "name": "Semantic \u0026 Hybrid Search",
       "category": "data",
       "touchCount": 0,
       "primaryFileCount": 5
     },
     {
-      "id": "project-tasks",
-      "name": "Project Task List",
-      "category": "",
+      "id": "settings-management",
+      "name": "Settings \u0026 Templates",
+      "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 0
-    },
-    {
-      "id": "prompt-building",
-      "name": "Prompt Construction",
-      "category": "",
-      "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 4
     },
     {
       "id": "skill-management",
       "name": "Skill Management",
-      "category": "",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "skills-system",
       "name": "Skills System",
-      "category": "",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
     },
     {
       "id": "stored-task-viewer",
@@ -282,50 +310,64 @@
       "primaryFileCount": 1
     },
     {
-      "id": "task-continuation-button",
-      "name": "Task Continuation Button",
-      "category": "",
+      "id": "task-decomposition",
+      "name": "Task Decomposition \u0026 Team Spawning",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
     },
     {
       "id": "task-execution",
       "name": "Task Execution Engine",
       "category": "core",
       "touchCount": 1,
-      "primaryFileCount": 3
+      "primaryFileCount": 4
     },
     {
       "id": "task-factory",
       "name": "Task Creation \u0026 Validation",
-      "category": "",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
     },
     {
       "id": "task-graph-ui",
-      "name": "Task Dependency Graph UI",
-      "category": "",
+      "name": "Task Graph UI",
+      "category": "ui",
+      "touchCount": 1,
+      "primaryFileCount": 4
+    },
+    {
+      "id": "task-group-tracking",
+      "name": "Task Group Tracking",
+      "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
     },
     {
       "id": "task-history",
       "name": "Task History \u0026 Group Tracking",
-      "category": "",
+      "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 2
+    },
+    {
+      "id": "task-lifecycle",
+      "name": "Task Lifecycle \u0026 State",
+      "category": "core",
+      "touchCount": 0,
+      "primaryFileCount": 4
     },
     {
       "id": "task-orchestration",
-      "name": "Task Orchestration \u0026 Lifecycle",
+      "name": "Task Orchestration \u0026 DAG",
       "category": "core",
       "touchCount": 0,
       "primaryFileCount": 4
     },
     {
       "id": "task-preprocessing",
-      "name": "Task Preprocessing",
+      "name": "Task Preprocessing \u0026 Flag Inference",
       "category": "core",
       "touchCount": 0,
       "primaryFileCount": 2
@@ -333,30 +375,30 @@
     {
       "id": "task-templates",
       "name": "Saved Prompts \u0026 Task Templates",
-      "category": "",
+      "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "task-templates-storage",
       "name": "Task Templates \u0026 Saved Prompts",
-      "category": "",
+      "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "task-ui",
       "name": "Task UI \u0026 Graph Visualization",
       "category": "ui",
-      "touchCount": 2,
-      "primaryFileCount": 8
+      "touchCount": 3,
+      "primaryFileCount": 9
     },
     {
       "id": "terminal",
       "name": "Integrated Terminal",
-      "category": "",
+      "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 3
     },
     {
       "id": "theming-ui-shared",
@@ -368,9 +410,9 @@
     {
       "id": "ui-theming",
       "name": "UI Theming \u0026 Style System",
-      "category": "",
+      "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 0
+      "primaryFileCount": 5
     }
   ],
   "modules": []

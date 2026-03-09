@@ -478,6 +478,10 @@ namespace Spritely.Controls
             showOutputItem.Click += (_, _) => ShowOutputRequested?.Invoke(task);
             menu.Items.Add(showOutputItem);
 
+            var scrollToItem = new MenuItem { Header = "Scroll to Task in List" };
+            scrollToItem.Click += (_, _) => ScrollToTaskRequested?.Invoke(task.Id);
+            menu.Items.Add(scrollToItem);
+
             menu.Items.Add(new Separator());
 
             var highlightItem = new MenuItem { Header = "Highlight Dependency Chain" };
@@ -537,6 +541,7 @@ namespace Spritely.Controls
 
         // Event for highlight from context menu
         public event Action<string>? NodeHighlightRequested;
+        public event Action<string>? ScrollToTaskRequested;
 
         // ── Node Tooltip ─────────────────────────────────────────────
 

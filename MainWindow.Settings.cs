@@ -170,7 +170,7 @@ namespace Spritely
         {
             if (_settingsManager == null || _projectManager == null) return;
 
-            _settingsManager.DefaultMcpServerName = DefaultMcpServerNameBox.Text?.Trim() ?? "mcp-for-unity-server";
+            _settingsManager.DefaultMcpServerName = DefaultMcpServerNameBox.Text?.Trim() ?? "UnityMCP";
             _settingsManager.DefaultMcpAddress = DefaultMcpAddressBox.Text?.Trim() ?? "http://127.0.0.1:8080/mcp";
             _settingsManager.DefaultMcpStartCommand = DefaultMcpStartCommandBox.Text?.Trim() ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
 

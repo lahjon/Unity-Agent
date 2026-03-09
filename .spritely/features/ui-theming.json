@@ -43,6 +43,7 @@
     "app-startup"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "app-startup",
     "logging-diagnostics",
     "theming-ui-shared"
@@ -87,26 +88,7 @@
   "parentModuleId": "ui",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
-  "symbolNames": [
-    "Bd",
-    "BdBg",
-    "BdScale",
-    "ChipBg",
-    "ChipBorder",
-    "GhostScale",
-    "OverflowBd",
-    "PART_ContentHost",
-    "PART_OverflowButton",
-    "TabBg",
-    "TabBorder",
-    "TbBd",
-    "TbBorderBrush",
-    "Thumb",
-    "ThumbBg",
-    "Track",
-    "TrackBg",
-    "root"
-  ],
+  "symbolNames": [],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.655831Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.5572137Z"
 }

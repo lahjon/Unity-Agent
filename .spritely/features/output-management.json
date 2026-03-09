@@ -1,0 +1,88 @@
+{
+  "id": "output-management",
+  "name": "Task Output Management",
+  "description": "Creates and manages per-task output tabs in the UI, handles ANSI-stripped streaming output rendering, supports Gemini image galleries, manages overflow when output exceeds the cap, and provides follow-up output injection.",
+  "category": "ui",
+  "keywords": [
+    "ANSI",
+    "OutputProcessor",
+    "OutputTabManager",
+    "RichTextBox",
+    "append output",
+    "follow-up output",
+    "output tab",
+    "overflow",
+    "typewriter animation"
+  ],
+  "primaryFiles": [
+    "Managers/OutputProcessor.cs",
+    "Managers/OutputTabManager.cs"
+  ],
+  "secondaryFiles": [
+    "Managers/GeminiImagePanel.cs",
+    "Spritely.Tests/FollowUpOutputTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "task-execution",
+    "task-lifecycle"
+  ],
+  "dependsOn": [
+    "app-infrastructure",
+    "chat",
+    "git-operations",
+    "message-bus",
+    "task-graph-ui",
+    "task-lifecycle",
+    "task-ui"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/OutputProcessor.cs": {
+        "hash": "221dd828cebb",
+        "content": "class OutputProcessor\n  L36: AppendOutput(string taskId, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L42: AppendColoredOutput(string taskId, string text, Brush foreground, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L223: TryInjectSubtaskResult(AgentTask child, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Synchronous wrapper kept for backward compatibility (non-UI-thread callers).\n  L299: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // Synchronous wrapper kept for backward compatibility (non-UI-thread callers)."
+      },
+      "Managers/OutputTabManager.cs": {
+        "hash": "d9b90959688f",
+        "content": "class OutputTabManager\n  L19: OutputCapChars: int = 500_000\n  L63: CreateTab(AgentTask task) -\u003E void\n  L190: CreateGeminiTab(AgentTask task, string imageFolder) -\u003E void\n  L223: AddGeminiImage(string taskId, string imagePath) -\u003E void\n  L363: CloseTab(AgentTask task) -\u003E void\n  L429: UpdateTabHeader(AgentTask task) -\u003E void\n  L490: AppendOutput(string taskId, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L541: AppendColoredOutput(string taskId, string text, Brush foreground, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L738: StopTypewriterAnimation(string taskId) -\u003E void\n  L905: HasTab(string taskId) -\u003E bool\n  L907: GetTab(string taskId) -\u003E TabItem?\n  L909: GetOutputBox(string taskId) -\u003E RichTextBox?\n  L911: EnsureOverflowButton() -\u003E void\n  L920: UpdateOutputTabWidths() -\u003E void"
+      }
+    },
+    "keyTypes": [
+      "class OutputProcessor",
+      "class OutputTabManager"
+    ],
+    "patterns": [
+      "Output cap with truncation marker",
+      "Tab-per-task with lazy recreation for running history tasks",
+      "Typewriter animation for streaming output"
+    ],
+    "dependencies": [
+      "Consumes streaming text from TaskProcessLauncher",
+      "WPF RichTextBox and TabControl for rendering"
+    ]
+  },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AddGeminiImage",
+    "AppendColoredOutput",
+    "AppendOutput",
+    "CloseTab",
+    "CreateGeminiTab",
+    "CreateTab",
+    "EnsureOverflowButton",
+    "GetOutputBox",
+    "GetTab",
+    "HasTab",
+    "InjectSubtaskResult",
+    "OutputCapChars",
+    "OutputProcessor",
+    "OutputTabManager",
+    "StopTypewriterAnimation",
+    "TryInjectSubtaskResult",
+    "UpdateOutputTabWidths",
+    "UpdateTabHeader"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-09T07:18:27.1504007Z"
+}

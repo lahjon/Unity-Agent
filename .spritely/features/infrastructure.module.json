@@ -1,0 +1,14 @@
+{
+  "id": "infrastructure",
+  "name": "Infrastructure \u0026 Logging",
+  "description": "Bootstraps the WPF application, wires the composition root, handles unhandled exceptions, crash and hang detection, structured log rotation, safe background file writes, and the system tray icon.",
+  "category": "",
+  "featureIds": [
+    "app-infrastructure",
+    "app-startup",
+    "logging-diagnostics",
+    "logging-infrastructure"
+  ],
+  "keywords": [],
+  "lastUpdatedAt": "2026-03-09T07:19:18.3689367Z"
+}

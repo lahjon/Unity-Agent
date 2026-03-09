@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using Spritely.Managers;
 using Spritely.Models;
 
@@ -170,6 +171,39 @@ namespace Spritely
             UpdateFeaturesTabCount();
         }
 
+        private void FeaturesListBox_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            // Prevent right-click from changing selection so the context menu opens without side effects
+            e.Handled = true;
+
+            // Find the ListBoxItem under the cursor and open its context menu
+            var dep = (DependencyObject)e.OriginalSource;
+            while (dep != null && dep is not ListBoxItem)
+                dep = VisualTreeHelper.GetParent(dep);
+
+            if (dep is ListBoxItem item)
+            {
+                var border = FindChildWithContextMenu(item);
+                if (border != null)
+                {
+                    border.ContextMenu!.PlacementTarget = border;
+                    border.ContextMenu.IsOpen = true;
+                }
+            }
+        }
+
+        private static FrameworkElement? FindChildWithContextMenu(DependencyObject parent)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is FrameworkElement fe && fe.ContextMenu != null) return fe;
+                var result = FindChildWithContextMenu(child);
+                if (result != null) return result;
+            }
+            return null;
+        }
+
         private void FeaturesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _selectedFeature = FeaturesListBox.SelectedItem as FeatureEntry;
@@ -281,6 +315,7 @@ namespace Spritely
         }
 
         private bool _featuresPanelExpanded = true;
+        private bool _featureOperationRunning;
 
         private void ToggleFeaturesPanel_Click(object sender, RoutedEventArgs e)
         {
@@ -319,9 +354,31 @@ namespace Spritely
             _ = LoadFeaturesAsync();
         }
 
+        private void SetFeatureOperationRunning(bool running, string? activeButtonLabel = null)
+        {
+            _featureOperationRunning = running;
+            ReindexBtn.IsEnabled = !running;
+            ReassignBtn.IsEnabled = !running;
+
+            if (running)
+            {
+                ReindexProgressBar.Visibility = Visibility.Visible;
+                ReindexProgressValue.IsIndeterminate = true;
+            }
+        }
+
+        private void HideFeatureProgressAfterDelay()
+        {
+            _ = Task.Delay(3000).ContinueWith(_ => Dispatcher.Invoke(() =>
+            {
+                if (!_featureOperationRunning)
+                    ReindexProgressBar.Visibility = Visibility.Collapsed;
+            }));
+        }
+
         private async void ReindexSymbols_Click(object sender, RoutedEventArgs e)
         {
-            if (!_projectManager.HasProjects) return;
+            if (_featureOperationRunning || !_projectManager.HasProjects) return;
 
             var projectPath = _projectManager.ProjectPath;
             var registry = new FeatureRegistryManager();
@@ -332,15 +389,86 @@ namespace Spritely
                 return;
             }
 
+            var confirm = MessageBox.Show(
+                "Re-indexing scans all source files and rebuilds the symbol index.\n" +
+                "This may take a while for large projects.\n\nProceed?",
+                "Re-index Symbols", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
             try
             {
+                SetFeatureOperationRunning(true);
+                ReindexProgressText.Text = "Starting re-index...";
+
                 AppLogger.Info("FeaturesTab", "Rebuilding codebase symbol index...");
-                await registry.RebuildSymbolIndexAsync(projectPath);
+
+                var progress = new Progress<string>(msg =>
+                {
+                    ReindexProgressText.Text = msg;
+
+                    var match = System.Text.RegularExpressions.Regex.Match(msg, @"(\d+)/(\d+) files");
+                    if (match.Success &&
+                        int.TryParse(match.Groups[1].Value, out var current) &&
+                        int.TryParse(match.Groups[2].Value, out var total) && total > 0)
+                    {
+                        ReindexProgressValue.IsIndeterminate = false;
+                        ReindexProgressValue.Value = (double)current / total * 100;
+                    }
+                });
+
+                await registry.RebuildSymbolIndexAsync(projectPath, progress);
                 AppLogger.Info("FeaturesTab", "Symbol index rebuilt successfully.");
+                ReindexProgressText.Text = "Re-index complete";
             }
             catch (Exception ex)
             {
                 AppLogger.Error("FeaturesTab", $"Failed to rebuild symbol index: {ex.Message}", ex);
+                ReindexProgressText.Text = $"Failed: {ex.Message}";
+            }
+            finally
+            {
+                SetFeatureOperationRunning(false);
+                HideFeatureProgressAfterDelay();
+            }
+        }
+
+        private async void ReassignFeatures_Click(object sender, RoutedEventArgs e)
+        {
+            if (_featureOperationRunning || !_projectManager.HasProjects) return;
+
+            var project = _projectManager.GetCurrentProject();
+            if (project == null) return;
+
+            var confirm = MessageBox.Show(
+                "This will re-scan all source files and use AI to re-analyze and reassign features.\n" +
+                "Existing task-discovered metadata will be merged, but the process uses LLM calls and may take several minutes.\n\nProceed?",
+                "Re-assign Features", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            try
+            {
+                SetFeatureOperationRunning(true);
+                ReindexProgressText.Text = "Starting feature re-assignment...";
+
+                await _projectManager.ForceInitializeFeaturesAsync(project, msg =>
+                {
+                    Dispatcher.Invoke(() => ReindexProgressText.Text = msg);
+                });
+
+                await LoadFeaturesAsync();
+                ReindexProgressText.Text = "Feature re-assignment complete";
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("FeaturesTab", $"Failed to re-assign features: {ex.Message}", ex);
+                ReindexProgressText.Text = $"Failed: {ex.Message}";
+            }
+            finally
+            {
+                SetFeatureOperationRunning(false);
+                HideFeatureProgressAfterDelay();
             }
         }
 

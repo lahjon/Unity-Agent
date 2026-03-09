@@ -1,0 +1,170 @@
+{
+  "id": "task-lifecycle",
+  "name": "Task Lifecycle \u0026 State",
+  "description": "Defines the core AgentTask model and its full lifecycle: status transitions, runtime context, flags, and property-change notifications. Acts as the central shared data contract for all task-related features.",
+  "category": "core",
+  "keywords": [
+    "AgentTask",
+    "AgentTaskData",
+    "AgentTaskStatus",
+    "INotifyPropertyChanged",
+    "ITaskFlags",
+    "RuntimeTaskContext",
+    "TaskStatus",
+    "task flags",
+    "task state"
+  ],
+  "primaryFiles": [
+    "AgentTask.cs",
+    "Models/AgentTaskData.cs",
+    "Models/ITaskFlags.cs",
+    "Models/RuntimeTaskContext.cs"
+  ],
+  "secondaryFiles": [
+    "Models/TaskConfigBase.cs",
+    "Models/TaskRecordBase.cs",
+    "Spritely.Tests/AgentTaskTests.cs",
+    "Spritely.Tests/ProjectSwapTests.cs"
+  ],
+  "relatedFeatureIds": [
+    "history-management",
+    "task-execution",
+    "task-orchestration"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-mode",
+    "feature-registry",
+    "file-lock-management",
+    "git-operations",
+    "history-management",
+    "module-management",
+    "module-registry",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "settings-management",
+    "skill-management",
+    "task-factory",
+    "terminal"
+  ],
+  "context": {
+    "signatures": {
+      "AgentTask.cs": {
+        "hash": "ddf8a7db73db",
+        "content": "enum AgentTaskStatus\n    Running, Completed, Cancelled, Failed, Queued, Paused, InitQueued, Planning, Verifying, Recommendation, Committing\nenum TaskPriority\n    Low, Normal, High\nenum ModelType\n    ClaudeCode, Gemini\nenum FeatureModePhase\n    None, TeamPlanning, PlanConsolidation, Execution, Evaluation\nclass AgentTask : INotifyPropertyChanged\n  Data: AgentTaskData\n  Runtime: RuntimeTaskContext\n  L64: OnPropertyChanged([CallerMemberName] string? name = null) -\u003E void\n  TaskNumber: int\n  Description: string\n  StartTime: DateTime\n  SkipPermissions: bool\n  Headless: bool\n  IsFeatureMode: bool\n  UseMcp: bool\n  SpawnTeam: bool\n  ExtendedPlanning: bool\n  PlanOnly: bool\n  UseMessageBus: bool\n  AutoDecompose: bool\n  ApplyFix: bool\n  GroupId: string?\n  GroupName: string?\n  AdditionalInstructions: string\n  StoredPrompt: string?\n  ConversationId: string?"
+      },
+      "Models/AgentTaskData.cs": {
+        "hash": "48a522b202ae",
+        "content": "class AgentTaskData : ITaskFlags\n  Id: string\n  TaskNumber: int\n  Description: string\n  StartTime: DateTime\n  SkipPermissions: bool\n  Headless: bool\n  IsFeatureMode: bool\n  IgnoreFileLocks: bool\n  UseMcp: bool\n  SpawnTeam: bool\n  ExtendedPlanning: bool\n  PlanOnly: bool\n  UseMessageBus: bool\n  AutoDecompose: bool\n  ApplyFix: bool\n  AdditionalInstructions: string\n  StoredPrompt: string?\n  ConversationId: string?\n  FullOutput: string?\n  Model: ModelType\n  MaxIterations: int\n  CurrentIteration: int\n  ProjectPath: string\n  ProjectColor: string\n  ProjectDisplayName: string\n  ImagePaths: List\u003Cstring\u003E\n  GeneratedImagePaths: List\u003Cstring\u003E\n  CompletionSummary: string\n  Recommendations: string"
+      },
+      "Models/ITaskFlags.cs": {
+        "hash": "015d1a8c0d99",
+        "content": "interface ITaskFlags"
+      },
+      "Models/RuntimeTaskContext.cs": {
+        "hash": "d2c3a270df16",
+        "content": "class RuntimeTaskContext : IDisposable\n  Process: Process?\n  Cts: CancellationTokenSource?\n  OutputBuilder: StringBuilder\n  ConsecutiveFailures: int\n  ConsecutiveTokenLimitRetries: int\n  LastIterationOutputStart: int\n  TokenLimitRetryCount: int\n  LastPromptTokenEstimate: long\n  LastCliModel: string?\n  PreprocessorPrompt: string?\n  FeatureContextBlock: string?\n  VerificationPrompt: string?\n  QueuedReason: string?\n  BlockedByTaskId: string?\n  BlockedByTaskNumber: int?\n  L65: AddDependencyTaskId(string id) -\u003E void\n  L66: RemoveDependencyTaskId(string id) -\u003E bool\n  L67: ContainsDependencyTaskId(string id) -\u003E bool\n  DependencyTaskIdCount: int\n  L69: ClearDependencyTaskIds() -\u003E void\n  DependencyTaskNumbers: List\u003Cint\u003E\n  SubTaskCounter: int\n  SubTaskIndex: int\n  IsPlanningBeforeQueue: bool\n  NeedsPlanRestart: bool\n  PlanPhaseReady: bool\n  PendingFileLockPath: string?\n  PendingFileLockBlocker: string?\n  PendingCommitTask: Task?"
+      }
+    },
+    "keyTypes": [
+      "class AgentTask",
+      "class AgentTaskData",
+      "class RuntimeTaskContext",
+      "enum AgentTaskStatus",
+      "enum ModelType",
+      "enum TaskPriority",
+      "interface ITaskFlags"
+    ],
+    "patterns": [
+      "INotifyPropertyChanged for WPF data binding",
+      "Separation of persisted data (AgentTaskData) from runtime context (RuntimeTaskContext)",
+      "Status-driven lifecycle with explicit transitions"
+    ],
+    "dependencies": [
+      "Persisted by HistoryManager",
+      "Used by virtually every manager and UI component"
+    ]
+  },
+  "parentModuleId": "task-engine",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AddDependencyTaskId",
+    "AdditionalInstructions",
+    "AgentTask",
+    "AgentTaskData",
+    "AgentTaskStatus",
+    "ApplyFix",
+    "AutoDecompose",
+    "BlockedByTaskId",
+    "BlockedByTaskNumber",
+    "ClearDependencyTaskIds",
+    "CompletionSummary",
+    "ConsecutiveFailures",
+    "ConsecutiveTokenLimitRetries",
+    "ContainsDependencyTaskId",
+    "ConversationId",
+    "Cts",
+    "CurrentIteration",
+    "Data",
+    "DependencyTaskIdCount",
+    "DependencyTaskNumbers",
+    "Description",
+    "ExtendedPlanning",
+    "FeatureContextBlock",
+    "FeatureModePhase",
+    "FullOutput",
+    "GeneratedImagePaths",
+    "GroupId",
+    "GroupName",
+    "Headless",
+    "ITaskFlags",
+    "Id",
+    "IgnoreFileLocks",
+    "ImagePaths",
+    "IsFeatureMode",
+    "IsPlanningBeforeQueue",
+    "LastCliModel",
+    "LastIterationOutputStart",
+    "LastPromptTokenEstimate",
+    "MaxIterations",
+    "Model",
+    "ModelType",
+    "NeedsPlanRestart",
+    "OnPropertyChanged",
+    "OutputBuilder",
+    "PendingCommitTask",
+    "PendingFileLockBlocker",
+    "PendingFileLockPath",
+    "PlanOnly",
+    "PlanPhaseReady",
+    "PreprocessorPrompt",
+    "Process",
+    "ProjectColor",
+    "ProjectDisplayName",
+    "ProjectPath",
+    "QueuedReason",
+    "Recommendations",
+    "RemoveDependencyTaskId",
+    "Runtime",
+    "RuntimeTaskContext",
+    "SkipPermissions",
+    "SpawnTeam",
+    "StartTime",
+    "StoredPrompt",
+    "SubTaskCounter",
+    "SubTaskIndex",
+    "TaskNumber",
+    "TaskPriority",
+    "TokenLimitRetryCount",
+    "UseMcp",
+    "UseMessageBus",
+    "VerificationPrompt"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-09T07:18:26.9389062Z"
+}

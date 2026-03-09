@@ -1,0 +1,99 @@
+{
+  "id": "module-management",
+  "name": "Module Registry",
+  "description": "Manages logical modules that group related features together, supporting module-level navigation, feature membership inference, and module-aware context building.",
+  "category": "data",
+  "keywords": [
+    "ModuleEntry",
+    "ModuleIndex",
+    "ModuleRegistryManager",
+    "ParentModuleId",
+    "feature grouping",
+    "module membership"
+  ],
+  "primaryFiles": [
+    "Managers/ModuleRegistryManager.cs",
+    "Models/ModuleEntry.cs"
+  ],
+  "secondaryFiles": [
+    "Constants/FeatureConstants.cs"
+  ],
+  "relatedFeatureIds": [
+    "feature-registry"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
+    "app-settings",
+    "app-startup-config",
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-mode",
+    "feature-registry",
+    "git-operations",
+    "history-management",
+    "module-registry",
+    "project-management",
+    "project-tasks",
+    "semantic-search",
+    "settings-management",
+    "skill-management",
+    "task-lifecycle",
+    "terminal"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/ModuleRegistryManager.cs": {
+        "hash": "20c199a8d548",
+        "content": "class ModuleRegistryManager\n  L42: LoadModuleIndexAsync(string projectPath) -\u003E Task\u003CModuleIndex\u003E\n  L61: SaveModuleIndexAsync(string projectPath, ModuleIndex index) -\u003E Task\n  L68: LoadModuleAsync(string projectPath, string moduleId) -\u003E Task\u003CModuleEntry?\u003E\n  L87: LoadAllModulesAsync(string projectPath) -\u003E Task\u003CList\u003CModuleEntry\u003E\u003E\n  L106: SaveModuleAsync(string projectPath, ModuleEntry module) -\u003E Task  // Saves a module file and updates the index if the module is new. All list prop...\n  L148: RemoveModuleAsync(string projectPath, string moduleId) -\u003E Task\n  L173: GetFeaturesInModule(ModuleEntry module, List\u003CFeatureEntry\u003E allFeatures) -\u003E List\u003CFeatureEntry\u003E  // Returns features whose \u003Csee cref=\u0022FeatureEntry.ParentModuleId\u0022/\u003E matches the ...\n  L180: GetRelatedFeaturesViaModule(string featureId, List\u003CFeatureEntry\u003E allFeatures, List\u003CModuleEntry\u003E allModules) -\u003E List\u003CFeatureEntry\u003E  // Given a feature, finds all other features in the same module (module siblings...\n  L202: RebuildModuleIndex(List\u003CModuleEntry\u003E modules) -\u003E ModuleIndex  // Deterministically rebuilds the module index from a list of modules. Modules a...\n  L295: Dispose() -\u003E void"
+      },
+      "Models/ModuleEntry.cs": {
+        "hash": "f855a619c5e9",
+        "content": "class ModuleEntry\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  FeatureIds: List\u003Cstring\u003E\n  Keywords: List\u003Cstring\u003E\n  LastUpdatedAt: DateTime\nclass ModuleIndex\n  Version: int\n  Modules: List\u003CModuleIndexEntry\u003E\nclass ModuleIndexEntry\n  Id: string\n  Name: string\n  FeatureIds: List\u003Cstring\u003E"
+      }
+    },
+    "keyTypes": [
+      "class ModuleEntry",
+      "class ModuleIndex",
+      "class ModuleRegistryManager"
+    ],
+    "patterns": [
+      "File-per-module JSON persistence",
+      "Mutex-protected writes matching FeatureRegistryManager conventions"
+    ],
+    "dependencies": [
+      "Consumed by FeatureRegistryManager for module context",
+      "Reads/writes JSON files under .spritely/features/"
+    ]
+  },
+  "parentModuleId": "codebase-intelligence",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "Category",
+    "Description",
+    "Dispose",
+    "FeatureIds",
+    "GetFeaturesInModule",
+    "GetRelatedFeaturesViaModule",
+    "Id",
+    "Keywords",
+    "LastUpdatedAt",
+    "LoadAllModulesAsync",
+    "LoadModuleAsync",
+    "LoadModuleIndexAsync",
+    "ModuleEntry",
+    "ModuleIndex",
+    "ModuleIndexEntry",
+    "ModuleRegistryManager",
+    "Modules",
+    "Name",
+    "RebuildModuleIndex",
+    "RemoveModuleAsync",
+    "SaveModuleAsync",
+    "SaveModuleIndexAsync",
+    "Version"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-09T07:18:27.0735151Z"
+}

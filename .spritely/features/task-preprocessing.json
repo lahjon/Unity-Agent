@@ -1,19 +1,16 @@
 {
   "id": "task-preprocessing",
-  "name": "Task Preprocessing",
-  "description": "Uses Haiku LLM to analyze and enhance a task before main execution: assigns headers, detects feature mode, determines decomposition, and enriches the prompt. Skipped for known utility task types.",
+  "name": "Task Preprocessing \u0026 Flag Inference",
+  "description": "Sends a task description to Claude Haiku before execution to infer optimal flags (feature mode, auto-decompose, spawn team, apply fix, MCP, extended planning). Applies inferred flags to the AgentTask without overriding user-set values.",
   "category": "core",
   "keywords": [
-    "AutoDecompose",
-    "EnhancedPrompt",
+    "ApplyToTask",
     "Haiku",
-    "IsFeatureMode",
+    "PreprocessAsync",
     "PreprocessResult",
-    "SpawnTeam",
-    "TaskFactory",
     "TaskPreprocessor",
-    "header",
-    "preprocessing"
+    "auto flags",
+    "flag inference"
   ],
   "primaryFiles": [
     "Managers/TaskFactory.cs",
@@ -27,46 +24,45 @@
   "relatedFeatureIds": [
     "llm-services",
     "prompt-building",
-    "task-orchestration"
+    "task-lifecycle"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "app-settings",
-    "app-startup",
     "app-startup-config",
     "feature-registry",
     "git-operations",
     "llm-services",
-    "logging-diagnostics",
     "prompt-building",
-    "task-factory"
+    "semantic-search",
+    "task-factory",
+    "task-lifecycle"
   ],
   "context": {
     "signatures": {
       "Managers/TaskFactory.cs": {
         "hash": "ebcbad3cb14f",
-        "content": "class TaskFactory\n  ValidateTaskInput(string? description) -\u003E bool\n  PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  GenerateLocalSummary(string description) -\u003E string\n  GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
+        "content": "class TaskFactory : ITaskFactory\n  L18: ValidateTaskInput(string? description) -\u003E bool\n  L69: PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  L89: GenerateLocalSummary(string description) -\u003E string\n  L251: GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
       },
       "Managers/TaskPreprocessor.cs": {
-        "hash": "4a4ea2928a65",
+        "hash": "ef684f743c06",
         "content": "class PreprocessResult\n  Header: string\n  EnhancedPrompt: string\n  ApplyFix: bool\n  ExtendedPlanning: bool\n  IsFeatureMode: bool\n  AutoDecompose: bool\n  SpawnTeam: bool\n  UseMcp: bool\n  Iterations: int\n  SentPrompt: string\nclass TaskPreprocessor\n  L42: PreprocessPrompt: string = PromptLoader.Load(\u0022TaskPreprocessorPr...\n  L44: PreprocessAsync(string taskDescription, CancellationToken ct = default) -\u003E Task\u003CPreprocessResult?\u003E\n  L153: ApplyToTask(AgentTask task, PreprocessResult result) -\u003E void  // Applies preprocessor results to an AgentTask. Only overrides toggles the user...\n  L180: FormatActiveToggles(AgentTask task) -\u003E string  // Formats the active toggles for display in task output."
       }
     },
     "keyTypes": [
       "class PreprocessResult",
-      "class TaskFactory",
-      "class TaskPreprocessor",
-      "interface ITaskFactory"
+      "class TaskPreprocessor"
     ],
     "patterns": [
-      "Fire-and-forget Haiku call before main task launch",
-      "Skip-list pattern for known task types"
+      "Haiku timeout with graceful fallback",
+      "Non-destructive flag application (only sets unset flags)"
     ],
     "dependencies": [
-      "Calls Haiku via Claude CLI",
-      "Writes PreprocessResult applied to AgentTask by ApplyToTask"
+      "Calls ClaudeService (Haiku model) for inference",
+      "Writes inferred flags back to AgentTask"
     ]
   },
-  "parentModuleId": "task-execution",
+  "parentModuleId": "task-engine",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
@@ -82,7 +78,10 @@
     "IsFeatureMode",
     "Iterations",
     "PrepareTaskForFeatureModeStart",
+    "PreprocessAsync",
+    "PreprocessPrompt",
     "PreprocessResult",
+    "SentPrompt",
     "SpawnTeam",
     "TaskFactory",
     "TaskPreprocessor",
@@ -90,5 +89,5 @@
     "ValidateTaskInput"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.2788816Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.0006226Z"
 }

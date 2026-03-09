@@ -27,21 +27,23 @@
     "llm-services"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "llm-services",
     "logging-diagnostics",
     "prompt-building",
     "task-graph-ui",
+    "task-lifecycle",
     "task-ui"
   ],
   "context": {
     "signatures": {
       "Managers/ChatManager.cs": {
-        "hash": "4154593c2665",
-        "content": "class ChatManager\n  PopulateModelCombo() -\u003E void\n  HandleNewChat() -\u003E void\n  HandleSendClick() -\u003E void\n  HandleInputKeyDown(KeyEventArgs e) -\u003E void\n  HandlePaste() -\u003E bool\n  HandleDragOver(DragEventArgs e) -\u003E bool\n  HandleDrop(DragEventArgs e) -\u003E bool\n  HandleModelComboChanged() -\u003E void\n  CancelAndDispose() -\u003E void\n  Dispose() -\u003E void"
+        "hash": "855f15be2140",
+        "content": "class ChatManager : IDisposable\n  L17: MaxTokenBudget: int = 30_000\n  L18: CharsPerToken: int = 4\n  L58: PopulateModelCombo() -\u003E void\n  L84: HandleNewChat() -\u003E void\n  L100: HandleSendClick() -\u003E void\n  L105: HandleInputKeyDown(KeyEventArgs e) -\u003E void\n  L114: HandlePaste() -\u003E bool\n  L157: HandleDragOver(DragEventArgs e) -\u003E bool\n  L172: HandleDrop(DragEventArgs e) -\u003E bool\n  L198: HandleModelComboChanged() -\u003E void\n  L200: CancelAndDispose() -\u003E void\n  L207: Dispose() -\u003E void"
       },
       "Managers/GeminiImagePanel.cs": {
-        "hash": "d1f0b20f09cc",
-        "content": "class GeminiImagePanel\n  Create(AgentTask task, out RichTextBox outputBox, out WrapPanel imageGallery) -\u003E DockPanel\n  AddImage(WrapPanel gallery, string imagePath) -\u003E void\n  SetOpenFolderHandler(DockPanel root, string folderPath) -\u003E void"
+        "hash": "bc3f71f72870",
+        "content": "class GeminiImagePanel\n  L16: Create(AgentTask task, out RichTextBox outputBox, out WrapPanel imageGallery) -\u003E DockPanel\n  L92: AddImage(WrapPanel gallery, string imagePath) -\u003E void\n  L143: SetOpenFolderHandler(DockPanel root, string folderPath) -\u003E void"
       }
     },
     "keyTypes": [
@@ -65,6 +67,7 @@
   "symbolNames": [
     "AddImage",
     "CancelAndDispose",
+    "CharsPerToken",
     "ChatManager",
     "Create",
     "Dispose",
@@ -76,9 +79,10 @@
     "HandleNewChat",
     "HandlePaste",
     "HandleSendClick",
+    "MaxTokenBudget",
     "PopulateModelCombo",
     "SetOpenFolderHandler"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.5179543Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.3543955Z"
 }

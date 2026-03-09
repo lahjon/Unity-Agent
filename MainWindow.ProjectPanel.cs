@@ -157,7 +157,7 @@ namespace Spritely
         {
             var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
             if (entry == null) return;
-            entry.McpServerName = McpServerNameBox.Text?.Trim() ?? "mcp-for-unity-server";
+            entry.McpServerName = McpServerNameBox.Text?.Trim() ?? "UnityMCP";
             entry.McpAddress = McpAddressBox.Text?.Trim() ?? "http://127.0.0.1:8080/mcp";
             entry.McpStartCommand = McpStartCommandBox.Text?.Trim() ?? "";
             _projectManager.SaveProjects();

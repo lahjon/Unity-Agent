@@ -29,16 +29,27 @@
     "task-factory"
   ],
   "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
     "codebase-indexing",
     "feature-context-resolution",
+    "feature-mode",
     "feature-registry",
+    "git-operations",
+    "history-management",
     "llm-services",
     "logging-diagnostics",
+    "module-management",
     "module-registry",
     "project-management",
+    "project-tasks",
     "prompt-building",
+    "settings-management",
+    "skill-management",
     "task-graph-ui",
+    "task-lifecycle",
     "task-ui",
+    "terminal",
     "theming-ui-shared"
   ],
   "context": {
@@ -52,8 +63,8 @@
         "content": "class MainWindow"
       },
       "Managers/SettingsManager.cs": {
-        "hash": "5821781d4f6a",
-        "content": "class SettingsManager\n  TaskTemplates: List\u003CTaskTemplate\u003E\n  LoadSettingsAsync() -\u003E Task\n  SaveSettings(string? projectPath) -\u003E void\n  LoadTemplatesAsync(string? projectPath) -\u003E Task\n  SaveTemplate(TaskTemplate template) -\u003E void\n  DeleteTemplate(TaskTemplate template) -\u003E void"
+        "hash": "475750ca02c7",
+        "content": "class SettingsManager\n  TaskTemplates: List\u003CTaskTemplate\u003E\n  L115: LoadSettingsAsync() -\u003E Task\n  L154: SaveSettings(string? projectPath) -\u003E void\n  L180: LoadTemplatesAsync(string? projectPath) -\u003E Task\n  L203: SaveTemplate(TaskTemplate template) -\u003E void\n  L219: DeleteTemplate(TaskTemplate template) -\u003E void"
       }
     },
     "keyTypes": [
@@ -72,13 +83,19 @@
       "TaskOrchestrator for workflow step dependencies"
     ]
   },
-  "parentModuleId": "ui",
+  "parentModuleId": "project-config",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "DeleteTemplate",
+    "LoadSettingsAsync",
+    "LoadTemplatesAsync",
     "MainWindow",
-    "SettingsManager"
+    "SaveSettings",
+    "SaveTemplate",
+    "SettingsManager",
+    "TaskTemplates"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.5104111Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.5272718Z"
 }

@@ -1,39 +1,43 @@
 {
   "id": "git-ui",
   "name": "Git Panel UI",
-  "description": "Renders the Git status panel showing uncommitted files, recent commits, and provides commit/push UI with conflict resolution. Wires Git operations into the main window.",
+  "description": "Renders the git status panel showing recent commits and changed files, and drives the commit workflow including staged-file selection and commit message editing via CommitDialog.",
   "category": "ui",
   "keywords": [
     "CommitDialog",
     "GitCommitInfo",
     "GitFileChange",
     "GitPanelManager",
-    "commit button",
-    "diff view",
+    "commit workflow",
     "git panel",
-    "git status UI",
-    "uncommitted files"
+    "git status",
+    "staged files"
   ],
   "primaryFiles": [
     "Dialogs/CommitDialog.cs",
+    "Managers/GitPanelManager.UI.cs",
     "Managers/GitPanelManager.cs"
   ],
   "secondaryFiles": [
+    "MainWindow.AutoCommit.cs",
     "MainWindow.Orchestration.cs",
     "Models/GitResult.cs"
   ],
   "relatedFeatureIds": [
-    "git-operations",
-    "task-orchestration"
+    "file-lock-management",
+    "git-operations"
   ],
   "dependsOn": [
     "activity-dashboard",
+    "app-infrastructure",
     "app-settings",
     "app-startup",
     "chat",
     "chat-interface",
     "codebase-indexing",
+    "completion-analysis",
     "context-optimization",
+    "export-task-data",
     "feature-context-resolution",
     "feature-initialization",
     "feature-mode",
@@ -44,55 +48,69 @@
     "git-operations",
     "helper-suggestions",
     "history-analytics",
+    "history-management",
     "llm-services",
     "logging-diagnostics",
     "logging-infrastructure",
     "mcp-integration",
     "message-bus",
+    "module-management",
     "module-registry",
+    "output-management",
     "output-processing",
+    "preprocessor-skip-rules",
+    "progress-tracking",
     "project-management",
     "project-tasks",
     "prompt-building",
+    "semantic-search",
+    "settings-management",
     "skill-management",
     "skills-system",
     "stored-task-viewer",
+    "task-decomposition",
     "task-execution",
     "task-factory",
     "task-graph-ui",
+    "task-group-tracking",
     "task-history",
+    "task-lifecycle",
     "task-orchestration",
     "task-preprocessing",
     "task-templates",
     "task-templates-storage",
     "task-ui",
+    "terminal",
     "theming-ui-shared"
   ],
   "context": {
     "signatures": {
       "Dialogs/CommitDialog.cs": {
         "hash": "e4634bcc5a84",
-        "content": "class CommitResult\n  Message: string\n  Cancelled: bool\nclass CommitDialog\n  Show(List\u003CGitFileChange\u003E selectedFiles, string suggestedMessage) -\u003E CommitResult"
+        "content": "class CommitResult\n  Message: string\n  Cancelled: bool\nclass CommitDialog\n  L21: Show(List\u003CGitFileChange\u003E selectedFiles, string suggestedMessage) -\u003E CommitResult"
       },
       "Managers/GitPanelManager.cs": {
-        "hash": "fbf159582c11",
-        "content": "class GitPanelManager\n  MarkDirty() -\u003E void\n  RefreshIfNeeded(ScrollViewer container) -\u003E void\n  RefreshAsync(ScrollViewer container) -\u003E Task\nclass GitCommitInfo\n  FullHash: string\n  ShortHash: string\n  Author: string\n  RelativeTime: string\n  Message: string\nclass GitFileChange\n  Status: string\n  FilePath: string\n  DisplayStatus: string"
+        "hash": "47d8eaa4714a",
+        "content": "class GitPanelManager\n  L73: MarkDirty() -\u003E void\n  L75: RefreshIfNeeded(ScrollViewer container) -\u003E void\n  L82: RefreshAsync(ScrollViewer container) -\u003E Task\nclass GitCommitInfo\n  FullHash: string\n  ShortHash: string\n  Author: string\n  RelativeTime: string\n  Message: string\nclass GitFileChange\n  Status: string\n  FilePath: string\n  DisplayStatus: string"
+      },
+      "Managers/GitPanelManager.UI.cs": {
+        "hash": "e08312c81da9",
+        "content": "class GitPanelManager"
       }
     },
     "keyTypes": [
       "class CommitDialog",
       "class CommitResult",
-      "class GitCommitInfo",
       "class GitFileChange",
       "class GitPanelManager"
     ],
     "patterns": [
-      "Dialog-based commit confirmation flow",
-      "Dirty-flag lazy refresh pattern"
+      "Deferred UI update to avoid redundant git calls",
+      "Dirty-flag refresh pattern (MarkDirty \u002B RefreshIfNeeded)"
     ],
     "dependencies": [
-      "CommitDialog presents selected files to user",
-      "Delegates Git commands to GitHelper/GitOperationGuard"
+      "Calls GitHelper for status/diff/commit",
+      "Guarded by GitOperationGuard and FileLockManager"
     ]
   },
   "parentModuleId": "git-integration",
@@ -119,5 +137,5 @@
     "Status"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.4420102Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.0983177Z"
 }

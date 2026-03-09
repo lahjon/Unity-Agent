@@ -27,11 +27,13 @@
     "task-execution"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "app-settings",
     "app-startup",
     "git-operations",
     "logging-diagnostics",
-    "prompt-building"
+    "prompt-building",
+    "task-lifecycle"
   ],
   "context": {
     "signatures": {
@@ -57,13 +59,17 @@
       "ProjectManager for project context"
     ]
   },
-  "parentModuleId": "task-execution",
+  "parentModuleId": "task-engine",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "GenerateClaudeMdAsync",
+    "GenerateLocalSummary",
     "ITaskFactory",
-    "TaskFactory"
+    "PrepareTaskForFeatureModeStart",
+    "TaskFactory",
+    "ValidateTaskInput"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.3191077Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.4983199Z"
 }

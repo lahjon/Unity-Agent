@@ -28,14 +28,25 @@
     "task-orchestration"
   ],
   "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
     "codebase-indexing",
     "feature-context-resolution",
+    "feature-mode",
     "feature-registry",
+    "git-operations",
+    "history-management",
     "logging-diagnostics",
+    "module-management",
     "module-registry",
     "project-management",
+    "project-tasks",
+    "settings-management",
+    "skill-management",
     "task-graph-ui",
+    "task-lifecycle",
     "task-ui",
+    "terminal",
     "theming-ui-shared"
   ],
   "context": {
@@ -68,7 +79,7 @@
       "TaskConfigBase.CopyFlagsTo transfers settings to AgentTaskData"
     ]
   },
-  "parentModuleId": "data-persistence",
+  "parentModuleId": "history-persistence",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
@@ -82,5 +93,5 @@
     "TaskTemplates"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.5949371Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.5352974Z"
 }

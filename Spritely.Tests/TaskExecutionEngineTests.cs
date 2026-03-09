@@ -84,16 +84,23 @@ namespace Spritely.Tests
             var gitOperationGuard = new GitOperationGuard(flm);
 
             var mbm = new MessageBusManager(dispatcher);
-            var mgr = new TaskExecutionManager(
-                tempDir, flm, otm,
-                _git, _completion, _prompt, _factory,
-                gitOperationGuard,
-                () => "test prompt",
-                _ => "test project",
-                _ => "",
-                _ => false,
-                mbm,
-                dispatcher);
+            var mgr = new TaskExecutionManager(new TaskExecutionServices
+            {
+                ScriptDir = tempDir,
+                Dispatcher = dispatcher,
+                FileLockManager = flm,
+                OutputTabManager = otm,
+                MessageBusManager = mbm,
+                GitOperationGuard = gitOperationGuard,
+                GitHelper = _git,
+                CompletionAnalyzer = _completion,
+                PromptBuilder = _prompt,
+                TaskFactory = _factory,
+                GetSystemPrompt = () => "test prompt",
+                GetProjectDescription = _ => "test project",
+                GetProjectRulesBlock = _ => "",
+                IsGameProject = _ => false,
+            });
 
             return (mgr, flm, tempDir);
         }

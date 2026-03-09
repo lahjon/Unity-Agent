@@ -30,16 +30,27 @@
     "task-orchestration"
   ],
   "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
     "codebase-indexing",
     "feature-context-resolution",
+    "feature-mode",
     "feature-registry",
+    "git-operations",
     "history-analytics",
+    "history-management",
     "logging-diagnostics",
     "logging-infrastructure",
+    "module-management",
     "module-registry",
     "project-management",
+    "project-tasks",
+    "settings-management",
+    "skill-management",
     "task-graph-ui",
+    "task-lifecycle",
     "task-ui",
+    "terminal",
     "theming-ui-shared"
   ],
   "context": {
@@ -70,16 +81,20 @@
       "TaskGroupTracker fires GroupCompleted events"
     ]
   },
-  "parentModuleId": "data-persistence",
+  "parentModuleId": "history-persistence",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "CleanupOldHistory",
     "ClearActiveQueue",
     "CompletedCount",
     "CompletionSummary",
     "Description",
     "EndTime",
     "FailedCount",
+    "GenerateAggregateSummary",
+    "GetActiveGroupIds",
+    "GetGroupState",
     "GroupCompletedEventArgs",
     "GroupId",
     "GroupName",
@@ -89,8 +104,10 @@
     "LoadActiveQueueAsync",
     "LoadHistoryAsync",
     "LoadStoredTasksAsync",
+    "OnTaskCompleted",
     "OutputTokens",
     "Recommendations",
+    "RegisterTask",
     "SaveActiveQueue",
     "SaveHistory",
     "SaveStoredTasks",
@@ -98,10 +115,11 @@
     "Status",
     "TaskGroupEntry",
     "TaskGroupState",
+    "TaskGroupTracker",
     "TaskId",
     "TaskNumber",
     "TotalCount"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.4568757Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.5100771Z"
 }

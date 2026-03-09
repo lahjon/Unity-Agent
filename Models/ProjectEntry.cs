@@ -20,7 +20,7 @@ namespace Spritely.Models
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
         public McpStatus McpStatus { get; set; } = McpStatus.NotConnected;
-        public string McpServerName { get; set; } = "mcp-for-unity-server";
+        public string McpServerName { get; set; } = "UnityMCP";
         public string McpAddress { get; set; } = "http://127.0.0.1:8080/mcp";
         public string McpStartCommand { get; set; } = @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
         public string ShortDescription { get; set; } = "";

@@ -296,11 +296,12 @@ namespace Spritely.Managers
         /// Rebuilds the codebase symbol index from all known features without
         /// resetting feature metadata. Delegates to <see cref="CodebaseIndexManager.BuildIndexAsync"/>.
         /// </summary>
-        public async Task RebuildSymbolIndexAsync(string projectPath, CancellationToken ct = default)
+        public async Task RebuildSymbolIndexAsync(string projectPath, IProgress<string>? progress = null, CancellationToken ct = default)
         {
+            progress?.Report("Loading features...");
             var features = await LoadAllFeaturesAsync(projectPath);
             var indexManager = new CodebaseIndexManager();
-            await indexManager.BuildIndexAsync(projectPath, features, ct);
+            await indexManager.BuildIndexAsync(projectPath, features, ct, progress);
         }
 
         // ── Search ───────────────────────────────────────────────────────

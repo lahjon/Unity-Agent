@@ -21,7 +21,8 @@ namespace Spritely
         Planning,
         Verifying,
         Recommendation,
-        Committing
+        Committing,
+        SoftStop
     }
 
     public enum TaskPriority
@@ -231,7 +232,8 @@ namespace Spritely
                 Data.Status = value;
                 NotifyAll(nameof(Status), nameof(StatusText), nameof(QueueStatusText), nameof(StatusColor),
                     nameof(IsRunning), nameof(IsPlanning), nameof(IsQueued), nameof(IsPaused),
-                    nameof(IsInitQueued), nameof(IsFinished), nameof(IsCommitting), nameof(IsRetryable), nameof(IsContinuable),
+                    nameof(IsInitQueued), nameof(IsFinished), nameof(IsCommitting), nameof(IsSoftStopping),
+                    nameof(IsRetryable), nameof(IsContinuable),
                     nameof(TimeInfo), nameof(HasPriorityBadge), nameof(IsCompletedUncommitted));
             }
         }
@@ -372,6 +374,7 @@ namespace Spritely
         public bool IsPaused => Status == AgentTaskStatus.Paused;
         public bool IsInitQueued => Status == AgentTaskStatus.InitQueued;
         public bool IsCommitting => Status == AgentTaskStatus.Committing;
+        public bool IsSoftStopping => Status == AgentTaskStatus.SoftStop;
         public bool IsFinished => Status is AgentTaskStatus.Completed or AgentTaskStatus.Cancelled or AgentTaskStatus.Failed or AgentTaskStatus.Recommendation;
         public bool IsRetryable => Status is AgentTaskStatus.Failed or AgentTaskStatus.Cancelled;
         public bool IsContinuable => Status == AgentTaskStatus.Recommendation;
@@ -424,6 +427,7 @@ namespace Spritely
             AgentTaskStatus.Verifying => "Verifying",
             AgentTaskStatus.Recommendation => "Has Recommendations",
             AgentTaskStatus.Committing => "Committing",
+            AgentTaskStatus.SoftStop => "Stopping...",
             _ => "?"
         };
 
@@ -451,6 +455,7 @@ namespace Spritely
             AgentTaskStatus.Verifying => "#80CBC4",
             AgentTaskStatus.Recommendation => "#FFB74D",
             AgentTaskStatus.Committing => "#4DD0E1",
+            AgentTaskStatus.SoftStop => "#FF8A65",
             _ => "#555555"
         };
 

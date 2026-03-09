@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -131,7 +132,8 @@ namespace Spritely.Managers
                         return true;
                     }
                 }
-                catch (Exception ex) { AppLogger.Warn("ChatManager", "Failed to paste image", ex); }
+                catch (IOException ex) { AppLogger.Warn("ChatManager", "Failed to paste image (I/O)", ex); }
+                catch (System.Runtime.InteropServices.ExternalException ex) { AppLogger.Warn("ChatManager", "Failed to paste image (clipboard)", ex); }
             }
 
             if (Clipboard.ContainsFileDropList())
@@ -374,8 +376,23 @@ namespace Spritely.Managers
                 _messagesPanel.Children.Remove(userBubble);
                 _input.Text = text;
             }
-            catch (Exception)
+            catch (HttpRequestException ex)
             {
+                AppLogger.Error("ChatManager", "Chat request failed", ex);
+                _messagesPanel.Children.Remove(responseBubble);
+                _messagesPanel.Children.Remove(userBubble);
+                _input.Text = text;
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                AppLogger.Error("ChatManager", "Failed to parse chat response", ex);
+                _messagesPanel.Children.Remove(responseBubble);
+                _messagesPanel.Children.Remove(userBubble);
+                _input.Text = text;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("ChatManager", "Unexpected error during chat send", ex);
                 _messagesPanel.Children.Remove(responseBubble);
                 _messagesPanel.Children.Remove(userBubble);
                 _input.Text = text;
@@ -474,14 +491,19 @@ namespace Spritely.Managers
                                     UseShellExecute = true
                                 });
                             }
-                            catch { }
+                            catch (System.ComponentModel.Win32Exception) { }
+                            catch (InvalidOperationException) { }
                         };
 
                         imageWrap.Children.Add(imgBorder);
                     }
-                    catch (Exception ex)
+                    catch (IOException ex)
                     {
                         AppLogger.Warn("ChatManager", $"Failed to load image thumbnail: {ex.Message}");
+                    }
+                    catch (NotSupportedException ex)
+                    {
+                        AppLogger.Warn("ChatManager", $"Unsupported image format: {ex.Message}");
                     }
                 }
                 panel.Children.Add(imageWrap);

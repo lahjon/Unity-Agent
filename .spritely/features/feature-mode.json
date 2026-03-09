@@ -1,89 +1,143 @@
 {
   "id": "feature-mode",
-  "name": "Feature Mode (Multi-Iteration Execution)",
-  "description": "Enables multi-iteration AI task execution with optional team spawning, plan consolidation, and evaluation phases. Drives the FeatureModePhase state machine and makes per-iteration continuation decisions including early termination.",
+  "name": "Feature Mode Orchestration",
+  "description": "Manages long-running iterative AI feature development cycles: multi-phase execution (TeamPlanning, PlanConsolidation, Execution, Evaluation), runtime cap enforcement, consecutive failure tracking, and token budget management.",
   "category": "core",
   "keywords": [
     "FeatureModeHandler",
+    "FeatureModeMaxRuntimeHours",
     "FeatureModePhase",
-    "continuation",
-    "evaluation",
+    "TokenBudgetConfig",
+    "consecutive failures",
+    "evaluation phase",
     "feature mode",
     "iteration",
-    "multi-iteration",
-    "plan consolidation",
-    "team spawning"
+    "planning phase"
   ],
   "primaryFiles": [
     "Managers/CompletionAnalyzer.cs",
-    "Managers/FeatureModeHandler.cs"
+    "Managers/FeatureModeHandler.cs",
+    "Models/TokenBudgetConfig.cs"
   ],
   "secondaryFiles": [
+    "MainWindow.Features.cs",
     "Managers/EarlyTerminationManager.cs",
+    "Managers/IterationMemoryManager.cs",
+    "Managers/ModelComplexityAnalyzer.cs",
     "Managers/ProgressAnalyzer.cs",
     "Managers/TokenLimitHandler.cs",
     "Models/TaskConfigBase.cs",
     "Spritely.Tests/TaskExecutionEngineTests.cs"
   ],
   "relatedFeatureIds": [
-    "context-optimization",
-    "prompt-building",
-    "task-execution"
+    "feature-registry",
+    "progress-tracking",
+    "task-decomposition",
+    "task-execution",
+    "task-lifecycle"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "app-settings",
     "app-startup-config",
     "codebase-indexing",
+    "completion-analysis",
     "context-optimization",
+    "feature-initialization",
     "feature-mode-execution",
     "feature-registry",
     "file-lock-management",
     "git-operations",
     "llm-services",
-    "logging-diagnostics",
     "message-bus",
-    "output-processing",
+    "output-management",
+    "progress-tracking",
     "prompt-building",
+    "semantic-search",
     "task-execution",
     "task-factory",
-    "task-ui"
+    "task-lifecycle"
   ],
   "context": {
     "signatures": {
       "Managers/CompletionAnalyzer.cs": {
-        "hash": "aef548c5c0d0",
-        "content": "class CompletionAnalyzer\n  IsTaskOutputComplete(string[] lines, int recommendationLine) -\u003E bool\n  ExtractRecommendations(string output) -\u003E string?\n  CheckFeatureModeComplete(string output) -\u003E bool\n  IsTokenLimitError(string output) -\u003E bool"
+        "hash": "3defff14d154",
+        "content": "class CompletionAnalyzer : ICompletionAnalyzer\n  L55: IsTaskOutputComplete(string[] lines, int recommendationLine) -\u003E bool\n  L89: ExtractRecommendations(string output) -\u003E string?\n  L168: VerifyResultAsync(string outputTail, string taskDescription, string? completionSummary, CancellationToken ct = default, string? modelOverride = null) -\u003E Task\u003CResultVerification?\u003E\n  L307: FormatCompletionSummary(AgentTaskStatus status, TimeSpan duration, List\u003C(string name, int added, int removed) -\u003E string\n  L318: GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash, AgentTaskStatus status, TimeSpan duration, long inputTokens = 0, long outputTokens = 0, long cacheReadTokens = 0, long cacheCreationTokens = 0, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E\n  L342: CheckFeatureModeComplete(string output) -\u003E bool\n  L355: IsTokenLimitError(string output) -\u003E bool"
       },
       "Managers/FeatureModeHandler.cs": {
-        "hash": "747a93de8b02",
-        "content": "class FeatureModeHandler\n  Description: string\n  DependsOn: List\u003Cint\u003E?\nenum FeatureModeAction\n    newFailures, Action, ConsecutiveFailures, TrimOutput"
+        "hash": "09d43ad514b7",
+        "content": "class FeatureModeHandler\n  L37: FeatureModeMaxRuntimeHours: int = 12\n  L38: FeatureModeIterationTimeoutMinutes: int = 60\n  L39: FeatureModeMaxConsecutiveFailures: int = 3\n  L40: FeatureModeOutputCapChars: int = 100_000\n  L41: PlanningTeamMemberTimeoutMinutes: int = 30\n  L87: HandleFeatureModeIteration(AgentTask task, int exitCode, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void\n  L330: OnFeatureModePhaseComplete(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Called when all children of the current phase have completed. Routes to the n...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L788: MaxPerChildChars: int = 2_000\n  L789: MaxTotalResultsChars: int = 12_000\nenum FeatureModeAction\n    newFailures, Action, ConsecutiveFailures, TrimOutput"
+      },
+      "Models/TokenBudgetConfig.cs": {
+        "hash": "f7f6d3f29dbd",
+        "content": "class TokenBudgetConfig\n  TotalTokenBudget: long\n  PhaseBudgets: Dictionary\u003CFeatureModePhase, long\u003E\n  Level: OptimizationLevel\n  Thresholds: Dictionary\u003COptimizationLevel, ProgressThresholds\u003E\n  EnableEarlyTermination: bool\n  EnableSmartTruncation: bool\n  EnableDynamicModelSelection: bool\n  EnableContextDeduplication: bool\n  EnableIterationMemory: bool\n  MaxTokensPerChildResult: int\n  MaxTotalChildResultTokens: int\n  L100: GetCurrentThresholds() -\u003E ProgressThresholds  // Gets the current progress thresholds based on optimization level.\n  L110: GetPhaseBudget(FeatureModePhase phase) -\u003E long  // Gets the phase budget for a specific phase.\n  L120: CreateDefault() -\u003E TokenBudgetConfig  // Creates a default configuration.\n  L128: CreateSmall() -\u003E TokenBudgetConfig  // Creates a configuration for small tasks.\n  L147: CreateLarge() -\u003E TokenBudgetConfig  // Creates a configuration for large tasks.\nenum OptimizationLevel\n    None, Conservative, Balanced\nclass ProgressThresholds\n  MinProgressPerIteration: double\n  MaxStallIterations: int\n  TokenBurnRateLimit: double"
       }
     },
     "keyTypes": [
-      "class CompletionAnalyzer",
       "class FeatureModeHandler",
+      "class TokenBudgetConfig",
       "enum FeatureModeAction",
       "enum FeatureModePhase"
     ],
     "patterns": [
-      "Fire-and-await continuation prompt",
-      "Per-iteration decision with crash-loop detection",
-      "Phase state machine (None\u2192TeamPlanning\u2192PlanConsolidation\u2192Execution\u2192Evaluation)"
+      "Iteration memory accumulation across phases",
+      "Phase state machine with explicit transitions",
+      "Runtime cap and crash-loop guards"
     ],
     "dependencies": [
-      "CompletionAnalyzer for completion detection",
-      "PromptBuilder for continuation prompts",
-      "TaskExecutionManager for process control"
+      "Drives TaskExecutionManager via callbacks",
+      "Reads feature context from FeatureRegistryManager",
+      "Uses IterationMemoryManager for cross-iteration state"
     ]
   },
-  "parentModuleId": "task-execution",
+  "parentModuleId": "prompt-ai",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "CheckFeatureModeComplete",
     "CompletionAnalyzer",
+    "CreateDefault",
+    "CreateLarge",
+    "CreateSmall",
+    "DependsOn",
+    "Description",
+    "EnableContextDeduplication",
+    "EnableDynamicModelSelection",
+    "EnableEarlyTermination",
+    "EnableIterationMemory",
+    "EnableSmartTruncation",
+    "ExtractRecommendations",
     "FeatureModeAction",
-    "FeatureModeHandler"
+    "FeatureModeHandler",
+    "FeatureModeIterationTimeoutMinutes",
+    "FeatureModeMaxConsecutiveFailures",
+    "FeatureModeMaxRuntimeHours",
+    "FeatureModeOutputCapChars",
+    "FormatCompletionSummary",
+    "GenerateCompletionSummaryAsync",
+    "GetCurrentThresholds",
+    "GetPhaseBudget",
+    "HandleFeatureModeIteration",
+    "IsTaskOutputComplete",
+    "IsTokenLimitError",
+    "Level",
+    "MaxPerChildChars",
+    "MaxStallIterations",
+    "MaxTokensPerChildResult",
+    "MaxTotalChildResultTokens",
+    "MaxTotalResultsChars",
+    "MinProgressPerIteration",
+    "OnFeatureModePhaseComplete",
+    "OptimizationLevel",
+    "PhaseBudgets",
+    "PlanningTeamMemberTimeoutMinutes",
+    "ProgressThresholds",
+    "Thresholds",
+    "TokenBudgetConfig",
+    "TokenBurnRateLimit",
+    "TotalTokenBudget",
+    "VerifyResultAsync"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.3450915Z"
+  "lastUpdatedAt": "2026-03-09T07:18:26.9849332Z"
 }

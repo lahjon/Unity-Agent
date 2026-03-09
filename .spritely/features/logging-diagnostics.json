@@ -26,10 +26,12 @@
   "relatedFeatureIds": [],
   "dependsOn": [
     "activity-dashboard",
+    "app-infrastructure",
     "app-settings",
     "chat",
     "chat-interface",
     "codebase-indexing",
+    "completion-analysis",
     "context-optimization",
     "feature-context-resolution",
     "feature-initialization",
@@ -42,20 +44,29 @@
     "git-ui",
     "helper-suggestions",
     "history-analytics",
+    "history-management",
     "llm-services",
     "logging-infrastructure",
     "mcp-integration",
     "message-bus",
+    "module-management",
     "module-registry",
+    "output-management",
     "output-processing",
+    "preprocessor-skip-rules",
+    "progress-tracking",
     "project-management",
     "project-tasks",
     "prompt-building",
+    "semantic-search",
+    "settings-management",
     "skill-management",
     "skills-system",
+    "task-decomposition",
     "task-execution",
     "task-factory",
     "task-graph-ui",
+    "task-group-tracking",
     "task-history",
     "task-orchestration",
     "task-preprocessing",
@@ -67,8 +78,8 @@
   "context": {
     "signatures": {
       "Dialogs/LogViewerDialog.cs": {
-        "hash": "7df1893d0a82",
-        "content": "class LogViewerDialog\n  Show() -\u003E void"
+        "hash": "9bfc87487899",
+        "content": "class LogViewerDialog\n  L12: Show() -\u003E void"
       },
       "Managers/AppLogger.cs": {
         "hash": "910d73c6d8dc",
@@ -92,15 +103,39 @@
       "%LOCALAPPDATA%\\Spritely\\logs\\ for log storage"
     ]
   },
-  "parentModuleId": "app-infrastructure",
+  "parentModuleId": "infrastructure",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
     "AppLogger",
+    "ClearMemory",
+    "Debug",
+    "Error",
+    "Flush",
+    "FlushAll",
+    "GetLogDir",
+    "GetLogFilePath",
+    "GetRecentEntries",
+    "Info",
+    "Initialize",
+    "Log",
+    "LogFile",
     "LogLevel",
     "LogViewerDialog",
-    "SafeFileWriter"
+    "MaxFileSizeBytes",
+    "MaxMemoryEntries",
+    "ReadLogFile",
+    "SafeFileWriter",
+    "Show",
+    "Warn",
+    "WriteInBackground",
+    "_allComplete",
+    "_drainLock",
+    "_lock",
+    "_locks",
+    "_recentEntries",
+    "_writeQueue"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.5825795Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.4374519Z"
 }

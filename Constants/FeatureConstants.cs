@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Spritely.Constants
 {
     /// <summary>
@@ -117,7 +120,82 @@ namespace Spritely.Constants
             "dist",
             "build",
             "__pycache__",
-            ".spritely"
+            ".spritely",
+            "TextMesh Pro",
+            "Plugins",
+            "StreamingAssets"
+        };
+
+        /// <summary>
+        /// File extensions to skip early during file enumeration to avoid processing
+        /// tens of thousands of non-source asset files (e.g. Unity .meta, textures, models).
+        /// </summary>
+        public static readonly HashSet<string> IgnoredFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".meta",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".bmp",
+            ".tga",
+            ".psd",
+            ".gif",
+            ".tif",
+            ".tiff",
+            ".exr",
+            ".hdr",
+            ".svg",
+            ".ico",
+            ".webp",
+            ".fbx",
+            ".obj",
+            ".blend",
+            ".dae",
+            ".3ds",
+            ".max",
+            ".ma",
+            ".mb",
+            ".prefab",
+            ".unity",
+            ".asset",
+            ".mat",
+            ".physicMaterial",
+            ".physicsMaterial2D",
+            ".controller",
+            ".anim",
+            ".overrideController",
+            ".mask",
+            ".wav",
+            ".mp3",
+            ".ogg",
+            ".aif",
+            ".flac",
+            ".mixer",
+            ".ttf",
+            ".otf",
+            ".fontsettings",
+            ".shader",
+            ".shadergraph",
+            ".shadersubgraph",
+            ".cginc",
+            ".hlsl",
+            ".compute",
+            ".dll",
+            ".so",
+            ".dylib",
+            ".bundle",
+            ".a",
+            ".aar",
+            ".jar",
+            ".lighting",
+            ".terrainlayer",
+            ".brush",
+            ".guiskin",
+            ".renderTexture",
+            ".cubemap",
+            ".flare",
+            ".spriteatlas",
+            ".spriteatlasv2"
         };
     }
 }

@@ -1,0 +1,139 @@
+{
+  "id": "history-management",
+  "name": "Task History \u0026 Persistence",
+  "description": "Persists completed tasks to disk, loads history on startup, cleans up entries beyond retention period, and saves/restores the active task queue across app restarts.",
+  "category": "data",
+  "keywords": [
+    "HistoryManager",
+    "LoadHistoryAsync",
+    "SaveHistory",
+    "StoredTaskEntry",
+    "TaskHistoryEntry",
+    "active queue restore",
+    "history persistence",
+    "retention"
+  ],
+  "primaryFiles": [
+    "Managers/HistoryManager.cs",
+    "Models/StoredTaskEntry.cs",
+    "Models/TaskHistoryEntry.cs",
+    "Models/TaskRecordBase.cs"
+  ],
+  "secondaryFiles": [
+    "Dialogs/StoredTaskViewerDialog.cs"
+  ],
+  "relatedFeatureIds": [
+    "task-group-tracking",
+    "task-lifecycle"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
+    "codebase-indexing",
+    "feature-context-resolution",
+    "feature-mode",
+    "feature-registry",
+    "git-operations",
+    "module-management",
+    "module-registry",
+    "project-management",
+    "project-tasks",
+    "settings-management",
+    "skill-management",
+    "task-graph-ui",
+    "task-lifecycle",
+    "task-ui",
+    "terminal",
+    "theming-ui-shared"
+  ],
+  "context": {
+    "signatures": {
+      "Managers/HistoryManager.cs": {
+        "hash": "6731b5b396e2",
+        "content": "class HistoryManager\n  L30: SaveHistory(ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L75: LoadHistoryAsync(int retentionHours) -\u003E Task\u003CList\u003CAgentTask\u003E\u003E\n  L123: CleanupOldHistory(ObservableCollection\u003CAgentTask\u003E historyTasks, Dictionary\u003Cstring, TabItem\u003E tabs, TabControl outputTabs, Dictionary\u003Cstring, System.Windows.Controls.RichTextBox\u003E outputBoxes, int retentionHours) -\u003E void\n  L160: SaveActiveQueue(ObservableCollection\u003CAgentTask\u003E activeTasks, object activeTasksLock, bool useBackgroundWrite = false) -\u003E void  // Persists active tasks that are in InitQueued, Queued, or Planning state so th...\n  L246: LoadActiveQueueAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E  // Loads tasks that were in the active queue when the app last shut down. Return...\n  L300: ClearActiveQueue() -\u003E void  // Removes the active queue file after tasks have been successfully recovered or...\n  L310: SaveStoredTasks(ObservableCollection\u003CAgentTask\u003E storedTasks) -\u003E void\n  L342: LoadStoredTasksAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E"
+      },
+      "Models/StoredTaskEntry.cs": {
+        "hash": "219c224f4ba5",
+        "content": "class StoredTaskEntry : TaskRecordBase\n  FullOutput: string\n  CreatedAt: DateTime"
+      },
+      "Models/TaskHistoryEntry.cs": {
+        "hash": "d9e71bb9b5fc",
+        "content": "class TaskHistoryEntry : TaskRecordBase\n  Status: string\n  StartTime: DateTime\n  EndTime: DateTime?\n  IsFeatureMode: bool\n  MaxIterations: int\n  CurrentIteration: int\n  CompletionSummary: string\n  Recommendations: string\n  GroupId: string?\n  GroupName: string?\n  InputTokens: long\n  OutputTokens: long\n  CacheReadTokens: long\n  CacheCreationTokens: long\n  WasActive: bool\n  Model: string\n  Headless: bool\n  IgnoreFileLocks: bool\n  UseMcp: bool\n  SpawnTeam: bool\n  ExtendedPlanning: bool\n  PlanOnly: bool\n  UseMessageBus: bool\n  AutoDecompose: bool\n  ApplyFix: bool\n  AdditionalInstructions: string\n  FullOutput: string\n  DependencyContext: string?"
+      },
+      "Models/TaskRecordBase.cs": {
+        "hash": "ed0670f59335",
+        "content": "class TaskRecordBase\n  Description: string\n  Summary: string\n  StoredPrompt: string\n  ConversationId: string\n  ProjectPath: string?\n  ProjectColor: string\n  ProjectDisplayName: string\n  SkipPermissions: bool"
+      }
+    },
+    "keyTypes": [
+      "class HistoryManager",
+      "class StoredTaskEntry",
+      "class TaskHistoryEntry",
+      "class TaskRecordBase"
+    ],
+    "patterns": [
+      "JSON serialization to %LOCALAPPDATA%\\Spritely\\",
+      "Separate active-queue persistence for crash recovery"
+    ],
+    "dependencies": [
+      "Consumed by ActivityDashboardManager for stats",
+      "Reads/writes JSON files under %LOCALAPPDATA%\\Spritely\\"
+    ]
+  },
+  "parentModuleId": "history-persistence",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "AdditionalInstructions",
+    "ApplyFix",
+    "AutoDecompose",
+    "CacheCreationTokens",
+    "CacheReadTokens",
+    "CleanupOldHistory",
+    "ClearActiveQueue",
+    "CompletionSummary",
+    "ConversationId",
+    "CreatedAt",
+    "CurrentIteration",
+    "DependencyContext",
+    "Description",
+    "EndTime",
+    "ExtendedPlanning",
+    "FullOutput",
+    "GroupId",
+    "GroupName",
+    "Headless",
+    "HistoryManager",
+    "IgnoreFileLocks",
+    "InputTokens",
+    "IsFeatureMode",
+    "LoadActiveQueueAsync",
+    "LoadHistoryAsync",
+    "LoadStoredTasksAsync",
+    "MaxIterations",
+    "Model",
+    "OutputTokens",
+    "PlanOnly",
+    "ProjectColor",
+    "ProjectDisplayName",
+    "ProjectPath",
+    "Recommendations",
+    "SaveActiveQueue",
+    "SaveHistory",
+    "SaveStoredTasks",
+    "SkipPermissions",
+    "SpawnTeam",
+    "StartTime",
+    "Status",
+    "StoredPrompt",
+    "StoredTaskEntry",
+    "Summary",
+    "TaskHistoryEntry",
+    "TaskRecordBase",
+    "UseMcp",
+    "UseMessageBus",
+    "WasActive"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-09T07:18:27.1586533Z"
+}

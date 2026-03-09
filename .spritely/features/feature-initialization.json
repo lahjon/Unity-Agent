@@ -1,20 +1,19 @@
 {
   "id": "feature-initialization",
-  "name": "Feature Registry Initialization",
-  "description": "Bootstraps the feature registry for a project from scratch by using Sonnet to scan the full codebase and produce an initial set of features and modules. Triggered by the \u0027Initialize Features\u0027 button.",
+  "name": "Feature Initialization \u0026 Discovery",
+  "description": "Performs initial codebase analysis to discover and create features by scanning source files and calling Claude Sonnet to identify logical features with their files, keywords, and dependencies. Excludes non-code assets (.png, .meta files) from discovery scans to focus on relevant source code.",
   "category": "core",
   "keywords": [
+    "DependencyAnalyzer",
     "FeatureInitializer",
-    "InitializeAsync",
-    "SignatureExtractor",
-    "Sonnet scan",
+    "InferModuleMembership",
     "SonnetFeature",
-    "SonnetModule",
-    "bootstrap registry",
-    "code signatures",
-    "initialize features"
+    "feature discovery",
+    "initialize features",
+    "project scan"
   ],
   "primaryFiles": [
+    "Managers/DependencyAnalyzer.cs",
     "Managers/FeatureInitializer.cs",
     "Managers/SignatureExtractor.cs"
   ],
@@ -23,31 +22,47 @@
     "Spritely.Tests/FeatureSystemTests.cs"
   ],
   "relatedFeatureIds": [
+    "codebase-indexing",
     "feature-registry",
-    "llm-services"
+    "llm-services",
+    "module-management"
   ],
   "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
     "app-settings",
     "app-startup-config",
     "codebase-indexing",
     "context-optimization",
     "feature-context-resolution",
+    "feature-mode",
     "feature-registry",
     "git-operations",
     "git-ui",
+    "history-management",
     "llm-services",
-    "logging-diagnostics",
+    "module-management",
     "module-registry",
     "project-management",
+    "project-tasks",
     "prompt-building",
+    "semantic-search",
+    "settings-management",
+    "skill-management",
     "task-factory",
-    "task-orchestration"
+    "task-lifecycle",
+    "task-orchestration",
+    "terminal"
   ],
   "context": {
     "signatures": {
+      "Managers/DependencyAnalyzer.cs": {
+        "hash": "bf50dec7253c",
+        "content": "class DependencyAnalyzer\n  L56: AnalyzeDependencies(List\u003CFeatureEntry\u003E features, string projectPath) -\u003E void  // Analyzes all features\u0027 primary files to detect cross-feature type references ...\n  L107: AnalyzeImportDependencies(List\u003CFeatureEntry\u003E features, string projectPath) -\u003E void  // Analyzes import/using statements in each feature\u0027s primary files to detect cr...\n  L153: ComputeDependsOnForNewFeature(FeatureEntry newFeature, List\u003CFeatureEntry\u003E existingFeatures, string projectPath) -\u003E List\u003Cstring\u003E  // Computes DependsOn for a single newly-created feature by analyzing its primar...\n  L201: InferModuleMembership(List\u003CFeatureEntry\u003E features, List\u003CModuleEntry\u003E modules) -\u003E Dictionary\u003Cstring, string\u003E  // Infers module membership for features that lack a ParentModuleId. Checks if t...\n  L279: ExtractDefinedTypes(string filePath) -\u003E HashSet\u003Cstring\u003E  // Extracts type names defined in a source file (class, interface, enum, struct,...\n  L313: ExtractReferencedTypes(string filePath) -\u003E HashSet\u003Cstring\u003E  // Extracts type names referenced (but not necessarily defined) in a source file..."
+      },
       "Managers/FeatureInitializer.cs": {
-        "hash": "f1001cb88602",
-        "content": "class FeatureInitializer\n  Features: List\u003CSonnetFeature\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  Keywords: List\u003Cstring\u003E\n  PrimaryFiles: List\u003Cstring\u003E\n  SecondaryFiles: List\u003Cstring\u003E\n  RelatedFeatureIds: List\u003Cstring\u003E\n  KeyTypes: List\u003Cstring\u003E\n  Patterns: List\u003Cstring\u003E\n  Dependencies: List\u003Cstring\u003E\n  DependsOnFeatures: List\u003Cstring\u003E\n  Modules: List\u003CSonnetModule\u003E\n  Id: string\n  Name: string\n  Description: string\n  FeatureIds: List\u003Cstring\u003E\n  InitializeAsync(string projectPath, CancellationToken ct = default) -\u003E Task\u003CFeatureIndex?\u003E"
+        "hash": "344698750b3b",
+        "content": "class FeatureInitializer\n  Features: List\u003CSonnetFeature\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  Keywords: List\u003Cstring\u003E\n  PrimaryFiles: List\u003Cstring\u003E\n  SecondaryFiles: List\u003Cstring\u003E\n  RelatedFeatureIds: List\u003Cstring\u003E\n  KeyTypes: List\u003Cstring\u003E\n  Patterns: List\u003Cstring\u003E\n  Dependencies: List\u003Cstring\u003E\n  DependsOnFeatures: List\u003Cstring\u003E\n  Modules: List\u003CSonnetModule\u003E\n  Id: string\n  Name: string\n  Description: string\n  FeatureIds: List\u003Cstring\u003E\n  L117: InitializeAsync(string projectPath, CancellationToken ct = default) -\u003E Task\u003CFeatureIndex?\u003E  // Scans the project, calls Sonnet to identify features, builds and persists the...\n  L670: ScanSourceFiles(string projectPath) -\u003E List\u003Cstring\u003E  // Returns relative paths of all source files under \u003Cparamref name=\u0022projectPath\u0022...\n  L718: BuildDirectoryTree(string projectPath, List\u003Cstring\u003E relativeFiles) -\u003E string  // Groups files by their first directory component and returns a compact tree su...\n  L749: DetectProjectType(string projectPath) -\u003E string  // Checks for well-known project indicator files and returns a string describing...\n  L777: SonnetTimeout: TimeSpan = TimeSpan.FromMinutes(5)"
       },
       "Managers/SignatureExtractor.cs": {
         "hash": "7c72ce24cde3",
@@ -55,30 +70,38 @@
       }
     },
     "keyTypes": [
-      "class ExtractedSymbol",
-      "class FeatureInitializer",
-      "class SignatureExtractor",
-      "enum SymbolKind"
+      "class DependencyAnalyzer",
+      "class FeatureInitializer"
     ],
     "patterns": [
-      "File hash-based change detection for signature staleness",
-      "One-shot Sonnet invocation to produce structured JSON registry"
+      "Chunked LLM calls for large projects (MaxFilesPerSonnetChunk)",
+      "Dependency analysis via import/using statement parsing"
     ],
     "dependencies": [
-      "Calls Sonnet LLM to analyze code signatures",
-      "Writes results via FeatureRegistryManager"
+      "Calls Claude Sonnet for feature identification",
+      "Uses SignatureExtractor for file scanning",
+      "Writes results to FeatureRegistryManager"
     ]
   },
-  "parentModuleId": "feature-registry",
+  "parentModuleId": "codebase-intelligence",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "AnalyzeDependencies",
+    "AnalyzeImportDependencies",
+    "BaseTypes",
+    "BuildDirectoryTree",
     "Category",
+    "ComputeDependsOnForNewFeature",
     "ComputeFileHash",
     "Dependencies",
+    "DependencyAnalyzer",
     "DependsOnFeatures",
     "Description",
+    "DetectProjectType",
+    "ExtractDefinedTypes",
     "ExtractImports",
+    "ExtractReferencedTypes",
     "ExtractSignatures",
     "ExtractStructuredSymbols",
     "ExtractedSymbol",
@@ -88,20 +111,27 @@
     "GetSupportedExtensions",
     "GetSymbolNames",
     "Id",
+    "InferModuleMembership",
     "InitializeAsync",
     "KeyTypes",
     "Keywords",
     "Kind",
+    "LineNumber",
     "Modules",
     "Name",
     "Patterns",
     "PrimaryFiles",
     "RelatedFeatureIds",
+    "ScanSourceFiles",
     "SecondaryFiles",
     "Signature",
     "SignatureExtractor",
+    "SonnetTimeout",
+    "Summary",
+    "SupportedExtensions",
     "SymbolKind"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.3139649Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-09T07:56:38.4892334Z",
+  "lastUpdatedByTaskId": "f83fc38a6d4b4ff6"
 }

@@ -1,37 +1,40 @@
 {
   "id": "git-operations",
   "name": "Git Operations",
-  "description": "Core Git command execution, operation safety guarding, and result modeling. Ensures all Git workflows are safe, reversible, and coordinated with file lock state.",
+  "description": "Provides a safe, testable wrapper around Git CLI commands: running arbitrary git commands, capturing HEAD, committing with path specs, and listing changed files. Enforces safe practices via GitOperationGuard.",
   "category": "integration",
   "keywords": [
+    "CaptureGitHeadAsync",
+    "CommitSecureAsync",
     "GitHelper",
-    "GitOperationGuard",
     "GitResult",
     "IGitHelper",
-    "file lock",
-    "git commit",
-    "git push",
-    "git status",
-    "safe git"
+    "RunGitCommandAsync",
+    "git command",
+    "git commit"
   ],
   "primaryFiles": [
     "Managers/GitHelper.cs",
     "Managers/IGitHelper.cs",
+    "Models/GitResult.cs",
     "Services/GitOperationGuard.cs"
   ],
   "secondaryFiles": [
+    "Managers/IGitHelper.cs",
     "Models/GitResult.cs"
   ],
   "relatedFeatureIds": [
-    "git-ui",
-    "task-orchestration"
+    "file-lock-management",
+    "git-ui"
   ],
   "dependsOn": [
     "activity-dashboard",
+    "app-infrastructure",
     "app-settings",
     "chat",
     "chat-interface",
     "codebase-indexing",
+    "completion-analysis",
     "context-optimization",
     "feature-context-resolution",
     "feature-initialization",
@@ -43,41 +46,56 @@
     "git-ui",
     "helper-suggestions",
     "history-analytics",
+    "history-management",
     "llm-services",
     "logging-diagnostics",
     "logging-infrastructure",
     "mcp-integration",
     "message-bus",
+    "module-management",
     "module-registry",
+    "output-management",
     "output-processing",
+    "preprocessor-skip-rules",
+    "progress-tracking",
     "project-management",
     "project-tasks",
     "prompt-building",
+    "semantic-search",
+    "settings-management",
     "skill-management",
     "skills-system",
+    "task-decomposition",
     "task-execution",
     "task-factory",
+    "task-group-tracking",
     "task-history",
+    "task-lifecycle",
     "task-orchestration",
     "task-preprocessing",
     "task-templates",
     "task-templates-storage",
     "task-ui",
+    "terminal",
     "theming-ui-shared"
   ],
   "context": {
     "signatures": {
       "Managers/GitHelper.cs": {
         "hash": "bcc7c7f2482b",
-        "content": "class GitHelper\n  EscapeGitPath(string path) -\u003E string\n  IsValidGitHash(string? hash) -\u003E bool"
+        "content": "class GitHelper : IGitHelper\n  L24: RunGitCommandAsync(string workingDirectory, string arguments, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L30: RunGitCommandAsync(string workingDirectory, string arguments, TimeSpan timeout, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L36: RunGitCommandAsync(string workingDirectory, string arguments, string? standardInput, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L42: RunGitCommandAsync(string workingDirectory, string arguments, string? standardInput, TimeSpan timeout, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L101: CaptureGitHeadAsync(string projectPath, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring?\u003E\n  L108: CommitSecureAsync(string workingDirectory, string message, string? pathSpec = null, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L159: GetChangedFileNamesAsync(string projectPath, string? gitStartHash, CancellationToken cancellationToken = default) -\u003E Task\u003CList\u003Cstring\u003E?\u003E  // Returns relative file paths changed since the given commit hash, including bo...\n  L202: EscapeGitPath(string path) -\u003E string  // Escapes a file path for safe use in git command-line arguments. Public static...\n  L216: IsValidGitHash(string? hash) -\u003E bool  // Validates that a string is a valid git commit hash (SHA-1). Valid hashes are ..."
       },
       "Managers/IGitHelper.cs": {
         "hash": "dba0a2dc56c0",
         "content": "interface IGitHelper"
       },
+      "Models/GitResult.cs": {
+        "hash": "5d6f64e24ab3",
+        "content": "  L9: GitResult(string Output, string Error, int ExitCode) -\u003E record  // Represents the result of a git command execution with structured output, erro...\n  L24: GetErrorMessage() -\u003E string  // Gets a combined error message including stderr and exit code for failed comma..."
+      },
       "Services/GitOperationGuard.cs": {
         "hash": "ca5c8d2faea0",
-        "content": "class GitOperationGuard"
+        "content": "class GitOperationGuard\n  L94: ExecuteGitOperationAsync(Func\u003CTask\u003E gitOperation, string operationName, CancellationToken cancellationToken = default) -\u003E Task  // Executes an async git operation with void return type."
       }
     },
     "keyTypes": [
@@ -87,24 +105,31 @@
       "record GitResult"
     ],
     "patterns": [
-      "Guard pattern blocking Git ops while file locks active",
-      "Reversible staged commit flow, no git add -A"
+      "All git output captured as GitResult with exit code",
+      "Interface-abstracted for testability"
     ],
     "dependencies": [
-      "Executes git CLI via Process/Bash",
-      "Integrated with FileLockManager for safety"
+      "Shells out to git CLI",
+      "Used by TaskExecutionManager for auto-commit and hash capture"
     ]
   },
   "parentModuleId": "git-integration",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "CaptureGitHeadAsync",
+    "CommitSecureAsync",
     "EscapeGitPath",
+    "ExecuteGitOperationAsync",
+    "GetChangedFileNamesAsync",
+    "GetErrorMessage",
     "GitHelper",
     "GitOperationGuard",
+    "GitResult",
     "IGitHelper",
-    "IsValidGitHash"
+    "IsValidGitHash",
+    "RunGitCommandAsync"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.4393963Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.0901244Z"
 }

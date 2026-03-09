@@ -27,8 +27,10 @@
     "task-execution"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "logging-diagnostics",
     "task-graph-ui",
+    "task-lifecycle",
     "task-ui",
     "theming-ui-shared"
   ],
@@ -55,9 +57,10 @@
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "Show",
     "StoredTaskViewerDialog"
   ],
   "touchCount": 1,
-  "lastUpdatedAt": "2026-03-08T20:39:56.2629886Z",
+  "lastUpdatedAt": "2026-03-09T07:18:27.494529Z",
   "lastUpdatedByTaskId": "29d6f606277649ad"
 }

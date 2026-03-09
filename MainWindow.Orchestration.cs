@@ -66,6 +66,8 @@ namespace Spritely
                     _activeTasks.Insert(insertAfter, task);
                     RefreshActivityDashboard();
                     RestoreStarRows();
+                    if (task.IsFeatureMode || task.DependencyTaskIdCount > 0)
+                        CheckAutoExpandGraph();
                     return;
                 }
             }
@@ -77,6 +79,10 @@ namespace Spritely
             _activeTasks.Insert(insertIndex, task);
             RefreshActivityDashboard();
             RestoreStarRows();
+
+            // Auto-expand graph when feature mode or dependency tasks are active
+            if (task.IsFeatureMode || task.DependencyTaskIdCount > 0)
+                CheckAutoExpandGraph();
         }
 
         /// <summary>

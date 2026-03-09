@@ -388,6 +388,15 @@ namespace Spritely
             }
         }
 
+        private void SoftStop_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
+            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning)) return;
+
+            _taskExecutionManager.SoftStopTask(task);
+            _outputTabManager.AppendOutput(task.Id, "\nSoft-stop requested — waiting for task to finish gracefully...\n", _activeTasks, _historyTasks);
+        }
+
         private void ForceStartQueued_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
@@ -754,7 +763,7 @@ namespace Spritely
                 return;
             }
 
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused)
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.SoftStop)
             {
                 if (!DarkDialog.ShowConfirm(
                     $"Task #{task.TaskNumber} is still running.\nAre you sure you want to cancel it?",

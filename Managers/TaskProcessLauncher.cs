@@ -306,6 +306,38 @@ namespace Spritely.Managers
             }
         }
 
+        /// <summary>
+        /// Sends a graceful stop signal (Ctrl+C via stdin) to the task's process.
+        /// The process is allowed to finish its current operation and exit cleanly,
+        /// preserving output and conversation ID.
+        /// </summary>
+        public void SoftStopTask(AgentTask task)
+        {
+            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning)) return;
+            if (task.Process is not { HasExited: false }) return;
+
+            task.Runtime.SoftStopRequested = true;
+            task.Status = AgentTaskStatus.SoftStop;
+
+            // Stop timers so no retries/iterations fire during shutdown
+            task.FeatureModeIterationTimer?.Stop();
+            task.FeatureModeRetryTimer?.Stop();
+            task.TokenLimitRetryTimer?.Stop();
+
+            // Send Ctrl+C (ETX) to stdin — Claude CLI treats this as a graceful abort
+            try
+            {
+                task.Process.StandardInput.Write('\x03');
+                task.Process.StandardInput.Flush();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("TaskExecution", $"Failed to send soft-stop signal to task {task.Id}", ex);
+            }
+
+            _outputTabManager.UpdateTabHeader(task);
+        }
+
         public void PauseTask(AgentTask task)
         {
             if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning)) return;

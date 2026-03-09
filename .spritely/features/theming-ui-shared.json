@@ -32,6 +32,7 @@
     "app-startup-config"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "app-startup",
     "logging-diagnostics",
     "task-graph-ui",
@@ -40,16 +41,16 @@
   "context": {
     "signatures": {
       "Dialogs/DarkDialog.cs": {
-        "hash": "3532b8a28ae8",
-        "content": "class DarkDialog\n  ShowConfirm(string message, string title) -\u003E bool\n  ShowAlert(string message, string title) -\u003E void\n  ShowTextInput(string title, string prompt, string defaultValue = \u0022\u0022) -\u003E string?"
+        "hash": "68fc0b135db5",
+        "content": "class DarkDialog\n  L10: ShowConfirm(string message, string title) -\u003E bool\n  L69: ShowAlert(string message, string title) -\u003E void\n  L112: ShowTextInput(string title, string prompt, string defaultValue = \u0022\u0022) -\u003E string?"
       },
       "Dialogs/DarkDialogWindow.xaml.cs": {
         "hash": "786fb061650a",
         "content": "class DarkDialogWindow : Window\n  L36: Create(string title, double width, double height, ResizeMode resizeMode = ResizeMode.NoResize, bool topmost = false, string backgroundResource = \u0022BgSurface\u0022, string titleColorResource = \u0022Accent\u0022) -\u003E DarkDialogWindow  // Creates a configured DarkDialogWindow, mirroring the old DialogFactory.Create...\n  L88: SetBodyContent(UIElement content) -\u003E void  // Sets the dialog body content (the area below the title bar)."
       },
       "Helpers/BrushCache.cs": {
-        "hash": "325a57e5fe0a",
-        "content": "class BrushCache\n  Get(string hex) -\u003E SolidColorBrush\n  Theme(string key) -\u003E SolidColorBrush"
+        "hash": "b23f12c60928",
+        "content": "class BrushCache\n  L9: Cache: ConcurrentDictionary\u003Cstring, SolidColorBrush\u003E = new()\n  L11: Get(string hex) -\u003E SolidColorBrush\n  L25: Theme(string key) -\u003E SolidColorBrush  // Looks up a named SolidColorBrush from the application\u0027s theme resources (Them..."
       }
     },
     "keyTypes": [
@@ -70,9 +71,17 @@
   "hierarchyLevel": 0,
   "symbolNames": [
     "BrushCache",
+    "Cache",
+    "Create",
     "DarkDialog",
-    "DarkDialogWindow"
+    "DarkDialogWindow",
+    "Get",
+    "SetBodyContent",
+    "ShowAlert",
+    "ShowConfirm",
+    "ShowTextInput",
+    "Theme"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.6612223Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.5473944Z"
 }

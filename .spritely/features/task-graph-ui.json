@@ -1,19 +1,18 @@
 {
   "id": "task-graph-ui",
-  "name": "Task Dependency Graph UI",
-  "description": "Renders an interactive visual graph of active tasks and their dependency relationships. Supports node selection, zoom/pan, force-directed layout animation, and context menus for task actions.",
+  "name": "Task Graph UI",
+  "description": "Renders an interactive visual dependency graph of active tasks with draggable nodes, animated layout transitions, edge drawing (dependency, blocking, file-lock), context menus, tooltips, and a progress overlay.",
   "category": "ui",
   "keywords": [
+    "FitToView",
     "GraphInteractionHandler",
     "GraphLayoutEngine",
     "GraphRenderer",
     "TaskNodeGraphPanel",
-    "dependency graph",
-    "edge",
-    "layout",
-    "node",
-    "task graph",
-    "visualization"
+    "dependency visualization",
+    "edge drawing",
+    "node dragging",
+    "task graph"
   ],
   "primaryFiles": [
     "Controls/GraphInteractionHandler.cs",
@@ -22,19 +21,23 @@
     "Controls/TaskNodeGraphPanel.cs"
   ],
   "secondaryFiles": [
+    "MainWindow.Orchestration.cs",
     "Models/AgentTaskData.cs"
   ],
   "relatedFeatureIds": [
-    "task-execution",
+    "file-lock-management",
+    "task-lifecycle",
     "task-orchestration"
   ],
   "dependsOn": [
     "activity-dashboard",
+    "app-infrastructure",
     "app-settings",
     "app-startup",
     "chat",
     "chat-interface",
     "codebase-indexing",
+    "completion-analysis",
     "context-optimization",
     "feature-context-resolution",
     "feature-initialization",
@@ -47,21 +50,31 @@
     "git-ui",
     "helper-suggestions",
     "history-analytics",
+    "history-management",
     "llm-services",
     "logging-diagnostics",
     "logging-infrastructure",
     "mcp-integration",
     "message-bus",
+    "module-management",
     "module-registry",
+    "output-management",
     "output-processing",
+    "preprocessor-skip-rules",
+    "progress-tracking",
     "project-management",
     "project-tasks",
     "prompt-building",
+    "semantic-search",
+    "settings-management",
     "skill-management",
     "skills-system",
+    "task-decomposition",
     "task-execution",
     "task-factory",
+    "task-group-tracking",
     "task-history",
+    "task-lifecycle",
     "task-orchestration",
     "task-preprocessing",
     "task-templates",
@@ -72,20 +85,20 @@
   "context": {
     "signatures": {
       "Controls/GraphInteractionHandler.cs": {
-        "hash": "05811bc061ac",
-        "content": "class GraphInteractionHandler\n  SetActiveTasks(ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E void\n  AttachScrollViewerEvents() -\u003E void\n  ToggleNodeSelection(string taskId) -\u003E void\n  FitToView(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  FocusOnTask(string taskId, Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  FocusOnNode(string nodeId, Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  CenterOnGraph(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  StartLayoutAnimation(Dictionary\u003Cstring, Point\u003E nodePositions, Dictionary\u003Cstring, Point\u003E targetPositions) -\u003E void\n  StopLayoutAnimation() -\u003E void\n  Dispose() -\u003E void"
+        "hash": "8f5c8e29d706",
+        "content": "class GraphInteractionHandler\n  L83: SetActiveTasks(ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E void\n  L90: AttachScrollViewerEvents() -\u003E void\n  L113: AttachNodeEvents(Border nodeBorder, AgentTask task, Dictionary\u003Cstring, Point\u003E nodePositions, IReadOnlyDictionary\u003Cstring, Border\u003E nodeBorders) -\u003E void\n  L325: ToggleNodeSelection(string taskId) -\u003E void\n  L498: FitToView(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  L552: FocusOnTask(string taskId, Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  L570: FocusOnNode(string nodeId, Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  L585: CenterOnGraph(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  L608: StartLayoutAnimation(Dictionary\u003Cstring, Point\u003E nodePositions, Dictionary\u003Cstring, Point\u003E targetPositions) -\u003E void\n  L657: StopLayoutAnimation() -\u003E void\n  L665: ResetLayout(Dictionary\u003Cstring, Point\u003E nodePositions, Dictionary\u003Cstring, Point\u003E targetPositions) -\u003E void\n  L680: Dispose() -\u003E void"
       },
       "Controls/GraphLayoutEngine.cs": {
         "hash": "12f5105ff38f",
-        "content": "class GraphLayoutEngine\n  WouldCreateCycle(IEnumerable\u003CAgentTask\u003E tasks, string sourceId, string targetId) -\u003E bool"
+        "content": "class GraphLayoutEngine\n  L10: NodeWidth: double = 180\n  L11: NodeHeight: double = 72\n  L12: NodePadding: double = 30\n  L13: HierarchyIndent: double = 200\n  L14: HierarchyRowGap: double = 80\n  L16: ComputeLayout(List\u003CAgentTask\u003E tasks, Dictionary\u003Cstring, Point\u003E nodePositions, Dictionary\u003Cstring, Point\u003E targetPositions, HashSet\u003Cstring\u003E userDraggedNodeIds, string? draggingNodeId) -\u003E void\n  L184: CleanupRemovedTasks(HashSet\u003Cstring\u003E currentTaskIds, Dictionary\u003Cstring, Point\u003E nodePositions, Dictionary\u003Cstring, Point\u003E targetPositions, HashSet\u003Cstring\u003E userDraggedNodeIds) -\u003E void\n  L201: WouldCreateCycle(IEnumerable\u003CAgentTask\u003E tasks, string sourceId, string targetId) -\u003E bool"
       },
       "Controls/GraphRenderer.cs": {
-        "hash": "c8bc8ef074f2",
-        "content": "class GraphRenderer\n  ClearAll() -\u003E void\n  ClearForRedraw() -\u003E void\n  RemoveEdgeElements() -\u003E void\n  DrawEmptyState() -\u003E void\n  CreateNodeContextMenu(AgentTask task, ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E ContextMenu\n  CreateNodeTooltip(AgentTask task, List\u003CAgentTask\u003E allTasks) -\u003E ToolTip\n  CreateLegendPanel() -\u003E Border\n  ResizeCanvas(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  GetCompactTimeInfo(AgentTask task) -\u003E string\n  CreateGridBrush() -\u003E DrawingBrush\n  CreateHeaderButton(string icon, string tooltip) -\u003E Button"
+        "hash": "30526b29aff4",
+        "content": "class GraphRenderer\n  L40: ClearAll() -\u003E void\n  L46: ClearForRedraw() -\u003E void\n  L52: RemoveEdgeElements() -\u003E void\n  L58: DrawEmptyState() -\u003E void\n  L75: DrawAllEdges(List\u003CAgentTask\u003E tasks, FileLockManager fileLockManager, Dictionary\u003Cstring, Point\u003E nodePositions, HashSet\u003Cstring\u003E highlightedEdgeKeys) -\u003E void\n  L473: CreateNodeContextMenu(AgentTask task, ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E ContextMenu\n  L548: CreateNodeTooltip(AgentTask task, List\u003CAgentTask\u003E allTasks) -\u003E ToolTip\n  L714: CreateLegendPanel() -\u003E Border\n  L817: RebuildProgressPanel(bool showProgress, ObservableCollection\u003CAgentTask\u003E? activeTasks, StackPanel progressStack) -\u003E void\n  L1036: ResizeCanvas(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  L1047: GetCompactTimeInfo(AgentTask task) -\u003E string\n  L1058: CreateGridBrush() -\u003E DrawingBrush\n  L1091: CreateHeaderButton(string icon, string tooltip) -\u003E Button"
       },
       "Controls/TaskNodeGraphPanel.cs": {
-        "hash": "2e0ae6a980e9",
-        "content": "class TaskNodeGraphPanel\n  Initialize(ObservableCollection\u003CAgentTask\u003E activeTasks, FileLockManager fileLockManager) -\u003E void\n  MarkDirty() -\u003E void\n  RebuildGraph() -\u003E void\n  FocusOnTask(string taskId) -\u003E void\n  FitToView() -\u003E void\n  Dispose() -\u003E void"
+        "hash": "523d08a15cc0",
+        "content": "class TaskNodeGraphPanel : Border\n  L274: Initialize(ObservableCollection\u003CAgentTask\u003E activeTasks, FileLockManager fileLockManager) -\u003E void\n  L357: MarkDirty() -\u003E void\n  L361: RebuildGraph() -\u003E void\n  L458: FocusOnTask(string taskId) -\u003E void\n  L463: FitToView() -\u003E void\n  L468: Dispose() -\u003E void"
       }
     },
     "keyTypes": [
@@ -95,23 +108,61 @@
       "class TaskNodeGraphPanel"
     ],
     "patterns": [
-      "Canvas-based rendering with layout animation",
-      "Dirty-flag with RebuildGraph on change"
+      "Dirty-flag triggered rebuild (MarkDirty \u002B RebuildGraph)",
+      "Layout animation between position snapshots",
+      "WPF Canvas with programmatic element creation"
     ],
     "dependencies": [
-      "AgentTask collection for node data",
-      "FileLockManager for lock state display"
+      "Observes ObservableCollection\u003CAgentTask\u003E",
+      "Reads FileLockManager for lock-edge visualization"
     ]
   },
   "parentModuleId": "ui",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "AttachNodeEvents",
+    "AttachScrollViewerEvents",
+    "CenterOnGraph",
+    "CleanupRemovedTasks",
+    "ClearAll",
+    "ClearForRedraw",
+    "ComputeLayout",
+    "CreateGridBrush",
+    "CreateHeaderButton",
+    "CreateLegendPanel",
+    "CreateNodeContextMenu",
+    "CreateNodeTooltip",
+    "Dispose",
+    "DrawAllEdges",
+    "DrawEmptyState",
+    "FitToView",
+    "FocusOnNode",
+    "FocusOnTask",
+    "GetCompactTimeInfo",
     "GraphInteractionHandler",
     "GraphLayoutEngine",
     "GraphRenderer",
-    "TaskNodeGraphPanel"
+    "HierarchyIndent",
+    "HierarchyRowGap",
+    "Initialize",
+    "MarkDirty",
+    "NodeHeight",
+    "NodePadding",
+    "NodeWidth",
+    "RebuildGraph",
+    "RebuildProgressPanel",
+    "RemoveEdgeElements",
+    "ResetLayout",
+    "ResizeCanvas",
+    "SetActiveTasks",
+    "StartLayoutAnimation",
+    "StopLayoutAnimation",
+    "TaskNodeGraphPanel",
+    "ToggleNodeSelection",
+    "WouldCreateCycle"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.5195172Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-09T07:18:27.203787Z",
+  "lastUpdatedByTaskId": "474d0b438aee4d4b"
 }

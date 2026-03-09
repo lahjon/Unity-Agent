@@ -21,7 +21,7 @@ namespace Spritely.Managers
         private int _taskTimeoutMinutes = 120;
         private bool _autoVerify;
         private bool _autoCommit;
-        private string _defaultMcpServerName = "mcp-for-unity-server";
+        private string _defaultMcpServerName = "UnityMCP";
         private string _defaultMcpAddress = "http://127.0.0.1:8080/mcp";
         private string _defaultMcpStartCommand = @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
         private string _opusEffortLevel = "high";
@@ -85,7 +85,7 @@ namespace Spritely.Managers
         public string DefaultMcpServerName
         {
             get => _defaultMcpServerName;
-            set => _defaultMcpServerName = value ?? "mcp-for-unity-server";
+            set => _defaultMcpServerName = value ?? "UnityMCP";
         }
 
         public string DefaultMcpAddress
@@ -140,7 +140,7 @@ namespace Spritely.Managers
                 if (dict.TryGetValue("autoCommit", out var ac))
                     _autoCommit = ac.GetBoolean();
                 if (dict.TryGetValue("defaultMcpServerName", out var dmsn))
-                    _defaultMcpServerName = dmsn.GetString() ?? "mcp-for-unity-server";
+                    _defaultMcpServerName = dmsn.GetString() ?? "UnityMCP";
                 if (dict.TryGetValue("defaultMcpAddress", out var dma))
                     _defaultMcpAddress = dma.GetString() ?? "http://127.0.0.1:8080/mcp";
                 if (dict.TryGetValue("defaultMcpStartCommand", out var dmsc))

@@ -1,61 +1,78 @@
 {
   "id": "terminal",
   "name": "Integrated Terminal",
-  "description": "Provides a ConPTY-based pseudo-terminal with command history, multiple tabs, and working directory tracking. Allows developers to run shell commands directly within Spritely.",
+  "description": "Embeds a real ConPTY-backed terminal within the application supporting multiple named tabs, full VT100 emulation, command history, working directory tracking, and Ctrl\u002BC interrupt.",
   "category": "ui",
   "keywords": [
     "ConPTY",
     "ConPtyTerminal",
     "SendLine",
     "TerminalTabManager",
+    "VtScreenBuffer",
     "command history",
-    "pseudo terminal",
     "shell",
-    "terminal tabs"
+    "terminal",
+    "working directory"
   ],
   "primaryFiles": [
     "ConPtyTerminal.cs",
+    "Models/VtScreenBuffer.cs",
     "TerminalTabManager.cs"
   ],
-  "secondaryFiles": [],
+  "secondaryFiles": [
+    "Constants/AppConstants.cs"
+  ],
   "relatedFeatureIds": [
-    "app-startup"
+    "app-infrastructure"
   ],
   "dependsOn": [
-    "app-settings",
+    "activity-dashboard",
+    "app-infrastructure",
     "app-startup",
     "codebase-indexing",
     "feature-context-resolution",
+    "feature-mode",
     "feature-registry",
-    "logging-diagnostics",
+    "git-operations",
+    "history-management",
+    "module-management",
     "module-registry",
     "project-management",
+    "project-tasks",
+    "settings-management",
+    "skill-management",
     "task-graph-ui",
+    "task-lifecycle",
     "task-ui",
     "theming-ui-shared"
   ],
   "context": {
     "signatures": {
       "ConPtyTerminal.cs": {
-        "hash": "4ef7bda95a9e",
-        "content": "class ConPtyTerminal\n  HistoryIndex: int\n  HasBeenUsed: bool\n  AddCommand(string command) -\u003E void\n  GetCommandFromEnd(int historyIndex) -\u003E string?\n  WorkingDirectory: string\n  ProcessId: int\n  SendLine(string text) -\u003E void\n  SendRaw(string text) -\u003E void\n  SendInterrupt() -\u003E void\n  GetOutputText() -\u003E string\n  ClearOutput() -\u003E void\n  Dispose() -\u003E void"
+        "hash": "aea125396ba2",
+        "content": "class ConPtyTerminal : IDisposable\n  L161: EXTENDED_STARTUPINFO_PRESENT: uint = 0x00080000\n  L162: PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE: IntPtr = (IntPtr)0x00020016\n  L163: STILL_ACTIVE: uint = 259\n  L164: STARTF_USESTDHANDLES: int = 0x00000100\n  HistoryIndex: int\n  HasBeenUsed: bool\n  L199: AddCommand(string command) -\u003E void\n  L209: GetCommandFromEnd(int historyIndex) -\u003E string?\n  WorkingDirectory: string\n  ProcessId: int\n  L348: SendLine(string text) -\u003E void\n  L353: SendRaw(string text) -\u003E void\n  L364: SendInterrupt() -\u003E void\n  L369: GetOutputText() -\u003E string\n  L374: ClearOutput() -\u003E void\n  L381: Dispose() -\u003E void"
+      },
+      "Models/VtScreenBuffer.cs": {
+        "hash": "5aee9794a554",
+        "content": "class VtScreenBuffer\n  L19: MaxScrollbackLines: int = Constants.AppConstants.ScrollbackLimit\n  L48: Process(string data) -\u003E void\n  L57: Render() -\u003E string\n  L89: Clear() -\u003E void"
       },
       "TerminalTabManager.cs": {
-        "hash": "c8a64e01987e",
-        "content": "class TerminalTabManager\n  UpdateWorkingDirectory(string directory) -\u003E void\n  AddTerminal(string? workingDirectory = null) -\u003E void\n  CloseTerminal(int index) -\u003E void\n  SwitchTo(int index) -\u003E void\n  SendCommand() -\u003E void\n  SendInterrupt() -\u003E void\n  HandleKeyDown(KeyEventArgs e) -\u003E void\n  Dispose() -\u003E void"
+        "hash": "5cc56f2e6acf",
+        "content": "class TerminalTabManager : IDisposable\n  L54: UpdateWorkingDirectory(string directory) -\u003E void\n  L125: AddTerminal(string? workingDirectory = null) -\u003E void\n  L224: CloseTerminal(int index) -\u003E void\n  L256: SwitchTo(int index) -\u003E void\n  L291: SendCommand() -\u003E void\n  L318: SendInterrupt() -\u003E void\n  L324: HandleKeyDown(KeyEventArgs e) -\u003E void\n  L535: Dispose() -\u003E void"
       }
     },
     "keyTypes": [
       "class ConPtyTerminal",
-      "class TerminalTabManager"
+      "class TerminalTabManager",
+      "class VtScreenBuffer"
     ],
     "patterns": [
-      "ConPTY Windows API integration",
-      "Tab-per-terminal model"
+      "P/Invoke for ConPTY Windows API",
+      "VT100 screen buffer with scrollback limit"
     ],
     "dependencies": [
-      "Windows ConPTY API for process I/O",
-      "Working directory synced with project selection"
+      "WPF RichTextBox for rendering",
+      "Windows ConPTY API via P/Invoke"
     ]
   },
   "parentModuleId": "ui",
@@ -64,16 +81,24 @@
   "symbolNames": [
     "AddCommand",
     "AddTerminal",
+    "Clear",
     "ClearOutput",
     "CloseTerminal",
     "ConPtyTerminal",
     "Dispose",
+    "EXTENDED_STARTUPINFO_PRESENT",
     "GetCommandFromEnd",
     "GetOutputText",
     "HandleKeyDown",
     "HasBeenUsed",
     "HistoryIndex",
+    "MaxScrollbackLines",
+    "PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE",
+    "Process",
     "ProcessId",
+    "Render",
+    "STARTF_USESTDHANDLES",
+    "STILL_ACTIVE",
     "SendCommand",
     "SendInterrupt",
     "SendLine",
@@ -81,8 +106,9 @@
     "SwitchTo",
     "TerminalTabManager",
     "UpdateWorkingDirectory",
+    "VtScreenBuffer",
     "WorkingDirectory"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.4947403Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.2306333Z"
 }

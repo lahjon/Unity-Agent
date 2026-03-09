@@ -34,14 +34,17 @@ namespace Spritely.Managers
         /// Full rebuild: scans all source files, extracts symbols, maps to features, writes index.
         /// No file-count ceiling — processes every supported source file in the project.
         /// </summary>
-        public async Task BuildIndexAsync(string projectPath, List<FeatureEntry> features, CancellationToken ct)
+        public async Task BuildIndexAsync(string projectPath, List<FeatureEntry> features, CancellationToken ct, IProgress<string>? progress = null)
         {
+            progress?.Report("Scanning source files...");
             var relativeFiles = ScanAllSourceFiles(projectPath);
             ct.ThrowIfCancellationRequested();
 
             var featureLookup = BuildFeatureFileLookup(features);
             var index = new CodebaseSymbolIndex { Version = 1, Symbols = new Dictionary<string, SymbolIndexEntry>() };
 
+            int processed = 0;
+            int total = relativeFiles.Count;
             foreach (var relPath in relativeFiles)
             {
                 ct.ThrowIfCancellationRequested();
@@ -61,9 +64,15 @@ namespace Spritely.Managers
                         ShortSignature = symbol.Signature
                     };
                 }
+
+                processed++;
+                if (processed % 50 == 0 || processed == total)
+                    progress?.Report($"Indexing symbols: {processed}/{total} files...");
             }
 
+            progress?.Report("Saving index...");
             await SaveIndexAsync(projectPath, index);
+            progress?.Report($"Re-index complete: {index.Symbols.Count} symbols from {total} files");
         }
 
         /// <summary>
@@ -217,8 +226,10 @@ namespace Spritely.Managers
             {
                 foreach (var file in Directory.EnumerateFiles(projectPath, "*.*", SearchOption.AllDirectories))
                 {
-                    var ext = Path.GetExtension(file).ToLowerInvariant();
-                    if (!supportedExtensions.Contains(ext))
+                    var ext = Path.GetExtension(file);
+                    if (FeatureConstants.IgnoredFileExtensions.Contains(ext))
+                        continue;
+                    if (!supportedExtensions.Contains(ext.ToLowerInvariant()))
                         continue;
 
                     var relativePath = Path.GetRelativePath(projectPath, file).Replace('\\', '/');

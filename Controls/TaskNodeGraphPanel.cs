@@ -67,6 +67,11 @@ namespace Spritely.Controls
         public event Action<AgentTask, AgentTask>? DependencyCreated;
         public event Action<AgentTask>? DependenciesRemoved;
 
+        /// <summary>
+        /// Fired on single-click of a node so the task list can scroll to that task.
+        /// </summary>
+        public event Action<string>? TaskScrollRequested;
+
         public TaskNodeGraphPanel()
         {
             InitializeComponent();
@@ -192,10 +197,12 @@ namespace Spritely.Controls
             _renderer.ForceStartRequested += t => ForceStartRequested?.Invoke(t);
             _renderer.DependenciesRemoved += t => DependenciesRemoved?.Invoke(t);
             _renderer.NodeHighlightRequested += id => _interaction.ToggleNodeSelection(id);
+            _renderer.ScrollToTaskRequested += id => TaskScrollRequested?.Invoke(id);
 
             // Wire interaction events -> panel events
             _interaction.ShowOutputRequested += t => ShowOutputRequested?.Invoke(t);
             _interaction.DependencyCreated += (s, t) => DependencyCreated?.Invoke(s, t);
+            _interaction.TaskScrollRequested += id => TaskScrollRequested?.Invoke(id);
             _interaction.RequestRebuildGraph = () => RebuildGraph();
             _interaction.RequestRedrawVisuals = () => RedrawEdgesOnly();
             _interaction.RequestFocusOnNode = id => _interaction.FocusOnNode(id, _nodePositions);

@@ -112,6 +112,7 @@ namespace Spritely
         private bool _isProcessingMessage = false;
         private bool _allowInterrupts = true; // Enable/disable interrupt capability
         private Queue<string> _interruptMessages = new(); // High-priority interrupt messages
+        private bool _softStopRequested; // Graceful stop requested via Ctrl+C to stdin
 
         /// <summary>
         /// Queue for storing messages that arrive while the task is busy processing.
@@ -208,6 +209,17 @@ namespace Spritely
         public bool HasInterruptMessages
         {
             get { lock (_messageQueueLock) return _interruptMessages.Count > 0; }
+        }
+
+        /// <summary>
+        /// Gets or sets whether a soft-stop has been requested for this task.
+        /// When true, a Ctrl+C signal was sent to the CLI stdin to request graceful shutdown.
+        /// Thread-safe.
+        /// </summary>
+        public bool SoftStopRequested
+        {
+            get { lock (_messageQueueLock) return _softStopRequested; }
+            set { lock (_messageQueueLock) _softStopRequested = value; }
         }
 
         public void Dispose()

@@ -677,8 +677,10 @@ public class FeatureInitializer
         {
             foreach (var file in Directory.EnumerateFiles(projectPath, "*.*", SearchOption.AllDirectories))
             {
-                var ext = Path.GetExtension(file).ToLowerInvariant();
-                if (!supportedExtensions.Contains(ext))
+                var ext = Path.GetExtension(file);
+                if (FeatureConstants.IgnoredFileExtensions.Contains(ext))
+                    continue;
+                if (!supportedExtensions.Contains(ext.ToLowerInvariant()))
                     continue;
 
                 // Check if any path segment is in the ignored set

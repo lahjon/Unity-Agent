@@ -111,7 +111,7 @@ namespace Spritely.Tests
         {
             var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: false);
             Assert.Contains("# MCP", result);
-            Assert.Contains("mcp-for-unity-server", result);
+            Assert.Contains("UnityMCP", result);
             Assert.StartsWith("SYS:", result);
             Assert.EndsWith("task", result);
         }

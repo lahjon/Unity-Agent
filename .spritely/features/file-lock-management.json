@@ -1,16 +1,16 @@
 {
   "id": "file-lock-management",
   "name": "File Lock Management",
-  "description": "Tracks which files are locked by which tasks and coordinates task queuing when file conflicts exist. Prevents concurrent file mutations and Git operations from colliding.",
-  "category": "infrastructure",
+  "description": "Coordinates exclusive file access between concurrently running tasks to prevent conflicts. Queues tasks that conflict on locked files and unblocks them when locks are released, including a Git operation guard.",
+  "category": "core",
   "keywords": [
     "FileLockManager",
     "QueuedTaskInfo",
-    "conflict",
+    "ReleaseTaskLocks",
+    "SetGitOperationInProgress",
+    "TryAcquireFileLock",
     "file lock",
-    "lock",
-    "queued task",
-    "resource contention",
+    "lock conflict",
     "task queueing"
   ],
   "primaryFiles": [
@@ -18,8 +18,10 @@
   ],
   "secondaryFiles": [
     "Models/RuntimeTaskContext.cs",
+    "Services/GitOperationGuard.cs",
     "Spritely.Tests/ProjectSwapTests.cs",
-    "Spritely.Tests/SessionDataCleanupTests.cs"
+    "Spritely.Tests/SessionDataCleanupTests.cs",
+    "Spritely.Tests/TaskExecutionEngineTests.cs"
   ],
   "relatedFeatureIds": [
     "git-operations",
@@ -27,41 +29,64 @@
     "task-orchestration"
   ],
   "dependsOn": [
+    "app-infrastructure",
+    "codebase-indexing",
+    "completion-analysis",
+    "feature-mode",
     "git-operations",
-    "logging-diagnostics",
     "message-bus",
+    "output-management",
     "project-management",
     "prompt-building",
+    "settings-management",
     "task-factory",
-    "task-templates",
+    "task-lifecycle",
     "theming-ui-shared"
   ],
   "context": {
     "signatures": {
       "Managers/FileLockManager.cs": {
         "hash": "be0d3833678d",
-        "content": "class FileLockManager\n  LockCount: int\n  ReleaseTaskLocks(string taskId) -\u003E void\n  IsFileLocked(string normalizedPath) -\u003E bool\n  GetTaskLockedFiles(string taskId) -\u003E HashSet\u003Cstring\u003E\n  CheckQueuedTasks(ObservableCollection\u003CAgentTask\u003E activeTasks) -\u003E void\n  ForceStartQueuedTask(AgentTask task) -\u003E void\n  AddQueuedTaskInfo(string taskId, QueuedTaskInfo info) -\u003E void\n  RemoveQueuedInfo(string taskId) -\u003E void\n  ClearAll() -\u003E void\n  SetGitOperationInProgress(bool inProgress) -\u003E void\n  TryExtractFilePathFromPartial(string partialJson) -\u003E string?\n  ExtractFilePath(JsonElement input) -\u003E string?"
+        "content": "class FileLockManager\n  L17: MaxLocks: int = 500\n  L18: MaxLocksPerTask: int = 100\n  LockCount: int\n  L42: TryAcquireOrConflict(string taskId, string filePath, string toolName, ObservableCollection\u003CAgentTask\u003E activeTasks, Action\u003Cstring, string\u003E appendOutput) -\u003E bool\n  L69: TryAcquireFileLock(string taskId, string filePath, string toolName, ObservableCollection\u003CAgentTask\u003E activeTasks, bool isIgnored = false) -\u003E bool\n  L184: ReleaseTaskLocks(string taskId) -\u003E void\n  L235: IsFileLocked(string normalizedPath) -\u003E bool\n  L247: GetTaskLockedFiles(string taskId) -\u003E HashSet\u003Cstring\u003E  // Returns a snapshot of the normalized file paths currently locked by the given...\n  L257: HandleFileLockConflict(string taskId, string filePath, string toolName, ObservableCollection\u003CAgentTask\u003E activeTasks, Action\u003Cstring, string\u003E appendOutput) -\u003E void\n  L359: CheckQueuedTasks(ObservableCollection\u003CAgentTask\u003E activeTasks) -\u003E void\n  L423: ForceStartQueuedTask(AgentTask task) -\u003E void\n  L450: AddQueuedTaskInfo(string taskId, QueuedTaskInfo info) -\u003E void\n  L458: RemoveQueuedInfo(string taskId) -\u003E void\n  L466: ClearAll() -\u003E void\n  L487: SetGitOperationInProgress(bool inProgress) -\u003E void  // Sets the git operation in progress flag to prevent new lock acquisitions. Thi...\n  L558: TryExtractFilePathFromPartial(string partialJson) -\u003E string?\n  L572: ExtractFilePath(JsonElement input) -\u003E string?"
       }
     },
     "keyTypes": [
       "class FileLockManager",
-      "class QueuedTaskInfo"
+      "class GitOperationGuard"
     ],
     "patterns": [
-      "Automatic queue re-evaluation on lock release",
-      "Lock tracking per task ID"
+      "Git operation in-progress flag blocks new lock acquisitions",
+      "Mutex-style file locking with queue-on-conflict",
+      "Per-task lock sets for batch release on completion"
     ],
     "dependencies": [
-      "AgentTask model for task identification",
-      "Git operation guard integration"
+      "Called by TaskExecutionManager on every file-modify tool use",
+      "Coordinates with GitPanelManager via GitOperationGuard"
     ]
   },
-  "parentModuleId": "git-integration",
+  "parentModuleId": "task-engine",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
-    "FileLockManager"
+    "AddQueuedTaskInfo",
+    "CheckQueuedTasks",
+    "ClearAll",
+    "ExtractFilePath",
+    "FileLockManager",
+    "ForceStartQueuedTask",
+    "GetTaskLockedFiles",
+    "HandleFileLockConflict",
+    "IsFileLocked",
+    "LockCount",
+    "MaxLocks",
+    "MaxLocksPerTask",
+    "ReleaseTaskLocks",
+    "RemoveQueuedInfo",
+    "SetGitOperationInProgress",
+    "TryAcquireFileLock",
+    "TryAcquireOrConflict",
+    "TryExtractFilePathFromPartial"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.4096496Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.0825467Z"
 }

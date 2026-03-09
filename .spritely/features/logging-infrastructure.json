@@ -26,6 +26,7 @@
     "app-startup"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "logging-diagnostics",
     "theming-ui-shared"
   ],
@@ -54,7 +55,7 @@
       "Writes to %LOCALAPPDATA%\\Spritely\\logs\\"
     ]
   },
-  "parentModuleId": "app-infrastructure",
+  "parentModuleId": "infrastructure",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
@@ -70,12 +71,21 @@
     "Info",
     "Initialize",
     "Log",
+    "LogFile",
     "LogLevel",
+    "MaxFileSizeBytes",
+    "MaxMemoryEntries",
     "ReadLogFile",
     "SafeFileWriter",
     "Warn",
-    "WriteInBackground"
+    "WriteInBackground",
+    "_allComplete",
+    "_drainLock",
+    "_lock",
+    "_locks",
+    "_recentEntries",
+    "_writeQueue"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.6388767Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.4458106Z"
 }

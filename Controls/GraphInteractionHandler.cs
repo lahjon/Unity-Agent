@@ -22,6 +22,7 @@ namespace Spritely.Controls
         // Node drag state
         private string? _draggingNodeId;
         private Point _dragNodeOffset;
+        private Point _dragStartCanvasPos;
         private readonly HashSet<string> _userDraggedNodeIds = new();
 
         // Drag-to-connect state
@@ -57,6 +58,7 @@ namespace Spritely.Controls
         // Events
         public event Action<AgentTask>? ShowOutputRequested;
         public event Action<AgentTask, AgentTask>? DependencyCreated;
+        public event Action<string>? TaskScrollRequested;
 
         public string? DraggingNodeId => _draggingNodeId;
         public string? DragSourceId => _dragSourceId;
@@ -139,6 +141,7 @@ namespace Spritely.Controls
                     var currentPos = nodePositions[capturedTaskId];
                     var mousePos = e.GetPosition(_canvas);
                     _dragNodeOffset = new Point(mousePos.X - currentPos.X, mousePos.Y - currentPos.Y);
+                    _dragStartCanvasPos = mousePos;
                     nodeBorder.CaptureMouse();
                     e.Handled = true;
                 }
@@ -192,12 +195,24 @@ namespace Spritely.Controls
             {
                 if (_draggingNodeId == capturedTaskId)
                 {
-                    _userDraggedNodeIds.Add(capturedTaskId);
+                    var endPos = e.GetPosition(_canvas);
+                    var dx = endPos.X - _dragStartCanvasPos.X;
+                    var dy = endPos.Y - _dragStartCanvasPos.Y;
+                    bool wasDragged = dx * dx + dy * dy > 25;
+
+                    if (wasDragged)
+                        _userDraggedNodeIds.Add(capturedTaskId);
+
                     _draggingNodeId = null;
                     nodeBorder.ReleaseMouseCapture();
                     e.Handled = true;
 
-                    // Trigger rebuild after drag ends to update canvas size and edges
+                    if (!wasDragged)
+                    {
+                        // Single click without drag — scroll task list to this task
+                        TaskScrollRequested?.Invoke(capturedTaskId);
+                    }
+
                     RequestRebuildGraph?.Invoke();
                 }
             };

@@ -126,6 +126,31 @@
                                         <DataTrigger Binding="{Binding IsPlanning}" Value="True">
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                         </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsSoftStopping}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <!-- Soft-stop button (visible only when running/planning) -->
+                        <Button Click="SoftStop_Click" Margin="0,0,2,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconBtn}">
+                                    <Setter Property="Content" Value="&#xE71A;"/>
+                                    <Setter Property="Foreground" Value="#FF8A65"/>
+                                    <Setter Property="ToolTip" Value="Stop task gracefully"/>
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsPlanning}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="#FFAB91"/>
+                                        </Trigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
@@ -1825,8 +1850,10 @@
                                    MouseLeftButtonDown="ToggleFeaturesPanel_Click">
                             <Button DockPanel.Dock="Right" Content="Refresh" Click="RefreshFeatures_Click"
                                     Style="{StaticResource GhostBtn}"/>
-                            <Button DockPanel.Dock="Right" Content="Re-index" Click="ReindexSymbols_Click"
+                            <Button x:Name="ReindexBtn" DockPanel.Dock="Right" Content="Re-index" Click="ReindexSymbols_Click"
                                     Style="{StaticResource GhostBtn}" ToolTip="Rebuild codebase symbol index from all features"/>
+                            <Button x:Name="ReassignBtn" DockPanel.Dock="Right" Content="Re-assign" Click="ReassignFeatures_Click"
+                                    Style="{StaticResource GhostBtn}" ToolTip="Full feature re-initialization: rescan files, re-analyze with AI, rebuild registry"/>
                             <Button x:Name="FeaturesPanelToggleBtn" DockPanel.Dock="Right"
                                     Content="&#xE70D;" Click="ToggleFeaturesPanel_Click"
                                     Margin="0,0,4,0">
@@ -1871,6 +1898,22 @@
                                 </TextBlock>
                             </Grid>
                         </Grid>
+                        <!-- Re-index progress bar -->
+                        <Border x:Name="ReindexProgressBar" Grid.Row="2" Visibility="Collapsed"
+                                Background="{StaticResource BgElevated}" CornerRadius="4"
+                                Padding="6,4" Margin="0,0,0,4">
+                            <StackPanel>
+                                <TextBlock x:Name="ReindexProgressText"
+                                           FontSize="10" FontFamily="Segoe UI"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           Margin="0,0,0,3"/>
+                                <ProgressBar x:Name="ReindexProgressValue"
+                                             Height="3" Minimum="0" Maximum="100"
+                                             Foreground="{StaticResource Accent}"
+                                             Background="{StaticResource BgDeep}"
+                                             BorderThickness="0"/>
+                            </StackPanel>
+                        </Border>
                         <!-- Feature health status bar -->
                         <Border x:Name="FeatureHealthBar" Grid.Row="2" Visibility="Collapsed"
                                 Background="{StaticResource BgElevated}" CornerRadius="4"
@@ -1884,7 +1927,8 @@
                         <ListBox x:Name="FeaturesListBox" Grid.Row="3"
                                  Style="{StaticResource TaskListStyle}"
                                  SelectionChanged="FeaturesListBox_SelectionChanged"
-                                 PreviewMouseWheel="TaskList_PreviewMouseWheel">
+                                 PreviewMouseWheel="TaskList_PreviewMouseWheel"
+                                 PreviewMouseRightButtonDown="FeaturesListBox_PreviewMouseRightButtonDown">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border Padding="6,4" CornerRadius="4">
@@ -2802,7 +2846,7 @@
 
                                 <TextBlock Text="Server Name" Foreground="{StaticResource TextLight}"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
-                                <TextBox x:Name="DefaultMcpServerNameBox" Text="mcp-for-unity-server"
+                                <TextBox x:Name="DefaultMcpServerNameBox" Text="UnityMCP"
                                          Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
                                          CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
                                          FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,10"

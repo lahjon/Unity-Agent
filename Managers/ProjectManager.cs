@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -21,33 +19,15 @@ using Spritely.Models;
 
 namespace Spritely.Managers
 {
-    public class ProjectManager
+    public class ProjectManager : IProjectDataProvider
     {
         private List<ProjectEntry> _savedProjects = new();
         private string _projectPath;
         private readonly string _projectsFile;
         private string _addProjectSelectedPath = "";
         private bool _isSwapping;
-        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
-        private static readonly Random _rng = new();
         private ObservableCollection<AgentTask>? _activeTasks;
         private ObservableCollection<AgentTask>? _historyTasks;
-
-        private static readonly string[] ProjectColorPalette =
-        {
-            "#D4806B", // soft coral
-            "#6BA3A0", // soft teal
-            "#9B8EC4", // soft lavender
-            "#C4A94D", // soft gold
-            "#7BAF7B", // soft sage
-            "#6B8FD4", // soft blue
-            "#C47B8E", // soft rose
-            "#D4A06B", // soft amber
-            "#6BC4A0", // soft mint
-            "#B08EB0", // soft mauve
-            "#8BAFC4", // soft steel
-            "#C49B6B", // soft tan
-        };
 
         private static readonly JsonSerializerOptions _projectJsonOptions = new()
         {
@@ -56,15 +36,22 @@ namespace Spritely.Managers
         };
 
         private readonly IProjectPanelView _view;
-        private ITaskFactory? _taskFactory;
         private SettingsManager? _settingsManager;
 
+        // ── Sub-managers ──
+        public ProjectColorManager Colors { get; }
+        public ProjectDescriptionManager Descriptions { get; }
+        public ProjectRulesManager Rules { get; }
+        public McpConfigManager Mcp { get; }
+
+        // ── Events (forwarded from sub-managers where needed) ──
         public event Action<AgentTask>? McpInvestigationRequested;
-        public event Action<string>? McpOutputChanged; // (projectPath)
+        public event Action<string>? McpOutputChanged;
         public event Action? ProjectSwapStarted;
         public event Action? ProjectSwapCompleted;
-        public event Action<string, string>? ProjectRenamed; // (projectPath, newName)
+        public event Action<string, string>? ProjectRenamed;
 
+        // ── IProjectDataProvider ──
         public string ProjectPath
         {
             get => _projectPath;
@@ -72,8 +59,7 @@ namespace Spritely.Managers
         }
 
         public List<ProjectEntry> SavedProjects => _savedProjects;
-
-        /// <summary>Whether any projects have been added.</summary>
+        public IProjectPanelView View => _view;
         public bool HasProjects => _savedProjects.Count > 0;
 
         public ProjectManager(
@@ -84,11 +70,20 @@ namespace Spritely.Managers
             _projectsFile = Path.Combine(appDataDir, "projects.json");
             _projectPath = initialProjectPath;
             _view = view;
+
+            Colors = new ProjectColorManager(this);
+            Descriptions = new ProjectDescriptionManager(this);
+            Rules = new ProjectRulesManager(this);
+            Mcp = new McpConfigManager(this, Colors);
+
+            // Forward sub-manager events
+            Mcp.McpInvestigationRequested += task => McpInvestigationRequested?.Invoke(task);
+            Mcp.McpOutputChanged += path => McpOutputChanged?.Invoke(path);
         }
 
         public void SetTaskFactory(ITaskFactory taskFactory)
         {
-            _taskFactory = taskFactory;
+            Descriptions.SetTaskFactory(taskFactory);
         }
 
         public void SetSettingsManager(SettingsManager settingsManager)
@@ -103,6 +98,8 @@ namespace Spritely.Managers
             _activeTasks = activeTasks;
             _historyTasks = historyTasks;
         }
+
+        // ── Stats ──
 
         public ProjectActivityStats GetProjectStats(string projectPath, IEnumerable<AgentTask> allTasks)
         {
@@ -178,28 +175,7 @@ namespace Spritely.Managers
             return time.ToString("MMM d");
         }
 
-        private string PickProjectColor()
-        {
-            // Pick a color not already used; generate a random unique one if palette exhausted
-            var used = new HashSet<string>(
-                _savedProjects
-                    .Where(p => !string.IsNullOrEmpty(p.Color))
-                    .Select(p => p.Color),
-                StringComparer.OrdinalIgnoreCase);
-            var available = ProjectColorPalette.Where(c => !used.Contains(c)).ToArray();
-            if (available.Length > 0)
-                return available[_rng.Next(available.Length)];
-
-            // All palette colors taken – generate a random color that isn't already used
-            for (var i = 0; i < 200; i++)
-            {
-                var candidate = $"#{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}";
-                if (!used.Contains(candidate))
-                    return candidate;
-            }
-            // Extremely unlikely fallback
-            return $"#{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}{_rng.Next(0x40, 0xD0):X2}";
-        }
+        // ── Persistence ──
 
         public async Task LoadProjectsAsync()
         {
@@ -222,19 +198,12 @@ namespace Spritely.Managers
             }
             catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed to load projects", ex); _savedProjects = new(); }
 
-            // Backfill colors for projects that don't have one yet
-            var needsSave = false;
-            foreach (var p in _savedProjects.Where(p => string.IsNullOrEmpty(p.Color)))
-            {
-                p.Color = PickProjectColor();
-                needsSave = true;
-            }
-            if (needsSave) SaveProjects();
+            if (Colors.BackfillColors()) SaveProjects();
 
             _view.ViewDispatcher.Invoke(() =>
             {
                 RefreshProjectCombo();
-                UpdateMcpToggleForProject();
+                Mcp.UpdateMcpToggleForProject();
             });
         }
 
@@ -248,48 +217,52 @@ namespace Spritely.Managers
             catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed to save projects", ex); }
         }
 
+        // ── Refresh ──
+
         public void RefreshProjectCombo()
         {
             var proj = _savedProjects.Find(p => p.Path == _projectPath);
             _view.PromptProjectLabel.Text = proj?.DisplayName ?? Path.GetFileName(_projectPath);
             _view.PromptProjectLabel.ToolTip = _projectPath;
-            RefreshDescriptionBoxes();
+            Descriptions.RefreshDescriptionBoxes();
         }
 
-        public void RefreshDescriptionBoxes()
+        // ── Delegating wrappers (preserve existing public API for callers) ──
+
+        public void RefreshDescriptionBoxes() => Descriptions.RefreshDescriptionBoxes();
+        public string GetProjectDescription(AgentTask task) => Descriptions.GetProjectDescription(task);
+        public async Task RegenerateProjectDescriptionAsync(ProjectEntry entry) => await Descriptions.RegenerateProjectDescriptionAsync(entry);
+        public async Task GenerateProjectDescriptionInBackground(ProjectEntry entry) => await Descriptions.GenerateProjectDescriptionInBackground(entry);
+        public void RegenerateDescriptions() => Descriptions.RegenerateDescriptions();
+        public void SaveShortDesc() => Descriptions.SaveShortDesc();
+        public void SaveLongDesc() => Descriptions.SaveLongDesc();
+
+        public void SaveRuleInstruction() => Rules.SaveRuleInstruction();
+        public void AddProjectRule(string rule) { Rules.AddProjectRule(rule); Descriptions.RefreshDescriptionBoxes(); }
+        public void RemoveProjectRule(string rule) { Rules.RemoveProjectRule(rule); Descriptions.RefreshDescriptionBoxes(); }
+        public string GetProjectRulesBlock(string projectPath) => Rules.GetProjectRulesBlock(projectPath);
+        public static string GetDefaultCrashLogPath() => ProjectRulesManager.GetDefaultCrashLogPath();
+        public static string GetDefaultAppLogPath() => ProjectRulesManager.GetDefaultAppLogPath();
+        public static string GetDefaultHangLogPath() => ProjectRulesManager.GetDefaultHangLogPath();
+        public List<string> GetCrashLogPaths(string projectPath) => Rules.GetCrashLogPaths(projectPath);
+        public void SaveCrashLogPaths(string crashLogPath, string appLogPath, string hangLogPath) => Rules.SaveCrashLogPaths(crashLogPath, appLogPath, hangLogPath);
+        public bool IsGameProject(string projectPath) => Rules.IsGameProject(projectPath);
+
+        public string GetProjectColor(string projectPath) => Colors.GetProjectColor(projectPath);
+        public string GetProjectDisplayName(string projectPath) => Colors.GetProjectDisplayName(projectPath);
+
+        public void UpdateMcpToggleForProject() => Mcp.UpdateMcpToggleForProject();
+        public async Task ConnectMcpAsync(string projectPath) => await Mcp.ConnectMcpAsync(projectPath);
+        public void DisconnectMcp(string projectPath) => Mcp.DisconnectMcp(projectPath);
+        public void StopMcpServer(ProjectEntry entry) => Mcp.StopMcpServer(entry);
+        public void StopAllMcpServers() => Mcp.StopAllMcpServers();
+        public void NotifyMcpOutputChanged(string projectPath) => Mcp.NotifyMcpOutputChanged(projectPath);
+
+        // ── Project CRUD ──
+
+        public ProjectEntry? GetCurrentProject()
         {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-            var initializing = entry?.IsInitializing == true;
-
-            if (initializing)
-            {
-                _view.ShortDescBox.Text = "Initializing...";
-                _view.LongDescBox.Text = "Initializing...";
-                _view.ShortDescBox.FontStyle = FontStyles.Italic;
-                _view.LongDescBox.FontStyle = FontStyles.Italic;
-            }
-            else
-            {
-                _view.ShortDescBox.Text = entry?.ShortDescription ?? "";
-                _view.LongDescBox.Text = entry?.LongDescription ?? "";
-                _view.ShortDescBox.FontStyle = FontStyles.Normal;
-                _view.LongDescBox.FontStyle = FontStyles.Normal;
-            }
-
-            _view.RuleInstructionBox.Text = entry?.RuleInstruction ?? "";
-            _view.ProjectRulesList.ItemsSource = null;
-            _view.ProjectRulesList.ItemsSource = entry?.ProjectRules ?? new List<string>();
-
-            _view.CrashLogPathBox.Text = !string.IsNullOrEmpty(entry?.CrashLogPath) ? entry.CrashLogPath : GetDefaultCrashLogPath();
-            _view.AppLogPathBox.Text = !string.IsNullOrEmpty(entry?.AppLogPath) ? entry.AppLogPath : GetDefaultAppLogPath();
-            _view.HangLogPathBox.Text = !string.IsNullOrEmpty(entry?.HangLogPath) ? entry.HangLogPath : GetDefaultHangLogPath();
-            _view.EditCrashLogPathsToggle.IsChecked = false;
-
-            _view.EditShortDescToggle.IsChecked = false;
-            _view.EditLongDescToggle.IsChecked = false;
-            _view.EditRuleInstructionToggle.IsChecked = false;
-            _view.EditShortDescToggle.IsEnabled = !initializing;
-            _view.EditLongDescToggle.IsEnabled = !initializing;
+            return _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
         }
 
         public void HandleAddProjectPathClick(Action<string> updateTerminalWorkingDirectory, Action saveSettings, Action syncSettings)
@@ -334,8 +307,8 @@ namespace Spritely.Managers
                 Name = name,
                 Path = path,
                 IsInitializing = true,
-                Color = PickProjectColor(),
-                McpServerName = _settingsManager?.DefaultMcpServerName ?? "mcp-for-unity-server",
+                Color = Colors.PickProjectColor(),
+                McpServerName = _settingsManager?.DefaultMcpServerName ?? "UnityMCP",
                 McpAddress = _settingsManager?.DefaultMcpAddress ?? "http://127.0.0.1:8080/mcp",
                 McpStartCommand = _settingsManager?.DefaultMcpStartCommand ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools"
             };
@@ -408,9 +381,9 @@ namespace Spritely.Managers
                 Name = result.Name,
                 Path = fullPath,
                 IsInitializing = true,
-                Color = PickProjectColor(),
+                Color = Colors.PickProjectColor(),
                 IsGame = result.IsGame,
-                McpServerName = _settingsManager?.DefaultMcpServerName ?? "mcp-for-unity-server",
+                McpServerName = _settingsManager?.DefaultMcpServerName ?? "UnityMCP",
                 McpAddress = _settingsManager?.DefaultMcpAddress ?? "http://127.0.0.1:8080/mcp",
                 McpStartCommand = _settingsManager?.DefaultMcpStartCommand ?? @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools",
                 McpStatus = result.IsGame ? McpStatus.NotConnected : McpStatus.Disabled
@@ -439,140 +412,18 @@ namespace Spritely.Managers
             syncSettings();
         }
 
-        public void UpdateMcpToggleForProject()
-        {
-            var proj = _savedProjects.Find(p => p.Path == _projectPath);
-            if (proj != null)
-            {
-                _view.UseMcpToggle.IsEnabled = true;
-                // For game projects with MCP connected, enable by default
-                _view.UseMcpToggle.IsChecked = proj.IsGame && proj.McpStatus == McpStatus.Connected;
-                _view.UseMcpToggle.Opacity = 1.0;
-                _view.UseMcpToggle.ToolTip = proj.IsGame && proj.McpStatus == McpStatus.Connected
-                    ? "MCP is connected and will be used for Unity-specific commands"
-                    : "Enable to use MCP for this project";
-            }
-            else
-            {
-                _view.UseMcpToggle.IsChecked = false;
-                _view.UseMcpToggle.IsEnabled = false;
-                _view.UseMcpToggle.Opacity = 0.4;
-                _view.UseMcpToggle.ToolTip = null;
-            }
-        }
+        // ── Project initialization ──
 
-        public ProjectEntry? GetCurrentProject()
+        private async Task InitializeNewProjectAsync(ProjectEntry entry)
         {
-            return _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-        }
+            await Descriptions.GenerateProjectDescriptionInBackground(entry);
 
-        public string GetProjectColor(string projectPath)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            return entry?.Color ?? "#666666";
-        }
-
-        public string GetProjectDisplayName(string projectPath)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            return entry?.DisplayName ?? Path.GetFileName(projectPath);
-        }
-
-        public bool IsGameProject(string projectPath)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            return entry?.IsGame == true;
-        }
-
-        public string GetProjectDescription(AgentTask task)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == task.ProjectPath);
-            if (entry == null) return "";
-            return task.ExtendedPlanning
-                ? (string.IsNullOrWhiteSpace(entry.LongDescription) ? entry.ShortDescription : entry.LongDescription)
-                : entry.ShortDescription;
-        }
-
-        /// <summary>
-        /// Generates descriptions and updates the entry. Throws on failure (for callers that handle errors themselves).
-        /// </summary>
-        public async System.Threading.Tasks.Task RegenerateProjectDescriptionAsync(ProjectEntry entry)
-        {
-            var (shortDesc, longDesc) = await _taskFactory!.GenerateProjectDescriptionAsync(entry.Path, default, entry.IsGame);
-            entry.ShortDescription = shortDesc;
-            entry.LongDescription = longDesc;
-            SaveProjects();
-        }
-
-        public async System.Threading.Tasks.Task GenerateProjectDescriptionInBackground(ProjectEntry entry)
-        {
-            try
-            {
-                var (shortDesc, longDesc) = await _taskFactory!.GenerateProjectDescriptionAsync(entry.Path, default, entry.IsGame);
-                _view.ViewDispatcher.Invoke(() =>
-                {
-                    entry.ShortDescription = shortDesc;
-                    entry.LongDescription = longDesc;
-                    entry.IsInitializing = false;
-                    SaveProjects();
-                    RefreshProjectCombo();
-                    RefreshProjectList(null, null, null);
-                });
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("ProjectManager", $"Failed to generate description for {entry.Path}", ex);
-                _view.ViewDispatcher.Invoke(() =>
-                {
-                    entry.IsInitializing = false;
-                    RefreshProjectList(null, null, null);
-                });
-            }
-        }
-
-        private async System.Threading.Tasks.Task InitializeNewProjectAsync(ProjectEntry entry)
-        {
-            // Generate description first (sets IsInitializing = false when done)
-            await GenerateProjectDescriptionInBackground(entry);
-
-            // Then generate CLAUDE.md and initialize features in parallel
-            var claudeTask = EnsureClaudeMdAsync(entry);
+            var claudeTask = Descriptions.EnsureClaudeMdAsync(entry);
             var featureTask = InitializeFeaturesAsync(entry);
-            await System.Threading.Tasks.Task.WhenAll(claudeTask, featureTask);
+            await Task.WhenAll(claudeTask, featureTask);
         }
 
-        private async System.Threading.Tasks.Task EnsureClaudeMdAsync(ProjectEntry entry)
-        {
-            try
-            {
-                var claudeMdPath = Path.Combine(entry.Path, "CLAUDE.md");
-                var claudeDir = Path.Combine(entry.Path, ".claude");
-
-                // Skip if already initialized
-                if (File.Exists(claudeMdPath) || Directory.Exists(claudeDir))
-                    return;
-
-                AppLogger.Info("ProjectManager", $"Generating CLAUDE.md for {entry.DisplayName}...");
-
-                var content = await _taskFactory!.GenerateClaudeMdAsync(entry.Path, entry.IsGame);
-                if (string.IsNullOrWhiteSpace(content))
-                {
-                    AppLogger.Warn("ProjectManager", $"CLAUDE.md generation returned empty for {entry.DisplayName}");
-                    return;
-                }
-
-                await File.WriteAllTextAsync(claudeMdPath, content);
-                AppLogger.Info("ProjectManager", $"Created CLAUDE.md for {entry.DisplayName}");
-
-                _view.ViewDispatcher.Invoke(() => RefreshProjectList(null, null, null));
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("ProjectManager", $"Failed to generate CLAUDE.md for {entry.DisplayName}", ex);
-            }
-        }
-
-        private async System.Threading.Tasks.Task InitializeFeaturesAsync(ProjectEntry entry)
+        private async Task InitializeFeaturesAsync(ProjectEntry entry)
         {
             try
             {
@@ -598,30 +449,7 @@ namespace Spritely.Managers
             }
         }
 
-        public async void RegenerateDescriptions()
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-            if (entry == null) return;
-
-            entry.IsInitializing = true;
-            entry.ShortDescription = "";
-            entry.LongDescription = "";
-            SaveProjects();
-            RefreshProjectCombo();
-            RefreshProjectList(null, null, null);
-            RefreshDescriptionBoxes();
-
-            _view.RegenerateDescBtn.IsEnabled = false;
-            _view.RegenerateDescBtn.Content = "Regenerating...";
-
-            await GenerateProjectDescriptionInBackground(entry);
-
-            _view.RegenerateDescBtn.Content = "Regenerate Descriptions";
-            _view.RegenerateDescBtn.IsEnabled = true;
-            RefreshDescriptionBoxes();
-        }
-
-        public async System.Threading.Tasks.Task ForceInitializeProjectAsync(ProjectEntry entry)
+        public async Task ForceInitializeProjectAsync(ProjectEntry entry)
         {
             entry.IsInitializing = true;
             entry.ShortDescription = "";
@@ -633,14 +461,14 @@ namespace Spritely.Managers
                 RefreshProjectList(null, null, null);
             });
 
-            await GenerateProjectDescriptionInBackground(entry);
+            await Descriptions.GenerateProjectDescriptionInBackground(entry);
 
-            var claudeTask = EnsureClaudeMdAsync(entry);
+            var claudeTask = Descriptions.EnsureClaudeMdAsync(entry);
             var featureTask = ForceInitializeFeaturesAsync(entry);
-            await System.Threading.Tasks.Task.WhenAll(claudeTask, featureTask);
+            await Task.WhenAll(claudeTask, featureTask);
         }
 
-        public async System.Threading.Tasks.Task ForceInitializeFeaturesAsync(ProjectEntry entry, Action<string>? onProgress = null)
+        public async Task ForceInitializeFeaturesAsync(ProjectEntry entry, Action<string>? onProgress = null)
         {
             try
             {
@@ -668,115 +496,7 @@ namespace Spritely.Managers
             }
         }
 
-        public void SaveShortDesc()
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-            if (entry != null)
-            {
-                entry.ShortDescription = _view.ShortDescBox.Text;
-                SaveProjects();
-            }
-            _view.EditShortDescToggle.IsChecked = false;
-        }
-
-        public void SaveLongDesc()
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-            if (entry != null)
-            {
-                entry.LongDescription = _view.LongDescBox.Text;
-                SaveProjects();
-            }
-            _view.EditLongDescToggle.IsChecked = false;
-        }
-
-        public void SaveRuleInstruction()
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-            if (entry != null)
-            {
-                entry.RuleInstruction = _view.RuleInstructionBox.Text;
-                SaveProjects();
-            }
-            _view.EditRuleInstructionToggle.IsChecked = false;
-        }
-
-        public void AddProjectRule(string rule)
-        {
-            if (string.IsNullOrWhiteSpace(rule)) return;
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-            if (entry == null) return;
-            entry.ProjectRules.Add(rule.Trim());
-            SaveProjects();
-            RefreshDescriptionBoxes();
-        }
-
-        public void RemoveProjectRule(string rule)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-            if (entry == null) return;
-            entry.ProjectRules.Remove(rule);
-            SaveProjects();
-            RefreshDescriptionBoxes();
-        }
-
-        public static string GetDefaultCrashLogPath() => Path.Combine(AppLogger.GetLogDir(), "crash.log");
-        public static string GetDefaultAppLogPath() => Path.Combine(AppLogger.GetLogDir(), "app.log");
-        public static string GetDefaultHangLogPath() => Path.Combine(AppLogger.GetLogDir(), "hang.log");
-
-        public List<string> GetCrashLogPaths(string projectPath)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            return new List<string>
-            {
-                !string.IsNullOrEmpty(entry?.CrashLogPath) ? entry.CrashLogPath : GetDefaultCrashLogPath(),
-                !string.IsNullOrEmpty(entry?.AppLogPath) ? entry.AppLogPath : GetDefaultAppLogPath(),
-                !string.IsNullOrEmpty(entry?.HangLogPath) ? entry.HangLogPath : GetDefaultHangLogPath()
-            };
-        }
-
-        public void SaveCrashLogPaths(string crashLogPath, string appLogPath, string hangLogPath)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == _projectPath);
-            if (entry != null)
-            {
-                entry.CrashLogPath = crashLogPath;
-                entry.AppLogPath = appLogPath;
-                entry.HangLogPath = hangLogPath;
-                SaveProjects();
-            }
-            _view.EditCrashLogPathsToggle.IsChecked = false;
-        }
-
-        public string GetProjectRulesBlock(string projectPath)
-        {
-            // CLAUDE.md and .claude/rules/ are read natively by Claude Code CLI,
-            // so we only inject Spritely-managed per-project rules here.
-            var sb = new System.Text.StringBuilder();
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            if (entry != null)
-            {
-                var hasInstruction = !string.IsNullOrWhiteSpace(entry.RuleInstruction);
-                var hasRules = entry.ProjectRules.Count > 0;
-
-                if (hasInstruction || hasRules)
-                {
-                    sb.Append("# PROJECT RULES\n");
-                    if (hasInstruction)
-                        sb.Append(entry.RuleInstruction.Trim()).Append("\n");
-                    if (hasRules)
-                    {
-                        if (hasInstruction) sb.Append("\n");
-                        foreach (var rule in entry.ProjectRules)
-                            sb.Append("- ").Append(rule).Append("\n");
-                    }
-                    sb.Append("\n");
-                }
-            }
-
-            return sb.ToString();
-        }
-
+        // ── Project list UI ──
 
         public void RefreshProjectList(
             Action<string>? updateTerminalWorkingDirectory,
@@ -785,10 +505,8 @@ namespace Spritely.Managers
         {
             if (_view.ProjectListPanel == null) return;
 
-            // Ensure the projects panel doesn't cause layout issues
             _view.ViewDispatcher.Invoke(() =>
             {
-                // Force the layout to update before clearing
                 _view.ProjectListPanel.UpdateLayout();
             });
 
@@ -809,7 +527,7 @@ namespace Spritely.Managers
                         ? (Brush)Application.Current.FindResource("Accent")
                         : (Brush)Application.Current.FindResource("BorderMedium"),
                     Cursor = Cursors.Hand,
-                    MaxHeight = 200 // Prevent project cards from growing too tall
+                    MaxHeight = 200
                 };
 
                 var grid = new Grid();
@@ -1010,7 +728,6 @@ namespace Spritely.Managers
                         btn.IsEnabled = false;
                         btn.Content = "Analyzing...";
 
-                        // Pulsing opacity animation for visual activity indication
                         var pulseAnim = new DoubleAnimation(1.0, 0.4, TimeSpan.FromSeconds(0.8))
                         {
                             AutoReverse = true,
@@ -1117,9 +834,8 @@ namespace Spritely.Managers
                     }
                 }
 
-                if (proj.IsGame) // Only show MCP for game projects
+                if (proj.IsGame)
                 {
-                    // Add MCP status to info panel
                     var statusColor = proj.McpStatus switch
                     {
                         McpStatus.Connected => BrushCache.Theme("SuccessGreen"),
@@ -1152,7 +868,6 @@ namespace Spritely.Managers
                         ToolTip = statusText
                     };
 
-                    // Add pulsing animation for Connecting and Connected states
                     if (proj.McpStatus == McpStatus.Connecting || proj.McpStatus == McpStatus.Connected)
                     {
                         var animation = new System.Windows.Media.Animation.DoubleAnimation
@@ -1183,9 +898,8 @@ namespace Spritely.Managers
                 Grid.SetColumn(infoPanel, 0);
                 grid.Children.Add(infoPanel);
 
-                if (proj.IsGame) // Only show MCP button for game projects
+                if (proj.IsGame)
                 {
-                    // Connect/Disconnect button
                     var mcpButton = new Button
                     {
                         Content = proj.McpStatus switch
@@ -1213,18 +927,17 @@ namespace Spritely.Managers
                         ev.Handled = true;
                         if (s is Button b && b.Tag is string path)
                         {
-                            var projEntry = _savedProjects.FirstOrDefault(p => p.Path == path);
-                            if (projEntry != null)
+                            var projEntry2 = _savedProjects.FirstOrDefault(p => p.Path == path);
+                            if (projEntry2 != null)
                             {
-                                if (projEntry.McpStatus == McpStatus.Connected)
-                                    DisconnectMcp(path);
+                                if (projEntry2.McpStatus == McpStatus.Connected)
+                                    Mcp.DisconnectMcp(path);
                                 else
-                                    await ConnectMcpAsync(path);
+                                    await Mcp.ConnectMcpAsync(path);
                             }
                         }
                     };
 
-                    // Create a wrapper to position the button at bottom right
                     var mcpButtonWrapper = new StackPanel
                     {
                         HorizontalAlignment = HorizontalAlignment.Right,
@@ -1233,7 +946,6 @@ namespace Spritely.Managers
                     };
                     mcpButtonWrapper.Children.Add(mcpButton);
 
-                    // Position MCP button in bottom row, spanning both columns
                     Grid.SetRow(mcpButtonWrapper, 1);
                     Grid.SetColumn(mcpButtonWrapper, 0);
                     Grid.SetColumnSpan(mcpButtonWrapper, 2);
@@ -1289,22 +1001,19 @@ namespace Spritely.Managers
                     ev.Handled = true;
                     ProjectSettingsDialog.Show(gearEntry, SaveProjects, () =>
                     {
-                        // Refresh UI after MCP/game toggle changes
                         RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
                         syncSettings?.Invoke();
                     }, this);
-                    // Refresh after dialog closes in case settings changed
                     RefreshProjectList(updateTerminalWorkingDirectory, saveSettings, syncSettings);
                     syncSettings?.Invoke();
                 };
                 btnPanel.Children.Add(gearBtn);
 
-                // Initialize Features button — shown when feature registry doesn't exist yet
                 if (!proj.IsFeatureRegistryInitialized)
                 {
                     var initFeaturesBtn = new Button
                     {
-                        Content = "\uE946", // Segoe MDL2 "Library" icon
+                        Content = "\uE946",
                         Background = Brushes.Transparent,
                         Foreground = (Brush)Application.Current.FindResource("Accent"),
                         FontFamily = new FontFamily("Segoe MDL2 Assets"),
@@ -1322,10 +1031,9 @@ namespace Spritely.Managers
                         ev.Handled = true;
                         if (s is not Button btn) return;
                         btn.IsEnabled = false;
-                        btn.Content = "\u23F3"; // hourglass
+                        btn.Content = "\u23F3";
                         btn.ToolTip = "Analyzing project structure...";
 
-                        // Pulsing opacity animation
                         var pulseAnim = new DoubleAnimation(1.0, 0.4, TimeSpan.FromSeconds(0.8))
                         {
                             AutoReverse = true,
@@ -1353,7 +1061,7 @@ namespace Spritely.Managers
                             }
                             else
                             {
-                                btn.Content = "\u274C"; // X mark
+                                btn.Content = "\u274C";
                                 btn.ToolTip = "Initialization returned no results. Click to retry.";
                                 btn.IsEnabled = true;
                             }
@@ -1363,7 +1071,7 @@ namespace Spritely.Managers
                             btn.BeginAnimation(UIElement.OpacityProperty, null);
                             btn.Opacity = 1.0;
                             AppLogger.Error("FeatureInit", $"Feature initialization failed for {initEntry.DisplayName}", ex);
-                            btn.Content = "\u274C"; // X mark
+                            btn.Content = "\u274C";
                             btn.ToolTip = $"Failed: {ex.Message}. Click to retry.";
                             btn.IsEnabled = true;
                         }
@@ -1388,9 +1096,6 @@ namespace Spritely.Managers
                     _isSwapping = true;
                     _projectPath = projPath;
                     ProjectSwapStarted?.Invoke();
-                    // Defer heavy work so we're not modifying the visual tree
-                    // from inside the click handler of a card that will be destroyed.
-                    // Use async to yield between operations and keep the UI responsive.
                     _view.ViewDispatcher.BeginInvoke(new Action(async () =>
                     {
                         try
@@ -1398,8 +1103,7 @@ namespace Spritely.Managers
                             try { updateTerminalWorkingDirectory?.Invoke(projPath); }
                             catch (Exception ex) { AppLogger.Warn("ProjectManager", "Terminal update failed during project swap", ex); }
 
-                            // Yield to let UI repaint after terminal update
-                            await System.Threading.Tasks.Task.Yield();
+                            await Task.Yield();
                             saveSettings?.Invoke();
                             syncSettings?.Invoke();
                         }
@@ -1413,482 +1117,6 @@ namespace Spritely.Managers
                 };
 
                 _view.ProjectListPanel.Children.Add(card);
-            }
-        }
-
-        public async System.Threading.Tasks.Task ConnectMcpAsync(string projectPath)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            if (entry == null) return;
-
-            // Check if Unity is running first
-            if (!IsUnityRunning())
-            {
-                // Show warning to user
-                entry.McpOutput.Clear();
-                entry.McpOutput.AppendLine("❌ Unity Editor is not running!");
-                entry.McpOutput.AppendLine("");
-                entry.McpOutput.AppendLine("MCP connection requires Unity Editor to be running.");
-                entry.McpOutput.AppendLine("Please start Unity Editor and try again.");
-
-                RefreshProjectList(null, null, null);
-
-                // Also show a message dialog
-                System.Windows.MessageBox.Show(
-                    "Unity Editor must be running before connecting to MCP.\n\nPlease start Unity Editor and try again.",
-                    "Unity Not Running",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Warning);
-
-                return;
-            }
-
-            // Start the MCP server
-            var success = await StartMcpServerAsync(entry);
-
-            if (!success)
-            {
-                // If failed after 3 retries, try to diagnose
-                var investigateTask = new AgentTask
-                {
-                    Description = $"Failed to start MCP server after 3 attempts (waited 30 seconds each). Please check:\n" +
-                        "1. Unity Editor is running with the MCP plugin installed\n" +
-                        "2. The MCP start command is correct: {entry.McpStartCommand}\n" +
-                        "3. The MCP address is accessible: {entry.McpAddress}\n" +
-                        "4. No firewall or antivirus is blocking the connection\n" +
-                        "5. Port is not already in use by another process\n\n" +
-                        "Check the logs for more detailed error information.",
-                    SkipPermissions = true,
-                    ProjectPath = projectPath,
-                    ProjectColor = GetProjectColor(projectPath),
-                    ProjectDisplayName = GetProjectDisplayName(projectPath)
-                };
-                McpInvestigationRequested?.Invoke(investigateTask);
-            }
-
-            UpdateMcpToggleForProject();
-        }
-
-        public void DisconnectMcp(string projectPath)
-        {
-            var entry = _savedProjects.FirstOrDefault(p => p.Path == projectPath);
-            if (entry == null) return;
-
-            StopMcpServer(entry);
-            UpdateMcpToggleForProject();
-        }
-
-        private bool IsUnityRunning()
-        {
-            try
-            {
-                // Check for Unity.exe process
-                var unityProcesses = System.Diagnostics.Process.GetProcessesByName("Unity");
-
-                if (unityProcesses.Length > 0)
-                {
-                    AppLogger.Info("ProjectManager", $"Found {unityProcesses.Length} Unity process(es) running");
-                    // Clean up process handles
-                    foreach (var process in unityProcesses)
-                    {
-                        process.Dispose();
-                    }
-                    return true;
-                }
-
-                // Also check for Unity Hub Unity.exe (sometimes named differently)
-                var unityHubProcesses = System.Diagnostics.Process.GetProcessesByName("Unity Hub");
-                if (unityHubProcesses.Length > 0)
-                {
-                    AppLogger.Debug("ProjectManager", "Unity Hub is running, but Unity Editor itself is not");
-                    foreach (var process in unityHubProcesses)
-                    {
-                        process.Dispose();
-                    }
-                }
-
-                AppLogger.Info("ProjectManager", "No Unity processes found");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("ProjectManager", "Error checking if Unity is running", ex);
-                // If we can't check, assume Unity might be running to avoid blocking
-                return true;
-            }
-        }
-
-        private async System.Threading.Tasks.Task<bool> CheckMcpHealth(string url)
-        {
-            try
-            {
-                // MCP servers expect JSON-RPC requests, not plain GET requests
-                var jsonRequest = new
-                {
-                    jsonrpc = "2.0",
-                    method = "initialize",
-                    @params = new
-                    {
-                        protocolVersion = "2024-11-05",
-                        capabilities = new
-                        {
-                            experimental = new { }
-                        },
-                        clientInfo = new
-                        {
-                            name = "Spritely",
-                            version = "1.0.0"
-                        }
-                    },
-                    id = 1
-                };
-
-                var json = System.Text.Json.JsonSerializer.Serialize(jsonRequest);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-                // Use POST request with proper headers for JSON-RPC
-                using var request = new HttpRequestMessage(HttpMethod.Post, url);
-                request.Content = content;
-                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-
-                var response = await _httpClient.SendAsync(request);
-
-                // For MCP health check, we just need to know if the server responds
-                // Even error responses indicate the server is running
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable &&
-                       response.StatusCode != System.Net.HttpStatusCode.NotFound;
-            }
-            catch (HttpRequestException)
-            {
-                // Connection refused or timeout - server not running
-                return false;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ProjectManager", $"MCP health check failed for {url}", ex);
-                return false;
-            }
-        }
-
-        private void KillProcessOnPort(int port, ProjectEntry entry)
-        {
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c netstat -ano | findstr \"LISTENING\" | findstr \":{port} \"",
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true
-                };
-                using var proc = System.Diagnostics.Process.Start(psi);
-                if (proc == null) return;
-                var output = proc.StandardOutput.ReadToEnd();
-                proc.WaitForExit(5000);
-
-                foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 5 && int.TryParse(parts[^1], out var pid) && pid > 0)
-                    {
-                        try
-                        {
-                            var existing = System.Diagnostics.Process.GetProcessById(pid);
-                            if (!existing.HasExited)
-                            {
-                                AppLogger.Info("ProjectManager", $"Killing stale process {pid} ({existing.ProcessName}) on port {port}");
-                                entry.McpOutput.AppendLine($"Killing stale process on port {port} (PID {pid})...");
-                                existing.Kill();
-                                existing.WaitForExit(5000);
-                            }
-                        }
-                        catch { /* Process may have already exited */ }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ProjectManager", $"Error checking port {port}", ex);
-            }
-        }
-
-        private async Task<bool> StartMcpServerAsync(ProjectEntry entry)
-        {
-            const int MAX_RETRIES = 3;
-            const int SERVER_START_TIMEOUT_SECONDS = 30;
-
-            try
-            {
-                entry.McpStatus = McpStatus.Connecting;
-                entry.McpOutput.Clear(); // Clear any previous output
-                entry.McpOutput.AppendLine($"Connecting to server...");
-                SaveProjects();
-                RefreshProjectList(null, null, null);
-
-                // First check if server is already running
-                AppLogger.Info("ProjectManager", $"Checking if MCP server is already running at {entry.McpAddress}");
-                entry.McpOutput.AppendLine($"Checking if MCP server is already running at {entry.McpAddress}");
-
-                if (await CheckMcpHealth(entry.McpAddress))
-                {
-                    AppLogger.Info("ProjectManager", "MCP server is already running, connecting...");
-                    entry.McpOutput.AppendLine($"Server already running, verifying connection...");
-
-                    // Register with Claude Code
-                    await RegisterMcpWithClaudeAsync(entry.McpServerName);
-
-                    entry.McpStatus = McpStatus.Connected;
-                    entry.McpOutput.AppendLine($"✓ Connection verified - MCP server is ready!");
-                    entry.McpOutput.AppendLine($"Unity operations available: create scene items, make prefabs, take screenshots");
-                    SaveProjects();
-                    RefreshProjectList(null, null, null);
-                    return true;
-                }
-
-                // Kill any stale process holding the port before starting
-                if (Uri.TryCreate(entry.McpAddress, UriKind.Absolute, out var uri))
-                {
-                    KillProcessOnPort(uri.Port, entry);
-                    await Task.Delay(500); // Brief pause for port release
-                }
-
-                // Try to start the server with retries
-                for (int retry = 1; retry <= MAX_RETRIES; retry++)
-                {
-                    AppLogger.Info("ProjectManager", $"Attempting to start MCP server (attempt {retry}/{MAX_RETRIES})");
-                    entry.McpOutput.AppendLine($"Starting MCP server (attempt {retry}/{MAX_RETRIES})...");
-
-                    // Start the server process asynchronously
-                    var processInfo = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = "cmd.exe",
-                        Arguments = $"/c {entry.McpStartCommand}",
-                        WorkingDirectory = entry.Path,
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-
-                    // Start the process asynchronously without waiting
-                    var startTask = Task.Run(() =>
-                    {
-                        try
-                        {
-                            var process = System.Diagnostics.Process.Start(processInfo);
-                            if (process != null)
-                            {
-                                entry.McpProcessId = process.Id;
-                                entry.McpProcess = process;
-
-                                // Capture output asynchronously in real-time
-                                process.OutputDataReceived += (sender, args) =>
-                                {
-                                    if (!string.IsNullOrEmpty(args.Data))
-                                    {
-                                        Application.Current?.Dispatcher?.InvokeAsync(() =>
-                                        {
-                                            entry.McpOutput.AppendLine(args.Data);
-                                            // Notify any UI listeners that output has changed
-                                            McpOutputChanged?.Invoke(entry.Path);
-                                        });
-                                        AppLogger.Debug("ProjectManager", $"MCP server output: {args.Data}");
-                                    }
-                                };
-
-                                process.ErrorDataReceived += (sender, args) =>
-                                {
-                                    if (!string.IsNullOrEmpty(args.Data))
-                                    {
-                                        Application.Current?.Dispatcher?.InvokeAsync(() =>
-                                        {
-                                            entry.McpOutput.AppendLine(args.Data);
-                                            McpOutputChanged?.Invoke(entry.Path);
-                                        });
-                                        AppLogger.Warn("ProjectManager", $"MCP server error: {args.Data}");
-                                    }
-                                };
-
-                                process.BeginOutputReadLine();
-                                process.BeginErrorReadLine();
-
-                                return true;
-                            }
-                            return false;
-                        }
-                        catch (Exception ex)
-                        {
-                            AppLogger.Error("ProjectManager", $"Failed to start process on attempt {retry}", ex);
-                            entry.McpOutput.AppendLine($"Failed to start process: {ex.Message}");
-                            return false;
-                        }
-                    });
-
-                    var processStarted = await startTask;
-                    if (!processStarted)
-                    {
-                        AppLogger.Warn("ProjectManager", $"Failed to start MCP server process on attempt {retry}");
-                        if (retry < MAX_RETRIES)
-                        {
-                            await Task.Delay(2000); // Wait 2 seconds before retry
-                            continue;
-                        }
-                        else
-                        {
-                            break; // All retries failed
-                        }
-                    }
-
-                    // Wait for server to start (up to 30 seconds)
-                    AppLogger.Info("ProjectManager", $"Waiting for MCP server to start (up to {SERVER_START_TIMEOUT_SECONDS} seconds)...");
-                    entry.McpOutput.AppendLine($"Waiting for server to respond...");
-
-                    var startTime = DateTime.Now;
-                    while ((DateTime.Now - startTime).TotalSeconds < SERVER_START_TIMEOUT_SECONDS)
-                    {
-                        if (await CheckMcpHealth(entry.McpAddress))
-                        {
-                            AppLogger.Info("ProjectManager", $"MCP server started successfully after {(DateTime.Now - startTime).TotalSeconds:F1} seconds");
-                            entry.McpOutput.AppendLine($"Server started successfully!");
-                            entry.McpOutput.AppendLine($"Verifying MCP connection...");
-
-                            // Register with Claude Code
-                            await RegisterMcpWithClaudeAsync(entry.McpServerName);
-
-                            entry.McpStatus = McpStatus.Connected;
-                            entry.McpOutput.AppendLine($"✓ Connection verified - MCP server is ready!");
-                            entry.McpOutput.AppendLine($"Unity operations available: create scene items, make prefabs, take screenshots");
-                            SaveProjects();
-                            RefreshProjectList(null, null, null);
-                            return true;
-                        }
-
-                        // Check less frequently at the beginning, more frequently as time goes on
-                        var elapsed = (DateTime.Now - startTime).TotalSeconds;
-                        var delay = elapsed < 5 ? 1000 : elapsed < 15 ? 500 : 250;
-                        await Task.Delay(delay);
-                    }
-
-                    AppLogger.Warn("ProjectManager", $"MCP server failed to respond within {SERVER_START_TIMEOUT_SECONDS} seconds on attempt {retry}");
-
-                    // Kill the process if it's still running and we're going to retry
-                    if (retry < MAX_RETRIES && entry.McpProcessId > 0)
-                    {
-                        try
-                        {
-                            var process = System.Diagnostics.Process.GetProcessById(entry.McpProcessId);
-                            if (!process.HasExited)
-                            {
-                                process.Kill();
-                                await Task.Delay(1000); // Give it time to clean up
-                            }
-                        }
-                        catch { /* Process may have already exited */ }
-                        entry.McpProcessId = 0;
-                    }
-                }
-
-                // All retries failed
-                AppLogger.Error("ProjectManager", $"Failed to start MCP server after {MAX_RETRIES} attempts");
-                entry.McpStatus = McpStatus.Failed;
-                SaveProjects();
-                RefreshProjectList(null, null, null);
-                return false;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("ProjectManager", "Unexpected error starting MCP server", ex);
-                entry.McpStatus = McpStatus.Failed;
-                SaveProjects();
-                RefreshProjectList(null, null, null);
-                return false;
-            }
-        }
-
-        public void StopMcpServer(ProjectEntry entry)
-        {
-            try
-            {
-                if (entry.McpProcessId > 0 || entry.McpProcess != null)
-                {
-                    try
-                    {
-                        var process = entry.McpProcess ?? (entry.McpProcessId > 0 ? System.Diagnostics.Process.GetProcessById(entry.McpProcessId) : null);
-                        if (process != null && !process.HasExited)
-                        {
-                            // Stop reading output
-                            try
-                            {
-                                process.CancelOutputRead();
-                                process.CancelErrorRead();
-                            }
-                            catch { }
-
-                            process.Kill();
-                            process.WaitForExit(5000);
-                            process.Dispose();
-                        }
-                    }
-                    catch { /* Process may have already exited */ }
-
-                    entry.McpProcessId = 0;
-                    entry.McpProcess = null;
-                }
-
-                // Also kill any stale process holding the port
-                if (Uri.TryCreate(entry.McpAddress, UriKind.Absolute, out var uri))
-                {
-                    KillProcessOnPort(uri.Port, entry);
-                }
-
-                entry.McpStatus = McpStatus.NotConnected;
-                entry.McpOutput.AppendLine($"Server disconnected.");
-                SaveProjects();
-                RefreshProjectList(null, null, null);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("ProjectManager", "Error stopping MCP server", ex);
-            }
-        }
-
-        public void StopAllMcpServers()
-        {
-            foreach (var entry in _savedProjects.Where(p => p.McpStatus is McpStatus.Connected or McpStatus.Connecting))
-            {
-                StopMcpServer(entry);
-            }
-        }
-
-        public void NotifyMcpOutputChanged(string projectPath)
-        {
-            McpOutputChanged?.Invoke(projectPath);
-        }
-
-        private async Task RegisterMcpWithClaudeAsync(string serverName)
-        {
-            try
-            {
-                var processInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "claude",
-                    Arguments = $"mcp add --scope local --transport http {serverName} http://127.0.0.1:8080/mcp",
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-
-                var process = await Task.Run(() => System.Diagnostics.Process.Start(processInfo));
-                if (process != null)
-                {
-                    await process.WaitForExitAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("ProjectManager", "Failed to register MCP server with Claude", ex);
             }
         }
     }

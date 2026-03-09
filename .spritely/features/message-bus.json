@@ -1,40 +1,47 @@
 {
   "id": "message-bus",
-  "name": "Agent Message Bus",
-  "description": "File-based message bus enabling multiple agent tasks to communicate with each other. Supports broadcast, directed mentions, topic filtering, and TTL-based expiry.",
-  "category": "integration",
+  "name": "Inter-Task Message Bus",
+  "description": "Provides a file-based message bus for concurrent agent tasks to communicate during team-mode execution: publishing, reading, and expiring messages, with per-participant inboxes and a shared scratchpad.",
+  "category": "core",
   "keywords": [
     "BusMessage",
     "BusParticipant",
+    "JoinBus",
     "MessageBusManager",
+    "MessageBusTTL",
     "UseMessageBus",
-    "agent bus",
-    "broadcast",
-    "inbox",
-    "inter-task communication",
-    "message bus"
+    "agent communication",
+    "message bus",
+    "team messages"
   ],
   "primaryFiles": [
     "Managers/MessageBusManager.cs"
   ],
   "secondaryFiles": [
-    "Models/AgentTaskData.cs"
+    "Constants/AppConstants.cs",
+    "Models/AgentTaskData.cs",
+    "Spritely.Tests/SessionDataCleanupTests.cs"
   ],
   "relatedFeatureIds": [
-    "task-orchestration"
+    "task-decomposition",
+    "task-execution"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "app-settings",
+    "app-startup",
     "app-startup-config",
     "feature-registry",
-    "logging-diagnostics",
-    "task-orchestration"
+    "file-lock-management",
+    "semantic-search",
+    "settings-management",
+    "task-lifecycle"
   ],
   "context": {
     "signatures": {
       "Managers/MessageBusManager.cs": {
         "hash": "07fa26eed908",
-        "content": "class BusMessage\n  From: string\n  FromSummary: string\n  Type: string\n  Topic: string\n  Body: string\n  Mentions: List\u003Cstring\u003E\n  Timestamp: DateTime\n  SourceFile: string\n  ExpiresAt: DateTime\n  IsExpired() -\u003E bool\nclass BusParticipant\n  TaskId: string\n  Summary: string\nclass BusContext\n  BusDir: string\n  InboxDir: string\n  Watcher: FileSystemWatcher?\n  PollTimer: DispatcherTimer?\n  ParticipantTaskIds: HashSet\u003Cstring\u003E"
+        "content": "class BusMessage\n  From: string\n  FromSummary: string\n  Type: string\n  Topic: string\n  Body: string\n  Mentions: List\u003Cstring\u003E\n  Timestamp: DateTime\n  SourceFile: string\n  ExpiresAt: DateTime\n  L26: IsExpired() -\u003E bool\nclass BusParticipant\n  TaskId: string\n  Summary: string\nclass BusContext\n  BusDir: string\n  InboxDir: string\n  Watcher: FileSystemWatcher?\n  PollTimer: DispatcherTimer?\n  ParticipantTaskIds: HashSet\u003Cstring\u003E\n  TaskSummaries: Dictionary\u003Cstring, string\u003E\n  Messages: List\u003CBusMessage\u003E\n  ProcessedFiles: HashSet\u003Cstring\u003E\n  LastCleanupTime: DateTime\n  LastActivityTime: DateTime\n  ScratchpadDirty: bool\n  LastScratchpadContent: string\nclass MessageBusManager : IDisposable\n  L68: GetSafeProjectName(string projectPath) -\u003E string\n  L112: JoinBus(string projectPath, string taskId, string taskSummary) -\u003E void"
       }
     },
     "keyTypes": [
@@ -44,15 +51,16 @@
       "class MessageBusManager"
     ],
     "patterns": [
-      "File-system watcher per bus inbox directory",
-      "TTL expiry enforced on message read"
+      "File-system-based message passing for process isolation",
+      "FileSystemWatcher \u002B poll fallback for message notification",
+      "TTL-based message expiry with periodic cleanup"
     ],
     "dependencies": [
-      "Enabled per-task via UseMessageBus flag",
-      "Persists messages to %LOCALAPPDATA%\\Spritely\\agent-bus\\"
+      "Integrated into task prompts via MessageBusBlockTemplate",
+      "Writes/reads files under %LOCALAPPDATA%\\Spritely\\agent-bus\\"
     ]
   },
-  "parentModuleId": "external-integrations",
+  "parentModuleId": "prompt-ai",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
@@ -64,19 +72,29 @@
     "ExpiresAt",
     "From",
     "FromSummary",
+    "GetSafeProjectName",
     "InboxDir",
     "IsExpired",
+    "JoinBus",
+    "LastActivityTime",
+    "LastCleanupTime",
+    "LastScratchpadContent",
     "Mentions",
+    "MessageBusManager",
+    "Messages",
     "ParticipantTaskIds",
     "PollTimer",
+    "ProcessedFiles",
+    "ScratchpadDirty",
     "SourceFile",
     "Summary",
     "TaskId",
+    "TaskSummaries",
     "Timestamp",
     "Topic",
     "Type",
     "Watcher"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.5906538Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.1772261Z"
 }

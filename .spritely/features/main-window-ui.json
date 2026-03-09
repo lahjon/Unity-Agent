@@ -1,0 +1,158 @@
+{
+  "id": "main-window-ui",
+  "name": "Main Window \u0026 UI Composition",
+  "description": "The composition root of the WPF application: wires all managers, handles UI events, manages layout and panels, and coordinates top-level workflows like project switching, build triggers, automation, and API configuration.",
+  "category": "ui",
+  "keywords": [
+    "IProjectPanelView",
+    "MainWindow",
+    "UI orchestration",
+    "composition root",
+    "event wiring",
+    "partial class",
+    "project panel"
+  ],
+  "primaryFiles": [
+    "MainWindow.Features.cs",
+    "MainWindow.Orchestration.cs",
+    "MainWindow.TaskExecution.cs",
+    "MainWindow.xaml",
+    "MainWindow.xaml.cs"
+  ],
+  "secondaryFiles": [
+    "Converters/InvertBoolConverter.cs",
+    "Converters/NestingDepthToMarginConverter.cs",
+    "Converters/StringToBrushConverter.cs",
+    "Converters/StringToVisibilityConverter.cs",
+    "Converters/WrapTooltipTextConverter.cs",
+    "MainWindow.ApiConfiguration.cs",
+    "MainWindow.AutoCommit.cs",
+    "MainWindow.Automation.cs",
+    "MainWindow.Build.cs",
+    "MainWindow.GeminiArt.cs",
+    "MainWindow.ProjectLifecycle.cs",
+    "MainWindow.ProjectPanel.cs",
+    "MainWindow.ProjectTasks.cs",
+    "MainWindow.SavedPrompts.cs",
+    "MainWindow.Settings.cs",
+    "MainWindow.Skills.cs",
+    "MainWindow.Templates.cs",
+    "MainWindow.UiLayout.cs",
+    "Models/IProjectPanelView.cs"
+  ],
+  "relatedFeatureIds": [
+    "activity-dashboard",
+    "chat-interface",
+    "git-ui",
+    "helper-suggestions",
+    "output-management",
+    "project-management",
+    "settings-management",
+    "skill-management",
+    "task-execution",
+    "task-graph-ui",
+    "terminal"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
+    "app-settings",
+    "chat",
+    "chat-interface",
+    "codebase-indexing",
+    "completion-analysis",
+    "context-optimization",
+    "export-task-data",
+    "feature-context-resolution",
+    "feature-initialization",
+    "feature-mode",
+    "feature-mode-execution",
+    "feature-registry",
+    "feature-update-agent",
+    "file-lock-management",
+    "git-operations",
+    "git-ui",
+    "helper-suggestions",
+    "history-analytics",
+    "history-management",
+    "llm-services",
+    "logging-diagnostics",
+    "logging-infrastructure",
+    "mcp-integration",
+    "message-bus",
+    "module-management",
+    "module-registry",
+    "output-management",
+    "output-processing",
+    "preprocessor-skip-rules",
+    "progress-tracking",
+    "project-management",
+    "project-tasks",
+    "prompt-building",
+    "semantic-search",
+    "settings-management",
+    "skill-management",
+    "skills-system",
+    "stored-task-viewer",
+    "task-decomposition",
+    "task-execution",
+    "task-factory",
+    "task-graph-ui",
+    "task-group-tracking",
+    "task-history",
+    "task-lifecycle",
+    "task-orchestration",
+    "task-preprocessing",
+    "task-templates",
+    "task-templates-storage",
+    "task-ui",
+    "terminal",
+    "theming-ui-shared"
+  ],
+  "context": {
+    "signatures": {
+      "MainWindow.Features.cs": {
+        "hash": "e990d0c40e91",
+        "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
+      },
+      "MainWindow.Orchestration.cs": {
+        "hash": "bc3c227e883f",
+        "content": "class MainWindow"
+      },
+      "MainWindow.TaskExecution.cs": {
+        "hash": "f5773e30c4a8",
+        "content": "class MainWindow"
+      },
+      "MainWindow.xaml.cs": {
+        "hash": "35e7a0412f6b",
+        "content": "class MainWindow : Window, IDisposable, IProjectPanelView\n  L36: DefaultSystemPrompt: string = PromptBuilder.DefaultSystemPrompt"
+      }
+    },
+    "keyTypes": [
+      "class MainWindow",
+      "interface IProjectPanelView"
+    ],
+    "patterns": [
+      "Partial class decomposition by concern",
+      "Thin event-handler shell delegating to managers",
+      "WPF data binding via INotifyPropertyChanged"
+    ],
+    "dependencies": [
+      "Composes all managers as fields",
+      "WPF Window with XAML layout"
+    ]
+  },
+  "parentModuleId": "ui",
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [
+    "DefaultSystemPrompt",
+    "LastUpdated",
+    "MainWindow",
+    "Placeholders",
+    "Stale",
+    "Total"
+  ],
+  "touchCount": 0,
+  "lastUpdatedAt": "2026-03-09T07:18:27.2701641Z"
+}

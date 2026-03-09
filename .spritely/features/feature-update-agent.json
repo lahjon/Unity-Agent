@@ -25,11 +25,13 @@
   ],
   "dependsOn": [
     "activity-dashboard",
+    "app-infrastructure",
     "app-settings",
     "app-startup-config",
     "chat",
     "chat-interface",
     "codebase-indexing",
+    "completion-analysis",
     "context-optimization",
     "feature-context-resolution",
     "feature-initialization",
@@ -41,37 +43,48 @@
     "git-ui",
     "helper-suggestions",
     "history-analytics",
+    "history-management",
     "llm-services",
     "logging-diagnostics",
     "logging-infrastructure",
     "mcp-integration",
     "message-bus",
+    "module-management",
     "module-registry",
+    "output-management",
     "output-processing",
+    "preprocessor-skip-rules",
+    "progress-tracking",
     "project-management",
     "project-tasks",
     "prompt-building",
+    "semantic-search",
+    "settings-management",
     "skill-management",
     "skills-system",
+    "task-decomposition",
     "task-execution",
     "task-factory",
     "task-graph-ui",
+    "task-group-tracking",
     "task-history",
+    "task-lifecycle",
     "task-orchestration",
     "task-preprocessing",
     "task-templates",
     "task-templates-storage",
-    "task-ui"
+    "task-ui",
+    "terminal"
   ],
   "context": {
     "signatures": {
       "Managers/FeatureUpdateAgent.cs": {
-        "hash": "05573645bb9a",
-        "content": "class FeatureUpdateAgent\n  L25: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L35: MaxPendingUpdates: int = 20\n  L480: MaxKeywords: int = 20\n  L481: CamelCaseSplitRegex: Regex = new(@\u0022(?\u003C=[a-z])(?=[A-Z])|(?\u003C=[A-Z])(..."
+        "hash": "ced477e83723",
+        "content": "class FeatureUpdateAgent\n  L25: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L35: MaxPendingUpdates: int = 20\n  L505: MaxKeywords: int = 20\n  L506: CamelCaseSplitRegex: Regex = new(@\u0022(?\u003C=[a-z])(?=[A-Z])|(?\u003C=[A-Z])(...\nclass PendingFeatureUpdate\n  TaskId: string\n  TaskDescription: string\n  CompletionSummary: string?\n  ChangedFiles: List\u003Cstring\u003E\n  QueuedAt: DateTime"
       },
       "MainWindow.Features.cs": {
-        "hash": "c49bdb41da89",
-        "content": "class MainWindow"
+        "hash": "e990d0c40e91",
+        "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
       }
     },
     "keyTypes": [
@@ -86,14 +99,28 @@
       "Updates FeatureRegistryManager entries"
     ]
   },
-  "parentModuleId": "feature-registry",
+  "parentModuleId": "codebase-intelligence",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "CamelCaseSplitRegex",
+    "ChangedFiles",
+    "CompletionSummary",
     "FeatureUpdateAgent",
-    "MainWindow"
+    "HaikuTimeout",
+    "LastUpdated",
+    "MainWindow",
+    "MaxKeywords",
+    "MaxPendingUpdates",
+    "PendingFeatureUpdate",
+    "Placeholders",
+    "QueuedAt",
+    "Stale",
+    "TaskDescription",
+    "TaskId",
+    "Total"
   ],
   "touchCount": 2,
-  "lastUpdatedAt": "2026-03-07T22:07:21.0753215Z",
+  "lastUpdatedAt": "2026-03-09T07:18:27.4005239Z",
   "lastUpdatedByTaskId": "ebfcc0891ad0416c"
 }

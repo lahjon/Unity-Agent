@@ -99,64 +99,6 @@ namespace Spritely.Dialogs
             };
             stack.Children.Add(regenerateBtn);
 
-            // ── Initialize Features Button ──
-            var initFeaturesStatusText = new TextBlock
-            {
-                Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
-                FontSize = 11,
-                FontFamily = new FontFamily("Segoe UI"),
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 4, 0, 0),
-                Visibility = Visibility.Collapsed
-            };
-            var initFeaturesBtn = new Button
-            {
-                Content = "Initialize Features",
-                Style = Application.Current.TryFindResource("SecondaryBtn") as Style,
-                Padding = new Thickness(10, 4, 10, 4),
-                Margin = new Thickness(0, 8, 0, 0),
-                HorizontalAlignment = HorizontalAlignment.Left
-            };
-            initFeaturesBtn.Click += async (_, _) =>
-            {
-                if (projectManager == null)
-                {
-                    MessageBox.Show("Cannot initialize features: ProjectManager not available.", "Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-
-                initFeaturesBtn.IsEnabled = false;
-                regenerateBtn.IsEnabled = false;
-                initFeaturesBtn.Content = "Initializing...";
-                initFeaturesStatusText.Visibility = Visibility.Visible;
-                initFeaturesStatusText.Text = "Scanning project files...";
-
-                try
-                {
-                    await projectManager.ForceInitializeFeaturesAsync(entry, progress =>
-                    {
-                        dlg.Dispatcher.Invoke(() => initFeaturesStatusText.Text = progress);
-                    });
-
-                    initFeaturesStatusText.Foreground = (Brush)Application.Current.FindResource("Success");
-                    initFeaturesStatusText.Text = "Feature registry initialized successfully.";
-                }
-                catch (Exception ex)
-                {
-                    initFeaturesStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
-                    initFeaturesStatusText.Text = $"Failed: {ex.Message}";
-                }
-                finally
-                {
-                    initFeaturesBtn.IsEnabled = true;
-                    regenerateBtn.IsEnabled = true;
-                    initFeaturesBtn.Content = "Initialize Features";
-                }
-            };
-            stack.Children.Add(initFeaturesBtn);
-            stack.Children.Add(initFeaturesStatusText);
-
             AddSeparator(stack);
 
             // ── Rule Instruction ──
@@ -386,7 +328,7 @@ namespace Spritely.Dialogs
             };
             saveMcpBtn.Click += (_, _) =>
             {
-                entry.McpServerName = mcpNameBox.Text?.Trim() ?? "mcp-for-unity-server";
+                entry.McpServerName = mcpNameBox.Text?.Trim() ?? "UnityMCP";
                 entry.McpAddress = mcpAddrBox.Text?.Trim() ?? "http://127.0.0.1:8080/mcp";
                 entry.McpStartCommand = mcpCmdBox.Text?.Trim() ?? "";
                 saveProjects();

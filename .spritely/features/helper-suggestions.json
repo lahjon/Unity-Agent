@@ -1,42 +1,43 @@
 {
   "id": "helper-suggestions",
-  "name": "AI-Powered Suggestions",
-  "description": "Generates context-aware improvement suggestions for the active project using Haiku. Categorizes them as bug fixes, new features, extensions, or general, and manages ignore/dismiss state.",
+  "name": "AI Helper \u0026 Suggestions",
+  "description": "Generates contextual task suggestions for the current project using Claude, organized by category (bug fixes, new features, extensions). Supports cancellation, ignored-title filtering, and manual refresh.",
   "category": "ui",
   "keywords": [
     "AI suggestions",
+    "GenerateSuggestionsAsync",
     "HelperManager",
     "Suggestion",
     "SuggestionCategory",
-    "bug fixes",
-    "generate suggestions",
     "ignored suggestions",
-    "new features"
+    "project suggestions"
   ],
   "primaryFiles": [
     "Managers/HelperManager.cs"
   ],
   "secondaryFiles": [
-    "Models/AgentTask.cs"
+    "MainWindow.UiLayout.cs"
   ],
   "relatedFeatureIds": [
     "llm-services",
     "project-management"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "app-settings",
     "app-startup-config",
     "feature-registry",
     "llm-services",
-    "logging-diagnostics",
     "project-management",
-    "prompt-building"
+    "prompt-building",
+    "semantic-search",
+    "task-lifecycle"
   ],
   "context": {
     "signatures": {
       "Managers/HelperManager.cs": {
         "hash": "23c72056738a",
-        "content": "enum SuggestionCategory\n    General, BugFixes, NewFeatures, Extensions\nclass Suggestion\n  Title: string\n  Description: string\n  Category: SuggestionCategory\nclass HelperManager\n  Suggestions: ObservableCollection\u003CSuggestion\u003E\n  IsGenerating: bool\n  SetActiveTaskSource(Func\u003CIEnumerable\u003Cstring\u003E\u003E getDescriptions) -\u003E void\n  SwitchProjectAsync(string projectPath) -\u003E Task\n  GenerateSuggestionsAsync(string projectPath, SuggestionCategory category, string? guidance = null, CancellationToken externalToken = default) -\u003E Task\n  CancelGeneration() -\u003E void\n  Dispose() -\u003E void\n  ClearSuggestions() -\u003E void\n  RemoveSuggestion(Suggestion suggestion) -\u003E void\n  IgnoreSuggestion(Suggestion suggestion) -\u003E void\n  ClearIgnoredTitles() -\u003E void\n  Title: string\n  Description: string"
+        "content": "enum SuggestionCategory\n    General, BugFixes, NewFeatures, Extensions\nclass Suggestion\n  Title: string\n  Description: string\n  Category: SuggestionCategory\nclass HelperManager : IDisposable\n  Suggestions: ObservableCollection\u003CSuggestion\u003E\n  IsGenerating: bool\n  L67: SetActiveTaskSource(Func\u003CIEnumerable\u003Cstring\u003E\u003E getDescriptions) -\u003E void  // Registers a callback that returns descriptions of currently active (non-finis...\n  L72: SwitchProjectAsync(string projectPath) -\u003E Task\n  L114: GenerateSuggestionsAsync(string projectPath, SuggestionCategory category, string? guidance = null, CancellationToken externalToken = default) -\u003E Task\n  L233: CancelGeneration() -\u003E void\n  L241: Dispose() -\u003E void\n  L249: ClearSuggestions() -\u003E void\n  L255: RemoveSuggestion(Suggestion suggestion) -\u003E void\n  L261: IgnoreSuggestion(Suggestion suggestion) -\u003E void\n  L272: ClearIgnoredTitles() -\u003E void\n  Title: string\n  Description: string\n  Category: string?"
       }
     },
     "keyTypes": [
@@ -45,12 +46,12 @@
       "enum SuggestionCategory"
     ],
     "patterns": [
-      "CancellationToken-based generation cancellation",
-      "ObservableCollection\u003CSuggestion\u003E bound to UI"
+      "Cancellable async generation with ObservableCollection binding",
+      "Ignored-title set persisted to suppress repetitive suggestions"
     ],
     "dependencies": [
-      "Calls Haiku to analyze project and generate suggestions",
-      "Reads active task descriptions for context"
+      "Calls ClaudeService for suggestion generation",
+      "Reads active task descriptions from ObservableCollection\u003CAgentTask\u003E"
     ]
   },
   "parentModuleId": "ui",
@@ -76,5 +77,5 @@
     "Title"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.5583685Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.2404497Z"
 }

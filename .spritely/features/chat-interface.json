@@ -1,24 +1,25 @@
 {
   "id": "chat-interface",
   "name": "Chat Interface",
-  "description": "Provides a direct multi-turn chat UI for conversing with Claude or Gemini, including image paste/drag-drop, model selection, and Gemini image generation display.",
+  "description": "Provides an interactive chat panel backed by Claude or Gemini with conversation history, image attachment (paste/drag-drop), streaming output, and model switching.",
   "category": "ui",
   "keywords": [
     "ChatManager",
-    "GeminiImagePanel",
+    "HandleSendClick",
+    "ImageAttachmentManager",
     "chat",
-    "chat history",
-    "drag drop",
-    "image generation",
-    "model selection",
-    "multi-turn",
-    "paste image"
+    "conversation history",
+    "image paste",
+    "model switch",
+    "streaming chat"
   ],
   "primaryFiles": [
     "Managers/ChatManager.cs",
-    "Managers/GeminiImagePanel.cs"
+    "Managers/GeminiImagePanel.cs",
+    "Managers/ImageAttachmentManager.cs"
   ],
   "secondaryFiles": [
+    "MainWindow.UiLayout.cs",
     "Managers/ClaudeService.cs",
     "Managers/GeminiService.cs",
     "Managers/ImageAttachmentManager.cs"
@@ -27,47 +28,67 @@
     "llm-services"
   ],
   "dependsOn": [
-    "app-settings",
+    "app-infrastructure",
     "llm-services",
-    "logging-diagnostics",
     "prompt-building",
     "task-graph-ui",
+    "task-lifecycle",
     "task-ui"
   ],
   "context": {
     "signatures": {
       "Managers/ChatManager.cs": {
-        "hash": "4154593c2665",
-        "content": "class ChatManager\n  PopulateModelCombo() -\u003E void\n  HandleNewChat() -\u003E void\n  HandleSendClick() -\u003E void\n  HandleInputKeyDown(KeyEventArgs e) -\u003E void\n  HandlePaste() -\u003E bool\n  HandleDragOver(DragEventArgs e) -\u003E bool\n  HandleDrop(DragEventArgs e) -\u003E bool\n  HandleModelComboChanged() -\u003E void\n  CancelAndDispose() -\u003E void\n  Dispose() -\u003E void"
+        "hash": "855f15be2140",
+        "content": "class ChatManager : IDisposable\n  L17: MaxTokenBudget: int = 30_000\n  L18: CharsPerToken: int = 4\n  L58: PopulateModelCombo() -\u003E void\n  L84: HandleNewChat() -\u003E void\n  L100: HandleSendClick() -\u003E void\n  L105: HandleInputKeyDown(KeyEventArgs e) -\u003E void\n  L114: HandlePaste() -\u003E bool\n  L157: HandleDragOver(DragEventArgs e) -\u003E bool\n  L172: HandleDrop(DragEventArgs e) -\u003E bool\n  L198: HandleModelComboChanged() -\u003E void\n  L200: CancelAndDispose() -\u003E void\n  L207: Dispose() -\u003E void"
       },
       "Managers/GeminiImagePanel.cs": {
-        "hash": "d1f0b20f09cc",
-        "content": "class GeminiImagePanel\n  Create(AgentTask task, out RichTextBox outputBox, out WrapPanel imageGallery) -\u003E DockPanel\n  AddImage(WrapPanel gallery, string imagePath) -\u003E void\n  SetOpenFolderHandler(DockPanel root, string folderPath) -\u003E void"
+        "hash": "bc3f71f72870",
+        "content": "class GeminiImagePanel\n  L16: Create(AgentTask task, out RichTextBox outputBox, out WrapPanel imageGallery) -\u003E DockPanel\n  L92: AddImage(WrapPanel gallery, string imagePath) -\u003E void\n  L143: SetOpenFolderHandler(DockPanel root, string folderPath) -\u003E void"
+      },
+      "Managers/ImageAttachmentManager.cs": {
+        "hash": "99dff1721eec",
+        "content": "class ImageAttachmentManager\n  L28: HandlePasteImage() -\u003E bool\n  L66: HandleDragOver(DragEventArgs e) -\u003E bool\n  L81: HandleDrop(DragEventArgs e) -\u003E bool\n  L111: ClearImages() -\u003E int  // Clears all attached images. Returns the number of files that could not be del...\n  L128: DetachImages() -\u003E List\u003Cstring\u003E?"
       }
     },
     "keyTypes": [
       "class ChatManager",
-      "class ChatMessage",
-      "class GeminiImagePanel",
-      "class GeminiImageResult"
+      "class ImageAttachmentManager"
     ],
     "patterns": [
-      "Cancel-and-dispose on new chat",
-      "Image gallery in side panel for Gemini image results"
+      "Image temp-file management with cleanup on clear",
+      "Streaming text with token budget enforcement"
     ],
     "dependencies": [
-      "ClaudeService for text chat",
-      "GeminiService for image generation",
-      "ImageAttachmentManager for paste/drop"
+      "Calls ClaudeService or GeminiService for streaming responses",
+      "WPF RichTextBox for output rendering"
     ]
   },
   "parentModuleId": "ui",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "AddImage",
+    "CancelAndDispose",
+    "CharsPerToken",
     "ChatManager",
-    "GeminiImagePanel"
+    "ClearImages",
+    "Create",
+    "DetachImages",
+    "Dispose",
+    "GeminiImagePanel",
+    "HandleDragOver",
+    "HandleDrop",
+    "HandleInputKeyDown",
+    "HandleModelComboChanged",
+    "HandleNewChat",
+    "HandlePaste",
+    "HandlePasteImage",
+    "HandleSendClick",
+    "ImageAttachmentManager",
+    "MaxTokenBudget",
+    "PopulateModelCombo",
+    "SetOpenFolderHandler"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.5299452Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.2231713Z"
 }

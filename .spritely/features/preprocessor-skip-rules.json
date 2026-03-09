@@ -31,8 +31,11 @@
   "secondaryFiles": [],
   "relatedFeatureIds": [],
   "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
     "app-startup",
     "codebase-indexing",
+    "completion-analysis",
     "feature-context-resolution",
     "feature-mode",
     "feature-mode-execution",
@@ -40,31 +43,39 @@
     "feature-update-agent",
     "file-lock-management",
     "git-operations",
+    "history-management",
     "logging-diagnostics",
     "message-bus",
+    "module-management",
     "module-registry",
+    "output-management",
     "output-processing",
     "project-management",
+    "project-tasks",
     "prompt-building",
+    "settings-management",
+    "skill-management",
     "task-execution",
     "task-factory",
     "task-graph-ui",
+    "task-lifecycle",
     "task-preprocessing",
     "task-ui",
+    "terminal",
     "theming-ui-shared"
   ],
   "context": {
     "signatures": {
       "Managers/TaskExecutionManager.cs": {
-        "hash": "e9dd3bee1a37",
-        "content": "class TaskExecutionManager\n  L717: LaunchHeadless(AgentTask task) -\u003E void\n  L748: ProcessQueuedMessages(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Processes any messages that were queued while the task was busy. Should be ca...\n  L764: SendInput(AgentTask task, TextBox inputBox, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L773: SendFollowUp(AgentTask task, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, bool isInterrupt = false) -\u003E void\n  L988: CancelTaskImmediate(AgentTask task) -\u003E void\n  L1031: KillProcess(AgentTask task) -\u003E void\n  L1033: RemoveStreamingState(string taskId) -\u003E void\n  L1043: PauseTask(AgentTask task) -\u003E void\n  L1045: ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L1114: SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask  // Creates a new subtask from a parent task, inheriting project path, permission...\n  L1191: SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask  // Creates a subtask and sets it to Queued status, blocked by the parent task. T...\n  L1211: ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060SUBTASKS\u0060\u0060\u0060 JSON block from agent output, spawns child tasks, a...\n  L1286: HandleDecompositionCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the decomposition phase: extracts subtasks from output,...\n  L1327: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // If the completing task has a ParentTaskId, finds the parent and injects the s...\n  L1358: ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060TEAM\u0060\u0060\u0060 JSON block from agent output, spawns child tasks with r...\n  L1436: HandleTeamCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the team decomposition phase: extracts team members fro...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L1600: CheckFeatureModePhaseCompletion(AgentTask featureParent, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Checks whether all children of a feature mode phase are complete. If so, trig..."
+        "hash": "b5ad7dcfa204",
+        "content": "class TaskExecutionManager\n  L730: LaunchHeadless(AgentTask task) -\u003E void\n  L761: ProcessQueuedMessages(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Processes any messages that were queued while the task was busy. Should be ca...\n  L777: SendInput(AgentTask task, TextBox inputBox, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L786: SendFollowUp(AgentTask task, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, bool isInterrupt = false) -\u003E void\n  L1001: CancelTaskImmediate(AgentTask task) -\u003E void\n  L1044: KillProcess(AgentTask task) -\u003E void\n  L1046: RemoveStreamingState(string taskId) -\u003E void\n  L1056: PauseTask(AgentTask task) -\u003E void\n  L1058: SoftStopTask(AgentTask task) -\u003E void\n  L1060: ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L1129: SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask  // Creates a new subtask from a parent task, inheriting project path, permission...\n  L1206: SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask  // Creates a subtask and sets it to Queued status, blocked by the parent task. T...\n  L1226: ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060SUBTASKS\u0060\u0060\u0060 JSON block from agent output, spawns child tasks, a...\n  L1301: HandleDecompositionCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the decomposition phase: extracts subtasks from output,...\n  L1342: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // If the completing task has a ParentTaskId, finds the parent and injects the s...\n  L1373: ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060TEAM\u0060\u0060\u0060 JSON block from agent output, spawns child tasks with r...\n  L1451: HandleTeamCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the team decomposition phase: extracts team members fro...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L1615: CheckFeatureModePhaseCompletion(AgentTask featureParent, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Checks whether all children of a feature mode phase are complete. If so, trig..."
       }
     },
     "keyTypes": [],
     "patterns": [],
     "dependencies": []
   },
-  "parentModuleId": "task-execution",
+  "parentModuleId": "task-engine",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
@@ -86,11 +97,12 @@
     "Role",
     "SendFollowUp",
     "SendInput",
+    "SoftStopTask",
     "SpawnSubtask",
     "SpawnSubtaskAndQueue",
     "TaskExecutionManager"
   ],
   "touchCount": 1,
-  "lastUpdatedAt": "2026-03-08T20:49:18.2746824Z",
+  "lastUpdatedAt": "2026-03-09T07:18:27.4788078Z",
   "lastUpdatedByTaskId": "224626c1e41c4daf"
 }

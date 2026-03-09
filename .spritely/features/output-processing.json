@@ -28,10 +28,12 @@
     "task-orchestration"
   ],
   "dependsOn": [
+    "app-infrastructure",
     "app-settings",
     "app-startup",
     "app-startup-config",
     "codebase-indexing",
+    "completion-analysis",
     "context-optimization",
     "feature-context-resolution",
     "feature-mode",
@@ -42,9 +44,12 @@
     "git-operations",
     "logging-diagnostics",
     "message-bus",
+    "output-management",
     "prompt-building",
+    "semantic-search",
     "task-execution",
     "task-factory",
+    "task-lifecycle",
     "task-orchestration",
     "task-preprocessing",
     "task-ui",
@@ -74,14 +79,18 @@
       "Uses ModelComplexityAnalyzer for retry model selection"
     ]
   },
-  "parentModuleId": "task-execution",
+  "parentModuleId": "task-engine",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "AppendColoredOutput",
+    "AppendOutput",
+    "HandleTokenLimitRetry",
     "InjectSubtaskResult",
     "OutputProcessor",
-    "TokenLimitHandler"
+    "TokenLimitHandler",
+    "TryInjectSubtaskResult"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T21:24:30.6096016Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.4594697Z"
 }

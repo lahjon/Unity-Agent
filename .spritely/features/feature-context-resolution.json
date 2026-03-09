@@ -1,47 +1,65 @@
 {
   "id": "feature-context-resolution",
   "name": "Feature Context Resolution",
-  "description": "Resolves which features are relevant to the given task and builds a context block for prompt injection. Now includes fast-path optimization to skip Haiku CLI call when 1-3 candidates all score above confidence threshold (0.85), treating them as confirmed with confidence 1.0. Saves 2-5 seconds per task launch on simple refactors.",
+  "description": "Resolves which features are relevant to a given task description using hybrid keyword\u002Bvector search, then builds a context block for prompt injection. Also handles post-completion feature updates.",
   "category": "core",
   "keywords": [
-    "FEATURE CONTEXT",
     "FeatureContextResolver",
     "FeatureContextResult",
+    "FeatureUpdateAgent",
     "MatchedFeature",
-    "context block",
+    "ResolveAsync",
+    "confidence threshold",
     "feature context",
-    "prompt injection",
-    "resolve features"
+    "task relevance"
   ],
   "primaryFiles": [
     "Managers/FeatureContextResolver.cs",
+    "Managers/FeatureUpdateAgent.cs",
     "Models/FeatureContextResult.cs"
   ],
   "secondaryFiles": [
-    "Constants/FeatureConstants.cs"
+    "Constants/FeatureConstants.cs",
+    "Models/FeatureDependencyGraph.cs"
   ],
   "relatedFeatureIds": [
-    "feature-registry",
-    "llm-services",
-    "prompt-building",
-    "task-orchestration"
-  ],
-  "dependsOn": [
-    "app-settings",
-    "app-startup-config",
     "codebase-indexing",
     "feature-registry",
     "llm-services",
-    "logging-diagnostics",
+    "semantic-search"
+  ],
+  "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
+    "app-settings",
+    "app-startup-config",
+    "codebase-indexing",
+    "feature-initialization",
+    "feature-mode",
+    "feature-registry",
+    "git-operations",
+    "history-management",
+    "llm-services",
+    "module-management",
     "module-registry",
     "project-management",
-    "prompt-building"
+    "project-tasks",
+    "prompt-building",
+    "semantic-search",
+    "settings-management",
+    "skill-management",
+    "task-lifecycle",
+    "terminal"
   ],
   "context": {
     "signatures": {
       "Managers/FeatureContextResolver.cs": {
         "hash": "6ed23b091a92",
         "content": "class FeatureContextResolver\n  L72: MinConfidenceThreshold: double = 0.3\n  L73: TreeExpansionConfidenceThreshold: double = 0.7\n  L74: SiblingScoreMultiplier: double = 0.5\n  L75: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L96: ResolveAsync(string projectPath, string taskDescription, CancellationToken ct = default) -\u003E Task\u003CFeatureContextResult?\u003E  // Resolves which features are relevant to the given task and builds a context b..."
+      },
+      "Managers/FeatureUpdateAgent.cs": {
+        "hash": "ced477e83723",
+        "content": "class FeatureUpdateAgent\n  L25: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L35: MaxPendingUpdates: int = 20\n  L505: MaxKeywords: int = 20\n  L506: CamelCaseSplitRegex: Regex = new(@\u0022(?\u003C=[a-z])(?=[A-Z])|(?\u003C=[A-Z])(...\nclass PendingFeatureUpdate\n  TaskId: string\n  TaskDescription: string\n  CompletionSummary: string?\n  ChangedFiles: List\u003Cstring\u003E\n  QueuedAt: DateTime"
       },
       "Models/FeatureContextResult.cs": {
         "hash": "b37d0e21ac66",
@@ -51,35 +69,53 @@
     "keyTypes": [
       "class FeatureContextResolver",
       "class FeatureContextResult",
+      "class FeatureUpdateAgent",
       "class MatchedFeature"
     ],
     "patterns": [
-      "Context block injection into Opus prompt",
-      "Haiku pre-flight call before main prompt construction"
+      "Confidence-gated fast path for high-confidence matches",
+      "Pending update queue for async post-task feature refresh",
+      "Tree expansion for related features above confidence threshold"
     ],
     "dependencies": [
-      "Calls Haiku to match task to features",
-      "Reads feature data from FeatureRegistryManager",
-      "Result injected into PromptBuilder"
+      "Calls Haiku for ambiguous resolution",
+      "Queries FeatureRegistryManager and HybridSearchManager",
+      "Queues post-completion updates via PendingFeatureUpdate"
     ]
   },
-  "parentModuleId": "feature-registry",
+  "parentModuleId": "codebase-intelligence",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
+    "CamelCaseSplitRegex",
+    "ChangedFiles",
+    "CompletionSummary",
     "Confidence",
     "ContextBlock",
     "FeatureContextResolver",
     "FeatureContextResult",
     "FeatureId",
     "FeatureName",
+    "FeatureUpdateAgent",
+    "HaikuTimeout",
     "IsNewFeature",
     "MatchedFeature",
+    "MaxKeywords",
+    "MaxPendingUpdates",
+    "MinConfidenceThreshold",
+    "PendingFeatureUpdate",
+    "QueuedAt",
     "RelevantFeatures",
+    "ResolveAsync",
+    "SiblingScoreMultiplier",
     "SuggestedKeywords",
-    "SuggestedNewFeatureName"
+    "SuggestedNewFeatureId",
+    "SuggestedNewFeatureName",
+    "TaskDescription",
+    "TaskId",
+    "TreeExpansionConfidenceThreshold"
   ],
   "touchCount": 2,
-  "lastUpdatedAt": "2026-03-07T22:07:44.3701763Z",
+  "lastUpdatedAt": "2026-03-09T07:18:27.0472468Z",
   "lastUpdatedByTaskId": "4fa53c33822a4f79"
 }

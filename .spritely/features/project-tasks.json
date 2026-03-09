@@ -1,39 +1,54 @@
 {
   "id": "project-tasks",
   "name": "Project Task List",
-  "description": "Manages a lightweight to-do list of project-level tasks (not AI tasks) \u2014 items that can be added, completed, and removed per project. Persisted per-project with async load/save.",
+  "description": "Manages a lightweight per-project to-do list of user-defined task items with completion tracking, independent of AI task execution.",
   "category": "data",
   "keywords": [
+    "AddTask",
+    "CompleteTask",
     "ProjectTaskItem",
     "ProjectTaskManager",
-    "checklist",
     "project tasks",
-    "project work items",
     "task list",
-    "todo"
+    "to-do list"
   ],
   "primaryFiles": [
-    "Managers/ProjectTaskManager.cs"
+    "Managers/ProjectTaskManager.cs",
+    "Models/ProjectTaskItem.cs"
   ],
   "secondaryFiles": [
+    "MainWindow.ProjectTasks.cs",
     "Models/ProjectTaskItem.cs"
   ],
   "relatedFeatureIds": [
     "project-management"
   ],
   "dependsOn": [
+    "activity-dashboard",
+    "app-infrastructure",
     "codebase-indexing",
     "feature-context-resolution",
+    "feature-mode",
     "feature-registry",
-    "logging-diagnostics",
+    "git-operations",
+    "history-management",
+    "module-management",
     "module-registry",
-    "project-management"
+    "project-management",
+    "settings-management",
+    "skill-management",
+    "task-lifecycle",
+    "terminal"
   ],
   "context": {
     "signatures": {
       "Managers/ProjectTaskManager.cs": {
         "hash": "d28918dcbb6a",
-        "content": "class ProjectTaskManager\n  LoadTasksAsync() -\u003E Task\n  SaveTasks() -\u003E void\n  SaveTasksAsync() -\u003E Task\n  AddTask(string text) -\u003E ProjectTaskItem\n  CompleteTask(ProjectTaskItem task) -\u003E void\n  RemoveTask(ProjectTaskItem task) -\u003E void"
+        "content": "class ProjectTaskManager\n  L32: LoadTasksAsync() -\u003E Task\n  L51: SaveTasks() -\u003E void\n  L66: SaveTasksAsync() -\u003E Task\n  L71: AddTask(string text) -\u003E ProjectTaskItem\n  L88: CompleteTask(ProjectTaskItem task) -\u003E void\n  L95: RemoveTask(ProjectTaskItem task) -\u003E void"
+      },
+      "Models/ProjectTaskItem.cs": {
+        "hash": "7f11b8997fd9",
+        "content": "class ProjectTaskItem : INotifyPropertyChanged\n  Id: string\n  Text: string\n  ProjectPath: string\n  CreatedAt: DateTime\n  CompletedAt: DateTime?"
       }
     },
     "keyTypes": [
@@ -41,20 +56,30 @@
       "class ProjectTaskManager"
     ],
     "patterns": [
-      "Async JSON load/save with background write",
-      "Per-project storage in .spritely/ directory"
+      "Simple CRUD with JSON persistence per project"
     ],
     "dependencies": [
-      "ProjectManager for current project path",
-      "SafeFileWriter for background persistence"
+      "Reads/writes JSON task list under project .spritely/ folder"
     ]
   },
-  "parentModuleId": "data-persistence",
+  "parentModuleId": "history-persistence",
   "childFeatureIds": [],
   "hierarchyLevel": 0,
   "symbolNames": [
-    "ProjectTaskManager"
+    "AddTask",
+    "CompleteTask",
+    "CompletedAt",
+    "CreatedAt",
+    "Id",
+    "LoadTasksAsync",
+    "ProjectPath",
+    "ProjectTaskItem",
+    "ProjectTaskManager",
+    "RemoveTask",
+    "SaveTasks",
+    "SaveTasksAsync",
+    "Text"
   ],
   "touchCount": 0,
-  "lastUpdatedAt": "2026-03-07T19:49:48.5654574Z"
+  "lastUpdatedAt": "2026-03-09T07:18:27.2491598Z"
 }
