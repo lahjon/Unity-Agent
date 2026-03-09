@@ -42,6 +42,10 @@ namespace Spritely.Models
         [JsonIgnore]
         public System.Diagnostics.Process? McpProcess { get; set; }
         [JsonIgnore]
+        public string McpActiveInstance { get; set; } = "";
+        [JsonIgnore]
+        public int McpUnityPid { get; set; }
+        [JsonIgnore]
         public string FolderName => string.IsNullOrEmpty(Path) ? "" : System.IO.Path.GetFileName(Path);
         [JsonIgnore]
         public string DisplayName => string.IsNullOrWhiteSpace(Name) ? FolderName : Name;

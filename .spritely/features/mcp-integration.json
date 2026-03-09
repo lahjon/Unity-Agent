@@ -86,8 +86,8 @@
         "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
       },
       "Managers/McpConfigManager.cs": {
-        "hash": "519f8382f50d",
-        "content": "class McpConfigManager\n  L16: _httpClient: HttpClient = new() { Timeout = TimeSpan.FromSecond...\n  L30: UpdateMcpToggleForProject() -\u003E void\n  L51: ConnectMcpAsync(string projectPath) -\u003E Task\n  L106: DisconnectMcp(string projectPath) -\u003E void\n  L115: IsUnityRunning() -\u003E bool\n  L147: CheckMcpHealth(string url) -\u003E Task\u003Cbool\u003E\n  L643: StopMcpServer(ProjectEntry entry) -\u003E void\n  L688: StopAllMcpServers() -\u003E void\n  L696: NotifyMcpOutputChanged(string projectPath) -\u003E void"
+        "hash": "ed9fc31011d8",
+        "content": "class McpConfigManager\n  L16: _httpClient: HttpClient = new() { Timeout = TimeSpan.FromSecond...\n  L30: UpdateMcpToggleForProject() -\u003E void\n  L51: ConnectMcpAsync(string projectPath) -\u003E Task\n  L106: DisconnectMcp(string projectPath) -\u003E void\n  L115: IsUnityRunning() -\u003E bool\n  L152: FindUnityPidForProject(string projectPath) -\u003E int  // Finds the Unity Editor PID that has the given project path open. Uses WMI to ...\n  L238: CheckMcpHealth(string url) -\u003E Task\u003Cbool\u003E\n  L761: StopMcpServer(ProjectEntry entry) -\u003E void\n  L806: StopAllMcpServers() -\u003E void\n  L814: NotifyMcpOutputChanged(string projectPath) -\u003E void"
       },
       "Managers/McpHealthMonitor.cs": {
         "hash": "c7b64e940a84",

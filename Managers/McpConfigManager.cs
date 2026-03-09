@@ -144,6 +144,97 @@ namespace Spritely.Managers
             }
         }
 
+        /// <summary>
+        /// Finds the Unity Editor PID that has the given project path open.
+        /// Uses WMI to match the -projectPath argument in the Unity process command line.
+        /// Returns 0 if no matching Unity process is found.
+        /// </summary>
+        public int FindUnityPidForProject(string projectPath)
+        {
+            try
+            {
+                var normalizedProject = System.IO.Path.GetFullPath(projectPath).TrimEnd('\\', '/');
+                var unityProcesses = System.Diagnostics.Process.GetProcessesByName("Unity");
+
+                if (unityProcesses.Length == 0)
+                    return 0;
+
+                // If only one Unity instance, it's the one we want
+                if (unityProcesses.Length == 1)
+                {
+                    var pid = unityProcesses[0].Id;
+                    AppLogger.Info("McpConfigManager", $"Single Unity instance found (PID {pid}), using it for project {projectPath}");
+                    foreach (var p in unityProcesses) p.Dispose();
+                    return pid;
+                }
+
+                // Multiple Unity instances — use WMI to match command line -projectPath
+                foreach (var p in unityProcesses) p.Dispose();
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c wmic process where \"name='Unity.exe'\" get ProcessId,CommandLine /format:csv 2>nul",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true
+                };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                if (proc == null) return 0;
+                var output = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit(5000);
+
+                foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!line.Contains("Unity", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    // CSV format: Node,CommandLine,ProcessId
+                    var cmdLine = line;
+                    var projectPathIdx = cmdLine.IndexOf("-projectPath", StringComparison.OrdinalIgnoreCase);
+                    if (projectPathIdx < 0) continue;
+
+                    // Extract the path after -projectPath
+                    var afterFlag = cmdLine.Substring(projectPathIdx + "-projectPath".Length).Trim();
+                    // Handle quoted paths
+                    string extractedPath;
+                    if (afterFlag.StartsWith("\""))
+                    {
+                        var endQuote = afterFlag.IndexOf('"', 1);
+                        extractedPath = endQuote > 0 ? afterFlag.Substring(1, endQuote - 1) : afterFlag.Trim('"');
+                    }
+                    else
+                    {
+                        var spaceIdx = afterFlag.IndexOf(' ');
+                        extractedPath = spaceIdx > 0 ? afterFlag.Substring(0, spaceIdx) : afterFlag;
+                    }
+
+                    var normalizedExtracted = System.IO.Path.GetFullPath(extractedPath.Trim()).TrimEnd('\\', '/');
+                    if (string.Equals(normalizedProject, normalizedExtracted, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Find PID — last CSV column
+                        var lastComma = line.LastIndexOf(',');
+                        if (lastComma >= 0)
+                        {
+                            var pidStr = line.Substring(lastComma + 1).Trim();
+                            if (int.TryParse(pidStr, out var matchedPid))
+                            {
+                                AppLogger.Info("McpConfigManager", $"Found Unity PID {matchedPid} for project {projectPath}");
+                                return matchedPid;
+                            }
+                        }
+                    }
+                }
+
+                AppLogger.Warn("McpConfigManager", $"Could not match Unity PID to project path: {projectPath}");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("McpConfigManager", $"Error finding Unity PID for project: {ex.Message}");
+                return 0;
+            }
+        }
+
         public async Task<bool> CheckMcpHealth(string url)
         {
             try
@@ -390,6 +481,10 @@ namespace Spritely.Managers
 
             // 4. Address/network info
             sb.AppendLine($"[INFO] MCP address: {entry.McpAddress}");
+            if (!string.IsNullOrEmpty(entry.McpActiveInstance))
+                sb.AppendLine($"[INFO] Active Unity instance: {entry.McpActiveInstance}");
+            if (entry.McpUnityPid > 0)
+                sb.AppendLine($"[INFO] Unity Editor PID: {entry.McpUnityPid}");
 
             // 5. Last health check error
             if (!string.IsNullOrEmpty(lastHealthError))
@@ -451,6 +546,7 @@ namespace Spritely.Managers
                     entry.McpOutput.AppendLine($"Server already running, verifying connection...");
 
                     await RegisterMcpWithClaudeAsync(entry.McpServerName, entry.McpAddress);
+                    await BindUnityInstanceAsync(entry);
 
                     entry.McpStatus = McpStatus.Connected;
                     entry.McpOutput.AppendLine($"✓ Connection verified - MCP server is ready!");
@@ -472,15 +568,32 @@ namespace Spritely.Managers
                     await Task.Delay(500);
                 }
 
+                // Find the Unity Editor PID for this project (used for diagnostics)
+                var unityPid = FindUnityPidForProject(entry.Path);
+                entry.McpUnityPid = unityPid;
+                if (unityPid > 0)
+                {
+                    AppLogger.Info("McpConfigManager", $"Binding MCP server to Unity PID {unityPid}");
+                    entry.McpOutput.AppendLine($"Found Unity Editor (PID {unityPid}) for this project");
+                }
+                else
+                {
+                    AppLogger.Warn("McpConfigManager", "Could not determine Unity PID — server will start without PID binding");
+                    entry.McpOutput.AppendLine("⚠ Could not determine Unity PID — starting without PID binding");
+                }
+
                 for (int retry = 1; retry <= MAX_RETRIES; retry++)
                 {
                     AppLogger.Info("McpConfigManager", $"Attempting to start MCP server (attempt {retry}/{MAX_RETRIES})");
                     entry.McpOutput.AppendLine($"Starting MCP server (attempt {retry}/{MAX_RETRIES})...");
 
+                    var startCommand = entry.McpStartCommand;
+                    AppLogger.Info("McpConfigManager", $"Start command: {startCommand}");
+
                     var processInfo = new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = "cmd.exe",
-                        Arguments = $"/c {entry.McpStartCommand}",
+                        Arguments = $"/c {startCommand}",
                         WorkingDirectory = entry.Path,
                         CreateNoWindow = true,
                         UseShellExecute = false,
@@ -570,6 +683,7 @@ namespace Spritely.Managers
                             entry.McpOutput.AppendLine($"Verifying MCP connection...");
 
                             await RegisterMcpWithClaudeAsync(entry.McpServerName, entry.McpAddress);
+                            await BindUnityInstanceAsync(entry);
 
                             entry.McpStatus = McpStatus.Connected;
                             entry.McpOutput.AppendLine($"✓ Connection verified - MCP server is ready!");
@@ -696,6 +810,120 @@ namespace Spritely.Managers
         public void NotifyMcpOutputChanged(string projectPath)
         {
             McpOutputChanged?.Invoke(projectPath);
+        }
+
+        /// <summary>
+        /// After the MCP server is healthy, queries for connected Unity instances and
+        /// binds the correct one (matching the project's Unity PID) as the active instance.
+        /// </summary>
+        private async Task BindUnityInstanceAsync(ProjectEntry entry)
+        {
+            try
+            {
+                // Query the server for connected Unity instances
+                var listRequest = new
+                {
+                    jsonrpc = "2.0",
+                    method = "resources/read",
+                    @params = new { uri = "mcpforunity://instances" },
+                    id = 2
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(listRequest);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, entry.McpAddress);
+                request.Content = content;
+                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                var response = await _httpClient.SendAsync(request);
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrEmpty(responseBody))
+                {
+                    AppLogger.Warn("McpConfigManager", "Empty response when querying Unity instances");
+                    return;
+                }
+
+                AppLogger.Info("McpConfigManager", $"Unity instances response: {responseBody}");
+
+                // Parse the response to find instance names (format: "Name@hash")
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+                string? instanceName = null;
+
+                // Look for instance names in the response
+                var bodyText = responseBody;
+                var instances = new System.Collections.Generic.List<string>();
+
+                // Extract Name@hash patterns from the response
+                foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(bodyText, @"[\w\-\. ]+@[a-f0-9]+"))
+                {
+                    instances.Add(match.Value);
+                }
+
+                if (instances.Count == 0)
+                {
+                    AppLogger.Warn("McpConfigManager", "No Unity instances found connected to MCP server");
+                    entry.McpOutput.AppendLine("⚠ No Unity instances detected — Unity may still be connecting");
+                    return;
+                }
+
+                // If only one instance, use it; otherwise try to match by project name
+                if (instances.Count == 1)
+                {
+                    instanceName = instances[0];
+                }
+                else
+                {
+                    // Try to match by project folder name
+                    var projectFolder = System.IO.Path.GetFileName(entry.Path);
+                    instanceName = instances.FirstOrDefault(i =>
+                        i.StartsWith(projectFolder, StringComparison.OrdinalIgnoreCase)) ?? instances[0];
+                }
+
+                AppLogger.Info("McpConfigManager", $"Setting active Unity instance: {instanceName}");
+                entry.McpOutput.AppendLine($"Binding to Unity instance: {instanceName}");
+                entry.McpActiveInstance = instanceName;
+
+                // Call set_active_instance on the MCP server
+                var setRequest = new
+                {
+                    jsonrpc = "2.0",
+                    method = "tools/call",
+                    @params = new
+                    {
+                        name = "set_active_instance",
+                        arguments = new { instance_name = instanceName }
+                    },
+                    id = 3
+                };
+
+                var setJson = System.Text.Json.JsonSerializer.Serialize(setRequest);
+                var setContent = new StringContent(setJson, System.Text.Encoding.UTF8, "application/json");
+
+                using var setReq = new HttpRequestMessage(HttpMethod.Post, entry.McpAddress);
+                setReq.Content = setContent;
+                setReq.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                var setResponse = await _httpClient.SendAsync(setReq);
+                var setResponseBody = await setResponse.Content.ReadAsStringAsync();
+                AppLogger.Info("McpConfigManager", $"set_active_instance response: {setResponseBody}");
+
+                if (setResponse.IsSuccessStatusCode)
+                {
+                    entry.McpOutput.AppendLine($"✓ Bound to Unity instance: {instanceName}");
+                }
+                else
+                {
+                    AppLogger.Warn("McpConfigManager", $"Failed to set active instance: {setResponseBody}");
+                    entry.McpOutput.AppendLine($"⚠ Could not bind instance (server may handle routing automatically)");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("McpConfigManager", $"Failed to bind Unity instance: {ex.Message}");
+                entry.McpOutput.AppendLine($"⚠ Instance binding skipped: {ex.Message}");
+            }
         }
 
         private async Task RegisterMcpWithClaudeAsync(string serverName, string mcpAddress = "http://127.0.0.1:8080/mcp")
