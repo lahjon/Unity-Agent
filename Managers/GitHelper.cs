@@ -223,5 +223,19 @@ namespace Spritely.Managers
             var gitHashRegex = new Regex(@"^[0-9a-f]{7,40}$", RegexOptions.IgnoreCase);
             return gitHashRegex.IsMatch(hash);
         }
+
+        /// <inheritdoc />
+        public async Task<string?> GetPendingDiffAsync(string projectPath,
+            CancellationToken cancellationToken = default)
+        {
+            // Get both staged and unstaged changes in a single diff
+            var result = await RunGitCommandAsync(projectPath, "diff HEAD", cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!result.IsSuccess || string.IsNullOrWhiteSpace(result.Output))
+                return null;
+
+            return result.Output;
+        }
     }
 }

@@ -110,6 +110,7 @@ namespace Spritely.Dialogs
             {
                 entry.RuleInstruction = ruleBox.Text;
                 saveProjects();
+                projectManager?.NotifyRulesChanged(entry);
             });
 
             AddSeparator(stack);
@@ -162,6 +163,7 @@ namespace Spritely.Dialogs
                     {
                         entry.ProjectRules.Remove(ruleText);
                         saveProjects();
+                        projectManager?.NotifyRulesChanged(entry);
                         RebuildRulesList();
                     };
                     dp.Children.Add(removeBtn);
@@ -198,6 +200,7 @@ namespace Spritely.Dialogs
                 if (string.IsNullOrWhiteSpace(r)) return;
                 entry.ProjectRules.Add(r);
                 saveProjects();
+                projectManager?.NotifyRulesChanged(entry);
                 ruleInputBox.Clear();
                 RebuildRulesList();
             }
@@ -241,6 +244,36 @@ namespace Spritely.Dialogs
             };
             stack.Children.Add(gameToggle);
             AddHint(stack, "When enabled, game creation rules are automatically included with every task.");
+
+            AddSeparator(stack);
+
+            // ── Auto-regenerate CLAUDE.md ──
+            AddSectionHeader(stack, "Auto-regenerate CLAUDE.md");
+            var claudeMdToggle = new ToggleButton
+            {
+                IsChecked = entry.AutoRegenerateClaudeMd,
+                Style = (Style)Application.Current.FindResource("ToggleSwitch"),
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            claudeMdToggle.Content = new TextBlock
+            {
+                Text = "Regenerate on rule changes",
+                Foreground = (Brush)Application.Current.FindResource("TextLight"),
+                FontSize = 11,
+                FontFamily = new FontFamily("Segoe UI")
+            };
+            claudeMdToggle.Checked += (_, _) =>
+            {
+                entry.AutoRegenerateClaudeMd = true;
+                saveProjects();
+            };
+            claudeMdToggle.Unchecked += (_, _) =>
+            {
+                entry.AutoRegenerateClaudeMd = false;
+                saveProjects();
+            };
+            stack.Children.Add(claudeMdToggle);
+            AddHint(stack, "When enabled, CLAUDE.md is automatically regenerated whenever project rules or rule instructions change.");
 
             AddSeparator(stack);
 

@@ -161,7 +161,7 @@ namespace Spritely.Managers
         public string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
             bool isGameProject = false, string skillsBlock = "",
-            string featureContextBlock = "")
+            string featureContextBlock = "", string pendingChangesBlock = "")
         {
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
             if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
@@ -173,6 +173,12 @@ namespace Spritely.Managers
             var suppressEfficiency = isPlanningMember || task.PlanOnly;
 
             var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency, skillsBlock, featureContextBlock);
+
+            // Inject pending changes block before the task description so the AI
+            // is aware of in-progress uncommitted work in the repository.
+            if (!string.IsNullOrWhiteSpace(pendingChangesBlock))
+                basePrompt = $"{basePrompt}\n\n{pendingChangesBlock}";
+
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
                 basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
             return BuildPromptWithImages(basePrompt, task.ImagePaths);

@@ -90,6 +90,7 @@ namespace Spritely.Managers
         public void SetTaskFactory(ITaskFactory taskFactory)
         {
             Descriptions.SetTaskFactory(taskFactory);
+            Rules.SetTaskFactory(taskFactory);
         }
 
         public void SetSettingsManager(SettingsManager settingsManager)
@@ -206,6 +207,10 @@ namespace Spritely.Managers
 
             if (Colors.BackfillColors()) SaveProjects();
 
+            // Seed rules hashes so first save after launch doesn't trigger spurious regen
+            foreach (var entry in _savedProjects)
+                Rules.SeedRulesHash(entry);
+
             _view.ViewDispatcher.Invoke(() =>
             {
                 RefreshProjectCombo();
@@ -253,6 +258,7 @@ namespace Spritely.Managers
         public List<string> GetCrashLogPaths(string projectPath) => Rules.GetCrashLogPaths(projectPath);
         public void SaveCrashLogPaths(string crashLogPath, string appLogPath, string hangLogPath) => Rules.SaveCrashLogPaths(crashLogPath, appLogPath, hangLogPath);
         public bool IsGameProject(string projectPath) => Rules.IsGameProject(projectPath);
+        public void NotifyRulesChanged(ProjectEntry entry) => Rules.NotifyRulesChanged(entry);
 
         public string GetProjectColor(string projectPath) => Colors.GetProjectColor(projectPath);
         public string GetProjectDisplayName(string projectPath) => Colors.GetProjectDisplayName(projectPath);

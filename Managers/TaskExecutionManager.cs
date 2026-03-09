@@ -130,7 +130,7 @@ namespace Spritely.Managers
         /// When <paramref name="activeTasks"/> is provided, auto-enables the message bus
         /// if sibling tasks exist on the same project.
         /// </summary>
-        private string BuildAndWritePromptFile(AgentTask task, ObservableCollection<AgentTask>? activeTasks = null, string featureContextBlock = "")
+        private string BuildAndWritePromptFile(AgentTask task, ObservableCollection<AgentTask>? activeTasks = null, string featureContextBlock = "", string pendingChangesBlock = "")
         {
             var fullPrompt = _promptBuilder.BuildFullPrompt(
                 _getSystemPrompt(), task,
@@ -138,7 +138,8 @@ namespace Spritely.Managers
                 _getProjectRulesBlock(task.ProjectPath),
                 _isGameProject(task.ProjectPath),
                 _getSkillsBlock(),
-                featureContextBlock);
+                featureContextBlock,
+                pendingChangesBlock);
 
             if (activeTasks != null)
             {
@@ -306,7 +307,28 @@ namespace Spritely.Managers
                 featureContextBlock = task.Runtime.FeatureContextBlock;
             }
 
-            var promptFile = BuildAndWritePromptFile(task, activeTasks, featureContextBlock);
+            // Fetch pending diff to give the AI awareness of uncommitted changes
+            var pendingChangesBlock = "";
+            try
+            {
+                var rawDiff = await _gitHelper.GetPendingDiffAsync(task.ProjectPath, task.Cts.Token)
+                    .ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(rawDiff))
+                {
+                    const int maxDiffTokens = 2000;
+                    var truncationService = new SmartTruncationService();
+                    var truncated = truncationService.TruncateWithSemantics(
+                        rawDiff, maxDiffTokens, SmartTruncationService.TruncationPriority.Balanced);
+                    pendingChangesBlock = $"# PENDING CHANGES\nUncommitted changes in the repository:\n```diff\n{truncated.Content}\n```";
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("TaskExecutionManager", "Pending diff fetch failed, continuing without", ex);
+            }
+
+            var promptFile = BuildAndWritePromptFile(task, activeTasks, featureContextBlock, pendingChangesBlock);
             var projectPath = task.ProjectPath;
 
             var cliModel = PromptBuilder.GetCliModelForTask(task);

@@ -53,5 +53,12 @@ namespace Spritely.Managers
         /// <param name="hash">The hash string to validate</param>
         /// <returns>True if the hash is valid, false otherwise</returns>
         bool IsValidGitHash(string? hash);
+
+        /// <summary>
+        /// Returns a compact unified diff of all pending (staged + unstaged) changes.
+        /// Used to inject a PENDING CHANGES context block into task prompts.
+        /// </summary>
+        Task<string?> GetPendingDiffAsync(string projectPath,
+            CancellationToken cancellationToken = default);
     }
 }

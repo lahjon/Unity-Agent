@@ -75,6 +75,7 @@ namespace Spritely
         private ActivityDashboardManager _activityDashboard = null!;
         private GitPanelManager _gitPanelManager = null!;
         private GitOperationGuard _gitOperationGuard = null!;
+        private CommitOrchestrator _commitOrchestrator = null!;
         private readonly TaskGroupTracker _taskGroupTracker;
         private readonly TaskOrchestrator _taskOrchestrator;
         private SkillManager _skillManager = null!;
@@ -251,6 +252,14 @@ namespace Spritely
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
 
             _gitOperationGuard = new GitOperationGuard(_fileLockManager);
+            _commitOrchestrator = new CommitOrchestrator(
+                _gitHelper,
+                _gitOperationGuard,
+                _fileLockManager,
+                _historyManager,
+                () => _historyTasks,
+                () => _activeTasks,
+                () => _gitPanelManager?.MarkDirty());
             _gitPanelManager = new GitPanelManager(
                 _gitHelper,
                 () => _projectManager.ProjectPath,

@@ -9,12 +9,24 @@
     "TaskExecutionManager",
     "TaskExecutionServices",
     "TaskProcessLauncher",
+    "agent",
+    "analyzer",
+    "auto",
+    "block",
+    "builder",
+    "bus",
+    "commit",
+    "description",
+    "git",
+    "output",
     "pause resume cancel",
     "process management",
     "stream-json",
+    "task",
     "task launch"
   ],
   "primaryFiles": [
+    "MainWindow.AutoCommit.cs",
     "MainWindow.TaskExecution.cs",
     "Managers/TaskExecutionManager.cs",
     "Managers/TaskExecutionServices.cs",
@@ -100,8 +112,8 @@
         "content": "class MainWindow"
       },
       "Managers/TaskExecutionManager.cs": {
-        "hash": "c487e6142a92",
-        "content": "class TaskExecutionManager\n  L735: LaunchHeadless(AgentTask task) -\u003E void\n  L766: ProcessQueuedMessages(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Processes any messages that were queued while the task was busy. Should be ca...\n  L782: SendInput(AgentTask task, TextBox inputBox, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L791: SendFollowUp(AgentTask task, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, bool isInterrupt = false) -\u003E void\n  L1006: CancelTaskImmediate(AgentTask task) -\u003E void\n  L1049: KillProcess(AgentTask task) -\u003E void\n  L1051: RemoveStreamingState(string taskId) -\u003E void\n  L1061: PauseTask(AgentTask task) -\u003E void\n  L1063: SoftStopTask(AgentTask task) -\u003E void\n  L1065: ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L1134: SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask  // Creates a new subtask from a parent task, inheriting project path, permission...\n  L1211: SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask  // Creates a subtask and sets it to Queued status, blocked by the parent task. T...\n  L1231: ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060SUBTASKS\u0060\u0060\u0060 JSON block from agent output, spawns child tasks, a...\n  L1306: HandleDecompositionCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the decomposition phase: extracts subtasks from output,...\n  L1347: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // If the completing task has a ParentTaskId, finds the parent and injects the s...\n  L1378: ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060TEAM\u0060\u0060\u0060 JSON block from agent output, spawns child tasks with r...\n  L1456: HandleTeamCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the team decomposition phase: extracts team members fro...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L1620: CheckFeatureModePhaseCompletion(AgentTask featureParent, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Checks whether all children of a feature mode phase are complete. If so, trig..."
+        "hash": "f1132967a220",
+        "content": "class TaskExecutionManager\n  L737: LaunchHeadless(AgentTask task) -\u003E void\n  L768: ProcessQueuedMessages(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Processes any messages that were queued while the task was busy. Should be ca...\n  L784: SendInput(AgentTask task, TextBox inputBox, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L793: SendFollowUp(AgentTask task, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, bool isInterrupt = false) -\u003E void\n  L1008: CancelTaskImmediate(AgentTask task) -\u003E void\n  L1051: KillProcess(AgentTask task) -\u003E void\n  L1053: RemoveStreamingState(string taskId) -\u003E void\n  L1063: PauseTask(AgentTask task) -\u003E void\n  L1065: SoftStopTask(AgentTask task) -\u003E void\n  L1067: ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L1136: SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask  // Creates a new subtask from a parent task, inheriting project path, permission...\n  L1213: SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask  // Creates a subtask and sets it to Queued status, blocked by the parent task. T...\n  L1233: ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060SUBTASKS\u0060\u0060\u0060 JSON block from agent output, spawns child tasks, a...\n  L1308: HandleDecompositionCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the decomposition phase: extracts subtasks from output,...\n  L1349: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // If the completing task has a ParentTaskId, finds the parent and injects the s...\n  L1380: ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?  // Parses the \u0060\u0060\u0060TEAM\u0060\u0060\u0060 JSON block from agent output, spawns child tasks with r...\n  L1458: HandleTeamCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Handles completion of the team decomposition phase: extracts team members fro...\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  Role: string\n  Description: string\n  DependsOn: List\u003Cint\u003E?\n  L1622: CheckFeatureModePhaseCompletion(AgentTask featureParent, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void  // Checks whether all children of a feature mode phase are complete. If so, trig..."
       },
       "Managers/TaskExecutionServices.cs": {
         "hash": "ab82d1aaff36",
@@ -110,6 +122,10 @@
       "Managers/TaskProcessLauncher.cs": {
         "hash": "0a40c4f2e263",
         "content": "class TaskProcessLauncher\n  ProcessQueuedMessagesCallback: Action\u003CAgentTask, ObservableCollection\u003CAgentTask\u003E, ObservableCollection\u003CAgentTask\u003E\u003E?\n  L68: CreateManagedProcess(string ps1File, string taskId, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003Cint\u003E onExited) -\u003E Process  // Creates a Process with standard output/error/event wiring for stream-json par...\n  L124: StartManagedProcess(AgentTask task, Process process) -\u003E void\n  L137: KillProcess(AgentTask task) -\u003E void\n  L147: RemoveStreamingState(string taskId) -\u003E void\n  L153: CleanupScripts(string taskId) -\u003E void\n  L202: THREAD_SUSPEND_RESUME: uint = 0x0002\n  L203: TH32CS_SNAPPROCESS: uint = 0x00000002\n  L314: SoftStopTask(AgentTask task) -\u003E void  // Sends a graceful stop signal (Ctrl\u002BC via stdin) to the task\u0027s process. The pr...\n  L341: PauseTask(AgentTask task) -\u003E void\n  L357: ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
+      },
+      "MainWindow.AutoCommit.cs": {
+        "hash": "03b0a469bd4d",
+        "content": "class MainWindow\n  L44: ReleaseTaskLocksAfterCommit(AgentTask task) -\u003E void  // Releases file locks that were deferred for Auto-Commit."
       }
     },
     "keyTypes": [
@@ -171,6 +187,7 @@
     "ProcessQueuedMessages",
     "ProcessQueuedMessagesCallback",
     "PromptBuilder",
+    "ReleaseTaskLocksAfterCommit",
     "RemoveStreamingState",
     "ResumeTask",
     "Role",
@@ -189,7 +206,7 @@
     "TaskPreprocessor",
     "TaskProcessLauncher"
   ],
-  "touchCount": 1,
-  "lastUpdatedAt": "2026-03-09T07:18:26.9600496Z",
-  "lastUpdatedByTaskId": "29d6f606277649ad"
+  "touchCount": 2,
+  "lastUpdatedAt": "2026-03-09T12:38:26.2628093Z",
+  "lastUpdatedByTaskId": "ceeb66d5ccaf4eaa"
 }

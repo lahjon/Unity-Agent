@@ -15,8 +15,8 @@ namespace Spritely.Managers
 {
     public class OutputTabManager
     {
-        /// <summary>Rolling-window cap for task output (500 KB of text).</summary>
-        internal const int OutputCapChars = 500_000;
+        /// <summary>Rolling-window cap for task output kept in memory (200 KB). Full output is on disk.</summary>
+        internal const int OutputCapChars = 200_000;
 
         private readonly Dictionary<string, TabItem> _tabs = new();
         private readonly Dictionary<string, RichTextBox> _outputBoxes = new();
@@ -27,6 +27,9 @@ namespace Spritely.Managers
         private Button? _overflowBtn;
         private readonly TabControl _outputTabs;
         private readonly Dispatcher _dispatcher;
+
+        /// <summary>Streams output chunks to per-task log files on disk.</summary>
+        private readonly StreamingOutputWriter _outputWriter = new();
 
         /// <summary>Tracks per-task typewriter animation and pulsing dots state.</summary>
         private class TypewriterState
@@ -52,6 +55,9 @@ namespace Spritely.Managers
 
         public Dictionary<string, TabItem> Tabs => _tabs;
         public Dictionary<string, RichTextBox> OutputBoxes => _outputBoxes;
+
+        /// <summary>Provides access to the disk-backed output writer for full output retrieval.</summary>
+        public StreamingOutputWriter OutputWriter => _outputWriter;
 
         public OutputTabManager(TabControl outputTabs, Dispatcher dispatcher)
         {
@@ -153,8 +159,27 @@ namespace Spritely.Managers
                 }
             };
 
+            var fullOutputBtn = new Button
+            {
+                Content = "\uE8A5", // ViewAll icon
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 14,
+                Style = (Style)Application.Current.FindResource("Btn"),
+                Background = (Brush)Application.Current.FindResource("BgCard"),
+                Foreground = (Brush)Application.Current.FindResource("TextSubtle"),
+                Padding = new Thickness(8, 6, 8, 6),
+                Margin = new Thickness(4, 0, 0, 0),
+                ToolTip = "View full output from disk"
+            };
+            fullOutputBtn.Click += (_, _) =>
+            {
+                Dialogs.FullOutputViewerDialog.Show(task.Id, task.Description, _outputWriter);
+            };
+
             var inputPanel = new DockPanel { Margin = new Thickness(0, 4, 0, 0) };
+            DockPanel.SetDock(fullOutputBtn, Dock.Right);
             DockPanel.SetDock(sendBtn, Dock.Right);
+            inputPanel.Children.Add(fullOutputBtn);
             inputPanel.Children.Add(sendBtn);
             inputPanel.Children.Add(inputBox);
 
@@ -499,6 +524,9 @@ namespace Spritely.Managers
 
             var baseBrush = (Brush)Application.Current.FindResource("TextBody");
 
+            // Stream to disk for full output recovery
+            _outputWriter.WriteChunk(taskId, text);
+
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
                     ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
             if (task != null)
@@ -545,6 +573,9 @@ namespace Spritely.Managers
                     return;
                 }
             }
+
+            // Stream to disk for full output recovery
+            _outputWriter.WriteChunk(taskId, text);
 
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
                     ?? historyTasks.FirstOrDefault(t => t.Id == taskId);

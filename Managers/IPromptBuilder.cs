@@ -17,7 +17,7 @@ namespace Spritely.Managers
         string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
             bool isGameProject = false, string skillsBlock = "",
-            string featureContextBlock = "");
+            string featureContextBlock = "", string pendingChangesBlock = "");
 
         string BuildPromptWithImages(string basePrompt, List<string> imagePaths);
 

@@ -50,6 +50,9 @@ namespace Spritely.Constants
         /// <summary>SQLite database filename for vector storage.</summary>
         public const string VectorDbFileName = "vectors.db";
 
+        /// <summary>Binary cache file extension for persistent embedding cache at %LOCALAPPDATA%.</summary>
+        public const string EmbeddingCacheExtension = ".bin";
+
         /// <summary>Current schema version for migration tracking.</summary>
         public const int SchemaVersion = 1;
 

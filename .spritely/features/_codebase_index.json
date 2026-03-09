@@ -308,13 +308,13 @@
       "shortSignature": "Dispose() -\u003E void"
     },
     "mainwindow": {
-      "featureId": "mcp-integration",
-      "filePath": "MainWindow.Settings.cs",
+      "featureId": "task-execution",
+      "filePath": "MainWindow.AutoCommit.cs",
       "kind": "Class",
       "shortSignature": "class MainWindow"
     },
     "releasetasklocksaftercommit": {
-      "featureId": "main-window-ui",
+      "featureId": "task-execution",
       "filePath": "MainWindow.AutoCommit.cs",
       "kind": "Method",
       "shortSignature": "ReleaseTaskLocksAfterCommit(AgentTask task) -\u003E void"

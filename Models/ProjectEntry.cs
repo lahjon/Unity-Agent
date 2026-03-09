@@ -32,6 +32,7 @@ namespace Spritely.Models
         public string CrashLogPath { get; set; } = "";
         public string AppLogPath { get; set; } = "";
         public string HangLogPath { get; set; } = "";
+        public bool AutoRegenerateClaudeMd { get; set; }
 
         [JsonIgnore]
         public bool IsInitializing { get; set; }

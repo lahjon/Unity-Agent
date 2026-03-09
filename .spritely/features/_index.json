@@ -320,8 +320,8 @@
       "id": "task-execution",
       "name": "Task Execution Engine",
       "category": "core",
-      "touchCount": 1,
-      "primaryFileCount": 4
+      "touchCount": 2,
+      "primaryFileCount": 5
     },
     {
       "id": "task-factory",

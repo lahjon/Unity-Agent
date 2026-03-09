@@ -38,12 +38,12 @@
   "context": {
     "signatures": {
       "Managers/ITaskFactory.cs": {
-        "hash": "f7d47977f37a",
+        "hash": "ec1653f7df76",
         "content": "interface ITaskFactory"
       },
       "Managers/TaskFactory.cs": {
-        "hash": "ebcbad3cb14f",
-        "content": "class TaskFactory\n  ValidateTaskInput(string? description) -\u003E bool\n  PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  GenerateLocalSummary(string description) -\u003E string\n  GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
+        "hash": "9f70c9830722",
+        "content": "class TaskFactory : ITaskFactory\n  L18: ValidateTaskInput(string? description) -\u003E bool\n  L73: PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  L93: GenerateLocalSummary(string description) -\u003E string\n  L255: GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
       }
     },
     "keyTypes": [
