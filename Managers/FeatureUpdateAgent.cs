@@ -17,12 +17,13 @@ namespace Spritely.Managers
     /// Fire-and-forget — never blocks task teardown and never propagates exceptions.
     /// Failed updates are queued to <c>_pending_updates.json</c> and drained on the next success.
     /// </summary>
-    public class FeatureUpdateAgent
+    public class FeatureUpdateAgent : IDisposable
     {
         private const string UpdateJsonSchema =
             """{"type":"object","properties":{"updated_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"add_primary_files":{"type":"array","items":{"type":"string"}},"add_secondary_files":{"type":"array","items":{"type":"string"}},"remove_files":{"type":"array","items":{"type":"string"}},"updated_description":{"type":"string"}},"required":["id"]}},"new_features":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"category":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"primary_files":{"type":"array","items":{"type":"string"}},"secondary_files":{"type":"array","items":{"type":"string"}},"depends_on":{"type":"array","items":{"type":"string"}},"module_id":{"type":"string"}},"required":["id","name","description","keywords","primary_files"]}}},"required":["updated_features","new_features"]}""";
 
         private static readonly TimeSpan HaikuTimeout = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan RetryInterval = TimeSpan.FromMinutes(5);
         private static readonly JsonSerializerOptions PendingJsonOptions = new()
         {
             WriteIndented = true,
@@ -38,6 +39,13 @@ namespace Spritely.Managers
         private readonly CodebaseIndexManager? _codebaseIndexManager;
         private readonly ModuleRegistryManager? _moduleRegistryManager;
 
+        // Background retry worker state
+        private Timer? _retryTimer;
+        private Func<bool>? _isBusy;
+        private Func<IReadOnlyList<string>>? _getProjectPaths;
+        private CancellationToken _shutdownToken;
+        private int _retryWorkerRunning;
+
         public FeatureUpdateAgent(
             FeatureRegistryManager registryManager,
             CodebaseIndexManager? codebaseIndexManager = null,
@@ -46,6 +54,88 @@ namespace Spritely.Managers
             _registryManager = registryManager;
             _codebaseIndexManager = codebaseIndexManager;
             _moduleRegistryManager = moduleRegistryManager;
+        }
+
+        /// <summary>
+        /// Starts a background timer that drains pending feature updates every 5 minutes.
+        /// Only processes when no task is actively running (gated by <paramref name="isBusy"/>).
+        /// </summary>
+        /// <param name="isBusy">Returns true when tasks are actively running — skips retry tick.</param>
+        /// <param name="getProjectPaths">Returns project paths that may have pending updates.</param>
+        /// <param name="shutdownToken">Cancellation token from the app's shutdown lifecycle.</param>
+        public void StartBackgroundRetryWorker(
+            Func<bool> isBusy,
+            Func<IReadOnlyList<string>> getProjectPaths,
+            CancellationToken shutdownToken)
+        {
+            _isBusy = isBusy;
+            _getProjectPaths = getProjectPaths;
+            _shutdownToken = shutdownToken;
+
+            _retryTimer = new Timer(OnRetryTimerTick, null, RetryInterval, RetryInterval);
+
+            shutdownToken.Register(() => _retryTimer?.Change(Timeout.Infinite, Timeout.Infinite));
+        }
+
+        private async void OnRetryTimerTick(object? state)
+        {
+            if (_shutdownToken.IsCancellationRequested)
+                return;
+
+            if (_isBusy?.Invoke() == true)
+                return;
+
+            // Prevent overlapping ticks
+            if (Interlocked.CompareExchange(ref _retryWorkerRunning, 1, 0) != 0)
+                return;
+
+            try
+            {
+                var projectPaths = _getProjectPaths?.Invoke();
+                if (projectPaths is null or { Count: 0 })
+                    return;
+
+                foreach (var projectPath in projectPaths)
+                {
+                    if (_shutdownToken.IsCancellationRequested)
+                        return;
+
+                    var pendingPath = GetPendingUpdatesPath(projectPath);
+                    if (!File.Exists(pendingPath))
+                        continue;
+
+                    try
+                    {
+                        var queue = await LoadPendingQueueAsync(pendingPath);
+                        if (queue.Count == 0)
+                            continue;
+
+                        AppLogger.Info("FeatureUpdateAgent",
+                            $"Background retry: draining {queue.Count} pending update(s) for {Path.GetFileName(projectPath)}");
+
+                        await DrainPendingUpdatesAsync(projectPath, _shutdownToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("FeatureUpdateAgent",
+                            $"Background retry failed for {Path.GetFileName(projectPath)}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeatureUpdateAgent", $"Background retry tick failed: {ex.Message}");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _retryWorkerRunning, 0);
+            }
+        }
+
+        public void Dispose()
+        {
+            _retryTimer?.Dispose();
+            _retryTimer = null;
         }
 
         /// <summary>

@@ -313,7 +313,7 @@ namespace Spritely.Managers
         /// </summary>
         public void SoftStopTask(AgentTask task)
         {
-            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning)) return;
+            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning)) return;
             if (task.Process is not { HasExited: false }) return;
 
             task.Runtime.SoftStopRequested = true;
@@ -340,7 +340,7 @@ namespace Spritely.Managers
 
         public void PauseTask(AgentTask task)
         {
-            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning)) return;
+            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning)) return;
             if (task.Process is not { HasExited: false }) return;
 
             SuspendProcessTree(task.Process);

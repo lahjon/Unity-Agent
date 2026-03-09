@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Spritely.Models
@@ -14,8 +15,21 @@ namespace Spritely.Models
         /// <summary>Ordered list of every feature registered in this project.</summary>
         public List<FeatureIndexEntry> Features { get; set; } = new();
 
+        /// <summary>
+        /// Hash of all tracked file hashes — used to detect when the symbol index is stale
+        /// and must be rebuilt. Computed after each full or incremental symbol index build.
+        /// </summary>
+        public string? SymbolIndexVersion { get; set; }
+
         /// <summary>Module membership info carried inline so loaders need only one file read.</summary>
         public List<ModuleIndexEntry> Modules { get; set; } = new();
+
+        /// <summary>
+        /// Inverted keyword map: token → list of feature IDs containing that token.
+        /// Built from each feature's keywords, name, and description during index save.
+        /// Enables O(1) candidate lookup during feature matching.
+        /// </summary>
+        public Dictionary<string, List<string>> KeywordMap { get; set; } = new();
     }
 
     /// <summary>
@@ -38,6 +52,15 @@ namespace Spritely.Models
 
         /// <summary>Number of primary files in this feature.</summary>
         public int PrimaryFileCount { get; set; }
+
+        /// <summary>UTC timestamp of when this feature's signatures were last indexed/refreshed.</summary>
+        public DateTime? LastIndexedAt { get; set; }
+
+        /// <summary>Keywords copied from the feature entry, used for keyword map building.</summary>
+        public List<string> Keywords { get; set; } = new();
+
+        /// <summary>Short description copied from the feature entry, used for keyword map building.</summary>
+        public string Description { get; set; } = "";
     }
 
 }

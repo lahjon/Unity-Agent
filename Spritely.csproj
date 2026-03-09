@@ -7,7 +7,7 @@
     <AssemblyName>Spritely</AssemblyName>
     <RootNamespace>Spritely</RootNamespace>
     <Nullable>enable</Nullable>
-    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
 
     <!-- Single file publish configuration (only applies during dotnet publish) -->
     <PublishSingleFile>true</PublishSingleFile>

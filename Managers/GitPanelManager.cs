@@ -19,7 +19,7 @@ namespace Spritely.Managers
     /// Shows unpushed commits, uncommitted changes, and provides push/fetch operations.
     /// Respects the file lock system.
     /// </summary>
-    public partial class GitPanelManager
+    public partial class GitPanelManager : IDisposable
     {
         private readonly IGitHelper _gitHelper;
         private readonly Func<string> _getProjectPath;
@@ -29,6 +29,10 @@ namespace Spritely.Managers
         private bool _isDirty = true;
         private bool _isRefreshing;
         private CancellationTokenSource? _refreshCts;
+        private FileSystemWatcher? _gitWatcher;
+        private string? _watchedProjectPath;
+        private DateTime _lastGitFsEvent = DateTime.MinValue;
+        private bool _isDisposed;
 
         // Cached state
         private bool _gitAvailable;
@@ -68,6 +72,88 @@ namespace Spritely.Managers
             _gitOperationGuard = gitOperationGuard;
             _dispatcher = dispatcher;
             _settingsManager = settingsManager;
+        }
+
+        /// <summary>
+        /// Starts watching the .git directory for changes (commits, branch switches, etc.).
+        /// Call on startup and after project path changes.
+        /// </summary>
+        public void StartWatching()
+        {
+            var projectPath = _getProjectPath();
+            if (string.IsNullOrEmpty(projectPath)) return;
+
+            if (_watchedProjectPath == projectPath && _gitWatcher != null) return;
+
+            StopWatching();
+            _watchedProjectPath = projectPath;
+
+            var gitDir = Path.Combine(projectPath, ".git");
+            if (!Directory.Exists(gitDir)) return;
+
+            try
+            {
+                _gitWatcher = new FileSystemWatcher(gitDir)
+                {
+                    IncludeSubdirectories = true,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
+                    EnableRaisingEvents = true
+                };
+
+                _gitWatcher.Changed += OnGitDirectoryChanged;
+                _gitWatcher.Created += OnGitDirectoryChanged;
+                _gitWatcher.Deleted += OnGitDirectoryChanged;
+                _gitWatcher.Renamed += (_, _) => OnGitDirectoryChanged(null, null!);
+                _gitWatcher.Error += (_, e) =>
+                    AppLogger.Warn("GitPanelManager", $"FileSystemWatcher error: {e.GetException().Message}");
+
+                AppLogger.Info("GitPanelManager", $"Started FileSystemWatcher on {gitDir}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("GitPanelManager", $"Failed to start FileSystemWatcher on {gitDir}", ex);
+            }
+        }
+
+        private void OnGitDirectoryChanged(object? sender, FileSystemEventArgs e)
+        {
+            if (_isDisposed) return;
+
+            // Debounce: git operations produce many file events in quick succession
+            var now = DateTime.UtcNow;
+            if ((now - _lastGitFsEvent).TotalSeconds < 2) return;
+            _lastGitFsEvent = now;
+
+            MarkDirty();
+        }
+
+        public void StopWatching()
+        {
+            if (_gitWatcher != null)
+            {
+                _gitWatcher.EnableRaisingEvents = false;
+                _gitWatcher.Dispose();
+                _gitWatcher = null;
+                _watchedProjectPath = null;
+            }
+        }
+
+        /// <summary>
+        /// Event handler for TaskExecutionManager.TaskCompleted.
+        /// Marks the git panel dirty so it refreshes on next view.
+        /// </summary>
+        public void OnTaskCompleted(string taskId)
+        {
+            MarkDirty();
+        }
+
+        public void Dispose()
+        {
+            if (_isDisposed) return;
+            _isDisposed = true;
+            StopWatching();
+            _refreshCts?.Cancel();
+            _refreshCts?.Dispose();
         }
 
         public void MarkDirty() => _isDirty = true;
@@ -114,6 +200,9 @@ namespace Spritely.Managers
                     _dispatcher.Invoke(() => container.Content = BuildContent());
                     return;
                 }
+
+                // Ensure watcher is running for the current project
+                StartWatching();
 
                 // Check if git is available
                 var gitCheck = await _gitHelper.RunGitCommandAsync(projectPath, "rev-parse --is-inside-work-tree", ct);
@@ -457,8 +546,9 @@ secrets.json
                     AppLogger.Info("GitPanelManager", "Created default .gitignore file");
                 }
 
-                // Force refresh
+                // Force refresh and start watching the new .git directory
                 MarkDirty();
+                StartWatching();
 
                 // Find the ScrollViewer to trigger immediate refresh
                 await _dispatcher.InvokeAsync(async () =>

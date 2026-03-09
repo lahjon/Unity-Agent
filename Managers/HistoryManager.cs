@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -122,9 +123,9 @@ namespace Spritely.Managers
 
         public void CleanupOldHistory(
             ObservableCollection<AgentTask> historyTasks,
-            Dictionary<string, TabItem> tabs,
+            ConcurrentDictionary<string, TabItem> tabs,
             TabControl outputTabs,
-            Dictionary<string, System.Windows.Controls.RichTextBox> outputBoxes,
+            ConcurrentDictionary<string, System.Windows.Controls.RichTextBox> outputBoxes,
             int retentionHours)
         {
             var cutoff = DateTime.Now.AddHours(-retentionHours);
@@ -139,12 +140,11 @@ namespace Spritely.Managers
             }
             foreach (var task in stale)
             {
-                if (tabs.TryGetValue(task.Id, out var tab))
+                if (tabs.TryRemove(task.Id, out var tab))
                 {
                     outputTabs.Items.Remove(tab);
-                    tabs.Remove(task.Id);
                 }
-                outputBoxes.Remove(task.Id);
+                outputBoxes.TryRemove(task.Id, out _);
             }
             if (stale.Count > 0)
             {
@@ -172,6 +172,7 @@ namespace Spritely.Managers
                                               or AgentTaskStatus.Queued
                                               or AgentTaskStatus.Planning
                                               or AgentTaskStatus.Running
+                                              or AgentTaskStatus.Stored
                                               or AgentTaskStatus.Paused)
                         .Select(t => new TaskHistoryEntry
                         {

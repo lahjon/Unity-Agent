@@ -201,6 +201,54 @@ public static class SignatureExtractor
     }
 
     /// <summary>
+    /// Extracts a unified keyword set from a source file: symbol names plus
+    /// tokenized (PascalCase/camelCase-split, lowercased) identifiers in one pass.
+    /// Eliminates the need for separate GetSymbolNames + Tokenize calls.
+    /// </summary>
+    public static HashSet<string> ExtractKeywords(string filePath)
+    {
+        var symbols = ExtractStructuredSymbols(filePath);
+        var keywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var symbol in symbols)
+        {
+            if (string.IsNullOrEmpty(symbol.Name)) continue;
+
+            // Add the raw symbol name
+            keywords.Add(symbol.Name);
+
+            // Split PascalCase/camelCase into individual tokens
+            foreach (var token in SplitIdentifier(symbol.Name))
+                keywords.Add(token);
+        }
+
+        return keywords;
+    }
+
+    /// <summary>
+    /// Splits a PascalCase or camelCase identifier into lowercase tokens.
+    /// E.g. "TaskExecutionManager" → ["task", "execution", "manager"].
+    /// </summary>
+    internal static IEnumerable<string> SplitIdentifier(string identifier)
+    {
+        if (string.IsNullOrEmpty(identifier)) yield break;
+
+        var start = 0;
+        for (var i = 1; i < identifier.Length; i++)
+        {
+            if (char.IsUpper(identifier[i]) && (i + 1 >= identifier.Length || !char.IsUpper(identifier[i + 1]) || !char.IsUpper(identifier[i - 1])))
+            {
+                var part = identifier[start..i].ToLowerInvariant();
+                if (part.Length > 1) yield return part;
+                start = i;
+            }
+        }
+
+        var last = identifier[start..].ToLowerInvariant();
+        if (last.Length > 1) yield return last;
+    }
+
+    /// <summary>
     /// Extracts import/using/dependency references from a source file.
     /// Returns namespace or module paths without the language keyword.
     /// </summary>

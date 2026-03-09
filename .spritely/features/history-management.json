@@ -49,11 +49,11 @@
   "context": {
     "signatures": {
       "Managers/HistoryManager.cs": {
-        "hash": "6731b5b396e2",
-        "content": "class HistoryManager\n  L30: SaveHistory(ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L75: LoadHistoryAsync(int retentionHours) -\u003E Task\u003CList\u003CAgentTask\u003E\u003E\n  L123: CleanupOldHistory(ObservableCollection\u003CAgentTask\u003E historyTasks, Dictionary\u003Cstring, TabItem\u003E tabs, TabControl outputTabs, Dictionary\u003Cstring, System.Windows.Controls.RichTextBox\u003E outputBoxes, int retentionHours) -\u003E void\n  L160: SaveActiveQueue(ObservableCollection\u003CAgentTask\u003E activeTasks, object activeTasksLock, bool useBackgroundWrite = false) -\u003E void  // Persists active tasks that are in InitQueued, Queued, or Planning state so th...\n  L246: LoadActiveQueueAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E  // Loads tasks that were in the active queue when the app last shut down. Return...\n  L300: ClearActiveQueue() -\u003E void  // Removes the active queue file after tasks have been successfully recovered or...\n  L310: SaveStoredTasks(ObservableCollection\u003CAgentTask\u003E storedTasks) -\u003E void\n  L342: LoadStoredTasksAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E"
+        "hash": "a61e96e7a4ff",
+        "content": "class HistoryManager\n  L31: SaveHistory(ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L76: LoadHistoryAsync(int retentionHours) -\u003E Task\u003CList\u003CAgentTask\u003E\u003E\n  L124: CleanupOldHistory(ObservableCollection\u003CAgentTask\u003E historyTasks, ConcurrentDictionary\u003Cstring, TabItem\u003E tabs, TabControl outputTabs, ConcurrentDictionary\u003Cstring, System.Windows.Controls.RichTextBox\u003E outputBoxes, int retentionHours) -\u003E void\n  L160: SaveActiveQueue(ObservableCollection\u003CAgentTask\u003E activeTasks, object activeTasksLock, bool useBackgroundWrite = false) -\u003E void  // Persists active tasks that are in InitQueued, Queued, or Planning state so th...\n  L246: LoadActiveQueueAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E  // Loads tasks that were in the active queue when the app last shut down. Return...\n  L300: ClearActiveQueue() -\u003E void  // Removes the active queue file after tasks have been successfully recovered or...\n  L310: SaveStoredTasks(ObservableCollection\u003CAgentTask\u003E storedTasks) -\u003E void\n  L342: LoadStoredTasksAsync() -\u003E Task\u003CList\u003CAgentTask\u003E\u003E"
       },
       "Models/StoredTaskEntry.cs": {
-        "hash": "219c224f4ba5",
+        "hash": "8114bdb1022d",
         "content": "class StoredTaskEntry : TaskRecordBase\n  FullOutput: string\n  CreatedAt: DateTime"
       },
       "Models/TaskHistoryEntry.cs": {
@@ -61,7 +61,7 @@
         "content": "class TaskHistoryEntry : TaskRecordBase\n  Status: string\n  StartTime: DateTime\n  EndTime: DateTime?\n  IsFeatureMode: bool\n  MaxIterations: int\n  CurrentIteration: int\n  CompletionSummary: string\n  Recommendations: string\n  GroupId: string?\n  GroupName: string?\n  InputTokens: long\n  OutputTokens: long\n  CacheReadTokens: long\n  CacheCreationTokens: long\n  WasActive: bool\n  Model: string\n  Headless: bool\n  IgnoreFileLocks: bool\n  UseMcp: bool\n  SpawnTeam: bool\n  ExtendedPlanning: bool\n  PlanOnly: bool\n  UseMessageBus: bool\n  AutoDecompose: bool\n  ApplyFix: bool\n  AdditionalInstructions: string\n  FullOutput: string\n  DependencyContext: string?"
       },
       "Models/TaskRecordBase.cs": {
-        "hash": "ed0670f59335",
+        "hash": "c2b60b035a4c",
         "content": "class TaskRecordBase\n  Description: string\n  Summary: string\n  StoredPrompt: string\n  ConversationId: string\n  ProjectPath: string?\n  ProjectColor: string\n  ProjectDisplayName: string\n  SkipPermissions: bool"
       }
     },

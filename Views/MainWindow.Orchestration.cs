@@ -372,7 +372,7 @@ namespace Spritely
         /// </summary>
         private void LaunchTaskProcess(AgentTask task, string statusMessage)
         {
-            task.Status = AgentTaskStatus.Running;
+            task.Status = AgentTaskStatus.Stored;
             task.StartTime = DateTime.Now;
             _outputTabManager.AppendOutput(task.Id, statusMessage, _activeTasks, _historyTasks);
             _outputTabManager.UpdateTabHeader(task);
@@ -384,7 +384,7 @@ namespace Spritely
         /// </summary>
         private int CountActiveSessionTasks()
         {
-            return _activeTasks.Count(t => t.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused);
+            return _activeTasks.Count(t => t.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning or AgentTaskStatus.Paused);
         }
 
         /// <summary>
@@ -496,7 +496,7 @@ namespace Spritely
             if (!resumed)
             {
                 AppLogger.Info("OnQueuedTaskResumed", $"Starting new process for task #{task.TaskNumber}");
-                task.Status = AgentTaskStatus.Running;
+                task.Status = AgentTaskStatus.Stored;
                 task.QueuedReason = null;
                 task.BlockedByTaskId = null;
                 task.BlockedByTaskNumber = null;
@@ -546,6 +546,9 @@ namespace Spritely
             }
 
             _taskOrchestrator.OnTaskCompleted(taskId);
+
+            // Trigger immediate MCP health check after task completes (if MCP is active)
+            _mcpHealthMonitor?.TriggerImmediateCheck();
         }
 
         private void OnTaskGroupCompleted(object? sender, GroupCompletedEventArgs e)
@@ -731,8 +734,11 @@ namespace Spritely
 
             AddActiveTask(newTask);
             _outputTabManager.CreateTab(newTask);
+            newTask.Status = AgentTaskStatus.Stored;
+            newTask.StartTime = DateTime.Now;
             _outputTabManager.AppendOutput(newTask.Id,
                 $"Re-running task #{historicTask.TaskNumber}\n", _activeTasks, _historyTasks);
+            _outputTabManager.UpdateTabHeader(newTask);
 
             _ = _taskExecutionManager.StartProcess(newTask, _activeTasks, _historyTasks, MoveToHistory);
             UpdateStatus();
@@ -797,7 +803,7 @@ namespace Spritely
             }
             else
             {
-                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                LaunchTaskProcess(task, $"Starting task #{task.TaskNumber}...\n\n");
             }
 
             RefreshFilterCombos();

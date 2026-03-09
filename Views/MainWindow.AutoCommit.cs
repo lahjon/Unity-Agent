@@ -44,7 +44,7 @@ namespace Spritely
         public void ReleaseTaskLocksAfterCommit(AgentTask task)
             => _commitOrchestrator.ReleaseTaskLocksAfterCommit(task, RefreshActivityDashboard);
 
-        private async void CommitTask_Click(object sender, RoutedEventArgs e)
+        internal async void CommitTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button { DataContext: AgentTask task }) return;
             if (!task.IsFinished) return;

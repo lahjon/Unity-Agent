@@ -375,7 +375,7 @@ namespace Spritely
             _taskExecutionManager.SendFollowUp(task, text, _activeTasks, _historyTasks, isInterrupt: true);
         }
 
-        private void Pause_Click(object sender, RoutedEventArgs e)
+        internal void Pause_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
 
@@ -390,16 +390,16 @@ namespace Spritely
             }
         }
 
-        private void SoftStop_Click(object sender, RoutedEventArgs e)
+        internal void SoftStop_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
-            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning)) return;
+            if (task.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning)) return;
 
             _taskExecutionManager.SoftStopTask(task);
             _outputTabManager.AppendOutput(task.Id, "\nSoft-stop requested — waiting for task to finish gracefully...\n", _activeTasks, _historyTasks);
         }
 
-        private void ForceStartQueued_Click(object sender, RoutedEventArgs e)
+        internal void ForceStartQueued_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (task.Status is not (AgentTaskStatus.Queued or AgentTaskStatus.InitQueued)) return;
@@ -451,7 +451,7 @@ namespace Spritely
             UpdateStatus();
         }
 
-        private void ToggleFileLock_Click(object sender, RoutedEventArgs e)
+        internal void ToggleFileLock_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             task.IgnoreFileLocks = !task.IgnoreFileLocks;
@@ -459,7 +459,7 @@ namespace Spritely
 
         private void CloseTab(AgentTask task)
         {
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.InitQueued || task.Status == AgentTaskStatus.Queued)
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.InitQueued || task.Status == AgentTaskStatus.Queued)
             {
                 var processAlreadyDone = task.Process == null || task.Process.HasExited;
                 if (processAlreadyDone)
@@ -545,7 +545,7 @@ namespace Spritely
             MoveToHistory(task);
         }
 
-        private void CopyPrompt_Click(object sender, RoutedEventArgs e)
+        internal void CopyPrompt_Click(object sender, RoutedEventArgs e)
         {
             var task = GetTaskFromContextMenuItem(sender);
             if (task == null) return;
@@ -553,7 +553,7 @@ namespace Spritely
                 Clipboard.SetText(task.Description);
         }
 
-        private void ExportTask_Click(object sender, RoutedEventArgs e)
+        internal void ExportTask_Click(object sender, RoutedEventArgs e)
         {
             var task = GetTaskFromContextMenuItem(sender);
             if (task == null) return;
@@ -586,7 +586,7 @@ namespace Spritely
             exportDialog.ShowDialog();
         }
 
-        private void CloneTask_Click(object sender, RoutedEventArgs e)
+        internal void CloneTask_Click(object sender, RoutedEventArgs e)
         {
             var sourceTask = GetTaskFromContextMenuItem(sender);
             if (sourceTask == null) return;
@@ -658,7 +658,7 @@ namespace Spritely
             ReorderByPriority();
         }
 
-        private async void RevertTask_Click(object sender, RoutedEventArgs e)
+        internal async void RevertTask_Click(object sender, RoutedEventArgs e)
         {
             var task = GetTaskFromContextMenuItem(sender);
             if (task == null) return;
@@ -713,13 +713,13 @@ namespace Spritely
             }
         }
 
-        private void Cancel_Click(object sender, RoutedEventArgs e)
+        internal void Cancel_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             CancelTask(task, el);
         }
 
-        private void TaskCard_PreviewMiddleDown(object sender, MouseButtonEventArgs e)
+        internal void TaskCard_PreviewMiddleDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Middle) return;
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
@@ -730,7 +730,7 @@ namespace Spritely
             e.Handled = true;
         }
 
-        private void TaskCard_MouseUp(object sender, MouseButtonEventArgs e)
+        internal void TaskCard_MouseUp(object sender, MouseButtonEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
 
@@ -765,7 +765,7 @@ namespace Spritely
                 return;
             }
 
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.SoftStop)
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.SoftStop)
             {
                 if (!DarkDialog.ShowConfirm(
                     $"Task #{task.TaskNumber} is still running.\nAre you sure you want to cancel it?",
@@ -816,7 +816,7 @@ namespace Spritely
             FinalizeTask(task);
         }
 
-        private void RemoveHistoryTask_Click(object sender, RoutedEventArgs e)
+        internal void RemoveHistoryTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             _outputTabManager.AppendOutput(task.Id, "\nTask removed.\n", _activeTasks, _historyTasks);
@@ -857,38 +857,42 @@ namespace Spritely
             UpdateStatus();
         }
 
-        private void Resume_Click(object sender, RoutedEventArgs e)
+        internal void Resume_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
 
-            if (_outputTabManager.HasTab(task.Id))
+            if (!_outputTabManager.HasTab(task.Id))
             {
-                OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
-                return;
+                _outputTabManager.CreateTab(task);
+                _outputTabManager.AppendOutput(task.Id, $"Resumed session\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, $"Original task: {task.Description}\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, $"Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
+                _outputTabManager.AppendOutput(task.Id, $"Status: {task.StatusText}\n", _activeTasks, _historyTasks);
+                if (!string.IsNullOrEmpty(task.ConversationId))
+                    _outputTabManager.AppendOutput(task.Id, $"Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
+                if (!string.IsNullOrWhiteSpace(task.CompletionSummary))
+                    _outputTabManager.AppendOutput(task.Id, $"\n{task.CompletionSummary}\n", _activeTasks, _historyTasks);
+                if (!string.IsNullOrWhiteSpace(task.Recommendations))
+                    _outputTabManager.AppendOutput(task.Id, $"\n[Recommendations]\n{task.Recommendations}\n", _activeTasks, _historyTasks);
+                var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "fresh session (no session ID)";
+                _outputTabManager.AppendOutput(task.Id, $"\nType a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
             }
 
-            _outputTabManager.CreateTab(task);
-            _outputTabManager.AppendOutput(task.Id, $"Resumed session\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"Original task: {task.Description}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"Project: {task.ProjectPath}\n", _activeTasks, _historyTasks);
-            _outputTabManager.AppendOutput(task.Id, $"Status: {task.StatusText}\n", _activeTasks, _historyTasks);
-            if (!string.IsNullOrEmpty(task.ConversationId))
-                _outputTabManager.AppendOutput(task.Id, $"Session: {task.ConversationId}\n", _activeTasks, _historyTasks);
-            if (!string.IsNullOrWhiteSpace(task.CompletionSummary))
-                _outputTabManager.AppendOutput(task.Id, $"\n{task.CompletionSummary}\n", _activeTasks, _historyTasks);
-            if (!string.IsNullOrWhiteSpace(task.Recommendations))
-                _outputTabManager.AppendOutput(task.Id, $"\n[Recommendations]\n{task.Recommendations}\n", _activeTasks, _historyTasks);
-            var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "fresh session (no session ID)";
-            _outputTabManager.AppendOutput(task.Id, $"\nType a follow-up message below. It will be sent with {resumeMethod}.\n", _activeTasks, _historyTasks);
+            OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
 
-            _historyTasks.Remove(task);
-            PinRowHeights();
-            _activeTasks.Insert(0, task);
-            RestoreStarRows();
+            // Move from history to active if needed
+            if (_historyTasks.Contains(task) && !_activeTasks.Any(t => t.Id == task.Id))
+            {
+                _historyTasks.Remove(task);
+                PinRowHeights();
+                _activeTasks.Insert(0, task);
+                RestoreStarRows();
+            }
+
             UpdateStatus();
         }
 
-        private void RetryTask_Click(object sender, RoutedEventArgs e)
+        internal void RetryTask_Click(object sender, RoutedEventArgs e)
         {
             var task = GetTaskFromContextMenuItem(sender);
             if (task == null) return;
@@ -896,7 +900,7 @@ namespace Spritely
             RetryTask(task);
         }
 
-        private void ContinueTask_Click(object sender, RoutedEventArgs e)
+        internal void ContinueTask_Click(object sender, RoutedEventArgs e)
         {
             var task = GetTaskFromContextMenuItem(sender);
             if (task == null) return;
@@ -936,14 +940,14 @@ namespace Spritely
             UpdateStatus();
         }
 
-        private void RerunTask_Click(object sender, RoutedEventArgs e)
+        internal void RerunTask_Click(object sender, RoutedEventArgs e)
         {
             var task = GetTaskFromContextMenuItem(sender);
             if (task == null) return;
             RetryTask(task);
         }
 
-        private void StoreHistoryTask_Click(object sender, RoutedEventArgs e)
+        internal void StoreHistoryTask_Click(object sender, RoutedEventArgs e)
         {
             var task = GetTaskFromContextMenuItem(sender);
             if (task == null) return;
@@ -971,7 +975,7 @@ namespace Spritely
             RefreshFilterCombos();
         }
 
-        private async void VerifyTask_Click(object sender, RoutedEventArgs e)
+        internal async void VerifyTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (!task.IsFinished) return;

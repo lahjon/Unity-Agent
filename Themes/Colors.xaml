@@ -32,6 +32,7 @@
     <SolidColorBrush x:Key="TextDim" Color="#777777"/>
     <SolidColorBrush x:Key="TextSubdued" Color="#888888"/>
     <SolidColorBrush x:Key="TextSecondary" Color="#999999"/>
+    <SolidColorBrush x:Key="TextSubtle" Color="#999999"/>
     <SolidColorBrush x:Key="TextTabHeader" Color="#AAAAAA"/>
     <SolidColorBrush x:Key="TextBody" Color="#B0B0B0"/>
     <SolidColorBrush x:Key="TextButton" Color="#C8C8C8"/>

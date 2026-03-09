@@ -1,7 +1,7 @@
 {
   "id": "task-lifecycle",
   "name": "Task Lifecycle \u0026 State",
-  "description": "Defines the core AgentTask model and its full lifecycle: status transitions, runtime context, flags, and property-change notifications. Acts as the central shared data contract for all task-related features.",
+  "description": "Defines the core AgentTask model and its full lifecycle with proper state machine transitions: status transitions (Queued \u2192 Stored \u2192 Running \u2192 Completed), runtime context, flags, and property-change notifications. Ensures mutually exclusive states tied to actual execution state. Acts as the central shared data contract for all task-related features.",
   "category": "core",
   "keywords": [
     "AgentTask",
@@ -54,7 +54,7 @@
   "context": {
     "signatures": {
       "AgentTask.cs": {
-        "hash": "2d75d4358998",
+        "hash": "86345f2534c7",
         "content": "enum AgentTaskStatus\n    Running, Completed, Cancelled, Failed, Queued, Paused, InitQueued, Planning, Verifying, Recommendation, Committing\nenum TaskPriority\n    Low, Normal, High\nenum ModelType\n    ClaudeCode, Gemini\nenum FeatureModePhase\n    None, TeamPlanning, PlanConsolidation, Execution, Evaluation\nclass AgentTask : INotifyPropertyChanged\n  Data: AgentTaskData\n  Runtime: RuntimeTaskContext\n  L64: OnPropertyChanged([CallerMemberName] string? name = null) -\u003E void\n  TaskNumber: int\n  Description: string\n  StartTime: DateTime\n  SkipPermissions: bool\n  Headless: bool\n  IsFeatureMode: bool\n  UseMcp: bool\n  SpawnTeam: bool\n  ExtendedPlanning: bool\n  PlanOnly: bool\n  UseMessageBus: bool\n  AutoDecompose: bool\n  ApplyFix: bool\n  UseAutoMode: bool\n  AllowFeatureModeInference: bool\n  GroupId: string?\n  GroupName: string?\n  AdditionalInstructions: string"
       },
       "Models/AgentTaskData.cs": {
@@ -165,6 +165,7 @@
     "UseMessageBus",
     "VerificationPrompt"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:26.9389062Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-09T21:27:54.3217464Z",
+  "lastUpdatedByTaskId": "c9a92e54a2cb479c"
 }

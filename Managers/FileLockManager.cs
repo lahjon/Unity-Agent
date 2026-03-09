@@ -370,7 +370,7 @@ namespace Spritely.Managers
                     foreach (var blockerId in qi.BlockedByTaskIds)
                     {
                         var blocker = activeTasks.FirstOrDefault(t => t.Id == blockerId);
-                        if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.Committing)
+                        if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.Committing)
                         {
                             allClear = false;
                             break;

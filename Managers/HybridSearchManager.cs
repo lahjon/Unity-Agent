@@ -533,7 +533,8 @@ namespace Spritely.Managers
 
             var contextBlock = _registryManager.BuildFeatureContextBlock(
                 primaryFeatures,
-                secondaryFeatures.Count > 0 ? secondaryFeatures : null);
+                secondaryFeatures.Count > 0 ? secondaryFeatures : null,
+                matchedFeatures: matchedFeatures);
 
             return new FeatureContextResult
             {

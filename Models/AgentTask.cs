@@ -22,7 +22,8 @@ namespace Spritely
         Verifying,
         Recommendation,
         Committing,
-        SoftStop
+        SoftStop,
+        Stored
     }
 
     public enum TaskPriority
@@ -65,7 +66,7 @@ namespace Spritely
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
         /// <summary>Sets a backing field, raises PropertyChanged if the value changed, and returns whether it changed.</summary>
-        private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)
+        private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
         {
             if (EqualityComparer<T>.Default.Equals(field, value)) return false;
             field = value;
@@ -73,8 +74,21 @@ namespace Spritely
             return true;
         }
 
+        /// <summary>Sets a backing field and raises PropertyChanged for the property and any related computed properties.</summary>
+        private bool Set<T>(ref T field, T value, string[] alsoNotify, [CallerMemberName] string? name = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+            field = value;
+            OnPropertyChanged(name);
+            var handler = PropertyChanged;
+            if (handler != null)
+                foreach (var n in alsoNotify)
+                    handler(this, new PropertyChangedEventArgs(n));
+            return true;
+        }
+
         /// <summary>Raises PropertyChanged for each of the specified property names.</summary>
-        private void NotifyAll(params string[] names)
+        private void NotifyAlso(params string[] names)
         {
             var handler = PropertyChanged;
             if (handler == null) return;
@@ -136,25 +150,25 @@ namespace Spritely
         public int Priority
         {
             get => Data.Priority;
-            set { if (Data.Priority == value) return; Data.Priority = value; NotifyAll(nameof(Priority), nameof(HasPriorityBadge), nameof(PriorityBadgeText)); }
+            set { if (Data.Priority == value) return; Data.Priority = value; OnPropertyChanged(); NotifyAlso(nameof(HasPriorityBadge), nameof(PriorityBadgeText)); }
         }
 
         public TaskPriority PriorityLevel
         {
             get => Data.PriorityLevel;
-            set { if (Data.PriorityLevel == value) return; Data.PriorityLevel = value; NotifyAll(nameof(PriorityLevel), nameof(HasPriorityBadge), nameof(PriorityBadgeText), nameof(PriorityBadgeColor)); }
+            set { if (Data.PriorityLevel == value) return; Data.PriorityLevel = value; OnPropertyChanged(); NotifyAlso(nameof(HasPriorityBadge), nameof(PriorityBadgeText), nameof(PriorityBadgeColor)); }
         }
 
         public string ProjectDisplayName
         {
             get => Data.ProjectDisplayName;
-            set { if (Data.ProjectDisplayName == value) return; Data.ProjectDisplayName = value; NotifyAll(nameof(ProjectDisplayName), nameof(ProjectName)); }
+            set { if (Data.ProjectDisplayName == value) return; Data.ProjectDisplayName = value; OnPropertyChanged(); NotifyAlso(nameof(ProjectName)); }
         }
 
         public int CurrentIteration
         {
             get => Data.CurrentIteration;
-            set { if (Data.CurrentIteration == value) return; Data.CurrentIteration = value; NotifyAll(nameof(CurrentIteration), nameof(StatusText), nameof(QueueStatusText)); }
+            set { if (Data.CurrentIteration == value) return; Data.CurrentIteration = value; OnPropertyChanged(); NotifyAlso(nameof(StatusText), nameof(QueueStatusText)); }
         }
 
         public string CompletionSummary
@@ -166,37 +180,37 @@ namespace Spritely
         public string Recommendations
         {
             get => Data.Recommendations;
-            set { if (Data.Recommendations == value) return; Data.Recommendations = value; NotifyAll(nameof(Recommendations), nameof(HasRecommendations)); }
+            set { if (Data.Recommendations == value) return; Data.Recommendations = value; OnPropertyChanged(); NotifyAlso(nameof(HasRecommendations)); }
         }
 
         public string VerificationResult
         {
             get => Data.VerificationResult;
-            set { if (Data.VerificationResult == value) return; Data.VerificationResult = value; NotifyAll(nameof(VerificationResult), nameof(HasVerificationResult)); }
+            set { if (Data.VerificationResult == value) return; Data.VerificationResult = value; OnPropertyChanged(); NotifyAlso(nameof(HasVerificationResult)); }
         }
 
         public bool IsVerified
         {
             get => Data.IsVerified;
-            set { if (Data.IsVerified == value) return; Data.IsVerified = value; NotifyAll(nameof(IsVerified), nameof(HasVerificationResult)); }
+            set { if (Data.IsVerified == value) return; Data.IsVerified = value; OnPropertyChanged(); NotifyAlso(nameof(HasVerificationResult)); }
         }
 
         public bool IsCommitted
         {
             get => Data.IsCommitted;
-            set { if (Data.IsCommitted == value) return; Data.IsCommitted = value; NotifyAll(nameof(IsCommitted), nameof(IsCompletedUncommitted)); }
+            set { if (Data.IsCommitted == value) return; Data.IsCommitted = value; OnPropertyChanged(); NotifyAlso(nameof(IsCompletedUncommitted)); }
         }
 
         public string? CommitHash
         {
             get => Data.CommitHash;
-            set { if (Data.CommitHash == value) return; Data.CommitHash = value; OnPropertyChanged(nameof(CommitHash)); }
+            set { if (Data.CommitHash == value) return; Data.CommitHash = value; OnPropertyChanged(); }
         }
 
         public string? CommitError
         {
             get => Data.CommitError;
-            set { if (Data.CommitError == value) return; Data.CommitError = value; NotifyAll(nameof(CommitError), nameof(HasCommitError)); }
+            set { if (Data.CommitError == value) return; Data.CommitError = value; OnPropertyChanged(); NotifyAlso(nameof(HasCommitError)); }
         }
 
         public List<string> ChangedFiles
@@ -214,13 +228,13 @@ namespace Spritely
         public string Summary
         {
             get => Data.Summary;
-            set { if (Data.Summary == value) return; Data.Summary = value; NotifyAll(nameof(Summary), nameof(ShortDescription)); }
+            set { if (Data.Summary == value) return; Data.Summary = value; OnPropertyChanged(); NotifyAlso(nameof(ShortDescription)); }
         }
 
         public string Header
         {
             get => Data.Header;
-            set { if (Data.Header == value) return; Data.Header = value; NotifyAll(nameof(Header), nameof(HasHeader), nameof(ShortDescription)); }
+            set { if (Data.Header == value) return; Data.Header = value; OnPropertyChanged(); NotifyAlso(nameof(HasHeader), nameof(ShortDescription)); }
         }
 
         public bool HasHeader => !string.IsNullOrEmpty(Header);
@@ -232,7 +246,8 @@ namespace Spritely
             {
                 if (Data.Status == value) return;
                 Data.Status = value;
-                NotifyAll(nameof(Status), nameof(StatusText), nameof(QueueStatusText), nameof(StatusColor),
+                OnPropertyChanged();
+                NotifyAlso(nameof(StatusText), nameof(QueueStatusText), nameof(StatusColor),
                     nameof(IsRunning), nameof(IsPlanning), nameof(IsQueued), nameof(IsPaused),
                     nameof(IsInitQueued), nameof(IsFinished), nameof(IsCommitting), nameof(IsSoftStopping),
                     nameof(IsRetryable), nameof(IsContinuable),
@@ -243,13 +258,13 @@ namespace Spritely
         public DateTime? EndTime
         {
             get => Data.EndTime;
-            set { if (Data.EndTime == value) return; Data.EndTime = value; NotifyAll(nameof(EndTime), nameof(TimeInfo)); }
+            set { if (Data.EndTime == value) return; Data.EndTime = value; OnPropertyChanged(); NotifyAlso(nameof(TimeInfo)); }
         }
 
         public FeatureModePhase FeatureModePhase
         {
             get => Data.FeatureModePhase;
-            set { if (Data.FeatureModePhase == value) return; Data.FeatureModePhase = value; NotifyAll(nameof(FeatureModePhase), nameof(StatusText), nameof(QueueStatusText)); }
+            set { if (Data.FeatureModePhase == value) return; Data.FeatureModePhase = value; OnPropertyChanged(); NotifyAlso(nameof(StatusText), nameof(QueueStatusText)); }
         }
 
         // ── Token tracking ─────────────────────────────────────────────
@@ -257,25 +272,25 @@ namespace Spritely
         public long InputTokens
         {
             get => Data.InputTokens;
-            set { Data.InputTokens = value; NotifyAll(nameof(InputTokens), nameof(TokenDisplayText), nameof(HasTokenData)); }
+            set { Data.InputTokens = value; OnPropertyChanged(); NotifyAlso(nameof(TokenDisplayText), nameof(HasTokenData)); }
         }
 
         public long OutputTokens
         {
             get => Data.OutputTokens;
-            set { Data.OutputTokens = value; NotifyAll(nameof(OutputTokens), nameof(TokenDisplayText), nameof(HasTokenData)); }
+            set { Data.OutputTokens = value; OnPropertyChanged(); NotifyAlso(nameof(TokenDisplayText), nameof(HasTokenData)); }
         }
 
         public long CacheReadTokens
         {
             get => Data.CacheReadTokens;
-            set { Data.CacheReadTokens = value; NotifyAll(nameof(CacheReadTokens), nameof(TokenDisplayText)); }
+            set { Data.CacheReadTokens = value; OnPropertyChanged(); NotifyAlso(nameof(TokenDisplayText)); }
         }
 
         public long CacheCreationTokens
         {
             get => Data.CacheCreationTokens;
-            set { Data.CacheCreationTokens = value; NotifyAll(nameof(CacheCreationTokens), nameof(TokenDisplayText)); }
+            set { Data.CacheCreationTokens = value; OnPropertyChanged(); NotifyAlso(nameof(TokenDisplayText)); }
         }
 
         public bool HasTokenData => InputTokens > 0 || OutputTokens > 0;
@@ -311,7 +326,7 @@ namespace Spritely
         public string ToolActivityText
         {
             get => _toolActivityText;
-            private set { if (SetField(ref _toolActivityText, value)) OnPropertyChanged(nameof(HasToolActivity)); }
+            private set => Set(ref _toolActivityText, value, [nameof(HasToolActivity)]);
         }
 
         public bool HasToolActivity => !string.IsNullOrEmpty(_toolActivityText);
@@ -353,13 +368,7 @@ namespace Spritely
         public int QueuePosition
         {
             get => _queuePosition;
-            set
-            {
-                if (SetField(ref _queuePosition, value))
-                {
-                    OnPropertyChanged(nameof(QueueStatusText));
-                }
-            }
+            set => Set(ref _queuePosition, value, [nameof(QueueStatusText)]);
         }
 
         // ── Computed properties ───────────────────────────────────────
@@ -370,7 +379,7 @@ namespace Spritely
         public bool HasChildren => ChildTaskIds.Count > 0;
         public int NestingDepth => IsSubTask ? 1 : 0;
         public bool IsWaitingForRetry => TokenLimitRetryTimer != null || FeatureModeRetryTimer != null;
-        public bool IsRunning => Status == AgentTaskStatus.Running;
+        public bool IsRunning => Status is AgentTaskStatus.Running or AgentTaskStatus.Stored;
         public bool IsPlanning => Status == AgentTaskStatus.Planning;
         public bool IsQueued => Status == AgentTaskStatus.Queued;
         public bool IsPaused => Status == AgentTaskStatus.Paused;
@@ -430,6 +439,7 @@ namespace Spritely
             AgentTaskStatus.Recommendation => "Has Recommendations",
             AgentTaskStatus.Committing => "Committing",
             AgentTaskStatus.SoftStop => "Stopping...",
+            AgentTaskStatus.Stored => "Starting",
             _ => "?"
         };
 
@@ -458,6 +468,7 @@ namespace Spritely
             AgentTaskStatus.Recommendation => "#FFB74D",
             AgentTaskStatus.Committing => "#4DD0E1",
             AgentTaskStatus.SoftStop => "#FF8A65",
+            AgentTaskStatus.Stored => "#42A5F5",
             _ => "#555555"
         };
 

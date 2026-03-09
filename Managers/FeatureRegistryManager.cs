@@ -21,6 +21,12 @@ namespace Spritely.Managers
     /// </summary>
     public class FeatureRegistryManager
     {
+        /// <summary>
+        /// Raised after a feature is saved. Argument is the feature ID.
+        /// Used by FeatureContextResolver to invalidate embedding caches.
+        /// </summary>
+        public event Action<string>? FeatureSaved;
+
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = true,
@@ -229,6 +235,7 @@ namespace Spritely.Managers
                 // Update index: add if missing, sync fields if changed
                 var index = await LoadIndexAsync(projectPath);
                 var indexEntry = index.Features.FirstOrDefault(f => f.Id == feature.Id);
+                var now = DateTime.UtcNow;
                 if (indexEntry == null)
                 {
                     index.Features.Add(new FeatureIndexEntry
@@ -237,7 +244,10 @@ namespace Spritely.Managers
                         Name = feature.Name,
                         Category = feature.Category,
                         TouchCount = feature.TouchCount,
-                        PrimaryFileCount = feature.PrimaryFiles.Count
+                        PrimaryFileCount = feature.PrimaryFiles.Count,
+                        LastIndexedAt = now,
+                        Keywords = new List<string>(feature.Keywords),
+                        Description = feature.Description ?? ""
                     });
                     await SaveIndexInternalAsync(projectPath, index);
                 }
@@ -248,15 +258,22 @@ namespace Spritely.Managers
                                   || indexEntry.TouchCount != feature.TouchCount
                                   || indexEntry.PrimaryFileCount != feature.PrimaryFiles.Count;
 
-                    if (changed)
+                    indexEntry.LastIndexedAt = now;
+                    var keywordsChanged = !indexEntry.Keywords.SequenceEqual(feature.Keywords)
+                                         || indexEntry.Description != (feature.Description ?? "");
+                    if (changed || keywordsChanged)
                     {
                         indexEntry.Name = feature.Name;
                         indexEntry.Category = feature.Category;
                         indexEntry.TouchCount = feature.TouchCount;
                         indexEntry.PrimaryFileCount = feature.PrimaryFiles.Count;
-                        await SaveIndexInternalAsync(projectPath, index);
+                        indexEntry.Keywords = new List<string>(feature.Keywords);
+                        indexEntry.Description = feature.Description ?? "";
                     }
+                    await SaveIndexInternalAsync(projectPath, index);
                 }
+
+                FeatureSaved?.Invoke(feature.Id);
             }
             catch (Exception ex)
             {
@@ -302,26 +319,89 @@ namespace Spritely.Managers
             var features = await LoadAllFeaturesAsync(projectPath);
             var indexManager = new CodebaseIndexManager();
             await indexManager.BuildIndexAsync(projectPath, features, ct, progress);
+
+            // Persist the version hash so startup can detect staleness
+            var versionHash = ComputeSymbolIndexVersion(features);
+            var index = await LoadIndexAsync(projectPath);
+            index.SymbolIndexVersion = versionHash;
+            await SaveIndexAsync(projectPath, index);
+        }
+
+        /// <summary>
+        /// Loads the persisted symbol index if it exists and is not stale.
+        /// Returns null when the index is missing or the version hash no longer matches,
+        /// indicating a full rebuild is required. Avoids O(n) file re-scan on app start.
+        /// </summary>
+        public async Task<CodebaseSymbolIndex?> LoadSymbolIndexAsync(string projectPath)
+        {
+            var featureIndex = await LoadIndexAsync(projectPath);
+            if (string.IsNullOrEmpty(featureIndex.SymbolIndexVersion))
+                return null; // No version recorded — must rebuild
+
+            var codebaseIndexManager = new CodebaseIndexManager();
+            var symbolIndex = await codebaseIndexManager.LoadIndexAsync(projectPath);
+            if (symbolIndex == null)
+                return null; // Index file missing
+
+            // Verify staleness: recompute version from current feature hashes
+            var features = await LoadAllFeaturesAsync(projectPath);
+            var currentVersion = ComputeSymbolIndexVersion(features);
+
+            if (currentVersion != featureIndex.SymbolIndexVersion)
+            {
+                AppLogger.Info("FeatureRegistry",
+                    $"Symbol index stale (stored={featureIndex.SymbolIndexVersion[..8]}, current={currentVersion[..8]}) — rebuild required");
+                return null;
+            }
+
+            return symbolIndex;
+        }
+
+        /// <summary>
+        /// Computes a version hash for the symbol index by hashing all file content hashes
+        /// from feature signatures. Changes when any tracked source file is modified.
+        /// </summary>
+        public static string ComputeSymbolIndexVersion(List<FeatureEntry> features)
+        {
+            var allHashes = new List<string>();
+
+            foreach (var feature in features)
+            {
+                foreach (var (filePath, sig) in feature.Context.Signatures)
+                {
+                    if (!string.IsNullOrEmpty(sig.Hash))
+                        allHashes.Add($"{filePath}:{sig.Hash}");
+                }
+            }
+
+            allHashes.Sort(StringComparer.Ordinal);
+            var combined = string.Join("|", allHashes);
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(combined));
+            return Convert.ToHexString(bytes).ToLowerInvariant();
         }
 
         // ── Search ───────────────────────────────────────────────────────
 
         /// <summary>
         /// Finds features matching a task description using local keyword matching.
-        /// No LLM involved — pure tokenization and scoring.
+        /// When a <paramref name="featureIndex"/> with a populated KeywordMap is provided,
+        /// uses O(1) candidate lookup instead of iterating all features.
         /// </summary>
         public List<FeatureEntry> FindMatchingFeatures(
             string taskDescription,
             List<FeatureEntry> allFeatures,
-            int maxResults = 5)
+            int maxResults = 5,
+            FeatureIndex? featureIndex = null)
         {
             var tokens = Tokenize(taskDescription);
             if (tokens.Count == 0)
                 return new List<FeatureEntry>();
 
+            var candidates = GetCandidatesFromKeywordMap(tokens, allFeatures, featureIndex);
+
             var scored = new List<(FeatureEntry Feature, double Score)>();
 
-            foreach (var feature in allFeatures)
+            foreach (var feature in candidates)
             {
                 var score = ScoreFeature(tokens, taskDescription, feature);
                 if (score > 0.1)
@@ -334,6 +414,34 @@ namespace Spritely.Managers
                 .Take(maxResults)
                 .Select(s => s.Feature)
                 .ToList();
+        }
+
+        /// <summary>
+        /// Uses the keyword map for O(1) candidate lookup. Falls back to all features
+        /// when the keyword map is empty or not provided.
+        /// </summary>
+        private static List<FeatureEntry> GetCandidatesFromKeywordMap(
+            HashSet<string> tokens,
+            List<FeatureEntry> allFeatures,
+            FeatureIndex? featureIndex)
+        {
+            if (featureIndex?.KeywordMap == null || featureIndex.KeywordMap.Count == 0)
+                return allFeatures;
+
+            var candidateIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var token in tokens)
+            {
+                if (featureIndex.KeywordMap.TryGetValue(token, out var featureIds))
+                {
+                    foreach (var id in featureIds)
+                        candidateIds.Add(id);
+                }
+            }
+
+            if (candidateIds.Count == 0)
+                return allFeatures;
+
+            return allFeatures.Where(f => candidateIds.Contains(f.Id)).ToList();
         }
 
         /// <summary>
@@ -381,19 +489,23 @@ namespace Spritely.Managers
             List<FeatureEntry> allFeatures,
             CodebaseSymbolIndex? symbolIndex,
             int maxResults = 8,
-            CodebaseIndexManager? codebaseIndexManager = null)
+            CodebaseIndexManager? codebaseIndexManager = null,
+            FeatureIndex? featureIndex = null)
         {
             if (symbolIndex == null)
-                return FindMatchingFeatures(taskDescription, allFeatures, maxResults);
+                return FindMatchingFeatures(taskDescription, allFeatures, maxResults, featureIndex);
 
             var tokens = Tokenize(taskDescription);
             if (tokens.Count == 0)
                 return new List<FeatureEntry>();
 
-            // Score all features with keyword + symbol scoring
+            // Use keyword map for O(1) candidate narrowing when available
+            var candidates = GetCandidatesFromKeywordMap(tokens, allFeatures, featureIndex);
+
+            // Score candidates with keyword + symbol scoring
             var scored = new Dictionary<string, (FeatureEntry Feature, double Score)>();
 
-            foreach (var feature in allFeatures)
+            foreach (var feature in candidates)
             {
                 var score = ScoreFeature(tokens, taskDescription, feature);
                 if (score > 0.1)
@@ -504,10 +616,14 @@ namespace Spritely.Managers
         public string BuildFeatureContextBlock(
             List<FeatureEntry> features,
             List<FeatureEntry>? secondaryFeatures = null,
-            string? modulePreamble = null)
+            string? modulePreamble = null,
+            List<MatchedFeature>? matchedFeatures = null)
         {
             if (features.Count == 0)
                 return string.Empty;
+
+            var confidenceMap = matchedFeatures?.ToDictionary(
+                m => m.FeatureId, m => m.Confidence, StringComparer.OrdinalIgnoreCase);
 
             var sb = new StringBuilder();
             sb.AppendLine("# FEATURE CONTEXT");
@@ -527,7 +643,8 @@ namespace Spritely.Managers
             // Primary features — full detail
             foreach (var feature in features)
             {
-                var featureBlock = BuildSingleFeatureBlock(feature);
+                var confidence = confidenceMap != null && confidenceMap.TryGetValue(feature.Id, out var c) ? c : (double?)null;
+                var featureBlock = BuildSingleFeatureBlock(feature, confidence);
                 var featureCharBudget = FeatureConstants.MaxTokensPerFeature * 4;
 
                 if (featureBlock.Length > featureCharBudget)
@@ -579,8 +696,16 @@ namespace Spritely.Managers
         /// Re-extracts signatures for any files whose content has changed.
         /// Returns true if any signatures were refreshed.
         /// </summary>
-        public async Task<bool> RefreshStaleSignaturesAsync(string projectPath, FeatureEntry feature)
+        public async Task<bool> RefreshStaleSignaturesAsync(string projectPath, FeatureEntry feature, DateTime? lastIndexedAt = null)
         {
+            // Auto-resolve LastIndexedAt from the index if not explicitly provided
+            if (!lastIndexedAt.HasValue)
+            {
+                var index = await LoadIndexAsync(projectPath);
+                var indexEntry = index.Features.FirstOrDefault(f => f.Id == feature.Id);
+                lastIndexedAt = indexEntry?.LastIndexedAt;
+            }
+
             var anyRefreshed = false;
 
             var filesToUpdate = new List<(string relativePath, string absolutePath)>();
@@ -590,6 +715,14 @@ namespace Spritely.Managers
                 var absolutePath = Path.Combine(projectPath, relativePath);
                 if (!File.Exists(absolutePath))
                     continue;
+
+                // Skip files not modified since LastIndexedAt — avoids redundant hash computation
+                if (lastIndexedAt.HasValue)
+                {
+                    var lastWrite = File.GetLastWriteTimeUtc(absolutePath);
+                    if (lastWrite <= lastIndexedAt.Value)
+                        continue;
+                }
 
                 var currentHash = SignatureExtractor.ComputeFileHash(absolutePath);
                 if (currentHash != signature.Hash)
@@ -669,6 +802,7 @@ namespace Spritely.Managers
                 Directory.CreateDirectory(featuresPath);
 
                 index.Features = index.Features.OrderBy(f => f.Id).ToList();
+                RebuildKeywordMap(index);
 
                 var json = SerializeDeterministic(index);
                 var indexPath = Path.Combine(featuresPath, FeatureConstants.IndexFileName);
@@ -678,6 +812,53 @@ namespace Spritely.Managers
             {
                 AppLogger.Debug("FeatureRegistry", $"Failed to save index: {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// Rebuilds the inverted keyword map from all index entries.
+        /// Tokenizes each entry's keywords, name, and description, mapping each token to the feature IDs that contain it.
+        /// </summary>
+        private static void RebuildKeywordMap(FeatureIndex index)
+        {
+            var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in index.Features)
+            {
+                // Collect all text sources for this feature
+                var textParts = new List<string> { entry.Name };
+                if (!string.IsNullOrWhiteSpace(entry.Description))
+                    textParts.Add(entry.Description);
+
+                // Tokenize name + description
+                var tokens = Tokenize(string.Join(" ", textParts));
+
+                // Add raw keywords (lowered) — these bypass stopword filtering since they're curated
+                foreach (var kw in entry.Keywords)
+                {
+                    var lower = kw.ToLowerInvariant().Trim();
+                    if (lower.Length > 0)
+                        tokens.Add(lower);
+                }
+
+                foreach (var token in tokens)
+                {
+                    if (!map.TryGetValue(token, out var list))
+                    {
+                        list = new List<string>();
+                        map[token] = list;
+                    }
+                    if (!list.Contains(entry.Id))
+                        list.Add(entry.Id);
+                }
+            }
+
+            // Sort lists for deterministic serialization
+            foreach (var list in map.Values)
+                list.Sort(StringComparer.Ordinal);
+
+            index.KeywordMap = new Dictionary<string, List<string>>(
+                map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                   .ToDictionary(kv => kv.Key, kv => kv.Value));
         }
 
         /// <summary>Serializes an object to JSON with deterministic formatting and LF line endings.</summary>
@@ -851,11 +1032,14 @@ namespace Spritely.Managers
         }
 
         /// <summary>Builds the markdown block for a single feature.</summary>
-        private static string BuildSingleFeatureBlock(FeatureEntry feature)
+        private static string BuildSingleFeatureBlock(FeatureEntry feature, double? confidence = null)
         {
             var sb = new StringBuilder();
 
-            sb.AppendLine($"## {feature.Name}");
+            var header = confidence.HasValue
+                ? $"## {feature.Name} (confidence: {confidence.Value:F2})"
+                : $"## {feature.Name}";
+            sb.AppendLine(header);
             sb.AppendLine($"**Core files:** {string.Join(", ", feature.PrimaryFiles)}");
 
             if (feature.DependsOn.Count > 0)

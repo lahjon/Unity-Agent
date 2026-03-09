@@ -308,8 +308,8 @@
       "shortSignature": "Dispose() -\u003E void"
     },
     "mainwindow": {
-      "featureId": "task-execution",
-      "filePath": "MainWindow.AutoCommit.cs",
+      "featureId": "main-window-ui",
+      "filePath": "Views/MainWindow.UiLayout.cs",
       "kind": "Class",
       "shortSignature": "class MainWindow"
     },

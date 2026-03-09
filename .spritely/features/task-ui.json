@@ -37,6 +37,7 @@
     "Managers/OutputTabManager.cs"
   ],
   "secondaryFiles": [
+    "Controls/Templates/TaskCardTemplates.xaml",
     "MainWindow.TaskExecution.cs",
     "MainWindow.xaml"
   ],
@@ -111,7 +112,7 @@
         "content": "class GraphLayoutEngine\n  WouldCreateCycle(IEnumerable\u003CAgentTask\u003E tasks, string sourceId, string targetId) -\u003E bool"
       },
       "Controls/GraphRenderer.cs": {
-        "hash": "30526b29aff4",
+        "hash": "6cfd97d773c6",
         "content": "class GraphRenderer\n  L40: ClearAll() -\u003E void\n  L46: ClearForRedraw() -\u003E void\n  L52: RemoveEdgeElements() -\u003E void\n  L58: DrawEmptyState() -\u003E void\n  L75: DrawAllEdges(List\u003CAgentTask\u003E tasks, FileLockManager fileLockManager, Dictionary\u003Cstring, Point\u003E nodePositions, HashSet\u003Cstring\u003E highlightedEdgeKeys) -\u003E void\n  L473: CreateNodeContextMenu(AgentTask task, ObservableCollection\u003CAgentTask\u003E? activeTasks) -\u003E ContextMenu\n  L548: CreateNodeTooltip(AgentTask task, List\u003CAgentTask\u003E allTasks) -\u003E ToolTip\n  L714: CreateLegendPanel() -\u003E Border\n  L817: RebuildProgressPanel(bool showProgress, ObservableCollection\u003CAgentTask\u003E? activeTasks, StackPanel progressStack) -\u003E void\n  L1036: ResizeCanvas(Dictionary\u003Cstring, Point\u003E nodePositions) -\u003E void\n  L1047: GetCompactTimeInfo(AgentTask task) -\u003E string\n  L1058: CreateGridBrush() -\u003E DrawingBrush\n  L1091: CreateHeaderButton(string icon, string tooltip) -\u003E Button"
       },
       "Controls/TaskNodeGraphPanel.cs": {
@@ -123,19 +124,19 @@
         "content": "class WorkflowStep\n  TaskName: string\n  Description: string\n  DependsOn: List\u003Cstring\u003E\nclass WorkflowComposerResult\n  Steps: List\u003CWorkflowStep\u003E\nclass WorkflowComposerDialog"
       },
       "Managers/OutputTabManager.cs": {
-        "hash": "cd8349458546",
-        "content": "class OutputTabManager\n  L19: OutputCapChars: int = 500_000\n  L63: CreateTab(AgentTask task) -\u003E void\n  L190: CreateGeminiTab(AgentTask task, string imageFolder) -\u003E void\n  L223: AddGeminiImage(string taskId, string imagePath) -\u003E void\n  L363: CloseTab(AgentTask task) -\u003E void\n  L401: UpdateTabHeader(AgentTask task) -\u003E void\n  L462: AppendOutput(string taskId, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L513: AppendColoredOutput(string taskId, string text, Brush foreground, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L710: StopTypewriterAnimation(string taskId) -\u003E void\n  L877: HasTab(string taskId) -\u003E bool\n  L879: GetTab(string taskId) -\u003E TabItem?\n  L881: GetOutputBox(string taskId) -\u003E RichTextBox?\n  L883: EnsureOverflowButton() -\u003E void\n  L892: UpdateOutputTabWidths() -\u003E void"
+        "hash": "80d8071d13f2",
+        "content": "class OutputTabManager\n  L22: OutputCapChars: int = 200_000\n  L57: CreateTab(AgentTask task) -\u003E void\n  L203: CreateGeminiTab(AgentTask task, string imageFolder) -\u003E void\n  L236: AddGeminiImage(string taskId, string imagePath) -\u003E void\n  L376: CloseTab(AgentTask task) -\u003E void\n  L413: UpdateTabHeader(AgentTask task) -\u003E void\n  L474: AppendOutput(string taskId, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L534: AppendColoredOutput(string taskId, string text, Brush foreground, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L591: StopTypewriterAnimation(string taskId) -\u003E void\n  L664: HasTab(string taskId) -\u003E bool\n  L666: GetTab(string taskId) -\u003E TabItem?\n  L668: GetOutputBox(string taskId) -\u003E RichTextBox?\n  L670: EnsureOverflowButton() -\u003E void\n  L679: UpdateOutputTabWidths() -\u003E void"
       },
       "MainWindow.Features.cs": {
         "hash": "7bc0139089d0",
         "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
       },
       "MainWindow.UiLayout.cs": {
-        "hash": "d488a9fb4400",
+        "hash": "92ef098028e8",
         "content": "class MainWindow"
       },
       "MainWindow.Orchestration.cs": {
-        "hash": "a32c1e366335",
+        "hash": "2399934bee2c",
         "content": "class MainWindow"
       }
     },
@@ -232,7 +233,7 @@
     "WorkflowStep",
     "WouldCreateCycle"
   ],
-  "touchCount": 4,
-  "lastUpdatedAt": "2026-03-09T12:27:16.1606185Z",
-  "lastUpdatedByTaskId": "d73f95acaec64359"
+  "touchCount": 5,
+  "lastUpdatedAt": "2026-03-09T20:40:56.5228267Z",
+  "lastUpdatedByTaskId": "c724054d587d4f0a"
 }

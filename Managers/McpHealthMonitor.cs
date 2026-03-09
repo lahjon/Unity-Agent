@@ -31,6 +31,7 @@ namespace Spritely.Managers
         private bool _isDisposed = false;
         private CancellationTokenSource _cts = new();
         private Task? _monitorTask;
+        private readonly SemaphoreSlim _checkSignal = new(0, 1);
 
         public McpHealthStatus McpStatus => _currentStatus;
 
@@ -54,6 +55,16 @@ namespace Spritely.Managers
             UpdateStatus(McpHealthStatus.Disconnected);
         }
 
+        /// <summary>
+        /// Triggers an immediate health check, bypassing the normal polling interval.
+        /// Safe to call from any thread; duplicate signals are coalesced.
+        /// </summary>
+        public void TriggerImmediateCheck()
+        {
+            if (_isDisposed) return;
+            try { _checkSignal.Release(); } catch (SemaphoreFullException) { }
+        }
+
         private async Task RunMonitorLoop(CancellationToken ct)
         {
             // Perform initial check immediately
@@ -63,7 +74,13 @@ namespace Spritely.Managers
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(30), ct);
+                    // Wait for either the 30s fallback interval or an explicit trigger
+                    using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    var delayTask = Task.Delay(TimeSpan.FromSeconds(30), delayCts.Token);
+                    var signalTask = _checkSignal.WaitAsync(ct);
+
+                    await Task.WhenAny(delayTask, signalTask);
+                    delayCts.Cancel();
                 }
                 catch (OperationCanceledException)
                 {
@@ -237,6 +254,7 @@ namespace Spritely.Managers
             _isDisposed = true;
             _cts?.Cancel();
             _cts?.Dispose();
+            _checkSignal.Dispose();
         }
     }
 }

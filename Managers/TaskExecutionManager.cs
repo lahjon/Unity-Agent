@@ -390,6 +390,11 @@ namespace Spritely.Managers
 
             task.OutputBuilder.Append(bootLog);
 
+            // Transition to Running now that prompt is written and process is launching.
+            // Planning tasks stay in Planning (they run the plan phase, not full execution).
+            if (task.Status is AgentTaskStatus.Stored or AgentTaskStatus.InitQueued or AgentTaskStatus.Queued)
+                task.Status = AgentTaskStatus.Running;
+
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
                 _processLauncher.CleanupScripts(task.Id);
@@ -520,6 +525,11 @@ namespace Spritely.Managers
                                 else if (HasNeedsMoreWorkStatus(outputText))
                                 {
                                     task.Recommendations = "Continue working on the incomplete task.";
+                                }
+                                else
+                                {
+                                    // COMPLETE WITH RECOMMENDATIONS without extractable headers
+                                    task.Recommendations = "Continue with the recommended next steps from this task.";
                                 }
                             }
                         }
@@ -838,7 +848,7 @@ namespace Spritely.Managers
                 return;
             }
 
-            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning && task.Process is { HasExited: false })
+            if (task.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning && task.Process is { HasExited: false })
             {
                 try
                 {
@@ -1142,7 +1152,7 @@ namespace Spritely.Managers
             }
 
             // No more blockers — start execution
-            task.Status = AgentTaskStatus.Running;
+            task.Status = AgentTaskStatus.Stored;
             task.StartTime = DateTime.Now;
             _outputProcessor.AppendOutput(task.Id, "\nPlanning complete. Starting execution...\n\n", activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);

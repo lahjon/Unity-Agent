@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -18,12 +21,11 @@ namespace Spritely.Managers
         /// <summary>Rolling-window cap for task output kept in memory (200 KB). Full output is on disk.</summary>
         internal const int OutputCapChars = 200_000;
 
-        private readonly Dictionary<string, TabItem> _tabs = new();
-        private readonly Dictionary<string, RichTextBox> _outputBoxes = new();
-        private readonly Dictionary<string, WrapPanel> _geminiGalleries = new();
-        private readonly Dictionary<string, TypewriterState> _typewriterStates = new();
-        private readonly Dictionary<string, Button> _sendButtons = new();
-        private readonly HashSet<string> _userScrolledUp = new();
+        private readonly ConcurrentDictionary<string, TabItem> _tabs = new();
+        private readonly ConcurrentDictionary<string, RichTextBox> _outputBoxes = new();
+        private readonly ConcurrentDictionary<string, WrapPanel> _geminiGalleries = new();
+        private readonly ConcurrentDictionary<string, TypewriterAnimationController> _animationControllers = new();
+        private readonly ConcurrentDictionary<string, Button> _sendButtons = new();
         private Button? _overflowBtn;
         private readonly TabControl _outputTabs;
         private readonly Dispatcher _dispatcher;
@@ -31,20 +33,6 @@ namespace Spritely.Managers
         /// <summary>Streams output chunks to per-task log files on disk.</summary>
         private readonly StreamingOutputWriter _outputWriter = new();
 
-        /// <summary>Tracks per-task typewriter animation and pulsing dots state.</summary>
-        private class TypewriterState
-        {
-            public readonly Queue<(string Text, Brush Foreground)> PendingChunks = new();
-            public Run? CurrentRun;
-            public string CurrentFullText = "";
-            public int CurrentCharIndex;
-            public Brush CurrentBrush = Brushes.White;
-            public DispatcherTimer? Timer;
-            public Run? PulsingDotsRun;
-            public DoubleAnimation? PulsingAnimation;
-            public bool IsAnimating;
-            public bool Stopped;
-        }
 
         public event Action<AgentTask>? TabCloseRequested;
         public event Action<AgentTask>? TabStoreRequested;
@@ -53,8 +41,8 @@ namespace Spritely.Managers
         public event Action<AgentTask, TextBox>? InputSent;
         public event Action<AgentTask, TextBox>? InterruptInputSent;
 
-        public Dictionary<string, TabItem> Tabs => _tabs;
-        public Dictionary<string, RichTextBox> OutputBoxes => _outputBoxes;
+        public ConcurrentDictionary<string, TabItem> Tabs => _tabs;
+        public ConcurrentDictionary<string, RichTextBox> OutputBoxes => _outputBoxes;
 
         /// <summary>Provides access to the disk-backed output writer for full output retrieval.</summary>
         public StreamingOutputWriter OutputWriter => _outputWriter;
@@ -87,7 +75,7 @@ namespace Spritely.Managers
             paraStyle.Setters.Add(new Setter(Block.MarginProperty, new Thickness(0)));
             outputBox.Resources.Add(typeof(Paragraph), paraStyle);
             _outputBoxes[task.Id] = outputBox;
-            AttachScrollTracking(task.Id, outputBox);
+            _animationControllers[task.Id] = new TypewriterAnimationController(outputBox, _dispatcher);
 
             var inputBox = new TextBox
             {
@@ -219,7 +207,7 @@ namespace Spritely.Managers
 
             _outputBoxes[task.Id] = outputBox;
             _geminiGalleries[task.Id] = imageGallery;
-            AttachScrollTracking(task.Id, outputBox);
+            _animationControllers[task.Id] = new TypewriterAnimationController(outputBox, _dispatcher);
 
             var header = CreateTabHeader(task, isGemini: true);
 
@@ -389,8 +377,8 @@ namespace Spritely.Managers
         {
             if (!_tabs.TryGetValue(task.Id, out var tab))
             {
-                _outputBoxes.Remove(task.Id);
-                _geminiGalleries.Remove(task.Id);
+                _outputBoxes.TryRemove(task.Id, out _);
+                _geminiGalleries.TryRemove(task.Id, out _);
                 return;
             }
 
@@ -414,12 +402,11 @@ namespace Spritely.Managers
             tab.BeginAnimation(FrameworkElement.WidthProperty, null);
 
             StopTypewriterAnimation(task.Id);
-            _userScrolledUp.Remove(task.Id);
             _outputTabs.Items.Remove(tab);
-            _tabs.Remove(task.Id);
-            _outputBoxes.Remove(task.Id);
-            _sendButtons.Remove(task.Id);
-            _geminiGalleries.Remove(task.Id);
+            _tabs.TryRemove(task.Id, out _);
+            _outputBoxes.TryRemove(task.Id, out _);
+            _sendButtons.TryRemove(task.Id, out _);
+            _geminiGalleries.TryRemove(task.Id, out _);
             UpdateOutputTabWidths();
         }
 
@@ -499,7 +486,7 @@ namespace Spritely.Managers
                     // Only recreate tabs for tasks that are actively running.
                     // Don't recreate tabs that were intentionally closed for finished/cancelled tasks
                     // (e.g. from stale follow-up process exit callbacks firing after removal).
-                    if (missingTask.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning
+                    if (missingTask.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning
                         or AgentTaskStatus.Queued or AgentTaskStatus.InitQueued or AgentTaskStatus.Paused))
                     {
                         AppLogger.Debug("FollowUp", $"[{taskId}] Skipping tab recreation — task status is {missingTask.Status}");
@@ -535,7 +522,13 @@ namespace Spritely.Managers
                 TrimOutputIfNeeded(task);
             }
 
-            EnqueueTypewriterText(taskId, text, baseBrush, box);
+            if (_animationControllers.TryGetValue(taskId, out var controller))
+            {
+                if (_dispatcher.CheckAccess())
+                    controller.Enqueue(text, baseBrush);
+                else
+                    _dispatcher.BeginInvoke(() => controller.Enqueue(text, baseBrush));
+            }
         }
 
         public void AppendColoredOutput(string taskId, string text, Brush foreground,
@@ -552,7 +545,7 @@ namespace Spritely.Managers
                 {
                     // Only recreate tabs for tasks that are actively running.
                     // Don't recreate tabs that were intentionally closed for finished/cancelled tasks.
-                    if (missingTask.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Planning
+                    if (missingTask.Status is not (AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning
                         or AgentTaskStatus.Queued or AgentTaskStatus.InitQueued or AgentTaskStatus.Paused))
                     {
                         AppLogger.Debug("FollowUp", $"[{taskId}] Skipping tab recreation — task status is {missingTask.Status}");
@@ -585,214 +578,21 @@ namespace Spritely.Managers
                 TrimOutputIfNeeded(task);
             }
 
-            EnqueueTypewriterText(taskId, text, foreground, box);
-        }
-
-        // ── Typewriter Animation Engine ────────────────────────────────
-
-        private void EnqueueTypewriterText(string taskId, string text, Brush foreground, RichTextBox box)
-        {
-            if (string.IsNullOrEmpty(text)) return;
-
-            if (!_typewriterStates.TryGetValue(taskId, out var state))
+            if (_animationControllers.TryGetValue(taskId, out var controller))
             {
-                state = new TypewriterState();
-                _typewriterStates[taskId] = state;
-            }
-
-            // Remove pulsing dots while we have text to show
-            RemovePulsingDots(state, box);
-
-            if (state.IsAnimating)
-            {
-                // Flush current animation immediately, then queue new text
-                FlushCurrentTypewriter(taskId, state, box);
-            }
-
-            state.PendingChunks.Enqueue((text, foreground));
-
-            if (!state.IsAnimating)
-                StartNextTypewriterChunk(taskId, state, box);
-        }
-
-        private void StartNextTypewriterChunk(string taskId, TypewriterState state, RichTextBox box)
-        {
-            if (state.PendingChunks.Count == 0)
-            {
-                state.IsAnimating = false;
-                // Show pulsing dots to indicate the task is still working
-                ShowPulsingDots(taskId, state, box);
-                return;
-            }
-
-            var (text, brush) = state.PendingChunks.Dequeue();
-            state.CurrentFullText = text;
-            state.CurrentCharIndex = 0;
-            state.CurrentBrush = brush;
-            state.IsAnimating = true;
-
-            // Create the Run that will be progressively filled
-            state.CurrentRun = new Run("") { Foreground = brush };
-            if (box.Document.Blocks.LastBlock is Paragraph lastPara)
-                lastPara.Inlines.Add(state.CurrentRun);
-            else
-                box.Document.Blocks.Add(new Paragraph(state.CurrentRun));
-
-            // Determine speed: longer texts get faster reveal
-            int charsPerTick = Math.Max(1, state.CurrentFullText.Length / 40);
-            // Cap the interval so it feels snappy
-            var interval = TimeSpan.FromMilliseconds(12);
-
-            state.Timer?.Stop();
-            state.Timer = new DispatcherTimer(DispatcherPriority.Render)
-            {
-                Interval = interval
-            };
-
-            state.Timer.Tick += (_, _) =>
-            {
-                if (state.CurrentRun == null || state.CurrentCharIndex >= state.CurrentFullText.Length)
-                {
-                    state.Timer.Stop();
-                    // Apply lightning effect on the completed run
-                    if (state.CurrentRun != null)
-                        ApplyLightningTextAnimation(state.CurrentRun, state.CurrentBrush);
-                    ScrollToEndIfNotUserScrolled(taskId, box);
-                    StartNextTypewriterChunk(taskId, state, box);
-                    return;
-                }
-
-                int end = Math.Min(state.CurrentCharIndex + charsPerTick, state.CurrentFullText.Length);
-                state.CurrentRun.Text = state.CurrentFullText[..end];
-                state.CurrentCharIndex = end;
-                ScrollToEndIfNotUserScrolled(taskId, box);
-            };
-            state.Timer.Start();
-        }
-
-        private void FlushCurrentTypewriter(string taskId, TypewriterState state, RichTextBox box)
-        {
-            state.Timer?.Stop();
-            if (state.CurrentRun != null && state.CurrentCharIndex < state.CurrentFullText.Length)
-            {
-                state.CurrentRun.Text = state.CurrentFullText;
-                ApplyLightningTextAnimation(state.CurrentRun, state.CurrentBrush);
-            }
-
-            // Also flush any remaining queued chunks immediately
-            while (state.PendingChunks.Count > 0)
-            {
-                var (text, brush) = state.PendingChunks.Dequeue();
-                var run = new Run(text) { Foreground = brush };
-                if (box.Document.Blocks.LastBlock is Paragraph p)
-                    p.Inlines.Add(run);
+                if (_dispatcher.CheckAccess())
+                    controller.Enqueue(text, foreground);
                 else
-                    box.Document.Blocks.Add(new Paragraph(run));
+                    _dispatcher.BeginInvoke(() => controller.Enqueue(text, foreground));
             }
-
-            state.CurrentRun = null;
-            state.CurrentFullText = "";
-            state.CurrentCharIndex = 0;
-            state.IsAnimating = false;
-            ScrollToEndIfNotUserScrolled(taskId, box);
-        }
-
-        private void ShowPulsingDots(string taskId, TypewriterState state, RichTextBox box)
-        {
-            if (state.Stopped) return;
-            if (state.PulsingDotsRun != null) return;
-
-            var dotsBrush = new SolidColorBrush(((SolidColorBrush)Application.Current.FindResource("TextDisabled")).Color);
-            state.PulsingDotsRun = new Run("...") { Foreground = dotsBrush };
-
-            // Always add dots on a new line, left-aligned
-            var dotsPara = new Paragraph(state.PulsingDotsRun) { Margin = new Thickness(0) };
-            box.Document.Blocks.Add(dotsPara);
-
-            // Pulse the opacity of the dots
-            var pulseAnim = new DoubleAnimation(0.2, 1.0, TimeSpan.FromSeconds(0.8))
-            {
-                AutoReverse = true,
-                RepeatBehavior = RepeatBehavior.Forever,
-                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
-            };
-            state.PulsingAnimation = pulseAnim;
-            dotsBrush.BeginAnimation(Brush.OpacityProperty, pulseAnim);
-            ScrollToEndIfNotUserScrolled(taskId, box);
-        }
-
-        private static void RemovePulsingDots(TypewriterState state, RichTextBox box)
-        {
-            if (state.PulsingDotsRun == null) return;
-
-            // Stop animation
-            if (state.PulsingDotsRun.Foreground is SolidColorBrush scb)
-                scb.BeginAnimation(Brush.OpacityProperty, null);
-
-            // Remove from document
-            if (state.PulsingDotsRun.Parent is Paragraph para)
-                para.Inlines.Remove(state.PulsingDotsRun);
-
-            state.PulsingDotsRun = null;
-            state.PulsingAnimation = null;
         }
 
         /// <summary>Stops typewriter animation and removes pulsing dots for a task (call on task completion).</summary>
         public void StopTypewriterAnimation(string taskId)
         {
-            if (!_typewriterStates.TryGetValue(taskId, out var state)) return;
-            state.Stopped = true;
-            if (_outputBoxes.TryGetValue(taskId, out var box))
-            {
-                FlushCurrentTypewriter(taskId, state, box);
-                RemovePulsingDots(state, box);
-            }
-            state.Timer?.Stop();
-            _typewriterStates.Remove(taskId);
-        }
-
-        /// <summary>
-        /// Animates newly appended text with a quick lightning-like fade:
-        /// starts bright and semi-transparent, then settles into the final brush.
-        /// </summary>
-        private static void ApplyLightningTextAnimation(Run run, Brush finalBrush)
-        {
-            try
-            {
-                // Clone the final color so we don't animate shared resource brushes
-                var finalColor = (finalBrush as SolidColorBrush)?.Color ?? Colors.LightGray;
-                var lightningColor = ((SolidColorBrush)Application.Current.FindResource("WarningYellow")).Color;
-
-                var animatedBrush = new SolidColorBrush(Color.FromArgb(0, lightningColor.R, lightningColor.G, lightningColor.B));
-                run.Foreground = animatedBrush;
-
-                var duration = TimeSpan.FromSeconds(0.45);
-
-                // Opacity fade-in via brush opacity
-                var opacityAnim = new DoubleAnimation
-                {
-                    From = 0.0,
-                    To = 1.0,
-                    Duration = new Duration(duration),
-                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-                };
-                animatedBrush.BeginAnimation(Brush.OpacityProperty, opacityAnim);
-
-                // Color flash from bright yellow back to the final text color
-                var colorAnim = new ColorAnimation
-                {
-                    From = lightningColor,
-                    To = finalColor,
-                    Duration = new Duration(duration),
-                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
-                };
-                animatedBrush.BeginAnimation(SolidColorBrush.ColorProperty, colorAnim);
-            }
-            catch
-            {
-                // If anything goes wrong with animation, fall back to normal rendering
-                run.Foreground = finalBrush;
-            }
+            if (!_animationControllers.TryGetValue(taskId, out var controller)) return;
+            controller.Stop();
+            _animationControllers.TryRemove(taskId, out _);
         }
 
         /// <summary>Keeps the last <see cref="OutputCapChars"/> characters when a task's buffer grows too large.</summary>
@@ -849,57 +649,13 @@ namespace Spritely.Managers
             }
         }
 
-        private void AttachScrollTracking(string taskId, RichTextBox box)
-        {
-            // Track user scrolling via mouse wheel — avoids false resets from content-change scroll events
-            box.PreviewMouseWheel += (_, _) =>
-            {
-                _dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
-                    UpdateScrollTrackingFromPosition(taskId, box));
-            };
-
-            // Track scrollbar thumb/button interactions
-            box.AddHandler(ScrollBar.ScrollEvent, new ScrollEventHandler((_, _) =>
-            {
-                UpdateScrollTrackingFromPosition(taskId, box);
-            }));
-        }
-
-        private void UpdateScrollTrackingFromPosition(string taskId, RichTextBox box)
-        {
-            var sv = FindScrollViewer(box);
-            if (sv == null) return;
-            bool atBottom = sv.VerticalOffset + sv.ViewportHeight >= sv.ExtentHeight - 20;
-            if (atBottom)
-                _userScrolledUp.Remove(taskId);
-            else
-                _userScrolledUp.Add(taskId);
-        }
-
-        private static ScrollViewer? FindScrollViewer(DependencyObject parent)
-        {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is ScrollViewer sv) return sv;
-                var result = FindScrollViewer(child);
-                if (result != null) return result;
-            }
-            return null;
-        }
-
-        private void ScrollToEndIfNotUserScrolled(string taskId, RichTextBox box)
-        {
-            if (!_userScrolledUp.Contains(taskId))
-                box.ScrollToEnd();
-        }
-
         private void OnTabSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (e.Source != _outputTabs) return;
             if (_outputTabs.SelectedItem is TabItem tab && tab.Tag is string taskId)
             {
-                _userScrolledUp.Remove(taskId);
+                if (_animationControllers.TryGetValue(taskId, out var controller))
+                    controller.ClearScrollLock();
                 if (_outputBoxes.TryGetValue(taskId, out var box))
                     box.ScrollToEnd();
             }

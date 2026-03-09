@@ -12,7 +12,11 @@ namespace Spritely
 {
     public partial class MainWindow
     {
-        // ── Splitter drag (Thumb-based, avoids GridSplitter star-sizing jitter) ──
+        // ── Splitter drag (Thumb-based, screen-space tracking to avoid coordinate feedback) ──
+
+        private double _tmDragStartTopHeight;
+        private double _tmDragStartBottomHeight;
+        private double _tmDragStartMouseY;
 
         private void TopMiddleSplitter_DragStarted(object sender, DragStartedEventArgs e)
         {
@@ -21,8 +25,12 @@ namespace Spritely
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
 
-            topRow.Height = new GridLength(topRow.ActualHeight);
-            bottomRow.Height = new GridLength(bottomRow.ActualHeight);
+            _tmDragStartTopHeight = topRow.ActualHeight;
+            _tmDragStartBottomHeight = bottomRow.ActualHeight;
+            _tmDragStartMouseY = PointToScreen(Mouse.GetPosition(this)).Y;
+
+            topRow.Height = new GridLength(_tmDragStartTopHeight);
+            bottomRow.Height = new GridLength(_tmDragStartBottomHeight);
         }
 
         private void TopMiddleSplitter_DragDelta(object sender, DragDeltaEventArgs e)
@@ -30,22 +38,14 @@ namespace Spritely
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
 
-            double newTop = topRow.Height.Value + e.VerticalChange;
-            double newBottom = bottomRow.Height.Value - e.VerticalChange;
+            double currentY = PointToScreen(Mouse.GetPosition(this)).Y;
+            double offset = currentY - _tmDragStartMouseY;
 
-            if (newTop < topRow.MinHeight)
-            {
-                newBottom += newTop - topRow.MinHeight;
-                newTop = topRow.MinHeight;
-            }
-            if (newBottom < bottomRow.MinHeight)
-            {
-                newTop += newBottom - bottomRow.MinHeight;
-                newBottom = bottomRow.MinHeight;
-            }
+            double newTop = _tmDragStartTopHeight + offset;
+            double newBottom = _tmDragStartBottomHeight - offset;
 
-            if (newTop < topRow.MinHeight || newBottom < bottomRow.MinHeight)
-                return;
+            if (newTop < topRow.MinHeight) { newTop = topRow.MinHeight; newBottom = _tmDragStartTopHeight + _tmDragStartBottomHeight - topRow.MinHeight; }
+            if (newBottom < bottomRow.MinHeight) { newBottom = bottomRow.MinHeight; newTop = _tmDragStartTopHeight + _tmDragStartBottomHeight - bottomRow.MinHeight; }
 
             topRow.Height = new GridLength(newTop);
             bottomRow.Height = new GridLength(newBottom);
@@ -59,6 +59,7 @@ namespace Spritely
             var bottomRow = RootGrid.RowDefinitions[2];
 
             double totalHeight = topRow.ActualHeight + bottomRow.ActualHeight;
+            if (totalHeight <= 0) return;
             double topProportion = topRow.ActualHeight / totalHeight;
             double bottomProportion = bottomRow.ActualHeight / totalHeight;
 
@@ -67,20 +68,34 @@ namespace Spritely
         }
 
         // ── Task List ↔ Features splitter drag ──
+        // Uses screen-space mouse tracking to avoid WPF Thumb coordinate feedback
+        // (the Thumb moves as row heights change, skewing element-relative deltas).
+
+        private double _tfDragStartTaskHeight;
+        private double _tfDragStartFeaturesHeight;
+        private double _tfDragStartMouseY;
 
         private void TaskFeaturesSplitter_DragStarted(object sender, DragStartedEventArgs e)
         {
-            TaskListRow.Height = new GridLength(TaskListRow.ActualHeight);
-            FeaturesPanelRow.Height = new GridLength(FeaturesPanelRow.ActualHeight);
+            _isSplitterDragging = true;
+            _tfDragStartTaskHeight = TaskListRow.ActualHeight;
+            _tfDragStartFeaturesHeight = FeaturesPanelRow.ActualHeight;
+            _tfDragStartMouseY = PointToScreen(Mouse.GetPosition(this)).Y;
+            TaskListRow.Height = new GridLength(_tfDragStartTaskHeight);
+            FeaturesPanelRow.Height = new GridLength(_tfDragStartFeaturesHeight);
         }
 
         private void TaskFeaturesSplitter_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            double newTask = TaskListRow.Height.Value + e.VerticalChange;
-            double newFeatures = FeaturesPanelRow.Height.Value - e.VerticalChange;
+            double currentY = PointToScreen(Mouse.GetPosition(this)).Y;
+            double offset = currentY - _tfDragStartMouseY;
+
+            double newTask = _tfDragStartTaskHeight + offset;
+            double newFeatures = _tfDragStartFeaturesHeight - offset;
 
             const double minHeight = 60;
-            if (newTask < minHeight || newFeatures < minHeight) return;
+            if (newTask < minHeight) { newTask = minHeight; newFeatures = _tfDragStartTaskHeight + _tfDragStartFeaturesHeight - minHeight; }
+            if (newFeatures < minHeight) { newFeatures = minHeight; newTask = _tfDragStartTaskHeight + _tfDragStartFeaturesHeight - minHeight; }
 
             TaskListRow.Height = new GridLength(newTask);
             FeaturesPanelRow.Height = new GridLength(newFeatures);
@@ -88,6 +103,7 @@ namespace Spritely
 
         private void TaskFeaturesSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
         {
+            _isSplitterDragging = false;
             double totalHeight = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
             if (totalHeight <= 0) return;
             double taskProportion = TaskListRow.ActualHeight / totalHeight;
@@ -141,7 +157,7 @@ namespace Spritely
                 GraphSplitter.Visibility = Visibility.Collapsed;
                 NodeGraphPanel.Visibility = Visibility.Collapsed;
 
-                GraphCollapseBtn.Content = "\uE70E";
+                GraphCollapseBtn.Content = "\uE70D";
                 GraphCollapseBtn.ToolTip = "Expand graph";
             }
             else
@@ -151,7 +167,7 @@ namespace Spritely
                 GraphSplitter.Visibility = Visibility.Visible;
                 NodeGraphPanel.Visibility = Visibility.Visible;
 
-                GraphCollapseBtn.Content = "\uE70D";
+                GraphCollapseBtn.Content = "\uE70E";
                 GraphCollapseBtn.ToolTip = "Collapse graph";
 
                 NodeGraphPanel.FitToView();

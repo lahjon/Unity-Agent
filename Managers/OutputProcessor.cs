@@ -108,6 +108,12 @@ namespace Spritely.Managers
                             // still enable the Continue button with a generic prompt
                             task.Recommendations = "Continue working on the incomplete task.";
                         }
+                        else if (HasCompleteWithRecommendationsStatus(outputText))
+                        {
+                            // COMPLETE WITH RECOMMENDATIONS without extractable recommendation headers —
+                            // still enable the Continue button so the status is properly recognized
+                            task.Recommendations = "Continue with the recommended next steps from this task.";
+                        }
                     }
                     catch (Exception recEx)
                     {
@@ -305,6 +311,17 @@ namespace Spritely.Managers
             foreach (var line in tail.Split('\n'))
             {
                 if (line.Trim() == "STATUS: NEEDS_MORE_WORK")
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool HasCompleteWithRecommendationsStatus(string outputText)
+        {
+            var tail = outputText.Length > 2000 ? outputText[^2000..] : outputText;
+            foreach (var line in tail.Split('\n'))
+            {
+                if (line.Trim() == "STATUS: COMPLETE WITH RECOMMENDATIONS")
                     return true;
             }
             return false;

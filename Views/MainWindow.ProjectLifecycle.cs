@@ -21,6 +21,7 @@ namespace Spritely
             _gitPanelManager.MarkDirty();
             _activityDashboard.MarkDirty();
 
+            _gitPanelManager.StartWatching(); // Re-attach FileSystemWatcher for new project
             _gitPanelManager.RefreshIfNeeded(GitTabContent);
 
             if (StatisticsTabs.SelectedItem == ActivityTabItem)
@@ -112,6 +113,7 @@ namespace Spritely
             _helperManager.GenerationFailed -= OnHelperGenerationFailed;
 
             _taskExecutionManager.TaskCompleted -= OnTaskProcessCompleted;
+            _taskExecutionManager.TaskCompleted -= _gitPanelManager.OnTaskCompleted;
             _taskExecutionManager.SubTaskSpawned -= OnSubTaskSpawned;
 
             _taskOrchestrator.TaskReady -= OnOrchestratorTaskReady;
@@ -129,7 +131,7 @@ namespace Spritely
         private void OnWindowClosing(object? sender, CancelEventArgs e)
         {
             var runningCount = _activeTasks.Count(t =>
-                t.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning or AgentTaskStatus.Paused);
+                t.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning or AgentTaskStatus.Paused);
 
             if (runningCount > 0)
             {
@@ -173,6 +175,7 @@ namespace Spritely
             _projectManager.StopAllMcpServers();
             _mcpHealthMonitor?.Stop();
             _mcpHealthMonitor?.Dispose();
+            _gitPanelManager?.Dispose();
 
             foreach (var task in _activeTasks)
             {

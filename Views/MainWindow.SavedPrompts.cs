@@ -122,13 +122,13 @@ namespace Spritely
             ResetPerTaskToggles();
         }
 
-        private void SavedPromptCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        internal void SavedPromptCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not SavedPromptEntry entry) return;
             LoadSavedPromptIntoUi(entry);
         }
 
-        private void SavedPromptCard_MouseDown(object sender, MouseButtonEventArgs e)
+        internal void SavedPromptCard_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Middle) return;
             if (sender is not FrameworkElement el || el.DataContext is not SavedPromptEntry entry) return;
@@ -137,7 +137,7 @@ namespace Spritely
             e.Handled = true;
         }
 
-        private void SavedPromptRun_Click(object sender, RoutedEventArgs e)
+        internal void SavedPromptRun_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not SavedPromptEntry entry) return;
             LoadSavedPromptIntoUi(entry);
@@ -151,7 +151,7 @@ namespace Spritely
             Execute_Click(this, new RoutedEventArgs());
         }
 
-        private void SavedPromptCopy_Click(object sender, RoutedEventArgs e)
+        internal void SavedPromptCopy_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not SavedPromptEntry entry) return;
             Clipboard.SetText(entry.PromptText);
@@ -185,7 +185,7 @@ namespace Spritely
             RefreshSkillsPanel();
         }
 
-        private void DeleteSavedPrompt_Click(object sender, RoutedEventArgs e)
+        internal void DeleteSavedPrompt_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
             if (sender is not FrameworkElement el || el.DataContext is not SavedPromptEntry entry) return;

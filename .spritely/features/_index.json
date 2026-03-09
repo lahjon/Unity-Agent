@@ -6,414 +6,1409 @@
       "name": "Activity Dashboard",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "app-infrastructure",
       "name": "App Infrastructure \u0026 Logging",
       "category": "infrastructure",
       "touchCount": 0,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "app-settings",
       "name": "Application Settings \u0026 Constants",
       "category": "config",
       "touchCount": 1,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "app-startup",
       "name": "Application Bootstrap",
       "category": "infrastructure",
       "touchCount": 0,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "app-startup-config",
       "name": "App Startup \u0026 Configuration",
       "category": "config",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "chat",
       "name": "Chat Interface",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "chat-interface",
       "name": "Chat Interface",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "codebase-indexing",
       "name": "Codebase Symbol Indexing",
       "category": "data",
       "touchCount": 1,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "completion-analysis",
       "name": "Task Completion Analysis",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "context-optimization",
       "name": "Context Optimization",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "export-task-data",
       "name": "Export Task Data",
       "category": "",
       "touchCount": 1,
-      "primaryFileCount": 1
+      "primaryFileCount": 1,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "feature-context-menu",
       "name": "Feature Context Menu",
       "category": "",
       "touchCount": 2,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "feature-context-resolution",
       "name": "Feature Context Resolution",
       "category": "core",
       "touchCount": 2,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "lastIndexedAt": "2026-03-09T21:46:14.5405907Z",
+      "keywords": [
+        "FeatureContextResolver",
+        "FeatureContextResult",
+        "FeatureUpdateAgent",
+        "MatchedFeature",
+        "ResolveAsync",
+        "confidence threshold",
+        "feature context",
+        "task relevance"
+      ],
+      "description": "Resolves which features are relevant to a given task description using hybrid keyword\u002Bvector search, then builds a context block for prompt injection. Also handles post-completion feature updates."
     },
     {
       "id": "feature-initialization",
       "name": "Feature Initialization \u0026 Discovery",
       "category": "core",
       "touchCount": 1,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "feature-mode",
       "name": "Feature Mode Orchestration",
       "category": "core",
       "touchCount": 2,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "feature-mode-execution",
       "name": "Feature Mode Execution",
       "category": "core",
       "touchCount": 2,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "feature-registry",
       "name": "Feature Registry",
       "category": "data",
       "touchCount": 2,
-      "primaryFileCount": 6
+      "primaryFileCount": 6,
+      "lastIndexedAt": "2026-03-09T21:46:14.5963079Z",
+      "keywords": [
+        "DependsOn",
+        "FeatureConstants",
+        "FeatureEntry",
+        "FeatureIndex",
+        "FeatureRegistryManager",
+        "feature context block",
+        "feature lookup",
+        "keyword matching",
+        "symbol lookup"
+      ],
+      "description": "Maintains a persistent registry of codebase features with signatures, keywords, dependencies, and module membership. Provides feature lookup by task description or symbol name and builds context blocks for prompt injection."
     },
     {
       "id": "feature-update-agent",
       "name": "Feature Update Agent",
       "category": "core",
       "touchCount": 2,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "file-lock-management",
       "name": "File Lock Management",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 1
+      "primaryFileCount": 1,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "git-operations",
       "name": "Git Operations",
       "category": "integration",
       "touchCount": 0,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "git-ui",
       "name": "Git Panel UI",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "helper-suggestions",
       "name": "AI Helper \u0026 Suggestions",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 1
+      "primaryFileCount": 1,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "history-analytics",
       "name": "Task History \u0026 Analytics",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "history-management",
       "name": "Task History \u0026 Persistence",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "llm-services",
       "name": "LLM Services (Claude \u0026 Gemini)",
       "category": "integration",
       "touchCount": 0,
-      "primaryFileCount": 6
+      "primaryFileCount": 6,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "logging-diagnostics",
       "name": "Logging \u0026 Diagnostics",
       "category": "infrastructure",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "logging-infrastructure",
       "name": "Logging \u0026 Safe File Writing",
       "category": "infrastructure",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "main-window-ui",
       "name": "Main Window \u0026 UI Composition",
       "category": "ui",
-      "touchCount": 1,
-      "primaryFileCount": 6
+      "touchCount": 4,
+      "primaryFileCount": 6,
+      "lastIndexedAt": "2026-03-09T21:45:13.0390869Z",
+      "keywords": [
+        "IProjectPanelView",
+        "MainWindow",
+        "UI orchestration",
+        "composition root",
+        "default",
+        "event wiring",
+        "last",
+        "main",
+        "partial class",
+        "placeholders",
+        "project panel",
+        "prompt",
+        "stale",
+        "system",
+        "total",
+        "updated",
+        "window"
+      ],
+      "description": "The composition root of the WPF application: wires all managers, handles UI events, manages layout and panels, and coordinates top-level workflows. MainWindow.xaml was refactored to split large XAML templates into separate ResourceDictionary files in Controls/Templates/ for improved startup parse time and maintainability."
     },
     {
       "id": "mcp-integration",
       "name": "MCP Server Integration",
       "category": "integration",
       "touchCount": 1,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "message-bus",
       "name": "Inter-Task Message Bus",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 1
+      "primaryFileCount": 1,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "module-management",
       "name": "Module Registry",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "module-registry",
       "name": "Module Registry",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "output-management",
       "name": "Task Output Management",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "output-processing",
       "name": "Output Processing \u0026 Subtask Extraction",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "preprocessor-skip-rules",
       "name": "Preprocessor Skip Rules for Task Types",
       "category": "",
       "touchCount": 1,
-      "primaryFileCount": 1
+      "primaryFileCount": 1,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "progress-tracking",
       "name": "Progress Tracking \u0026 Early Termination",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "project-management",
       "name": "Project Management",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 8
+      "primaryFileCount": 8,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "project-tasks",
       "name": "Project Task List",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "prompt-building",
       "name": "Prompt Building \u0026 Context Assembly",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 5
+      "primaryFileCount": 5,
+      "lastIndexedAt": "2026-03-09T21:46:14.6194889Z",
+      "keywords": [
+        "ContextDeduplicationService",
+        "ContextReducer",
+        "GameRules",
+        "NoGitWrite",
+        "PromptBuilder",
+        "PromptLoader",
+        "context reduction",
+        "prompt assembly",
+        "system prompt",
+        "token limit retry"
+      ],
+      "description": "Assembles full AI prompts from modular blocks: system instructions, project rules, MCP configuration, feature context, skills, and user input. Also handles context reduction for token-limit retries and deduplication of repeated context."
     },
     {
       "id": "semantic-search",
       "name": "Semantic \u0026 Hybrid Search",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 5
+      "primaryFileCount": 5,
+      "lastIndexedAt": "2026-03-09T21:46:14.5696898Z",
+      "keywords": [
+        "EmbeddingConstants",
+        "EmbeddingService",
+        "HybridSearchManager",
+        "SemanticIndexInitializer",
+        "VectorStore",
+        "cosine similarity",
+        "hybrid search",
+        "vector index",
+        "voyage embeddings"
+      ],
+      "description": "Provides vector-based semantic search over features, source file chunks, and task history using Voyage AI embeddings stored in SQLite. Combines vector similarity, keyword scoring, symbol matching, and task history for hybrid relevance ranking."
     },
     {
       "id": "settings-management",
       "name": "Settings \u0026 Templates",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 4
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "skill-management",
       "name": "Skill Management",
       "category": "core",
       "touchCount": 1,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "skills-system",
       "name": "Skills System",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "stored-task-viewer",
       "name": "Stored Task Viewer",
       "category": "ui",
       "touchCount": 1,
-      "primaryFileCount": 1
+      "primaryFileCount": 1,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-decomposition",
       "name": "Task Decomposition \u0026 Team Spawning",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-execution",
       "name": "Task Execution Engine",
       "category": "core",
-      "touchCount": 2,
-      "primaryFileCount": 5
+      "touchCount": 3,
+      "primaryFileCount": 5,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-factory",
       "name": "Task Creation \u0026 Validation",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-graph-ui",
       "name": "Task Graph UI",
       "category": "ui",
-      "touchCount": 1,
-      "primaryFileCount": 4
+      "touchCount": 2,
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-group-tracking",
       "name": "Task Group Tracking",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-history",
       "name": "Task History \u0026 Group Tracking",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-lifecycle",
       "name": "Task Lifecycle \u0026 State",
       "category": "core",
-      "touchCount": 0,
-      "primaryFileCount": 4
+      "touchCount": 1,
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-orchestration",
       "name": "Task Orchestration \u0026 DAG",
       "category": "core",
-      "touchCount": 0,
-      "primaryFileCount": 4
+      "touchCount": 1,
+      "primaryFileCount": 4,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-preprocessing",
       "name": "Task Preprocessing \u0026 Flag Inference",
       "category": "core",
       "touchCount": 0,
-      "primaryFileCount": 2
+      "primaryFileCount": 2,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-templates",
       "name": "Saved Prompts \u0026 Task Templates",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-templates-storage",
       "name": "Task Templates \u0026 Saved Prompts",
       "category": "data",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "task-ui",
       "name": "Task UI \u0026 Graph Visualization",
       "category": "ui",
-      "touchCount": 4,
-      "primaryFileCount": 9
+      "touchCount": 5,
+      "primaryFileCount": 9,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "terminal",
       "name": "Integrated Terminal",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "theming-ui-shared",
       "name": "Theming \u0026 Shared UI Components",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 3
+      "primaryFileCount": 3,
+      "keywords": [],
+      "description": ""
     },
     {
       "id": "ui-theming",
       "name": "UI Theming \u0026 Style System",
       "category": "ui",
       "touchCount": 0,
-      "primaryFileCount": 5
+      "primaryFileCount": 5,
+      "keywords": [],
+      "description": ""
     }
   ],
-  "modules": []
+  "modules": [],
+  "keywordMap": {
+    "activity": [
+      "activity-dashboard"
+    ],
+    "agent": [
+      "feature-update-agent"
+    ],
+    "ai": [
+      "helper-suggestions",
+      "prompt-building",
+      "semantic-search"
+    ],
+    "analysis": [
+      "completion-analysis"
+    ],
+    "analytics": [
+      "history-analytics"
+    ],
+    "app": [
+      "app-infrastructure",
+      "app-startup-config"
+    ],
+    "application": [
+      "app-settings",
+      "app-startup",
+      "main-window-ui"
+    ],
+    "assembles": [
+      "prompt-building"
+    ],
+    "assembly": [
+      "prompt-building"
+    ],
+    "based": [
+      "semantic-search"
+    ],
+    "block": [
+      "feature-context-resolution"
+    ],
+    "blocks": [
+      "feature-registry",
+      "prompt-building"
+    ],
+    "bootstrap": [
+      "app-startup"
+    ],
+    "building": [
+      "prompt-building"
+    ],
+    "builds": [
+      "feature-context-resolution",
+      "feature-registry"
+    ],
+    "bus": [
+      "message-bus"
+    ],
+    "chat": [
+      "chat",
+      "chat-interface"
+    ],
+    "chunks": [
+      "semantic-search"
+    ],
+    "claude": [
+      "llm-services"
+    ],
+    "codebase": [
+      "codebase-indexing",
+      "feature-registry"
+    ],
+    "combines": [
+      "semantic-search"
+    ],
+    "completion": [
+      "completion-analysis",
+      "feature-context-resolution"
+    ],
+    "components": [
+      "theming-ui-shared"
+    ],
+    "composition": [
+      "main-window-ui"
+    ],
+    "composition root": [
+      "main-window-ui"
+    ],
+    "confidence threshold": [
+      "feature-context-resolution"
+    ],
+    "configuration": [
+      "app-startup-config",
+      "prompt-building"
+    ],
+    "constants": [
+      "app-settings"
+    ],
+    "context": [
+      "context-optimization",
+      "feature-context-menu",
+      "feature-context-resolution",
+      "feature-registry",
+      "prompt-building"
+    ],
+    "context reduction": [
+      "prompt-building"
+    ],
+    "contextdeduplicationservice": [
+      "prompt-building"
+    ],
+    "contextreducer": [
+      "prompt-building"
+    ],
+    "controls": [
+      "main-window-ui"
+    ],
+    "coordinates": [
+      "main-window-ui"
+    ],
+    "cosine similarity": [
+      "semantic-search"
+    ],
+    "creation": [
+      "task-factory"
+    ],
+    "dag": [
+      "task-orchestration"
+    ],
+    "dashboard": [
+      "activity-dashboard"
+    ],
+    "data": [
+      "export-task-data"
+    ],
+    "decomposition": [
+      "task-decomposition"
+    ],
+    "deduplication": [
+      "prompt-building"
+    ],
+    "default": [
+      "main-window-ui"
+    ],
+    "dependencies": [
+      "feature-registry"
+    ],
+    "dependson": [
+      "feature-registry"
+    ],
+    "description": [
+      "feature-context-resolution",
+      "feature-registry"
+    ],
+    "diagnostics": [
+      "logging-diagnostics"
+    ],
+    "discovery": [
+      "feature-initialization"
+    ],
+    "early": [
+      "progress-tracking"
+    ],
+    "embeddingconstants": [
+      "semantic-search"
+    ],
+    "embeddings": [
+      "semantic-search"
+    ],
+    "embeddingservice": [
+      "semantic-search"
+    ],
+    "engine": [
+      "task-execution"
+    ],
+    "event wiring": [
+      "main-window-ui"
+    ],
+    "events": [
+      "main-window-ui"
+    ],
+    "execution": [
+      "feature-mode-execution",
+      "task-execution"
+    ],
+    "export": [
+      "export-task-data"
+    ],
+    "extraction": [
+      "output-processing"
+    ],
+    "feature": [
+      "feature-context-menu",
+      "feature-context-resolution",
+      "feature-initialization",
+      "feature-mode",
+      "feature-mode-execution",
+      "feature-registry",
+      "feature-update-agent",
+      "prompt-building"
+    ],
+    "feature context": [
+      "feature-context-resolution"
+    ],
+    "feature context block": [
+      "feature-registry"
+    ],
+    "feature lookup": [
+      "feature-registry"
+    ],
+    "featureconstants": [
+      "feature-registry"
+    ],
+    "featurecontextresolver": [
+      "feature-context-resolution"
+    ],
+    "featurecontextresult": [
+      "feature-context-resolution"
+    ],
+    "featureentry": [
+      "feature-registry"
+    ],
+    "featureindex": [
+      "feature-registry"
+    ],
+    "featureregistrymanager": [
+      "feature-registry"
+    ],
+    "features": [
+      "feature-context-resolution",
+      "feature-registry",
+      "semantic-search"
+    ],
+    "featureupdateagent": [
+      "feature-context-resolution"
+    ],
+    "file": [
+      "file-lock-management",
+      "logging-infrastructure",
+      "semantic-search"
+    ],
+    "files": [
+      "main-window-ui"
+    ],
+    "flag": [
+      "task-preprocessing"
+    ],
+    "full": [
+      "prompt-building"
+    ],
+    "gamerules": [
+      "prompt-building"
+    ],
+    "gemini": [
+      "llm-services"
+    ],
+    "git": [
+      "git-operations",
+      "git-ui"
+    ],
+    "given": [
+      "feature-context-resolution"
+    ],
+    "graph": [
+      "task-graph-ui",
+      "task-ui"
+    ],
+    "group": [
+      "task-group-tracking",
+      "task-history"
+    ],
+    "handles": [
+      "feature-context-resolution",
+      "main-window-ui",
+      "prompt-building"
+    ],
+    "helper": [
+      "helper-suggestions"
+    ],
+    "history": [
+      "history-analytics",
+      "history-management",
+      "semantic-search",
+      "task-history"
+    ],
+    "hybrid": [
+      "feature-context-resolution",
+      "semantic-search"
+    ],
+    "hybrid search": [
+      "semantic-search"
+    ],
+    "hybridsearchmanager": [
+      "semantic-search"
+    ],
+    "improved": [
+      "main-window-ui"
+    ],
+    "indexing": [
+      "codebase-indexing"
+    ],
+    "inference": [
+      "task-preprocessing"
+    ],
+    "infrastructure": [
+      "app-infrastructure"
+    ],
+    "initialization": [
+      "feature-initialization"
+    ],
+    "injection": [
+      "feature-context-resolution",
+      "feature-registry"
+    ],
+    "input": [
+      "prompt-building"
+    ],
+    "instructions": [
+      "prompt-building"
+    ],
+    "integrated": [
+      "terminal"
+    ],
+    "integration": [
+      "mcp-integration"
+    ],
+    "inter": [
+      "message-bus"
+    ],
+    "interface": [
+      "chat",
+      "chat-interface"
+    ],
+    "iprojectpanelview": [
+      "main-window-ui"
+    ],
+    "keyword": [
+      "semantic-search"
+    ],
+    "keyword matching": [
+      "feature-registry"
+    ],
+    "keyword\u002Bvector": [
+      "feature-context-resolution"
+    ],
+    "keywords": [
+      "feature-registry"
+    ],
+    "large": [
+      "main-window-ui"
+    ],
+    "last": [
+      "main-window-ui"
+    ],
+    "layout": [
+      "main-window-ui"
+    ],
+    "level": [
+      "main-window-ui"
+    ],
+    "lifecycle": [
+      "task-lifecycle"
+    ],
+    "limit": [
+      "prompt-building"
+    ],
+    "list": [
+      "project-tasks"
+    ],
+    "llm": [
+      "llm-services"
+    ],
+    "lock": [
+      "file-lock-management"
+    ],
+    "logging": [
+      "app-infrastructure",
+      "logging-diagnostics",
+      "logging-infrastructure"
+    ],
+    "lookup": [
+      "feature-registry"
+    ],
+    "main": [
+      "main-window-ui"
+    ],
+    "maintainability": [
+      "main-window-ui"
+    ],
+    "maintains": [
+      "feature-registry"
+    ],
+    "mainwindow": [
+      "main-window-ui"
+    ],
+    "management": [
+      "file-lock-management",
+      "output-management",
+      "project-management",
+      "skill-management"
+    ],
+    "managers": [
+      "main-window-ui"
+    ],
+    "manages": [
+      "main-window-ui"
+    ],
+    "matchedfeature": [
+      "feature-context-resolution"
+    ],
+    "matching": [
+      "semantic-search"
+    ],
+    "mcp": [
+      "mcp-integration",
+      "prompt-building"
+    ],
+    "membership": [
+      "feature-registry"
+    ],
+    "menu": [
+      "feature-context-menu"
+    ],
+    "message": [
+      "message-bus"
+    ],
+    "mode": [
+      "feature-mode",
+      "feature-mode-execution"
+    ],
+    "modular": [
+      "prompt-building"
+    ],
+    "module": [
+      "feature-registry",
+      "module-management",
+      "module-registry"
+    ],
+    "name": [
+      "feature-registry"
+    ],
+    "nogitwrite": [
+      "prompt-building"
+    ],
+    "operations": [
+      "git-operations"
+    ],
+    "optimization": [
+      "context-optimization"
+    ],
+    "orchestration": [
+      "feature-mode",
+      "task-orchestration"
+    ],
+    "output": [
+      "output-management",
+      "output-processing"
+    ],
+    "over": [
+      "semantic-search"
+    ],
+    "panel": [
+      "git-ui"
+    ],
+    "panels": [
+      "main-window-ui"
+    ],
+    "parse": [
+      "main-window-ui"
+    ],
+    "partial class": [
+      "main-window-ui"
+    ],
+    "persistence": [
+      "history-management"
+    ],
+    "persistent": [
+      "feature-registry"
+    ],
+    "placeholders": [
+      "main-window-ui"
+    ],
+    "post": [
+      "feature-context-resolution"
+    ],
+    "preprocessing": [
+      "task-preprocessing"
+    ],
+    "preprocessor": [
+      "preprocessor-skip-rules"
+    ],
+    "processing": [
+      "output-processing"
+    ],
+    "progress": [
+      "progress-tracking"
+    ],
+    "project": [
+      "project-management",
+      "project-tasks",
+      "prompt-building"
+    ],
+    "project panel": [
+      "main-window-ui"
+    ],
+    "prompt": [
+      "feature-context-resolution",
+      "feature-registry",
+      "main-window-ui",
+      "prompt-building"
+    ],
+    "prompt assembly": [
+      "prompt-building"
+    ],
+    "promptbuilder": [
+      "prompt-building"
+    ],
+    "promptloader": [
+      "prompt-building"
+    ],
+    "prompts": [
+      "prompt-building",
+      "task-templates",
+      "task-templates-storage"
+    ],
+    "provides": [
+      "feature-registry",
+      "semantic-search"
+    ],
+    "ranking": [
+      "semantic-search"
+    ],
+    "reduction": [
+      "prompt-building"
+    ],
+    "refactored": [
+      "main-window-ui"
+    ],
+    "registry": [
+      "feature-registry",
+      "module-management",
+      "module-registry"
+    ],
+    "relevance": [
+      "semantic-search"
+    ],
+    "relevant": [
+      "feature-context-resolution"
+    ],
+    "repeated": [
+      "prompt-building"
+    ],
+    "resolution": [
+      "feature-context-resolution"
+    ],
+    "resolveasync": [
+      "feature-context-resolution"
+    ],
+    "resolves": [
+      "feature-context-resolution"
+    ],
+    "resourcedictionary": [
+      "main-window-ui"
+    ],
+    "retries": [
+      "prompt-building"
+    ],
+    "root": [
+      "main-window-ui"
+    ],
+    "rules": [
+      "preprocessor-skip-rules",
+      "prompt-building"
+    ],
+    "safe": [
+      "logging-infrastructure"
+    ],
+    "saved": [
+      "task-templates",
+      "task-templates-storage"
+    ],
+    "scoring": [
+      "semantic-search"
+    ],
+    "search": [
+      "feature-context-resolution",
+      "semantic-search"
+    ],
+    "semantic": [
+      "semantic-search"
+    ],
+    "semanticindexinitializer": [
+      "semantic-search"
+    ],
+    "separate": [
+      "main-window-ui"
+    ],
+    "server": [
+      "mcp-integration"
+    ],
+    "services": [
+      "llm-services"
+    ],
+    "settings": [
+      "app-settings",
+      "settings-management"
+    ],
+    "shared": [
+      "theming-ui-shared"
+    ],
+    "signatures": [
+      "feature-registry"
+    ],
+    "similarity": [
+      "semantic-search"
+    ],
+    "skill": [
+      "skill-management"
+    ],
+    "skills": [
+      "prompt-building",
+      "skills-system"
+    ],
+    "skip": [
+      "preprocessor-skip-rules"
+    ],
+    "source": [
+      "semantic-search"
+    ],
+    "spawning": [
+      "task-decomposition"
+    ],
+    "split": [
+      "main-window-ui"
+    ],
+    "sqlite": [
+      "semantic-search"
+    ],
+    "stale": [
+      "main-window-ui"
+    ],
+    "startup": [
+      "app-startup-config",
+      "main-window-ui"
+    ],
+    "state": [
+      "task-lifecycle"
+    ],
+    "stored": [
+      "semantic-search",
+      "stored-task-viewer"
+    ],
+    "style": [
+      "ui-theming"
+    ],
+    "subtask": [
+      "output-processing"
+    ],
+    "suggestions": [
+      "helper-suggestions"
+    ],
+    "symbol": [
+      "codebase-indexing",
+      "feature-registry",
+      "semantic-search"
+    ],
+    "symbol lookup": [
+      "feature-registry"
+    ],
+    "system": [
+      "main-window-ui",
+      "prompt-building",
+      "skills-system",
+      "ui-theming"
+    ],
+    "system prompt": [
+      "prompt-building"
+    ],
+    "task": [
+      "completion-analysis",
+      "export-task-data",
+      "feature-context-resolution",
+      "feature-registry",
+      "history-analytics",
+      "history-management",
+      "message-bus",
+      "output-management",
+      "preprocessor-skip-rules",
+      "project-tasks",
+      "semantic-search",
+      "stored-task-viewer",
+      "task-decomposition",
+      "task-execution",
+      "task-factory",
+      "task-graph-ui",
+      "task-group-tracking",
+      "task-history",
+      "task-lifecycle",
+      "task-orchestration",
+      "task-preprocessing",
+      "task-templates",
+      "task-templates-storage",
+      "task-ui"
+    ],
+    "task relevance": [
+      "feature-context-resolution"
+    ],
+    "team": [
+      "task-decomposition"
+    ],
+    "templates": [
+      "main-window-ui",
+      "settings-management",
+      "task-templates",
+      "task-templates-storage"
+    ],
+    "terminal": [
+      "terminal"
+    ],
+    "termination": [
+      "progress-tracking"
+    ],
+    "theming": [
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "time": [
+      "main-window-ui"
+    ],
+    "token": [
+      "prompt-building"
+    ],
+    "token limit retry": [
+      "prompt-building"
+    ],
+    "top": [
+      "main-window-ui"
+    ],
+    "total": [
+      "main-window-ui"
+    ],
+    "tracking": [
+      "progress-tracking",
+      "task-group-tracking",
+      "task-history"
+    ],
+    "types": [
+      "preprocessor-skip-rules"
+    ],
+    "ui": [
+      "git-ui",
+      "main-window-ui",
+      "task-graph-ui",
+      "task-ui",
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "ui orchestration": [
+      "main-window-ui"
+    ],
+    "updated": [
+      "main-window-ui"
+    ],
+    "updates": [
+      "feature-context-resolution"
+    ],
+    "user": [
+      "prompt-building"
+    ],
+    "using": [
+      "feature-context-resolution",
+      "semantic-search"
+    ],
+    "validation": [
+      "task-factory"
+    ],
+    "vector": [
+      "semantic-search"
+    ],
+    "vector index": [
+      "semantic-search"
+    ],
+    "vectorstore": [
+      "semantic-search"
+    ],
+    "viewer": [
+      "stored-task-viewer"
+    ],
+    "visualization": [
+      "task-ui"
+    ],
+    "voyage": [
+      "semantic-search"
+    ],
+    "voyage embeddings": [
+      "semantic-search"
+    ],
+    "window": [
+      "main-window-ui"
+    ],
+    "wires": [
+      "main-window-ui"
+    ],
+    "workflows": [
+      "main-window-ui"
+    ],
+    "wpf": [
+      "main-window-ui"
+    ],
+    "writing": [
+      "logging-infrastructure"
+    ],
+    "xaml": [
+      "main-window-ui"
+    ]
+  }
 }

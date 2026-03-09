@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -152,20 +153,30 @@ public class FeatureInitializer
                 if (totalChunks > 1)
                     ReportProgress($"Analyzing chunk {chunkIdx + 1}/{totalChunks} ({chunk.Count} files)...");
 
-                var signaturesBuilder = new StringBuilder();
-                foreach (var relativePath in chunk)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    var absolutePath = Path.Combine(projectPath, relativePath);
-                    var signatures = SignatureExtractor.ExtractSignatures(absolutePath);
-
-                    if (!string.IsNullOrEmpty(signatures))
+                // Extract signatures in parallel across all files in the chunk
+                var sigResults = new ConcurrentBag<(string RelativePath, string Signatures)>();
+                await Parallel.ForEachAsync(chunk,
+                    new ParallelOptions
                     {
-                        signaturesBuilder.AppendLine($"## {relativePath}");
-                        signaturesBuilder.AppendLine(signatures);
-                        signaturesBuilder.AppendLine();
-                    }
+                        MaxDegreeOfParallelism = FeatureConstants.MaxSignatureParallelism,
+                        CancellationToken = ct
+                    },
+                    (relativePath, innerCt) =>
+                    {
+                        var absolutePath = Path.Combine(projectPath, relativePath);
+                        var signatures = SignatureExtractor.ExtractSignatures(absolutePath);
+                        if (!string.IsNullOrEmpty(signatures))
+                            sigResults.Add((relativePath, signatures));
+                        return ValueTask.CompletedTask;
+                    });
+
+                // Reassemble in deterministic order
+                var signaturesBuilder = new StringBuilder();
+                foreach (var (relPath, sigs) in sigResults.OrderBy(r => r.RelativePath, StringComparer.OrdinalIgnoreCase))
+                {
+                    signaturesBuilder.AppendLine($"## {relPath}");
+                    signaturesBuilder.AppendLine(sigs);
+                    signaturesBuilder.AppendLine();
                 }
 
                 var signaturesText = signaturesBuilder.ToString();
@@ -308,30 +319,47 @@ public class FeatureInitializer
                     feature.SecondaryFiles.Sort(StringComparer.OrdinalIgnoreCase);
                 }
 
-                // Populate signatures and SymbolNames for primary files
-                var symbolNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var primaryFile in feature.PrimaryFiles)
-                {
-                    var absolutePath = Path.Combine(projectPath, primaryFile);
-                    var signatures = SignatureExtractor.ExtractSignatures(absolutePath);
-                    var hash = SignatureExtractor.ComputeFileHash(absolutePath);
-
-                    if (!string.IsNullOrEmpty(signatures))
+                // Populate signatures, SymbolNames, and derived keywords for primary files (parallel)
+                var fileSigResults = new ConcurrentBag<(string File, string Hash, string Sigs, HashSet<string> Keywords)>();
+                Parallel.ForEach(feature.PrimaryFiles,
+                    new ParallelOptions { MaxDegreeOfParallelism = FeatureConstants.MaxSignatureParallelism },
+                    primaryFile =>
                     {
-                        feature.Context.Signatures[primaryFile] = new FileSignature
+                        var absolutePath = Path.Combine(projectPath, primaryFile);
+                        var signatures = SignatureExtractor.ExtractSignatures(absolutePath);
+                        var hash = SignatureExtractor.ComputeFileHash(absolutePath);
+                        var fileKeywords = SignatureExtractor.ExtractKeywords(absolutePath);
+                        fileSigResults.Add((primaryFile, hash, signatures, fileKeywords));
+                    });
+
+                var symbolNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var derivedKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (file, hash, sigs, keywords) in fileSigResults)
+                {
+                    if (!string.IsNullOrEmpty(sigs))
+                    {
+                        feature.Context.Signatures[file] = new FileSignature
                         {
                             Hash = hash,
-                            Content = signatures
+                            Content = sigs
                         };
                     }
-
-                    // Extract symbol names for this file
-                    var fileSymbols = SignatureExtractor.GetSymbolNames(absolutePath);
-                    foreach (var sym in fileSymbols)
-                        symbolNames.Add(sym);
+                    foreach (var kw in keywords)
+                    {
+                        derivedKeywords.Add(kw);
+                        if (kw.Length > 1 && char.IsUpper(kw[0]))
+                            symbolNames.Add(kw);
+                    }
                 }
 
                 feature.SymbolNames = symbolNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+
+                // Merge symbol-derived keywords into the feature's keyword list
+                foreach (var kw in derivedKeywords.Where(k => k.Length > 2 && char.IsLower(k[0])))
+                {
+                    if (!feature.Keywords.Contains(kw, StringComparer.OrdinalIgnoreCase))
+                        feature.Keywords.Add(kw);
+                }
 
                 await _registryManager.SaveFeatureAsync(projectPath, feature);
                 createdCount++;
@@ -394,14 +422,24 @@ public class FeatureInitializer
                 // Refresh stale signatures
                 await _registryManager.RefreshStaleSignaturesAsync(projectPath, existingFeature);
 
-                // Rebuild symbol names from current files
+                // Rebuild symbol names and keywords from current files via unified extraction
                 var symNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var refreshKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var pf in existingFeature.PrimaryFiles)
                 {
-                    foreach (var sym in SignatureExtractor.GetSymbolNames(Path.Combine(projectPath, pf)))
-                        symNames.Add(sym);
+                    foreach (var kw in SignatureExtractor.ExtractKeywords(Path.Combine(projectPath, pf)))
+                    {
+                        refreshKeywords.Add(kw);
+                        if (kw.Length > 1 && char.IsUpper(kw[0]))
+                            symNames.Add(kw);
+                    }
                 }
                 existingFeature.SymbolNames = symNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+                foreach (var kw in refreshKeywords.Where(k => k.Length > 2 && char.IsLower(k[0])))
+                {
+                    if (!existingFeature.Keywords.Contains(kw, StringComparer.OrdinalIgnoreCase))
+                        existingFeature.Keywords.Add(kw);
+                }
 
                 existingFeature.LastUpdatedAt = DateTime.UtcNow;
                 await _registryManager.SaveFeatureAsync(projectPath, existingFeature);
@@ -427,6 +465,9 @@ public class FeatureInitializer
             DependencyAnalyzer.AnalyzeImportDependencies(allFeatures, projectPath);
             _registryManager.ValidateDependencies(allFeatures);
 
+            // Prune inflated dependsOn arrays to top-N by keyword relevance
+            PruneDependencies(allFeatures);
+
             // Re-save features with updated DependsOn
             foreach (var feature in allFeatures)
                 await _registryManager.SaveFeatureAsync(projectPath, feature);
@@ -447,6 +488,12 @@ public class FeatureInitializer
             ct.ThrowIfCancellationRequested();
             var codebaseIndexManager = new CodebaseIndexManager();
             await codebaseIndexManager.BuildIndexAsync(projectPath, allFeatures, ct);
+
+            // Persist symbol index version hash for staleness detection on next startup
+            var symbolVersion = FeatureRegistryManager.ComputeSymbolIndexVersion(allFeatures);
+            var currentIndex = await _registryManager.LoadIndexAsync(projectPath);
+            currentIndex.SymbolIndexVersion = symbolVersion;
+            await _registryManager.SaveIndexAsync(projectPath, currentIndex);
 
             ReportProgress("Codebase symbol index written");
 
@@ -472,6 +519,182 @@ public class FeatureInitializer
             AppLogger.Error("FeatureInitializer", $"Initialization failed: {ex.Message}", ex);
             ReportProgress($"Initialization failed: {ex.Message}");
             return null;
+        }
+    }
+
+    // ── Incremental Update ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Incrementally updates the feature registry by only re-scanning files that have
+    /// changed since the last scan. Compares file hashes stored in feature signatures
+    /// against current disk state. Much faster than a full <see cref="InitializeAsync"/>.
+    /// Returns the number of features updated, or -1 if a full re-init is needed.
+    /// </summary>
+    public async Task<int> IncrementalUpdateAsync(string projectPath, CancellationToken ct = default)
+    {
+        try
+        {
+            if (!_registryManager.RegistryExists(projectPath))
+                return -1; // No registry — need full init
+
+            var allFeatures = await _registryManager.LoadAllFeaturesAsync(projectPath);
+            if (allFeatures.Count == 0)
+                return -1;
+
+            ReportProgress("Scanning for changed files...");
+
+            // Scan current source files on disk
+            var currentFiles = new HashSet<string>(
+                ScanSourceFiles(projectPath), StringComparer.OrdinalIgnoreCase);
+
+            // Build a map of all files tracked by features and their stored hashes
+            var trackedFileHashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var feature in allFeatures)
+            {
+                foreach (var (relPath, sig) in feature.Context.Signatures)
+                    trackedFileHashes.TryAdd(relPath, sig.Hash);
+            }
+
+            // Detect changed, new, and deleted files (parallel hash computation)
+            var changedFiles = new ConcurrentBag<string>();
+            var newFiles = new ConcurrentBag<string>();
+
+            await Parallel.ForEachAsync(currentFiles,
+                new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = FeatureConstants.MaxSignatureParallelism,
+                    CancellationToken = ct
+                },
+                (relPath, innerCt) =>
+                {
+                    var absPath = Path.Combine(projectPath, relPath);
+                    var currentHash = SignatureExtractor.ComputeFileHash(absPath);
+
+                    if (trackedFileHashes.TryGetValue(relPath, out var storedHash))
+                    {
+                        if (currentHash != storedHash)
+                            changedFiles.Add(relPath);
+                    }
+                    else
+                    {
+                        newFiles.Add(relPath);
+                    }
+                    return ValueTask.CompletedTask;
+                });
+
+            var deletedFiles = trackedFileHashes.Keys
+                .Where(f => !currentFiles.Contains(f))
+                .ToList();
+
+            var totalChanges = changedFiles.Count + newFiles.Count + deletedFiles.Count;
+            if (totalChanges == 0)
+            {
+                ReportProgress("No file changes detected — registry is up to date");
+                return 0;
+            }
+
+            // If too many new files, suggest full re-init
+            if (newFiles.Count > allFeatures.Count * 2)
+            {
+                ReportProgress($"Too many new files ({newFiles.Count}) — full re-initialization recommended");
+                return -1;
+            }
+
+            ReportProgress($"Detected {changedFiles.Count} changed, {newFiles.Count} new, {deletedFiles.Count} deleted files");
+
+            // Update signatures for changed files in their owning features
+            var updatedFeatureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var changedFileSet = new HashSet<string>(changedFiles, StringComparer.OrdinalIgnoreCase);
+            var deletedFileSet = new HashSet<string>(deletedFiles, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var feature in allFeatures)
+            {
+                ct.ThrowIfCancellationRequested();
+                var needsSave = false;
+
+                // Remove deleted files from signatures and file lists
+                foreach (var deleted in deletedFileSet)
+                {
+                    if (feature.Context.Signatures.Remove(deleted))
+                        needsSave = true;
+                    if (feature.PrimaryFiles.Remove(deleted))
+                        needsSave = true;
+                    if (feature.SecondaryFiles.Remove(deleted))
+                        needsSave = true;
+                }
+
+                // Refresh changed file signatures
+                foreach (var changed in changedFileSet)
+                {
+                    if (!feature.Context.Signatures.ContainsKey(changed) &&
+                        !feature.PrimaryFiles.Contains(changed, StringComparer.OrdinalIgnoreCase))
+                        continue;
+
+                    var absPath = Path.Combine(projectPath, changed);
+                    var newSigs = SignatureExtractor.ExtractSignatures(absPath);
+                    var newHash = SignatureExtractor.ComputeFileHash(absPath);
+
+                    feature.Context.Signatures[changed] = new FileSignature
+                    {
+                        Hash = newHash,
+                        Content = newSigs
+                    };
+                    needsSave = true;
+                }
+
+                if (needsSave)
+                {
+                    // Rebuild symbol names and keywords via unified extraction
+                    var symNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var incKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var pf in feature.PrimaryFiles)
+                    {
+                        foreach (var kw in SignatureExtractor.ExtractKeywords(Path.Combine(projectPath, pf)))
+                        {
+                            incKeywords.Add(kw);
+                            if (kw.Length > 1 && char.IsUpper(kw[0]))
+                                symNames.Add(kw);
+                        }
+                    }
+                    feature.SymbolNames = symNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+                    foreach (var kw in incKeywords.Where(k => k.Length > 2 && char.IsLower(k[0])))
+                    {
+                        if (!feature.Keywords.Contains(kw, StringComparer.OrdinalIgnoreCase))
+                            feature.Keywords.Add(kw);
+                    }
+
+                    feature.LastUpdatedAt = DateTime.UtcNow;
+                    await _registryManager.SaveFeatureAsync(projectPath, feature);
+                    updatedFeatureIds.Add(feature.Id);
+                }
+            }
+
+            // Remove features with no remaining primary files
+            foreach (var feature in allFeatures.Where(f => f.PrimaryFiles.Count == 0).ToList())
+            {
+                await _registryManager.RemoveFeatureAsync(projectPath, feature.Id);
+                ReportProgress($"Removed feature '{feature.Id}' (all primary files deleted)");
+            }
+
+            // Update symbol index version hash after incremental changes
+            if (updatedFeatureIds.Count > 0)
+            {
+                var refreshedFeatures = await _registryManager.LoadAllFeaturesAsync(projectPath);
+                var symbolVersion = FeatureRegistryManager.ComputeSymbolIndexVersion(refreshedFeatures);
+                var featureIndex = await _registryManager.LoadIndexAsync(projectPath);
+                featureIndex.SymbolIndexVersion = symbolVersion;
+                await _registryManager.SaveIndexAsync(projectPath, featureIndex);
+            }
+
+            ReportProgress($"Incremental update complete: {updatedFeatureIds.Count} features updated");
+            return updatedFeatureIds.Count;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            AppLogger.Error("FeatureInitializer", $"Incremental update failed: {ex.Message}", ex);
+            ReportProgress($"Incremental update failed: {ex.Message}");
+            return -1;
         }
     }
 
@@ -955,6 +1178,60 @@ public class FeatureInitializer
     }
 
     // ── Helper: Report Progress ─────────────────────────────────────────
+
+    /// <summary>
+    /// Caps each feature's DependsOn to <see cref="FeatureConstants.MaxDependenciesPerFeature"/>
+    /// by ranking candidates using keyword overlap via <see cref="FeatureRegistryManager.ScoreFeature"/>,
+    /// keeping the top-N most relevant, and discarding the rest.
+    /// </summary>
+    private static void PruneDependencies(List<FeatureEntry> allFeatures)
+    {
+        var cap = FeatureConstants.MaxDependenciesPerFeature;
+        var featureLookup = allFeatures.ToDictionary(f => f.Id, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var feature in allFeatures)
+        {
+            if (feature.DependsOn.Count <= cap)
+                continue;
+
+            // Build tokens from the feature's own keywords + description for scoring
+            var featureText = string.Join(" ", feature.Keywords);
+            if (!string.IsNullOrWhiteSpace(feature.Description))
+                featureText += " " + feature.Description;
+
+            var tokens = FeatureRegistryManager.Tokenize(featureText);
+
+            // Score each dependency by relevance to this feature
+            var scored = new List<(string DepId, double Score)>();
+            foreach (var depId in feature.DependsOn)
+            {
+                if (featureLookup.TryGetValue(depId, out var depFeature))
+                {
+                    var score = FeatureRegistryManager.ScoreFeature(tokens, featureText, depFeature);
+                    scored.Add((depId, score));
+                }
+                else
+                {
+                    scored.Add((depId, 0.0));
+                }
+            }
+
+            var kept = scored
+                .OrderByDescending(s => s.Score)
+                .Take(cap)
+                .Select(s => s.DepId)
+                .ToList();
+
+            var removed = feature.DependsOn.Except(kept, StringComparer.OrdinalIgnoreCase).ToList();
+
+            feature.DependsOn = kept;
+            feature.DependsOn.Sort(StringComparer.Ordinal);
+
+            AppLogger.Info("FeatureInitializer",
+                $"Pruned {removed.Count} low-relevance dependencies from '{feature.Id}' " +
+                $"(kept {kept.Count}/{kept.Count + removed.Count}): removed [{string.Join(", ", removed)}]");
+        }
+    }
 
     private void ReportProgress(string message)
     {

@@ -40,6 +40,9 @@ namespace Spritely.Constants
         /// <summary>Maximum secondary (dependency/sibling) features injected for cross-feature context.</summary>
         public const int MaxSecondaryFeaturesPerTask = 5;
 
+        /// <summary>Maximum number of dependsOn entries kept per feature after pruning during init.</summary>
+        public const int MaxDependenciesPerFeature = 15;
+
         /// <summary>Approximate token cap for context injected from a single secondary feature.</summary>
         public const int MaxTokensPerSecondaryFeature = 150;
 
@@ -55,13 +58,16 @@ namespace Spritely.Constants
         public const int SignatureHashLength = 12;
 
         /// <summary>Maximum source files sent to Sonnet in a single init-scan chunk.</summary>
-        public const int MaxFilesPerSonnetChunk = 400;
+        public const int MaxFilesPerSonnetChunk = 600;
 
         /// <summary>Alias for <see cref="MaxFilesPerSonnetChunk"/> — used by newer scan code.</summary>
         public const int MaxFilesPerChunk = MaxFilesPerSonnetChunk;
 
         /// <summary>Maximum signature lines extracted per source file.</summary>
-        public const int MaxSignatureLinesPerFile = 30;
+        public const int MaxSignatureLinesPerFile = 50;
+
+        /// <summary>Maximum degree of parallelism for signature extraction across files.</summary>
+        public const int MaxSignatureParallelism = 8;
 
         // ── Module Limits ─────────────────────────────────────────────
 

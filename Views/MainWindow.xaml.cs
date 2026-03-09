@@ -107,7 +107,7 @@ namespace Spritely
         private bool _terminalCollapsed = true;
         private GridLength _terminalExpandedHeight = new(120);
 
-        // Track when the top-middle splitter is being dragged to prevent RestoreStarRows interference
+        // Track when any splitter is being dragged to prevent RestoreStarRows interference
         private bool _isSplitterDragging;
 
 
@@ -210,10 +210,25 @@ namespace Spritely
             var featureRegistryManager = new FeatureRegistryManager();
             var codebaseIndexManager = new CodebaseIndexManager();
             var moduleRegistryManager = new ModuleRegistryManager();
+            var embeddingService = new EmbeddingService();
+            var vectorStore = new VectorStore();
             var featureContextResolver = new FeatureContextResolver(
-                featureRegistryManager, codebaseIndexManager, moduleRegistryManager);
+                featureRegistryManager, codebaseIndexManager, moduleRegistryManager,
+                embeddingService, vectorStore);
+            var hybridSearchManager = new HybridSearchManager(
+                embeddingService, vectorStore, featureRegistryManager,
+                featureContextResolver, codebaseIndexManager);
             var featureUpdateAgent = new FeatureUpdateAgent(
                 featureRegistryManager, codebaseIndexManager, moduleRegistryManager);
+
+            featureUpdateAgent.StartBackgroundRetryWorker(
+                isBusy: () => { lock (_activeTasksLock) return _activeTasks.Any(t => !t.IsFinished); },
+                getProjectPaths: () => _projectManager.SavedProjects
+                    .Select(p => p.Path)
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                shutdownToken: _windowCts.Token);
 
             _taskExecutionManager = new TaskExecutionManager(new TaskExecutionServices
             {
@@ -238,6 +253,7 @@ namespace Spritely
                 FeatureRegistryManager = featureRegistryManager,
                 FeatureContextResolver = featureContextResolver,
                 FeatureUpdateAgent = featureUpdateAgent,
+                HybridSearchManager = hybridSearchManager,
             });
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
@@ -267,6 +283,8 @@ namespace Spritely
                 _gitOperationGuard,
                 Dispatcher,
                 _settingsManager);
+            _taskExecutionManager.TaskCompleted += _gitPanelManager.OnTaskCompleted;
+            _gitPanelManager.StartWatching();
 
             _projectManager.SetTaskCollections(_activeTasks, _historyTasks);
 
@@ -803,7 +821,7 @@ namespace Spritely
             {
                 if (task.Status == AgentTaskStatus.InitQueued)
                 {
-                    task.Status = AgentTaskStatus.Running;
+                    task.Status = AgentTaskStatus.Stored;
                     task.QueuedReason = null;
                     task.StartTime = DateTime.Now;
                     _outputTabManager.AppendOutput(task.Id,
@@ -833,7 +851,7 @@ namespace Spritely
                         }
                         else
                         {
-                            task.Status = AgentTaskStatus.Running;
+                            task.Status = AgentTaskStatus.Stored;
                             task.StartTime = DateTime.Now;
                             _outputTabManager.AppendOutput(task.Id,
                                 $"\nForce-starting task #{task.TaskNumber} (dependencies skipped)...\n\n",
@@ -869,7 +887,7 @@ namespace Spritely
                 dependent.BlockedByTaskNumber = prerequisite.TaskNumber;
                 dependent.QueuedReason = $"Waiting for #{prerequisite.TaskNumber} to complete";
 
-                if (dependent.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning)
+                if (dependent.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning)
                 {
                     _taskExecutionManager.PauseTask(dependent);
                     dependent.Status = AgentTaskStatus.Queued;
@@ -911,7 +929,7 @@ namespace Spritely
                         }
                         else
                         {
-                            task.Status = AgentTaskStatus.Running;
+                            task.Status = AgentTaskStatus.Stored;
                             task.StartTime = DateTime.Now;
                             _outputTabManager.AppendOutput(task.Id,
                                 $"\nDependencies removed — starting task #{task.TaskNumber}...\n",
@@ -1086,7 +1104,7 @@ namespace Spritely
 
         private readonly List<AgentTask> _pendingDependencies = new();
 
-        private void TaskCard_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        internal void TaskCard_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
             if (IsInsideButton(e.OriginalSource as DependencyObject))
             {
@@ -1109,7 +1127,7 @@ namespace Spritely
             return false;
         }
 
-        private void TaskCard_MouseMove(object sender, MouseEventArgs e)
+        internal void TaskCard_MouseMove(object sender, MouseEventArgs e)
         {
             if (e.LeftButton != MouseButtonState.Pressed) return;
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
@@ -1240,7 +1258,7 @@ namespace Spritely
 
         // ── Task-to-Task Drag & Drop (add dependency) ─────────────
 
-        private void TaskCard_DragOver(object sender, DragEventArgs e)
+        internal void TaskCard_DragOver(object sender, DragEventArgs e)
         {
             if (!e.Data.GetDataPresent("AgentTask") ||
                 sender is not FrameworkElement { DataContext: AgentTask target } ||
@@ -1259,7 +1277,7 @@ namespace Spritely
         private static bool IsReorderablePair(AgentTask a, AgentTask b) =>
             (a.IsQueued || a.IsInitQueued) && (b.IsQueued || b.IsInitQueued);
 
-        private void TaskCard_Drop(object sender, DragEventArgs e)
+        internal void TaskCard_Drop(object sender, DragEventArgs e)
         {
             if (!e.Data.GetDataPresent("AgentTask")) return;
             if (sender is not FrameworkElement { DataContext: AgentTask target }) return;
@@ -1288,7 +1306,7 @@ namespace Spritely
             dragged.BlockedByTaskNumber = target.TaskNumber;
             dragged.QueuedReason = $"Waiting for #{target.TaskNumber} to complete";
 
-            if (dragged.Status is AgentTaskStatus.Running or AgentTaskStatus.Planning)
+            if (dragged.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning)
             {
                 _taskExecutionManager.PauseTask(dragged);
                 dragged.Status = AgentTaskStatus.Queued;
@@ -1423,7 +1441,7 @@ namespace Spritely
             UpdateExecuteButtonText();
         }
 
-        private void RemoveStoredTask_Click(object sender, RoutedEventArgs e)
+        internal void RemoveStoredTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             AnimateRemoval(el, () =>
@@ -1448,14 +1466,14 @@ namespace Spritely
             UpdateStatus();
         }
 
-        private void CopyStoredPrompt_Click(object sender, RoutedEventArgs e)
+        internal void CopyStoredPrompt_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             if (!string.IsNullOrEmpty(task.StoredPrompt))
                 Clipboard.SetText(task.StoredPrompt);
         }
 
-        private void ExecuteStoredTask_Click(object sender, RoutedEventArgs e)
+        internal void ExecuteStoredTask_Click(object sender, RoutedEventArgs e)
         {
             if (!_projectManager.HasProjects) return;
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
@@ -1515,13 +1533,13 @@ namespace Spritely
             UpdateStatus();
         }
 
-        private void ViewStoredTask_Click(object sender, RoutedEventArgs e)
+        internal void ViewStoredTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             StoredTaskViewerDialog.Show(task);
         }
 
-        private void ViewOutput_Click(object sender, RoutedEventArgs e)
+        internal void ViewOutput_Click(object sender, RoutedEventArgs e)
         {
             var task = GetTaskFromContextMenuItem(sender);
             if (task == null) return;
@@ -1816,7 +1834,7 @@ namespace Spritely
 
         private void UpdateStatus()
         {
-            var running = _activeTasks.Count(t => t.Status == AgentTaskStatus.Running);
+            var running = _activeTasks.Count(t => t.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored);
             var planning = _activeTasks.Count(t => t.Status == AgentTaskStatus.Planning);
             var queued = _activeTasks.Count(t => t.Status == AgentTaskStatus.Queued);
             var waiting = _activeTasks.Count(t => t.Status == AgentTaskStatus.InitQueued);
@@ -1842,7 +1860,7 @@ namespace Spritely
 
         private void CheckTaskTimeouts()
         {
-            var runningTasks = _activeTasks.Where(t => t.Status == AgentTaskStatus.Running || t.Status == AgentTaskStatus.Planning).ToList();
+            var runningTasks = _activeTasks.Where(t => t.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored or AgentTaskStatus.Planning).ToList();
 
             foreach (var task in runningTasks)
             {
