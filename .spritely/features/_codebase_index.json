@@ -56,8 +56,8 @@
       "shortSignature": "TaskNumber: int"
     },
     "description": {
-      "featureId": "settings-management",
-      "filePath": "Models/TaskTemplate.cs",
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Property",
       "shortSignature": "Description: string"
     },
@@ -1328,10 +1328,10 @@
       "shortSignature": "TaskName: string"
     },
     "dependson": {
-      "featureId": "feature-registry",
-      "filePath": "Models/FeatureEntry.cs",
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Property",
-      "shortSignature": "DependsOn: List\u003Cstring\u003E"
+      "shortSignature": "DependsOn: List\u003Cint\u003E?"
     },
     "workflowcomposerresult": {
       "featureId": "task-ui",
@@ -2971,11 +2971,11 @@
       "kind": "Class",
       "shortSignature": "class ChatMessage"
     },
-    "role": {
-      "featureId": "task-orchestration",
+    "checkfeaturemodephasecompletion": {
+      "featureId": "feature-mode",
       "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Property",
-      "shortSignature": "Role: string"
+      "kind": "Method",
+      "shortSignature": "CheckFeatureModePhaseCompletion(AgentTask featureParent, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
     },
     "geminiimageresult": {
       "featureId": "llm-services",
@@ -3895,11 +3895,11 @@
       "kind": "Method",
       "shortSignature": "TryInjectSubtaskResult(AgentTask child, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
     },
-    "injectsubtaskresult": {
-      "featureId": "task-orchestration",
+    "role": {
+      "featureId": "feature-mode",
       "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void"
+      "kind": "Property",
+      "shortSignature": "Role: string"
     },
     "outputtabmanager": {
       "featureId": "task-execution",
@@ -5011,113 +5011,113 @@
       "kind": "Property",
       "shortSignature": "TruncationMetrics: TruncationMetrics"
     },
-    "taskexecutionmanager": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Class",
-      "shortSignature": "class TaskExecutionManager"
-    },
-    "launchheadless": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "LaunchHeadless(AgentTask task) -\u003E void"
-    },
-    "processqueuedmessages": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "ProcessQueuedMessages(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
-    },
-    "sendinput": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "SendInput(AgentTask task, TextBox inputBox, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
-    },
-    "sendfollowup": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "SendFollowUp(AgentTask task, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, bool isInterrupt = false) -\u003E void"
-    },
-    "canceltaskimmediate": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "CancelTaskImmediate(AgentTask task) -\u003E void"
-    },
-    "killprocess": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskProcessLauncher.cs",
-      "kind": "Method",
-      "shortSignature": "KillProcess(AgentTask task) -\u003E void"
-    },
-    "removestreamingstate": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskProcessLauncher.cs",
-      "kind": "Method",
-      "shortSignature": "RemoveStreamingState(string taskId) -\u003E void"
-    },
-    "pausetask": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskProcessLauncher.cs",
-      "kind": "Method",
-      "shortSignature": "PauseTask(AgentTask task) -\u003E void"
-    },
-    "softstoptask": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskProcessLauncher.cs",
-      "kind": "Method",
-      "shortSignature": "SoftStopTask(AgentTask task) -\u003E void"
-    },
-    "resumetask": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskProcessLauncher.cs",
-      "kind": "Method",
-      "shortSignature": "ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
-    },
-    "spawnsubtask": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask"
-    },
-    "spawnsubtaskandqueue": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask"
-    },
-    "extractandspawnsubtasks": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?"
-    },
-    "handledecompositioncompletion": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "HandleDecompositionCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
-    },
-    "extractandspawnteam": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskExecutionManager.cs",
-      "kind": "Method",
-      "shortSignature": "ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?"
-    },
     "handleteamcompletion": {
-      "featureId": "task-orchestration",
+      "featureId": "feature-mode",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
       "shortSignature": "HandleTeamCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
     },
-    "checkfeaturemodephasecompletion": {
-      "featureId": "task-orchestration",
+    "extractandspawnteam": {
+      "featureId": "feature-mode",
       "filePath": "Managers/TaskExecutionManager.cs",
       "kind": "Method",
-      "shortSignature": "CheckFeatureModePhaseCompletion(AgentTask featureParent, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
+      "shortSignature": "ExtractAndSpawnTeam(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?"
+    },
+    "injectsubtaskresult": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void"
+    },
+    "handledecompositioncompletion": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "HandleDecompositionCompletion(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
+    },
+    "extractandspawnsubtasks": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "ExtractAndSpawnSubtasks(AgentTask parent, string output) -\u003E List\u003CAgentTask\u003E?"
+    },
+    "spawnsubtaskandqueue": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "SpawnSubtaskAndQueue(AgentTask parent, string description) -\u003E AgentTask"
+    },
+    "killprocess": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "KillProcess(AgentTask task) -\u003E void"
+    },
+    "removestreamingstate": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "RemoveStreamingState(string taskId) -\u003E void"
+    },
+    "pausetask": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "PauseTask(AgentTask task) -\u003E void"
+    },
+    "softstoptask": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "SoftStopTask(AgentTask task) -\u003E void"
+    },
+    "resumetask": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
+    },
+    "spawnsubtask": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "SpawnSubtask(AgentTask parent, string description, bool inheritSettings = true) -\u003E AgentTask"
+    },
+    "canceltaskimmediate": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "CancelTaskImmediate(AgentTask task) -\u003E void"
+    },
+    "sendfollowup": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "SendFollowUp(AgentTask task, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, bool isInterrupt = false) -\u003E void"
+    },
+    "sendinput": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "SendInput(AgentTask task, TextBox inputBox, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
+    },
+    "processqueuedmessages": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "ProcessQueuedMessages(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
+    },
+    "launchheadless": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "LaunchHeadless(AgentTask task) -\u003E void"
+    },
+    "taskexecutionmanager": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TaskExecutionManager.cs",
+      "kind": "Class",
+      "shortSignature": "class TaskExecutionManager"
     },
     "taskexecutionservices": {
       "featureId": "task-execution",

@@ -103,8 +103,8 @@
       "id": "feature-mode",
       "name": "Feature Mode Orchestration",
       "category": "core",
-      "touchCount": 1,
-      "primaryFileCount": 3
+      "touchCount": 2,
+      "primaryFileCount": 4
     },
     {
       "id": "feature-mode-execution",
