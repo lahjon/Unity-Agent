@@ -19,6 +19,7 @@ namespace Spritely.Managers
         private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
         private readonly string _globalSkillsDir;
+        private string? _currentProjectPath;
         private readonly List<SkillEntry> _globalSkills = new();
         private readonly List<SkillEntry> _projectSkills = new();
 
@@ -46,9 +47,11 @@ namespace Spritely.Managers
 
         /// <summary>
         /// Loads global skills and, if a project path is provided, project skills.
+        /// Remembers the project path for subsequent Save/Delete calls.
         /// </summary>
         public async Task LoadAsync(string? projectPath = null)
         {
+            _currentProjectPath = projectPath;
             _globalSkills.Clear();
             _projectSkills.Clear();
 
@@ -102,7 +105,13 @@ namespace Spritely.Managers
         public void SaveSkill(SkillEntry skill, string? projectPath = null)
         {
             skill.UpdatedAt = DateTime.Now;
-            var dir = skill.IsGlobal ? _globalSkillsDir : GetProjectSkillsDir(projectPath ?? "");
+            var resolvedProjectPath = projectPath ?? _currentProjectPath;
+            if (!skill.IsGlobal && string.IsNullOrEmpty(resolvedProjectPath))
+            {
+                AppLogger.Warn("SkillManager", "Cannot save project skill without a project path");
+                return;
+            }
+            var dir = skill.IsGlobal ? _globalSkillsDir : GetProjectSkillsDir(resolvedProjectPath!);
             var list = skill.IsGlobal ? _globalSkills : _projectSkills;
 
             // Add or update in the in-memory list
@@ -123,7 +132,13 @@ namespace Spritely.Managers
         /// <summary>Deletes a skill and its .md file.</summary>
         public void DeleteSkill(SkillEntry skill, string? projectPath = null)
         {
-            var dir = skill.IsGlobal ? _globalSkillsDir : GetProjectSkillsDir(projectPath ?? "");
+            var resolvedProjectPath = projectPath ?? _currentProjectPath;
+            if (!skill.IsGlobal && string.IsNullOrEmpty(resolvedProjectPath))
+            {
+                AppLogger.Warn("SkillManager", "Cannot delete project skill without a project path");
+                return;
+            }
+            var dir = skill.IsGlobal ? _globalSkillsDir : GetProjectSkillsDir(resolvedProjectPath!);
             var list = skill.IsGlobal ? _globalSkills : _projectSkills;
 
             list.RemoveAll(s => s.Id == skill.Id);

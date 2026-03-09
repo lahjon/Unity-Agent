@@ -292,7 +292,7 @@
       "id": "skill-management",
       "name": "Skill Management",
       "category": "core",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 3
     },
     {
@@ -390,7 +390,7 @@
       "id": "task-ui",
       "name": "Task UI \u0026 Graph Visualization",
       "category": "ui",
-      "touchCount": 3,
+      "touchCount": 4,
       "primaryFileCount": 9
     },
     {

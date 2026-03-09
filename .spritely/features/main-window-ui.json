@@ -123,11 +123,11 @@
   "context": {
     "signatures": {
       "MainWindow.Features.cs": {
-        "hash": "36c90f7287e5",
+        "hash": "7bc0139089d0",
         "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
       },
       "MainWindow.Orchestration.cs": {
-        "hash": "e315e59ee30b",
+        "hash": "a32c1e366335",
         "content": "class MainWindow"
       },
       "MainWindow.TaskExecution.cs": {
@@ -135,7 +135,7 @@
         "content": "class MainWindow"
       },
       "MainWindow.xaml.cs": {
-        "hash": "35e7a0412f6b",
+        "hash": "ffdb5b23d53c",
         "content": "class MainWindow : Window, IDisposable, IProjectPanelView\n  L36: DefaultSystemPrompt: string = PromptBuilder.DefaultSystemPrompt"
       },
       "MainWindow.Settings.cs": {

@@ -76,7 +76,7 @@
                     </Grid.RowDefinitions>
                     <!-- Top-right buttons + task number -->
                     <StackPanel Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                Margin="0,-2,-2,0">
+                                Margin="0,-2,-2,0" Panel.ZIndex="1">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <!-- Force-start button (visible on queued/init-queued tasks) -->
                         <Button Click="ForceStartQueued_Click" Margin="0,0,2,0">
@@ -730,7 +730,7 @@
                     </Grid.RowDefinitions>
                     <!-- Top-right buttons + task number -->
                     <StackPanel Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                Margin="0,-2,-2,0">
+                                Margin="0,-2,-2,0" Panel.ZIndex="1">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <!-- Verify button (visible when finished) -->
                         <Button Click="VerifyTask_Click" Margin="0,0,2,0" FontSize="11">

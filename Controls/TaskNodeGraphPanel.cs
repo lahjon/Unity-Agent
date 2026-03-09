@@ -90,16 +90,6 @@ namespace Spritely.Controls
             // Header bar
             var header = new DockPanel { Margin = new Thickness(8, 6, 8, 4) };
 
-            var titleBlock = new TextBlock
-            {
-                Text = "GRAPH VIEW",
-                Foreground = (Brush)Application.Current.FindResource("Accent"),
-                FontWeight = FontWeights.Bold,
-                FontSize = 10,
-                FontFamily = new FontFamily("Segoe UI"),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
             _nodeCountText = new TextBlock
             {
                 Foreground = (Brush)Application.Current.FindResource("TextSubdued"),
@@ -148,7 +138,6 @@ namespace Spritely.Controls
             buttonPanel.Children.Add(legendBtn);
 
             header.Children.Add(buttonPanel);
-            header.Children.Add(titleBlock);
             header.Children.Add(_nodeCountText);
 
             DockPanel.SetDock(header, Dock.Top);

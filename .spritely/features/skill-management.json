@@ -86,8 +86,8 @@
         "content": "class SkillEditorDialog\n  L22: Show(SkillManager skillManager, string? projectPath) -\u003E bool  // Shows the full skill manager dialog. Returns true if any changes were made.\n  L275: ShowSkillEditDialog(SkillEntry? existing, bool isGlobal, SkillManager skillManager, string? projectPath = null) -\u003E bool  // Shows a dialog to create or edit a single skill. Returns true if saved."
       },
       "Managers/SkillManager.cs": {
-        "hash": "17476723125b",
-        "content": "class SkillManager\n  L19: JsonOpts: JsonSerializerOptions = new() { WriteIndented = true }\n  L50: LoadAsync(string? projectPath = null) -\u003E Task  // Loads global skills and, if a project path is provided, project skills.\n  L102: SaveSkill(SkillEntry skill, string? projectPath = null) -\u003E void  // Saves a skill (creates or updates). If the skill is global, saves to the glob...\n  L124: DeleteSkill(SkillEntry skill, string? projectPath = null) -\u003E void\n  L144: BuildSkillsBlock() -\u003E string  // Builds a prompt block from the currently enabled skills. Returns empty string...\n  L169: BuildSkillsBlock(IEnumerable\u003Cstring\u003E skillIds) -\u003E string  // Builds a prompt block from specific skill IDs (for restoring from saved promp...\n  L193: GetEnabledSkillIds() -\u003E List\u003Cstring\u003E\n  L197: SetEnabledSkills(IEnumerable\u003Cstring\u003E skillIds) -\u003E void\n  L205: ClearEnabledSkills() -\u003E void\n  L212: GetCategories() -\u003E List\u003Cstring\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  IsGlobal: bool\n  CreatedAt: DateTime\n  UpdatedAt: DateTime"
+        "hash": "baaae34941bf",
+        "content": "class SkillManager\n  L19: JsonOpts: JsonSerializerOptions = new() { WriteIndented = true }\n  L52: LoadAsync(string? projectPath = null) -\u003E Task  // Loads global skills and, if a project path is provided, project skills. Remem...\n  L105: SaveSkill(SkillEntry skill, string? projectPath = null) -\u003E void  // Saves a skill (creates or updates). If the skill is global, saves to the glob...\n  L133: DeleteSkill(SkillEntry skill, string? projectPath = null) -\u003E void\n  L159: BuildSkillsBlock() -\u003E string  // Builds a prompt block from the currently enabled skills. Returns empty string...\n  L184: BuildSkillsBlock(IEnumerable\u003Cstring\u003E skillIds) -\u003E string  // Builds a prompt block from specific skill IDs (for restoring from saved promp...\n  L208: GetEnabledSkillIds() -\u003E List\u003Cstring\u003E\n  L212: SetEnabledSkills(IEnumerable\u003Cstring\u003E skillIds) -\u003E void\n  L220: ClearEnabledSkills() -\u003E void\n  L227: GetCategories() -\u003E List\u003Cstring\u003E\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  IsGlobal: bool\n  CreatedAt: DateTime\n  UpdatedAt: DateTime"
       },
       "Models/SkillEntry.cs": {
         "hash": "d97b0904e816",
@@ -135,6 +135,7 @@
     "SkillManager",
     "UpdatedAt"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.1859797Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-09T12:27:45.7676005Z",
+  "lastUpdatedByTaskId": "516c259326b44921"
 }

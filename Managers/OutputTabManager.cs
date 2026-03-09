@@ -369,17 +369,7 @@ namespace Spritely.Managers
                 return;
             }
 
-            // If tab isn't loaded or has no width yet, skip animation
-            if (tab.ActualWidth <= 0)
-            {
-                RemoveTabImmediate(task, tab);
-                return;
-            }
-
-            // Prevent interaction during animation
-            tab.IsHitTestVisible = false;
-
-            // Select an adjacent tab before animating
+            // Select an adjacent tab before removing
             if (_outputTabs.SelectedItem == tab)
             {
                 int idx = _outputTabs.Items.IndexOf(tab);
@@ -389,25 +379,7 @@ namespace Spritely.Managers
                     _outputTabs.SelectedIndex = idx - 1;
             }
 
-            double originalWidth = tab.ActualWidth;
-
-            // Phase 1: Fade out (200ms)
-            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200))
-            {
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-            };
-
-            // Phase 2: Shrink width to 0 (180ms, starts 80ms after fade begins)
-            var shrink = new DoubleAnimation(originalWidth, 0, TimeSpan.FromMilliseconds(180))
-            {
-                BeginTime = TimeSpan.FromMilliseconds(80),
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-            };
-
-            shrink.Completed += (_, _) => RemoveTabImmediate(task, tab);
-
-            tab.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-            tab.BeginAnimation(FrameworkElement.WidthProperty, shrink);
+            RemoveTabImmediate(task, tab);
         }
 
         private void RemoveTabImmediate(AgentTask task, TabItem tab)

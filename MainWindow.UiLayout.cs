@@ -16,6 +16,8 @@ namespace Spritely
 
         private void TopMiddleSplitter_DragStarted(object sender, DragStartedEventArgs e)
         {
+            _isSplitterDragging = true;
+
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
 
@@ -51,6 +53,8 @@ namespace Spritely
 
         private void TopMiddleSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
         {
+            _isSplitterDragging = false;
+
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
 

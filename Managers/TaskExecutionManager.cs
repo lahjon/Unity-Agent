@@ -178,7 +178,9 @@ namespace Spritely.Managers
             // (before enhancement) since that better represents the user's intent for matching.
             var originalDescription = task.Description;
             var needsPreprocess = task.UseAutoMode && !task.HasHeader && !task.IsSubTask && !IsKnownTaskType(task.Summary);
-            var needsFeatures = !task.IsSubTask && !IsKnownTaskType(task.Summary) && _featureRegistryManager.RegistryExists(task.ProjectPath);
+            var needsFeatures = !task.IsSubTask && !IsKnownTaskType(task.Summary)
+                && (task.IsFeatureMode || task.AllowFeatureModeInference)
+                && _featureRegistryManager.RegistryExists(task.ProjectPath);
 
             if (needsPreprocess || needsFeatures)
             {
