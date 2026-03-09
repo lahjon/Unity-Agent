@@ -26,6 +26,8 @@ namespace Spritely
         public bool UseMessageBus { get; set; }
         public bool AutoDecompose { get; set; }
         public bool ApplyFix { get; set; } = true;
+        public bool UseAutoMode { get; set; } = true;
+        public bool AllowFeatureModeInference { get; set; } = true;
         public string AdditionalInstructions { get; set; } = "";
         public string? StoredPrompt { get; set; }
         public string? ConversationId { get; set; }

@@ -98,6 +98,8 @@ namespace Spritely
         public bool UseMessageBus { get => Data.UseMessageBus; set => Data.UseMessageBus = value; }
         public bool AutoDecompose { get => Data.AutoDecompose; set => Data.AutoDecompose = value; }
         public bool ApplyFix { get => Data.ApplyFix; set => Data.ApplyFix = value; }
+        public bool UseAutoMode { get => Data.UseAutoMode; set => Data.UseAutoMode = value; }
+        public bool AllowFeatureModeInference { get => Data.AllowFeatureModeInference; set => Data.AllowFeatureModeInference = value; }
         public string? GroupId { get => Data.GroupId; set => Data.GroupId = value; }
         public string? GroupName { get => Data.GroupName; set => Data.GroupName = value; }
         public string AdditionalInstructions { get => Data.AdditionalInstructions; set => Data.AdditionalInstructions = value; }

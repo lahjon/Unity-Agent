@@ -8,13 +8,24 @@
     "MainWindow",
     "UI orchestration",
     "composition root",
+    "default",
     "event wiring",
+    "last",
+    "main",
     "partial class",
-    "project panel"
+    "placeholders",
+    "project panel",
+    "prompt",
+    "stale",
+    "system",
+    "total",
+    "updated",
+    "window"
   ],
   "primaryFiles": [
     "MainWindow.Features.cs",
     "MainWindow.Orchestration.cs",
+    "MainWindow.Settings.cs",
     "MainWindow.TaskExecution.cs",
     "MainWindow.xaml",
     "MainWindow.xaml.cs"
@@ -112,20 +123,24 @@
   "context": {
     "signatures": {
       "MainWindow.Features.cs": {
-        "hash": "e990d0c40e91",
+        "hash": "36c90f7287e5",
         "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
       },
       "MainWindow.Orchestration.cs": {
-        "hash": "bc3c227e883f",
+        "hash": "e315e59ee30b",
         "content": "class MainWindow"
       },
       "MainWindow.TaskExecution.cs": {
-        "hash": "f5773e30c4a8",
+        "hash": "06b77d86c583",
         "content": "class MainWindow"
       },
       "MainWindow.xaml.cs": {
         "hash": "35e7a0412f6b",
         "content": "class MainWindow : Window, IDisposable, IProjectPanelView\n  L36: DefaultSystemPrompt: string = PromptBuilder.DefaultSystemPrompt"
+      },
+      "MainWindow.Settings.cs": {
+        "hash": "dc1dc03c41e7",
+        "content": "class MainWindow"
       }
     },
     "keyTypes": [
@@ -153,6 +168,7 @@
     "Stale",
     "Total"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.2701641Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-09T11:39:01.5890195Z",
+  "lastUpdatedByTaskId": "381d7c471212420d"
 }

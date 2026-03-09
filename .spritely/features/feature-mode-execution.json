@@ -22,6 +22,7 @@
     "Managers/ProgressAnalyzer.cs"
   ],
   "secondaryFiles": [
+    "MainWindow.Orchestration.cs",
     "Managers/TokenLimitHandler.cs",
     "Models/ProgressMetrics.cs",
     "Models/ResultVerification.cs",
@@ -180,7 +181,7 @@
     "VelocityTrend",
     "VerifyResultAsync"
   ],
-  "touchCount": 1,
-  "lastUpdatedAt": "2026-03-09T07:18:27.3886781Z",
-  "lastUpdatedByTaskId": "29d6f606277649ad"
+  "touchCount": 2,
+  "lastUpdatedAt": "2026-03-09T11:37:08.3269159Z",
+  "lastUpdatedByTaskId": "2aebe3ba2e224408"
 }

@@ -104,7 +104,9 @@ namespace Spritely
                 imagePaths: imagePaths,
                 model: model,
                 autoDecompose: AutoDecomposeToggle.IsChecked == true,
-                applyFix: ApplyFixToggle.IsChecked == true);
+                applyFix: ApplyFixToggle.IsChecked == true,
+                useAutoMode: AutoModeToggle.IsChecked == true,
+                allowFeatureModeInference: AutoFeatureModeToggle.IsChecked == true);
 
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);

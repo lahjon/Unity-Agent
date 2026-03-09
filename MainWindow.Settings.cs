@@ -25,6 +25,22 @@ namespace Spritely
             _settingsManager.AutoVerify = AutoVerifyToggle.IsChecked == true;
         }
 
+        // ── Auto-Mode / Feature-Mode Toggles ────────────────────────
+
+        private void AutoModeToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (AdvancedBorder == null) return;
+            var autoMode = AutoModeToggle.IsChecked == true;
+            AdvancedBorder.Visibility = autoMode ? Visibility.Collapsed : Visibility.Visible;
+            if (AdvancedTabItem != null)
+                AdvancedTabItem.Visibility = autoMode ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void AutoFeatureModeToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            // Purely a flag read at task launch time — no immediate UI side-effects needed.
+        }
+
         // ── Advanced Panel ───────────────────────────────────────────
 
         private bool _advancedPanelOpen = true;

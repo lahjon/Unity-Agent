@@ -161,7 +161,7 @@ namespace Spritely.Managers
                 task.ApplyFix = result.ApplyFix;
             if (!task.ExtendedPlanning)          // still at default (false)
                 task.ExtendedPlanning = result.ExtendedPlanning;
-            if (!task.IsFeatureMode)             // still at default (false)
+            if (!task.IsFeatureMode && task.AllowFeatureModeInference)
                 task.IsFeatureMode = result.IsFeatureMode;
             if (!task.AutoDecompose)             // still at default (false)
                 task.AutoDecompose = result.AutoDecompose;

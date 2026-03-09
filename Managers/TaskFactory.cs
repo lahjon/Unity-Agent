@@ -38,7 +38,9 @@ namespace Spritely.Managers
             ModelType model = ModelType.ClaudeCode,
             string? parentTaskId = null,
             bool autoDecompose = false,
-            bool applyFix = true)
+            bool applyFix = true,
+            bool useAutoMode = true,
+            bool allowFeatureModeInference = true)
         {
             var task = new AgentTask
             {
@@ -54,6 +56,8 @@ namespace Spritely.Managers
                 UseMessageBus = useMessageBus,
                 AutoDecompose = autoDecompose,
                 ApplyFix = applyFix,
+                UseAutoMode = useAutoMode,
+                AllowFeatureModeInference = allowFeatureModeInference,
                 Model = model,
                 MaxIterations = 2,
                 ProjectPath = projectPath,

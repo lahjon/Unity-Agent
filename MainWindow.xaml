@@ -1358,7 +1358,8 @@
                     <Border x:Name="AdvancedBorder" DockPanel.Dock="Top"
                             Background="{StaticResource BgSurface}" CornerRadius="4"
                             BorderBrush="{StaticResource BgElevated}" BorderThickness="1"
-                            Margin="0,0,0,6" Padding="6,4">
+                            Margin="0,0,0,6" Padding="6,4"
+                            Visibility="Collapsed">
                         <DockPanel>
                             <Button DockPanel.Dock="Left" Click="AdvancedToggle_Click"
                                     Style="{StaticResource GhostBtn}"
@@ -1503,6 +1504,26 @@
                                     FontSize="9" FontFamily="Segoe UI" Padding="6,2"
                                     VerticalAlignment="Center" Margin="8,0,0,0"
                                     ToolTip="Save current toggle states as a reusable template"/>
+                            <ToggleButton x:Name="AutoModeToggle" IsChecked="True"
+                                          Style="{StaticResource ToggleChip}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                          ToolTip="Enable preprocessor and hide advanced toggles"
+                                          Checked="AutoModeToggle_Changed" Unchecked="AutoModeToggle_Changed">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                               Foreground="{StaticResource TextLight}"/>
+                                    <TextBlock Text="Auto-Mode" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton x:Name="AutoFeatureModeToggle" IsChecked="True"
+                                          Style="{StaticResource ToggleChip}" VerticalAlignment="Center" Margin="4,0,0,0"
+                                          ToolTip="Allow preprocessor to infer feature mode"
+                                          Checked="AutoFeatureModeToggle_Changed" Unchecked="AutoFeatureModeToggle_Changed">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                               Foreground="{StaticResource TextLight}"/>
+                                    <TextBlock Text="Feature-Mode" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ToggleButton>
                             <Button Content="Clear" Click="ClearPrompt_Click"
                                     Style="{StaticResource GhostBtn}" Foreground="{StaticResource TextMuted}"
                                     FontSize="10" FontFamily="Segoe UI" Padding="6,2"
@@ -2763,7 +2784,7 @@
                         </DockPanel>
                     </TabItem>
                     <!-- Advanced tab -->
-                    <TabItem>
+                    <TabItem x:Name="AdvancedTabItem" Visibility="Collapsed">
                         <TabItem.Header>
                             <TextBlock Text="Advanced" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>

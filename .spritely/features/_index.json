@@ -110,7 +110,7 @@
       "id": "feature-mode-execution",
       "name": "Feature Mode Execution",
       "category": "core",
-      "touchCount": 1,
+      "touchCount": 2,
       "primaryFileCount": 4
     },
     {
@@ -194,8 +194,8 @@
       "id": "main-window-ui",
       "name": "Main Window \u0026 UI Composition",
       "category": "ui",
-      "touchCount": 0,
-      "primaryFileCount": 5
+      "touchCount": 1,
+      "primaryFileCount": 6
     },
     {
       "id": "mcp-integration",

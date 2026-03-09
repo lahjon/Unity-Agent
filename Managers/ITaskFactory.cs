@@ -24,7 +24,9 @@ namespace Spritely.Managers
             ModelType model = ModelType.ClaudeCode,
             string? parentTaskId = null,
             bool autoDecompose = false,
-            bool applyFix = true);
+            bool applyFix = true,
+            bool useAutoMode = true,
+            bool allowFeatureModeInference = true);
 
         void PrepareTaskForFeatureModeStart(AgentTask task);
 

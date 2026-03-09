@@ -309,9 +309,9 @@
     },
     "mainwindow": {
       "featureId": "main-window-ui",
-      "filePath": "MainWindow.xaml.cs",
+      "filePath": "MainWindow.Settings.cs",
       "kind": "Class",
-      "shortSignature": "class MainWindow : Window, IDisposable, IProjectPanelView"
+      "shortSignature": "class MainWindow"
     },
     "releasetasklocksaftercommit": {
       "featureId": "main-window-ui",
