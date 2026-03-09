@@ -177,13 +177,14 @@ namespace Spritely.Managers
             // Both are independent Haiku CLI calls; feature resolver uses the original description
             // (before enhancement) since that better represents the user's intent for matching.
             var originalDescription = task.Description;
-            var needsPreprocess = !task.HasHeader && !task.IsSubTask && !IsKnownTaskType(task.Summary);
+            // DISABLED: Preprocessor disabled — set to true to re-enable
+            var needsPreprocess = false; // was: !task.HasHeader && !task.IsSubTask && !IsKnownTaskType(task.Summary);
             var needsFeatures = !task.IsSubTask && !IsKnownTaskType(task.Summary) && _featureRegistryManager.RegistryExists(task.ProjectPath);
 
             if (needsPreprocess || needsFeatures)
             {
                 _outputProcessor.AppendColoredOutput(task.Id,
-                    $"[Startup] Preparing task{(needsFeatures ? " (preprocessor + features)" : " (preprocessor)")}...\n",
+                    $"[Startup] Preparing task{(needsFeatures ? " (features)" : "")}...\n",
                     Brushes.DarkGray, activeTasks, historyTasks);
             }
 
