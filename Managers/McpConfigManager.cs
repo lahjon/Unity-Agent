@@ -818,55 +818,66 @@ namespace Spritely.Managers
         /// </summary>
         private async Task BindUnityInstanceAsync(ProjectEntry entry)
         {
+            const int MAX_INSTANCE_RETRIES = 5;
+            const int INSTANCE_RETRY_DELAY_MS = 2000;
+
             try
             {
-                // Query the server for connected Unity instances
-                var listRequest = new
-                {
-                    jsonrpc = "2.0",
-                    method = "resources/read",
-                    @params = new { uri = "mcpforunity://instances" },
-                    id = 2
-                };
-
-                var json = System.Text.Json.JsonSerializer.Serialize(listRequest);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-                using var request = new HttpRequestMessage(HttpMethod.Post, entry.McpAddress);
-                request.Content = content;
-                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-
-                var response = await _httpClient.SendAsync(request);
-                var responseBody = await response.Content.ReadAsStringAsync();
-
-                if (string.IsNullOrEmpty(responseBody))
-                {
-                    AppLogger.Warn("McpConfigManager", "Empty response when querying Unity instances");
-                    return;
-                }
-
-                AppLogger.Info("McpConfigManager", $"Unity instances response: {responseBody}");
-
-                // Parse the response to find instance names (format: "Name@hash")
-                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
-                string? instanceName = null;
-
-                // Look for instance names in the response
-                var bodyText = responseBody;
                 var instances = new System.Collections.Generic.List<string>();
 
-                // Extract Name@hash patterns from the response
-                foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(bodyText, @"[\w\-\. ]+@[a-f0-9]+"))
+                // Retry loop: Unity may take a few seconds to connect to the server after it starts
+                for (int attempt = 1; attempt <= MAX_INSTANCE_RETRIES; attempt++)
                 {
-                    instances.Add(match.Value);
+                    instances.Clear();
+
+                    var listRequest = new
+                    {
+                        jsonrpc = "2.0",
+                        method = "resources/read",
+                        @params = new { uri = "mcpforunity://instances" },
+                        id = 2
+                    };
+
+                    var json = System.Text.Json.JsonSerializer.Serialize(listRequest);
+                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                    using var request = new HttpRequestMessage(HttpMethod.Post, entry.McpAddress);
+                    request.Content = content;
+                    request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                    var response = await _httpClient.SendAsync(request);
+                    var responseBody = await response.Content.ReadAsStringAsync();
+
+                    if (!string.IsNullOrEmpty(responseBody))
+                    {
+                        AppLogger.Info("McpConfigManager", $"Unity instances response (attempt {attempt}): {responseBody}");
+
+                        // Extract Name@hash patterns from the response
+                        foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(responseBody, @"[\w\-\. ]+@[a-f0-9]+"))
+                        {
+                            instances.Add(match.Value);
+                        }
+                    }
+
+                    if (instances.Count > 0)
+                        break;
+
+                    if (attempt < MAX_INSTANCE_RETRIES)
+                    {
+                        AppLogger.Info("McpConfigManager", $"No Unity instances yet (attempt {attempt}/{MAX_INSTANCE_RETRIES}), waiting {INSTANCE_RETRY_DELAY_MS}ms...");
+                        entry.McpOutput.AppendLine($"Waiting for Unity to connect ({attempt}/{MAX_INSTANCE_RETRIES})...");
+                        await Task.Delay(INSTANCE_RETRY_DELAY_MS);
+                    }
                 }
 
                 if (instances.Count == 0)
                 {
-                    AppLogger.Warn("McpConfigManager", "No Unity instances found connected to MCP server");
-                    entry.McpOutput.AppendLine("⚠ No Unity instances detected — Unity may still be connecting");
+                    AppLogger.Warn("McpConfigManager", "No Unity instances found after retries");
+                    entry.McpOutput.AppendLine("⚠ No Unity instances detected — Unity may need the COPLAY package installed");
                     return;
                 }
+
+                string? instanceName;
 
                 // If only one instance, use it; otherwise try to match by project name
                 if (instances.Count == 1)
