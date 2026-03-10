@@ -3,181 +3,181 @@
   "symbols": {
     "agenttaskstatus": {
       "featureId": "task-lifecycle",
-      "filePath": "AgentTask.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Enum",
       "shortSignature": "enum AgentTaskStatus"
     },
     "taskpriority": {
       "featureId": "task-lifecycle",
-      "filePath": "AgentTask.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Enum",
       "shortSignature": "enum TaskPriority"
     },
     "modeltype": {
       "featureId": "task-lifecycle",
-      "filePath": "AgentTask.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Enum",
       "shortSignature": "enum ModelType"
     },
     "featuremodephase": {
       "featureId": "task-lifecycle",
-      "filePath": "AgentTask.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Enum",
       "shortSignature": "enum FeatureModePhase"
     },
     "agenttask": {
       "featureId": "task-lifecycle",
-      "filePath": "AgentTask.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Class",
       "shortSignature": "class AgentTask : INotifyPropertyChanged"
     },
     "data": {
       "featureId": "task-lifecycle",
-      "filePath": "AgentTask.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "Data: AgentTaskData"
     },
     "runtime": {
       "featureId": "task-lifecycle",
-      "filePath": "AgentTask.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "Runtime: RuntimeTaskContext"
     },
     "onpropertychanged": {
       "featureId": "task-lifecycle",
-      "filePath": "AgentTask.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Method",
       "shortSignature": "OnPropertyChanged([CallerMemberName] string? name = null) -\u003E void"
     },
     "tasknumber": {
       "featureId": "task-lifecycle",
-      "filePath": "Models/AgentTaskData.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "TaskNumber: int"
     },
     "description": {
-      "featureId": "feature-mode",
-      "filePath": "Managers/TaskExecutionManager.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "Description: string"
     },
     "starttime": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "StartTime: DateTime"
     },
     "skippermissions": {
-      "featureId": "settings-management",
-      "filePath": "Models/TaskTemplate.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "SkipPermissions: bool"
     },
     "headless": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "Headless: bool"
     },
     "isfeaturemode": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "IsFeatureMode: bool"
     },
     "usemcp": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "UseMcp: bool"
     },
     "spawnteam": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "SpawnTeam: bool"
     },
     "extendedplanning": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "ExtendedPlanning: bool"
     },
     "planonly": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "PlanOnly: bool"
     },
     "usemessagebus": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "UseMessageBus: bool"
     },
     "autodecompose": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "AutoDecompose: bool"
     },
     "applyfix": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "ApplyFix: bool"
     },
     "groupid": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "GroupId: string?"
     },
     "groupname": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "GroupName: string?"
     },
     "additionalinstructions": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "AdditionalInstructions: string"
     },
     "storedprompt": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskRecordBase.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
-      "shortSignature": "StoredPrompt: string"
+      "shortSignature": "StoredPrompt: string?"
     },
     "conversationid": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskRecordBase.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
-      "shortSignature": "ConversationId: string"
+      "shortSignature": "ConversationId: string?"
     },
     "fulloutput": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
-      "shortSignature": "FullOutput: string"
+      "shortSignature": "FullOutput: string?"
     },
     "model": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
-      "shortSignature": "Model: string"
+      "shortSignature": "Model: ModelType"
     },
     "maxiterations": {
-      "featureId": "settings-management",
-      "filePath": "Models/TaskTemplate.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "MaxIterations: int"
     },
     "imagepaths": {
       "featureId": "task-lifecycle",
-      "filePath": "Models/AgentTaskData.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "ImagePaths: List\u003Cstring\u003E"
     },
@@ -308,14 +308,14 @@
       "shortSignature": "Dispose() -\u003E void"
     },
     "mainwindow": {
-      "featureId": "main-window-ui",
-      "filePath": "Views/MainWindow.xaml.cs",
+      "featureId": "task-orchestration",
+      "filePath": "Views/MainWindow.Orchestration.cs",
       "kind": "Class",
-      "shortSignature": "class MainWindow : Window, IDisposable, IProjectPanelView"
+      "shortSignature": "class MainWindow"
     },
     "releasetasklocksaftercommit": {
       "featureId": "task-execution",
-      "filePath": "MainWindow.AutoCommit.cs",
+      "filePath": "Views/MainWindow.AutoCommit.cs",
       "kind": "Method",
       "shortSignature": "ReleaseTaskLocksAfterCommit(AgentTask task) -\u003E void"
     },
@@ -5552,14 +5552,14 @@
       "shortSignature": "CurrentIteration: int"
     },
     "projectpath": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskRecordBase.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
-      "shortSignature": "ProjectPath: string?"
+      "shortSignature": "ProjectPath: string"
     },
     "projectcolor": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskRecordBase.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "ProjectColor: string"
     },
@@ -5571,7 +5571,7 @@
     },
     "generatedimagepaths": {
       "featureId": "task-lifecycle",
-      "filePath": "Models/AgentTaskData.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "GeneratedImagePaths: List\u003Cstring\u003E"
     },
@@ -6321,7 +6321,7 @@
     },
     "consecutivefailures": {
       "featureId": "task-lifecycle",
-      "filePath": "Models/RuntimeTaskContext.cs",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "ConsecutiveFailures: int"
     },
@@ -6632,8 +6632,8 @@
       "shortSignature": "WasActive: bool"
     },
     "dependencycontext": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
       "kind": "Property",
       "shortSignature": "DependencyContext: string?"
     },
@@ -8190,6 +8190,96 @@
       "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "HandleOutputTextInput(System.Windows.Input.TextCompositionEventArgs e) -\u003E void"
+    },
+    "useautomode": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "UseAutoMode: bool"
+    },
+    "allowfeaturemodeinference": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "AllowFeatureModeInference: bool"
+    },
+    "gitstarthash": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "GitStartHash: string?"
+    },
+    "parenttaskid": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "ParentTaskId: string?"
+    },
+    "childtaskids": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "ChildTaskIds: List\u003Cstring\u003E"
+    },
+    "featurephasechildids": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "FeaturePhaseChildIds: List\u003Cstring\u003E"
+    },
+    "addfeaturephasechildid": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Method",
+      "shortSignature": "AddFeaturePhaseChildId(string id) -\u003E void"
+    },
+    "clearfeaturephasechildids": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Method",
+      "shortSignature": "ClearFeaturePhaseChildIds() -\u003E void"
+    },
+    "containsfeaturephasechildid": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Method",
+      "shortSignature": "ContainsFeaturePhaseChildId(string id) -\u003E bool"
+    },
+    "originalfeaturedescription": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "OriginalFeatureDescription: string"
+    },
+    "timeoutminutes": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "TimeoutMinutes: int?"
+    },
+    "hastimeoutwarning": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Property",
+      "shortSignature": "HasTimeoutWarning: bool"
+    },
+    "addtokenusage": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Method",
+      "shortSignature": "AddTokenUsage(long inputTokens, long outputTokens, long cacheReadTokens = 0, long cacheCreationTokens = 0) -\u003E void"
+    },
+    "addtoolactivity": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Method",
+      "shortSignature": "AddToolActivity(string action) -\u003E void"
+    },
+    "cleartoolactivity": {
+      "featureId": "task-lifecycle",
+      "filePath": "Models/AgentTask.cs",
+      "kind": "Method",
+      "shortSignature": "ClearToolActivity() -\u003E void"
     }
   }
 }

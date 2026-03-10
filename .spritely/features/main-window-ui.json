@@ -1,7 +1,7 @@
 {
   "id": "main-window-ui",
   "name": "Main Window \u0026 UI Composition",
-  "description": "The composition root of the WPF application: wires all managers, handles UI events, manages layout and panels, and coordinates top-level workflows. MainWindow.xaml was refactored to split large XAML templates into separate ResourceDictionary files in Controls/Templates/ for improved startup parse time and maintainability.",
+  "description": "The composition root of the WPF application: wires all managers, handles UI events, manages layout and panels, and coordinates top-level workflows. Updated to keep completed tasks visible in active tabs without auto-hiding, preventing session termination and enabling follow-up work without restart. MainWindow.xaml uses separate ResourceDictionary files in Controls/Templates/ for improved startup parse time.",
   "category": "ui",
   "keywords": [
     "IProjectPanelView",
@@ -24,10 +24,9 @@
   ],
   "primaryFiles": [
     "MainWindow.Features.cs",
-    "MainWindow.Orchestration.cs",
     "MainWindow.Settings.cs",
-    "MainWindow.TaskExecution.cs",
     "Views/MainWindow.Orchestration.cs",
+    "Views/MainWindow.TaskExecution.cs",
     "Views/MainWindow.UiLayout.cs",
     "Views/MainWindow.xaml.cs"
   ],
@@ -129,16 +128,12 @@
         "hash": "7bc0139089d0",
         "content": "class MainWindow\n  Total: int\n  Placeholders: int\n  Stale: int\n  LastUpdated: DateTime?"
       },
-      "MainWindow.Orchestration.cs": {
-        "hash": "2399934bee2c",
-        "content": "class MainWindow"
-      },
-      "MainWindow.TaskExecution.cs": {
-        "hash": "2677f47a59b6",
+      "Views/MainWindow.TaskExecution.cs": {
+        "hash": "93ff6df5d952",
         "content": "class MainWindow"
       },
       "Views/MainWindow.UiLayout.cs": {
-        "hash": "3f3755e44f9d",
+        "hash": "4bf9e90ac212",
         "content": "class MainWindow"
       },
       "MainWindow.Settings.cs": {
@@ -146,7 +141,7 @@
         "content": "class MainWindow"
       },
       "Views/MainWindow.Orchestration.cs": {
-        "hash": "d8e6ccaa2700",
+        "hash": "a190c7c0f015",
         "content": "class MainWindow"
       },
       "Views/MainWindow.xaml.cs": {
@@ -179,7 +174,7 @@
     "Stale",
     "Total"
   ],
-  "touchCount": 5,
-  "lastUpdatedAt": "2026-03-10T07:36:10.0353374Z",
-  "lastUpdatedByTaskId": "4866d541d9e44604"
+  "touchCount": 6,
+  "lastUpdatedAt": "2026-03-10T10:46:11.4397754Z",
+  "lastUpdatedByTaskId": "4c66623737f34ff4"
 }

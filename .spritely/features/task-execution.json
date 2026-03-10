@@ -26,15 +26,14 @@
     "task launch"
   ],
   "primaryFiles": [
-    "MainWindow.AutoCommit.cs",
-    "MainWindow.TaskExecution.cs",
     "Managers/TaskExecutionManager.cs",
     "Managers/TaskExecutionServices.cs",
-    "Managers/TaskProcessLauncher.cs"
+    "Managers/TaskProcessLauncher.cs",
+    "Views/MainWindow.AutoCommit.cs",
+    "Views/MainWindow.TaskExecution.cs"
   ],
   "secondaryFiles": [
     "AgentTask.cs",
-    "MainWindow.TaskExecution.cs",
     "Models/AgentTaskData.cs",
     "Models/RuntimeTaskContext.cs",
     "Spritely.Tests/FollowUpProcessTests.cs",
@@ -75,6 +74,7 @@
     "llm-services",
     "logging-diagnostics",
     "logging-infrastructure",
+    "main-window-ui",
     "mcp-integration",
     "message-bus",
     "module-management",
@@ -107,9 +107,9 @@
   ],
   "context": {
     "signatures": {
-      "MainWindow.TaskExecution.cs": {
-        "hash": "2677f47a59b6",
-        "content": "class MainWindow"
+      "Views/MainWindow.AutoCommit.cs": {
+        "hash": "fef51f27e7bd",
+        "content": "class MainWindow\n  L67: ReleaseTaskLocksAfterCommit(AgentTask task) -\u003E void  // Releases file locks that were deferred for Auto-Commit."
       },
       "Managers/TaskExecutionManager.cs": {
         "hash": "1f30cac2bccc",
@@ -123,9 +123,9 @@
         "hash": "4ed66fd6f7b7",
         "content": "class TaskProcessLauncher\n  ProcessQueuedMessagesCallback: Action\u003CAgentTask, ObservableCollection\u003CAgentTask\u003E, ObservableCollection\u003CAgentTask\u003E\u003E?\n  L68: CreateManagedProcess(string ps1File, string taskId, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003Cint\u003E onExited) -\u003E Process  // Creates a Process with standard output/error/event wiring for stream-json par...\n  L124: StartManagedProcess(AgentTask task, Process process) -\u003E void\n  L137: KillProcess(AgentTask task) -\u003E void\n  L147: RemoveStreamingState(string taskId) -\u003E void\n  L153: CleanupScripts(string taskId) -\u003E void\n  L202: THREAD_SUSPEND_RESUME: uint = 0x0002\n  L203: TH32CS_SNAPPROCESS: uint = 0x00000002\n  L314: SoftStopTask(AgentTask task) -\u003E void  // Sends a graceful stop signal (Ctrl\u002BC via stdin) to the task\u0027s process. The pr...\n  L341: PauseTask(AgentTask task) -\u003E void\n  L357: ResumeTask(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void"
       },
-      "MainWindow.AutoCommit.cs": {
-        "hash": "f5d73648b460",
-        "content": "class MainWindow\n  L44: ReleaseTaskLocksAfterCommit(AgentTask task) -\u003E void  // Releases file locks that were deferred for Auto-Commit."
+      "Views/MainWindow.TaskExecution.cs": {
+        "hash": "93ff6df5d952",
+        "content": "class MainWindow"
       }
     },
     "keyTypes": [
@@ -206,7 +206,7 @@
     "TaskPreprocessor",
     "TaskProcessLauncher"
   ],
-  "touchCount": 4,
-  "lastUpdatedAt": "2026-03-10T07:28:31.3659935Z",
-  "lastUpdatedByTaskId": "f06809fdd4064ab7"
+  "touchCount": 5,
+  "lastUpdatedAt": "2026-03-10T10:46:11.294222Z",
+  "lastUpdatedByTaskId": "4c66623737f34ff4"
 }

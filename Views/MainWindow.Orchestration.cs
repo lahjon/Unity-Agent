@@ -494,20 +494,30 @@ namespace Spritely
                     _activeTasks.Move(idx, 0);
             }
 
-            // Auto-finalize when auto-commit is on: trigger git commit and release file locks.
-            // Without this, FinalizeTask only runs when the user manually dismisses the card,
-            // so auto-commit never fires and locks stay held indefinitely.
-            // Recommendation tasks are always finalized (to release locks and stay in active list).
-            if (task is { IsFinished: true } && (_settingsManager.AutoCommit || task.Status == AgentTaskStatus.Recommendation))
+            // Keep finished tasks in the active list so the user can follow up without
+            // restarting the conversation. Release file locks and trigger auto-commit if
+            // enabled, but don't call PerformTaskTeardown (which removes from active list).
+            // Tasks are only moved to history when the user manually dismisses the card.
+            if (task is { IsFinished: true })
             {
-                FinalizeTask(task, closeTab: false);
-            }
-            else if (task is { IsFinished: true })
-            {
-                // Without auto-commit, release file locks immediately so queued tasks can proceed.
-                // The task card stays in the active list for the user to review/dismiss manually.
-                _fileLockManager.ReleaseTaskLocks(task.Id);
-                _fileLockManager.CheckQueuedTasks(_activeTasks);
+                if (_settingsManager.AutoCommit && task.Status == AgentTaskStatus.Completed && !task.IsCommitted)
+                {
+                    // Trigger auto-commit flow but keep task in active list afterwards
+                    FinalizeTask(task, closeTab: false);
+                }
+                else
+                {
+                    // Release file locks so queued tasks can proceed.
+                    // The task card stays in the active list for follow-up.
+                    _fileLockManager.ReleaseTaskLocks(task.Id);
+                    _fileLockManager.RemoveQueuedInfo(task.Id);
+                    _taskExecutionManager.RemoveStreamingState(task.Id);
+                    _outputTabManager.UpdateTabHeader(task);
+                    RefreshActivityDashboard();
+                    UpdateStatus();
+                    _fileLockManager.CheckQueuedTasks(_activeTasks);
+                    DrainInitQueue();
+                }
             }
 
             _taskOrchestrator.OnTaskCompleted(taskId);

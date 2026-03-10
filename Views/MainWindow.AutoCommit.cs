@@ -26,16 +26,39 @@ namespace Spritely
         {
             // Release all file locks now that commit is done (or failed)
             _fileLockManager.ReleaseTaskLocks(task.Id);
+            _fileLockManager.RemoveQueuedInfo(task.Id);
+            _taskExecutionManager.RemoveStreamingState(task.Id);
             task.Runtime.LockedFilesForCommit = null;
             task.Runtime.PendingCommitTask = null;
+
+            // Persist changed files before releasing locks
+            if (task.ChangedFiles.Count == 0)
+            {
+                var lockedFiles = _fileLockManager.GetTaskLockedFiles(task.Id);
+                if (lockedFiles.Count > 0)
+                    PersistChangedFiles(task, lockedFiles);
+            }
+
+            // Snapshot output so it survives restart
+            if (string.IsNullOrEmpty(task.FullOutput) && task.OutputBuilder.Length > 0)
+                task.FullOutput = task.OutputBuilder.ToString();
 
             // Transition from Committing to Completed
             task.Status = AgentTaskStatus.Completed;
             task.EndTime ??= DateTime.Now;
             _outputTabManager.UpdateTabHeader(task);
 
-            // Perform the standard teardown (move to history, resume queued tasks, etc.)
-            PerformTaskTeardown(task, closeTab);
+            // Keep task in active list for follow-up — don't call PerformTaskTeardown.
+            // Resume queued/dependency-blocked tasks and update UI.
+            RefreshActivityDashboard();
+            UpdateStatus();
+            _fileLockManager.CheckQueuedTasks(_activeTasks);
+            _taskOrchestrator.OnTaskCompleted(task.Id);
+            DrainInitQueue();
+
+            // Increment tray badge if app is not focused
+            if (!IsActive)
+                App.IncrementTrayBadge();
         }
 
         /// <summary>

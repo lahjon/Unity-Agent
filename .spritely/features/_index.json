@@ -310,9 +310,9 @@
       "id": "main-window-ui",
       "name": "Main Window \u0026 UI Composition",
       "category": "ui",
-      "touchCount": 5,
-      "primaryFileCount": 7,
-      "lastIndexedAt": "2026-03-10T08:41:42.6155559Z",
+      "touchCount": 6,
+      "primaryFileCount": 6,
+      "lastIndexedAt": "2026-03-10T10:46:11.4417899Z",
       "keywords": [
         "IProjectPanelView",
         "MainWindow",
@@ -332,7 +332,7 @@
         "updated",
         "window"
       ],
-      "description": "The composition root of the WPF application: wires all managers, handles UI events, manages layout and panels, and coordinates top-level workflows. MainWindow.xaml was refactored to split large XAML templates into separate ResourceDictionary files in Controls/Templates/ for improved startup parse time and maintainability."
+      "description": "The composition root of the WPF application: wires all managers, handles UI events, manages layout and panels, and coordinates top-level workflows. Updated to keep completed tasks visible in active tabs without auto-hiding, preventing session termination and enabling follow-up work without restart. MainWindow.xaml uses separate ResourceDictionary files in Controls/Templates/ for improved startup parse time."
     },
     {
       "id": "mcp-integration",
@@ -569,9 +569,9 @@
       "id": "task-execution",
       "name": "Task Execution Engine",
       "category": "core",
-      "touchCount": 4,
+      "touchCount": 5,
       "primaryFileCount": 5,
-      "lastIndexedAt": "2026-03-10T07:28:31.3748107Z",
+      "lastIndexedAt": "2026-03-10T10:46:11.2958608Z",
       "keywords": [
         "Claude CLI",
         "ConPty",
@@ -647,27 +647,61 @@
       "id": "task-lifecycle",
       "name": "Task Lifecycle \u0026 State",
       "category": "core",
-      "touchCount": 1,
+      "touchCount": 2,
       "primaryFileCount": 4,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T10:46:11.3653275Z",
+      "keywords": [
+        "AgentTask",
+        "AgentTaskData",
+        "AgentTaskStatus",
+        "INotifyPropertyChanged",
+        "ITaskFlags",
+        "RuntimeTaskContext",
+        "TaskStatus",
+        "activity",
+        "additional",
+        "agent",
+        "allow",
+        "apply",
+        "auto",
+        "block",
+        "blocked",
+        "conversation",
+        "restart",
+        "task",
+        "task flags",
+        "task state"
+      ],
+      "description": "Defines the core AgentTask model and its full lifecycle with proper state machine transitions: status transitions (Queued \u2192 Stored \u2192 Running \u2192 Completed), runtime context, flags, and property-change notifications. Ensures mutually exclusive states tied to actual execution state. Acts as the central shared data contract for all task-related features."
     },
     {
       "id": "task-orchestration",
       "name": "Task Orchestration \u0026 DAG",
       "category": "core",
-      "touchCount": 1,
-      "primaryFileCount": 4,
-      "lastIndexedAt": "2026-03-10T07:33:15.97579Z",
+      "touchCount": 2,
+      "primaryFileCount": 5,
+      "lastIndexedAt": "2026-03-10T10:46:11.5129111Z",
       "keywords": [
         "DAG",
         "DependsOn",
         "TaskOrchestrator",
+        "acquire",
+        "callback",
+        "cancel",
+        "check",
+        "cleanup",
+        "clear",
+        "completed",
+        "completion",
         "cycle detection",
         "dependency graph",
+        "follow",
+        "kill",
+        "task",
         "task dependencies",
         "task ordering",
-        "task ready"
+        "task ready",
+        "up"
       ],
       "description": "Manages a directed acyclic graph (DAG) of task dependencies, ensuring tasks are started only when all their dependencies have resolved. Properly transitions queued tasks to running status when unblocked. Fires TaskReady events and detects dependency cycles."
     },
@@ -812,6 +846,9 @@
     "99": [
       "tray-icon-badge"
     ],
+    "acquire": [
+      "task-orchestration"
+    ],
     "across": [
       "history-management"
     ],
@@ -820,6 +857,7 @@
     ],
     "active": [
       "history-management",
+      "main-window-ui",
       "project-management",
       "task-history",
       "task-ui",
@@ -832,10 +870,15 @@
       "history-management"
     ],
     "activity": [
-      "activity-dashboard"
+      "activity-dashboard",
+      "task-lifecycle"
     ],
     "acts": [
-      "project-management"
+      "project-management",
+      "task-lifecycle"
+    ],
+    "actual": [
+      "task-lifecycle"
     ],
     "actually": [
       "task-execution"
@@ -843,12 +886,23 @@
     "acyclic": [
       "task-orchestration"
     ],
+    "additional": [
+      "task-lifecycle"
+    ],
     "agent": [
       "feature-update-agent",
-      "task-execution"
+      "task-execution",
+      "task-lifecycle"
     ],
     "agenttask": [
+      "task-lifecycle",
       "task-preprocessing"
+    ],
+    "agenttaskdata": [
+      "task-lifecycle"
+    ],
+    "agenttaskstatus": [
+      "task-lifecycle"
     ],
     "aggregated": [
       "task-history"
@@ -858,6 +912,9 @@
       "prompt-building",
       "semantic-search",
       "task-execution"
+    ],
+    "allow": [
+      "task-lifecycle"
     ],
     "analysis": [
       "completion-analysis"
@@ -918,6 +975,7 @@
       "app-infrastructure"
     ],
     "apply": [
+      "task-lifecycle",
       "task-preprocessing"
     ],
     "applytotask": [
@@ -942,8 +1000,10 @@
       "task-ui"
     ],
     "auto": [
+      "main-window-ui",
       "mcp-integration",
       "task-execution",
+      "task-lifecycle",
       "task-preprocessing"
     ],
     "auto flags": [
@@ -983,7 +1043,11 @@
     ],
     "block": [
       "feature-context-resolution",
-      "task-execution"
+      "task-execution",
+      "task-lifecycle"
+    ],
+    "blocked": [
+      "task-lifecycle"
     ],
     "blocking": [
       "feature-update-agent"
@@ -1022,8 +1086,12 @@
     "button": [
       "task-ui"
     ],
+    "callback": [
+      "task-orchestration"
+    ],
     "cancel": [
-      "task-execution"
+      "task-execution",
+      "task-orchestration"
     ],
     "canvas": [
       "task-ui"
@@ -1038,6 +1106,9 @@
     "center": [
       "task-ui"
     ],
+    "central": [
+      "task-lifecycle"
+    ],
     "changed": [
       "feature-update-agent",
       "mcp-integration"
@@ -1051,7 +1122,8 @@
       "llm-services"
     ],
     "check": [
-      "mcp-integration"
+      "mcp-integration",
+      "task-orchestration"
     ],
     "checks": [
       "mcp-integration"
@@ -1086,7 +1158,11 @@
     "cleans": [
       "history-management"
     ],
+    "cleanup": [
+      "task-orchestration"
+    ],
     "clear": [
+      "task-orchestration",
       "terminal",
       "tray-icon-badge"
     ],
@@ -1125,12 +1201,16 @@
     "completed": [
       "feature-update-agent",
       "history-management",
-      "task-history"
+      "main-window-ui",
+      "task-history",
+      "task-lifecycle",
+      "task-orchestration"
     ],
     "completion": [
       "completion-analysis",
       "feature-context-resolution",
       "feature-update-agent",
+      "task-orchestration",
       "tray-icon-badge"
     ],
     "components": [
@@ -1190,7 +1270,8 @@
       "feature-context-menu",
       "feature-context-resolution",
       "feature-registry",
-      "prompt-building"
+      "prompt-building",
+      "task-lifecycle"
     ],
     "context reduction": [
       "prompt-building"
@@ -1201,11 +1282,20 @@
     "contextreducer": [
       "prompt-building"
     ],
+    "contract": [
+      "task-lifecycle"
+    ],
     "controls": [
       "main-window-ui"
     ],
+    "conversation": [
+      "task-lifecycle"
+    ],
     "coordinates": [
       "main-window-ui"
+    ],
+    "core": [
+      "task-lifecycle"
     ],
     "corner": [
       "tray-icon-badge"
@@ -1252,7 +1342,8 @@
       "activity-dashboard"
     ],
     "data": [
-      "export-task-data"
+      "export-task-data",
+      "task-lifecycle"
     ],
     "decompose": [
       "task-preprocessing"
@@ -1265,6 +1356,9 @@
     ],
     "default": [
       "main-window-ui"
+    ],
+    "defines": [
+      "task-lifecycle"
     ],
     "dependencies": [
       "feature-registry",
@@ -1356,11 +1450,15 @@
       "mcp-integration",
       "task-history"
     ],
+    "enabling": [
+      "main-window-ui"
+    ],
     "engine": [
       "task-execution"
     ],
     "ensures": [
-      "task-execution"
+      "task-execution",
+      "task-lifecycle"
     ],
     "ensuring": [
       "task-orchestration"
@@ -1387,12 +1485,16 @@
     "exceeds": [
       "output-management"
     ],
+    "exclusive": [
+      "task-lifecycle"
+    ],
     "executing": [
       "task-execution"
     ],
     "execution": [
       "feature-mode-execution",
       "task-execution",
+      "task-lifecycle",
       "task-preprocessing"
     ],
     "export": [
@@ -1458,7 +1560,8 @@
     "features": [
       "feature-context-resolution",
       "feature-registry",
-      "semantic-search"
+      "semantic-search",
+      "task-lifecycle"
     ],
     "featureupdateagent": [
       "feature-context-resolution",
@@ -1498,13 +1601,16 @@
       "task-preprocessing"
     ],
     "flags": [
+      "task-lifecycle",
       "task-preprocessing"
     ],
     "focused": [
       "tray-icon-badge"
     ],
     "follow": [
-      "output-management"
+      "main-window-ui",
+      "output-management",
+      "task-orchestration"
     ],
     "follow-up output": [
       "output-management"
@@ -1518,6 +1624,7 @@
     "full": [
       "prompt-building",
       "task-execution",
+      "task-lifecycle",
       "terminal"
     ],
     "galleries": [
@@ -1612,6 +1719,9 @@
     "hide": [
       "tray-icon-badge"
     ],
+    "hiding": [
+      "main-window-ui"
+    ],
     "historical": [
       "task-history"
     ],
@@ -1692,6 +1802,9 @@
     "injectsubtaskresult": [
       "output-processing"
     ],
+    "inotifypropertychanged": [
+      "task-lifecycle"
+    ],
     "input": [
       "prompt-building",
       "terminal"
@@ -1732,8 +1845,14 @@
     "isunityrunning": [
       "mcp-integration"
     ],
+    "itaskflags": [
+      "task-lifecycle"
+    ],
     "json": [
       "llm-services"
+    ],
+    "keep": [
+      "main-window-ui"
     ],
     "keeps": [
       "feature-update-agent"
@@ -1762,8 +1881,8 @@
     "keywords": [
       "feature-registry"
     ],
-    "large": [
-      "main-window-ui"
+    "kill": [
+      "task-orchestration"
     ],
     "last": [
       "main-window-ui",
@@ -1821,12 +1940,10 @@
       "feature-registry"
     ],
     "machine": [
-      "task-execution"
+      "task-execution",
+      "task-lifecycle"
     ],
     "main": [
-      "main-window-ui"
-    ],
-    "maintainability": [
       "main-window-ui"
     ],
     "maintains": [
@@ -1906,7 +2023,8 @@
     ],
     "model": [
       "llm-services",
-      "output-processing"
+      "output-processing",
+      "task-lifecycle"
     ],
     "model complexity": [
       "output-processing"
@@ -1929,6 +2047,9 @@
     "multiple": [
       "terminal"
     ],
+    "mutually": [
+      "task-lifecycle"
+    ],
     "name": [
       "feature-registry"
     ],
@@ -1949,7 +2070,8 @@
       "tray-icon-badge"
     ],
     "notifications": [
-      "app-infrastructure"
+      "app-infrastructure",
+      "task-lifecycle"
     ],
     "o": [
       "task-execution"
@@ -2075,6 +2197,9 @@
     "preprocessresult": [
       "task-preprocessing"
     ],
+    "preventing": [
+      "main-window-ui"
+    ],
     "primary": [
       "project-management",
       "task-ui"
@@ -2151,11 +2276,15 @@
       "task-templates-storage"
     ],
     "proper": [
-      "task-execution"
+      "task-execution",
+      "task-lifecycle"
     ],
     "properly": [
       "task-orchestration",
       "tray-icon-badge"
+    ],
+    "property": [
+      "task-lifecycle"
     ],
     "provides": [
       "feature-registry",
@@ -2170,6 +2299,7 @@
     ],
     "queued": [
       "task-execution",
+      "task-lifecycle",
       "task-orchestration"
     ],
     "ranking": [
@@ -2187,14 +2317,14 @@
     "reduction": [
       "prompt-building"
     ],
-    "refactored": [
-      "main-window-ui"
-    ],
     "registry": [
       "feature-registry",
       "feature-update-agent",
       "module-management",
       "module-registry"
+    ],
+    "related": [
+      "task-lifecycle"
     ],
     "relevance": [
       "semantic-search"
@@ -2233,7 +2363,9 @@
       "main-window-ui"
     ],
     "restart": [
-      "mcp-integration"
+      "main-window-ui",
+      "mcp-integration",
+      "task-lifecycle"
     ],
     "restarts": [
       "history-management"
@@ -2274,7 +2406,14 @@
     "running": [
       "mcp-integration",
       "task-execution",
+      "task-lifecycle",
       "task-orchestration"
+    ],
+    "runtime": [
+      "task-lifecycle"
+    ],
+    "runtimetaskcontext": [
+      "task-lifecycle"
     ],
     "safe": [
       "app-infrastructure",
@@ -2334,6 +2473,7 @@
       "llm-services"
     ],
     "session": [
+      "main-window-ui",
       "task-history"
     ],
     "session recovery": [
@@ -2348,6 +2488,7 @@
       "settings-management"
     ],
     "shared": [
+      "task-lifecycle",
       "theming-ui-shared"
     ],
     "shell": [
@@ -2385,9 +2526,6 @@
     "spawning": [
       "task-decomposition"
     ],
-    "split": [
-      "main-window-ui"
-    ],
     "sqlite": [
       "semantic-search"
     ],
@@ -2409,16 +2547,19 @@
       "task-lifecycle"
     ],
     "states": [
-      "task-history"
+      "task-history",
+      "task-lifecycle"
     ],
     "status": [
       "task-execution",
+      "task-lifecycle",
       "task-orchestration"
     ],
     "stored": [
       "semantic-search",
       "stored-task-viewer",
-      "task-execution"
+      "task-execution",
+      "task-lifecycle"
     ],
     "stored tasks": [
       "task-history"
@@ -2486,6 +2627,7 @@
       "task-ui"
     ],
     "tabs": [
+      "main-window-ui",
       "output-management",
       "task-ui",
       "terminal"
@@ -2524,6 +2666,9 @@
     "task dependencies": [
       "task-orchestration"
     ],
+    "task flags": [
+      "task-lifecycle"
+    ],
     "task graph": [
       "task-ui"
     ],
@@ -2538,6 +2683,9 @@
     ],
     "task relevance": [
       "feature-context-resolution"
+    ],
+    "task state": [
+      "task-lifecycle"
     ],
     "taskexecutionmanager": [
       "task-execution"
@@ -2572,11 +2720,15 @@
     ],
     "tasks": [
       "history-management",
+      "main-window-ui",
       "output-processing",
       "project-management",
       "task-execution",
       "task-orchestration",
       "tray-icon-badge"
+    ],
+    "taskstatus": [
+      "task-lifecycle"
     ],
     "team": [
       "output-processing",
@@ -2599,6 +2751,7 @@
       "terminal"
     ],
     "termination": [
+      "main-window-ui",
       "progress-tracking"
     ],
     "their": [
@@ -2607,6 +2760,9 @@
     "theming": [
       "theming-ui-shared",
       "ui-theming"
+    ],
+    "tied": [
+      "task-lifecycle"
     ],
     "time": [
       "main-window-ui"
@@ -2641,6 +2797,7 @@
     ],
     "transitions": [
       "task-execution",
+      "task-lifecycle",
       "task-orchestration"
     ],
     "tray": [
@@ -2680,7 +2837,9 @@
     ],
     "up": [
       "history-management",
-      "output-management"
+      "main-window-ui",
+      "output-management",
+      "task-orchestration"
     ],
     "update registry": [
       "feature-update-agent"
@@ -2700,7 +2859,8 @@
       "task-ui"
     ],
     "uses": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "main-window-ui"
     ],
     "using": [
       "feature-context-resolution",
@@ -2726,6 +2886,9 @@
     ],
     "viewer": [
       "stored-task-viewer"
+    ],
+    "visible": [
+      "main-window-ui"
     ],
     "visual": [
       "tray-icon-badge"
@@ -2762,7 +2925,11 @@
     ],
     "without": [
       "feature-update-agent",
+      "main-window-ui",
       "task-preprocessing"
+    ],
+    "work": [
+      "main-window-ui"
     ],
     "workflow": [
       "task-ui"
@@ -2790,6 +2957,9 @@
     ],
     "xaml": [
       "main-window-ui"
+    ],
+    "\u2192": [
+      "task-lifecycle"
     ]
   }
 }

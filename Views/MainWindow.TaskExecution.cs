@@ -555,7 +555,15 @@ namespace Spritely
             task.EndTime = DateTime.Now;
             TaskExecutionManager.KillProcess(task);
             _outputTabManager.UpdateTabHeader(task);
-            MoveToHistory(task);
+
+            // Keep task in active list for follow-up. Release locks so queued tasks can proceed.
+            _fileLockManager.ReleaseTaskLocks(task.Id);
+            _fileLockManager.RemoveQueuedInfo(task.Id);
+            _taskExecutionManager.RemoveStreamingState(task.Id);
+            RefreshActivityDashboard();
+            UpdateStatus();
+            _fileLockManager.CheckQueuedTasks(_activeTasks);
+            DrainInitQueue();
         }
 
         internal void CopyPrompt_Click(object sender, RoutedEventArgs e)
