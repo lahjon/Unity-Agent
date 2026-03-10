@@ -178,28 +178,6 @@ namespace Spritely
             dlg.ShowDialog();
         }
 
-        /// <summary>
-        /// Shows a balloon notification in the system tray.
-        /// </summary>
-        public static void ShowBalloonNotification(string title, string message, System.Windows.Forms.ToolTipIcon icon)
-        {
-            try
-            {
-                if (_notifyIcon != null)
-                {
-                    _notifyIcon.ShowBalloonTip(5000, title, message, icon);
-                }
-                else
-                {
-                    Managers.AppLogger.Debug("App", "Cannot show balloon notification - NotifyIcon not initialized");
-                }
-            }
-            catch (Exception ex)
-            {
-                Managers.AppLogger.Debug("App", $"Failed to show balloon notification: {ex.Message}");
-            }
-        }
-
         private static string? _lastUiAction;
         private static long _opStartTicks;
         private static string? _currentOpName;

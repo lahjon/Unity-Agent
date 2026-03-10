@@ -54,12 +54,12 @@
   "context": {
     "signatures": {
       "Managers/FeatureContextResolver.cs": {
-        "hash": "cdfbcfdea7c0",
-        "content": "class FeatureContextResolver\n  L72: MinConfidenceThreshold: double = 0.3\n  L73: TreeExpansionConfidenceThreshold: double = 0.7\n  L74: SiblingScoreMultiplier: double = 0.5\n  L75: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L77: EmbeddingCacheMaxEntries: int = 200\n  L78: EmbeddingCacheTtl: TimeSpan = TimeSpan.FromMinutes(30)\n  L112: InvalidateFeatureCache(string featureId) -\u003E void  // Invalidates cached feature embedding when a feature is saved/updated.\n  L123: ClearEmbeddingCaches() -\u003E void  // Clears all cached embeddings.\n  L192: ResolveAsync(string projectPath, string taskDescription, CancellationToken ct = default) -\u003E Task\u003CFeatureContextResult?\u003E  // Resolves which features are relevant to the given task and builds a context b..."
+        "hash": "eae5501f12ac",
+        "content": "class FeatureContextResolver\n  L72: MinConfidenceThreshold: double = 0.3\n  L73: TreeExpansionConfidenceThreshold: double = 0.7\n  L74: SiblingScoreMultiplier: double = 0.5\n  L75: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L77: EmbeddingCacheMaxEntries: int = 200\n  L78: EmbeddingCacheTtl: TimeSpan = TimeSpan.FromMinutes(30)\n  L115: InvalidateFeatureCache(string featureId) -\u003E void  // Invalidates cached feature embedding when a feature is saved/updated.\n  L126: ClearEmbeddingCaches() -\u003E void  // Clears all cached embeddings.\n  L195: ResolveAsync(string projectPath, string taskDescription, CancellationToken ct = default) -\u003E Task\u003CFeatureContextResult?\u003E  // Resolves which features are relevant to the given task and builds a context b..."
       },
       "Managers/FeatureUpdateAgent.cs": {
-        "hash": "e0abf7b662f8",
-        "content": "class FeatureUpdateAgent : IDisposable\n  L25: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L26: RetryInterval: TimeSpan = TimeSpan.FromMinutes(5)\n  L36: MaxPendingUpdates: int = 20\n  L66: StartBackgroundRetryWorker(Func\u003Cbool\u003E isBusy, Func\u003CIReadOnlyList\u003Cstring\u003E\u003E getProjectPaths, CancellationToken shutdownToken) -\u003E void  // Starts a background timer that drains pending feature updates every 5 minutes...\n  L135: Dispose() -\u003E void\n  L595: MaxKeywords: int = 20\n  L596: CamelCaseSplitRegex: Regex = new(@\u0022(?\u003C=[a-z])(?=[A-Z])|(?\u003C=[A-Z])(...\nclass PendingFeatureUpdate\n  TaskId: string\n  TaskDescription: string\n  CompletionSummary: string?\n  ChangedFiles: List\u003Cstring\u003E\n  QueuedAt: DateTime"
+        "hash": "5edd07bf762e",
+        "content": "class FeatureUpdateAgent : IDisposable\n  L25: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L26: RetryInterval: TimeSpan = TimeSpan.FromMinutes(5)\n  L36: MaxPendingUpdates: int = 20\n  L69: StartBackgroundRetryWorker(Func\u003Cbool\u003E isBusy, Func\u003CIReadOnlyList\u003Cstring\u003E\u003E getProjectPaths, CancellationToken shutdownToken) -\u003E void  // Starts a background timer that drains pending feature updates every 5 minutes...\n  L153: Dispose() -\u003E void\n  L612: MaxKeywords: int = 20\n  L613: CamelCaseSplitRegex: Regex = new(@\u0022(?\u003C=[a-z])(?=[A-Z])|(?\u003C=[A-Z])(...\nclass PendingFeatureUpdate\n  TaskId: string\n  TaskDescription: string\n  CompletionSummary: string?\n  ChangedFiles: List\u003Cstring\u003E\n  QueuedAt: DateTime"
       },
       "Models/FeatureContextResult.cs": {
         "hash": "b37d0e21ac66",
@@ -115,7 +115,7 @@
     "TaskId",
     "TreeExpansionConfidenceThreshold"
   ],
-  "touchCount": 2,
-  "lastUpdatedAt": "2026-03-09T07:18:27.0472468Z",
-  "lastUpdatedByTaskId": "4fa53c33822a4f79"
+  "touchCount": 3,
+  "lastUpdatedAt": "2026-03-10T07:28:31.3112294Z",
+  "lastUpdatedByTaskId": "f06809fdd4064ab7"
 }

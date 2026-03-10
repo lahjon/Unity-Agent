@@ -336,7 +336,7 @@ namespace Spritely
                 }
                 e.Handled = true;
             }
-            else if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+            else if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
             {
                 SendCommand();
                 e.Handled = true;

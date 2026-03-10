@@ -35,6 +35,7 @@ namespace Spritely.Managers
 
         // ── Optional dependencies ────────────────────────────────────
         public TaskPreprocessor? TaskPreprocessor { get; init; }
+        public ClaudeService? ClaudeService { get; init; }
         public Func<int>? GetTokenLimitRetryMinutes { get; init; }
         public Func<bool>? GetAutoVerify { get; init; }
         public Func<string>? GetSkillsBlock { get; init; }

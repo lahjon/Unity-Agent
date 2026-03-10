@@ -1,7 +1,7 @@
 {
   "id": "llm-services",
   "name": "LLM Services (Claude \u0026 Gemini)",
-  "description": "Provides streaming and non-streaming chat interfaces to Claude (Anthropic) and Gemini (Google) APIs, including API key management, usage tracking, model selection, and image generation.",
+  "description": "Provides streaming and non-streaming chat interfaces to Claude (Anthropic) and Gemini (Google) APIs, including API key management, usage tracking, model selection, image generation, and structured JSON outputs via SendStructuredHaikuAsync method.",
   "category": "integration",
   "keywords": [
     "API key",
@@ -49,8 +49,8 @@
         "content": "class BaseLlmService : IDisposable\n  ApiKeyDecryptionFailed: bool\n  IsConfigured: bool\n  L63: SaveApiKey(string apiKey) -\u003E void\n  L88: GetMaskedApiKey() -\u003E string\n  L99: GetApiKeyForRefresh() -\u003E string?\n  L157: SendChatMessageStreamingAsync(List\u003CChatMessage\u003E history, string userMessage, Action\u003Cstring\u003E onTextChunk, string? systemInstruction = null, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E\n  L164: Dispose() -\u003E void"
       },
       "Managers/ClaudeService.cs": {
-        "hash": "f746dd987c09",
-        "content": "class ClaudeService : BaseLlmService\n  L15: ApiBaseUrl: string = \u0022https://api.anthropic.com/v1/messages\u0022\n  AvailableModels: string[]\n  L26: SetUsageManager(ClaudeUsageManager usageManager) -\u003E void\n  L31: SendChatMessageStreamingAsync(List\u003CChatMessage\u003E history, string userMessage, Action\u003Cstring\u003E onTextChunk, string? systemInstruction = null, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
+        "hash": "766412fdfcf4",
+        "content": "class ClaudeService : BaseLlmService\n  L15: ApiBaseUrl: string = \u0022https://api.anthropic.com/v1/messages\u0022\n  AvailableModels: string[]\n  L26: SetUsageManager(ClaudeUsageManager usageManager) -\u003E void\n  L31: SendChatMessageStreamingAsync(List\u003CChatMessage\u003E history, string userMessage, Action\u003Cstring\u003E onTextChunk, string? systemInstruction = null, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E\n  L173: SendStructuredHaikuAsync(string prompt, string jsonSchema, CancellationToken ct = default) -\u003E Task\u003CJsonElement?\u003E  // Sends a single-turn prompt to the Haiku model via direct API call and returns..."
       },
       "Managers/ClaudeUsageManager.cs": {
         "hash": "fd962d9fce86",
@@ -152,6 +152,7 @@
     "UsageData",
     "Weight"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.1188744Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-10T07:28:31.2572583Z",
+  "lastUpdatedByTaskId": "f06809fdd4064ab7"
 }

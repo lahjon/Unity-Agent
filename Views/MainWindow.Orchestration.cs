@@ -18,9 +18,6 @@ namespace Spritely
     {
         // ── Orchestration ──────────────────────────────────────────
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
         private void AddActiveTask(AgentTask task)
         {
             // Guard against duplicate insertions (can happen during concurrent spawning)
@@ -170,22 +167,6 @@ namespace Spritely
                 RefreshActivityDashboard();
                 UpdateStatus();
 
-                // Show notification if window is in background
-                try
-                {
-                    var foregroundWindow = GetForegroundWindow();
-                    var currentWindowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-                    if (foregroundWindow != currentWindowHandle && foregroundWindow != IntPtr.Zero)
-                    {
-                        var title = $"Task #{task.TaskNumber} has recommendations";
-                        var message = task.Description.Length > 100
-                            ? task.Description.Substring(0, 97) + "..."
-                            : task.Description;
-                        App.ShowBalloonNotification(title, message, System.Windows.Forms.ToolTipIcon.Info);
-                    }
-                }
-                catch { /* notification is best-effort */ }
-
                 // Resume tasks waiting on file locks or dependencies
                 _fileLockManager.CheckQueuedTasks(_activeTasks);
                 DrainInitQueue();
@@ -305,34 +286,6 @@ namespace Spritely
             RefreshFilterCombos();
             RefreshInlineProjectStats();
             UpdateStatus();
-
-            // Show notification if window is not in foreground
-            try
-            {
-                var foregroundWindow = GetForegroundWindow();
-                var currentWindowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-
-                if (foregroundWindow != currentWindowHandle && foregroundWindow != IntPtr.Zero)
-                {
-                    // Window is in background, show notification
-                    var title = $"Task #{task.TaskNumber} {task.Status}";
-                    var message = task.Description.Length > 100
-                        ? task.Description.Substring(0, 97) + "..."
-                        : task.Description;
-
-                    var icon = task.Status == AgentTaskStatus.Completed
-                        ? System.Windows.Forms.ToolTipIcon.Info
-                        : task.Status == AgentTaskStatus.Failed
-                            ? System.Windows.Forms.ToolTipIcon.Error
-                            : System.Windows.Forms.ToolTipIcon.Warning;
-
-                    App.ShowBalloonNotification(title, message, icon);
-                }
-            }
-            catch (Exception ex)
-            {
-                Managers.AppLogger.Debug("Orchestration", $"Failed to show task completion notification: {ex.Message}");
-            }
 
             // Resume tasks that were waiting on file locks or dependencies
             _fileLockManager.CheckQueuedTasks(_activeTasks);

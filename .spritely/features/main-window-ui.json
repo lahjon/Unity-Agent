@@ -137,7 +137,7 @@
         "content": "class MainWindow"
       },
       "Views/MainWindow.UiLayout.cs": {
-        "hash": "9b3460320001",
+        "hash": "154bf92268e0",
         "content": "class MainWindow"
       },
       "MainWindow.Settings.cs": {
@@ -145,7 +145,7 @@
         "content": "class MainWindow"
       },
       "Views/MainWindow.Orchestration.cs": {
-        "hash": "1e32d27260ce",
+        "hash": "480d5ab49e9d",
         "content": "class MainWindow"
       }
     },

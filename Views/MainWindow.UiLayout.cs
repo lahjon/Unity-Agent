@@ -12,7 +12,7 @@ namespace Spritely
 {
     public partial class MainWindow
     {
-        // ── Splitter drag (Thumb-based, screen-space tracking to avoid coordinate feedback) ──
+        // ── Splitter drag (Thumb-based, window-relative DIP tracking) ──
 
         private double _tmDragStartTopHeight;
         private double _tmDragStartBottomHeight;
@@ -27,7 +27,7 @@ namespace Spritely
 
             _tmDragStartTopHeight = topRow.ActualHeight;
             _tmDragStartBottomHeight = bottomRow.ActualHeight;
-            _tmDragStartMouseY = PointToScreen(Mouse.GetPosition(this)).Y;
+            _tmDragStartMouseY = Mouse.GetPosition(this).Y;
 
             topRow.Height = new GridLength(_tmDragStartTopHeight);
             bottomRow.Height = new GridLength(_tmDragStartBottomHeight);
@@ -38,7 +38,7 @@ namespace Spritely
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
 
-            double currentY = PointToScreen(Mouse.GetPosition(this)).Y;
+            double currentY = Mouse.GetPosition(this).Y;
             double offset = currentY - _tmDragStartMouseY;
 
             double newTop = _tmDragStartTopHeight + offset;
@@ -68,7 +68,7 @@ namespace Spritely
         }
 
         // ── Task List ↔ Features splitter drag ──
-        // Uses screen-space mouse tracking to avoid WPF Thumb coordinate feedback
+        // Uses window-relative DIP tracking to avoid Thumb coordinate feedback
         // (the Thumb moves as row heights change, skewing element-relative deltas).
 
         private double _tfDragStartTaskHeight;
@@ -80,14 +80,14 @@ namespace Spritely
             _isSplitterDragging = true;
             _tfDragStartTaskHeight = TaskListRow.ActualHeight;
             _tfDragStartFeaturesHeight = FeaturesPanelRow.ActualHeight;
-            _tfDragStartMouseY = PointToScreen(Mouse.GetPosition(this)).Y;
+            _tfDragStartMouseY = Mouse.GetPosition(this).Y;
             TaskListRow.Height = new GridLength(_tfDragStartTaskHeight);
             FeaturesPanelRow.Height = new GridLength(_tfDragStartFeaturesHeight);
         }
 
         private void TaskFeaturesSplitter_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            double currentY = PointToScreen(Mouse.GetPosition(this)).Y;
+            double currentY = Mouse.GetPosition(this).Y;
             double offset = currentY - _tfDragStartMouseY;
 
             double newTask = _tfDragStartTaskHeight + offset;

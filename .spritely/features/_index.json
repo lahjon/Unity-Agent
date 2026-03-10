@@ -113,9 +113,9 @@
       "id": "feature-context-resolution",
       "name": "Feature Context Resolution",
       "category": "core",
-      "touchCount": 2,
+      "touchCount": 3,
       "primaryFileCount": 3,
-      "lastIndexedAt": "2026-03-09T21:46:14.5405907Z",
+      "lastIndexedAt": "2026-03-10T07:28:31.3212833Z",
       "keywords": [
         "FeatureContextResolver",
         "FeatureContextResult",
@@ -179,9 +179,9 @@
       "id": "feature-update-agent",
       "name": "Feature Update Agent",
       "category": "core",
-      "touchCount": 2,
+      "touchCount": 3,
       "primaryFileCount": 2,
-      "lastIndexedAt": "2026-03-10T07:23:48.722165Z",
+      "lastIndexedAt": "2026-03-10T07:28:31.3442068Z",
       "keywords": [
         "FeatureUpdateAgent",
         "Haiku update",
@@ -250,10 +250,22 @@
       "id": "llm-services",
       "name": "LLM Services (Claude \u0026 Gemini)",
       "category": "integration",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 6,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:28:31.2663092Z",
+      "keywords": [
+        "API key",
+        "BaseLlmService",
+        "ChatMessage",
+        "ClaudeService",
+        "ClaudeUsageManager",
+        "GeminiService",
+        "SendChatMessageStreamingAsync",
+        "image generation",
+        "model selection",
+        "streaming"
+      ],
+      "description": "Provides streaming and non-streaming chat interfaces to Claude (Anthropic) and Gemini (Google) APIs, including API key management, usage tracking, model selection, image generation, and structured JSON outputs via SendStructuredHaikuAsync method."
     },
     {
       "id": "logging-diagnostics",
@@ -279,7 +291,7 @@
       "category": "ui",
       "touchCount": 4,
       "primaryFileCount": 6,
-      "lastIndexedAt": "2026-03-09T21:45:13.0390869Z",
+      "lastIndexedAt": "2026-03-10T07:32:42.4373433Z",
       "keywords": [
         "IProjectPanelView",
         "MainWindow",
@@ -352,8 +364,19 @@
       "category": "core",
       "touchCount": 0,
       "primaryFileCount": 2,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:26:45.4579345Z",
+      "keywords": [
+        "ExtractAndSpawnSubtasks",
+        "InjectSubtaskResult",
+        "OutputProcessor",
+        "TokenLimitHandler",
+        "model complexity",
+        "output injection",
+        "stream-json",
+        "subtask",
+        "team spawn"
+      ],
+      "description": "Processes raw Claude CLI output to extract subtasks, team members, and inject child outputs back into parent tasks. Handles token limit errors and model-switching on retry."
     },
     {
       "id": "preprocessor-skip-rules",
@@ -481,10 +504,32 @@
       "id": "task-execution",
       "name": "Task Execution Engine",
       "category": "core",
-      "touchCount": 3,
+      "touchCount": 4,
       "primaryFileCount": 5,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:28:31.3748107Z",
+      "keywords": [
+        "Claude CLI",
+        "ConPty",
+        "TaskExecutionManager",
+        "TaskExecutionServices",
+        "TaskProcessLauncher",
+        "agent",
+        "analyzer",
+        "auto",
+        "block",
+        "builder",
+        "bus",
+        "commit",
+        "description",
+        "git",
+        "output",
+        "pause resume cancel",
+        "process management",
+        "stream-json",
+        "task",
+        "task launch"
+      ],
+      "description": "Launches, monitors, and manages the full execution lifecycle of AI tasks with proper state machine transitions: building Claude CLI commands, handling process I/O, managing pause/resume/cancel, auto-commit, subtask injection, and token limit retries. Ensures tasks transition from Queued to Stored (executing) status when actually running."
     },
     {
       "id": "task-factory",
@@ -544,10 +589,19 @@
       "id": "task-preprocessing",
       "name": "Task Preprocessing \u0026 Flag Inference",
       "category": "core",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 2,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:28:31.2947931Z",
+      "keywords": [
+        "ApplyToTask",
+        "Haiku",
+        "PreprocessAsync",
+        "PreprocessResult",
+        "TaskPreprocessor",
+        "auto flags",
+        "flag inference"
+      ],
+      "description": "Sends a task description to Claude Haiku before execution to infer optimal flags (feature mode, auto-decompose, spawn team, apply fix, MCP, extended planning). Applies inferred flags to the AgentTask without overriding user-set values."
     },
     {
       "id": "task-templates",
@@ -573,8 +627,30 @@
       "category": "ui",
       "touchCount": 5,
       "primaryFileCount": 9,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:26:45.427525Z",
+      "keywords": [
+        "GraphInteractionHandler",
+        "GraphLayoutEngine",
+        "GraphRenderer",
+        "OutputTabManager",
+        "TaskNodeGraphPanel",
+        "active",
+        "animation",
+        "attach",
+        "box",
+        "brush",
+        "button",
+        "canvas",
+        "center",
+        "dependency visualization",
+        "output tab",
+        "panel",
+        "tab",
+        "task card",
+        "task graph",
+        "workflow composer"
+      ],
+      "description": "Renders task cards, output tabs with live streaming, task dependency graph, and workflow composer. Provides the primary user-facing task management interface."
     },
     {
       "id": "terminal",
@@ -606,22 +682,51 @@
   ],
   "modules": [],
   "keywordMap": {
+    "active": [
+      "task-ui"
+    ],
     "activity": [
       "activity-dashboard"
     ],
+    "actually": [
+      "task-execution"
+    ],
     "agent": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "task-execution"
+    ],
+    "agenttask": [
+      "task-preprocessing"
     ],
     "ai": [
       "helper-suggestions",
       "prompt-building",
-      "semantic-search"
+      "semantic-search",
+      "task-execution"
     ],
     "analysis": [
       "completion-analysis"
     ],
     "analytics": [
       "history-analytics"
+    ],
+    "analyzer": [
+      "task-execution"
+    ],
+    "animation": [
+      "task-ui"
+    ],
+    "anthropic": [
+      "llm-services"
+    ],
+    "api": [
+      "llm-services"
+    ],
+    "api key": [
+      "llm-services"
+    ],
+    "apis": [
+      "llm-services"
     ],
     "app": [
       "app-infrastructure",
@@ -632,18 +737,44 @@
       "app-startup",
       "main-window-ui"
     ],
+    "applies": [
+      "task-preprocessing"
+    ],
+    "apply": [
+      "task-preprocessing"
+    ],
+    "applytotask": [
+      "task-preprocessing"
+    ],
     "assembles": [
       "prompt-building"
     ],
     "assembly": [
       "prompt-building"
     ],
+    "attach": [
+      "task-ui"
+    ],
+    "auto": [
+      "task-execution",
+      "task-preprocessing"
+    ],
+    "auto flags": [
+      "task-preprocessing"
+    ],
+    "back": [
+      "output-processing"
+    ],
     "based": [
       "feature-update-agent",
       "semantic-search"
     ],
+    "basellmservice": [
+      "llm-services"
+    ],
     "block": [
-      "feature-context-resolution"
+      "feature-context-resolution",
+      "task-execution"
     ],
     "blocking": [
       "feature-update-agent"
@@ -655,28 +786,77 @@
     "bootstrap": [
       "app-startup"
     ],
+    "box": [
+      "task-ui"
+    ],
+    "brush": [
+      "task-ui"
+    ],
+    "builder": [
+      "task-execution"
+    ],
     "building": [
-      "prompt-building"
+      "prompt-building",
+      "task-execution"
     ],
     "builds": [
       "feature-context-resolution",
       "feature-registry"
     ],
     "bus": [
-      "message-bus"
+      "message-bus",
+      "task-execution"
+    ],
+    "button": [
+      "task-ui"
+    ],
+    "cancel": [
+      "task-execution"
+    ],
+    "canvas": [
+      "task-ui"
+    ],
+    "cards": [
+      "task-ui"
+    ],
+    "center": [
+      "task-ui"
     ],
     "changed": [
       "feature-update-agent"
     ],
     "chat": [
       "chat",
-      "chat-interface"
+      "chat-interface",
+      "llm-services"
+    ],
+    "chatmessage": [
+      "llm-services"
+    ],
+    "child": [
+      "output-processing"
     ],
     "chunks": [
       "semantic-search"
     ],
     "claude": [
+      "llm-services",
+      "output-processing",
+      "task-execution",
+      "task-preprocessing"
+    ],
+    "claude cli": [
+      "task-execution"
+    ],
+    "claudeservice": [
       "llm-services"
+    ],
+    "claudeusagemanager": [
+      "llm-services"
+    ],
+    "cli": [
+      "output-processing",
+      "task-execution"
     ],
     "codebase": [
       "codebase-indexing",
@@ -684,6 +864,12 @@
     ],
     "combines": [
       "semantic-search"
+    ],
+    "commands": [
+      "task-execution"
+    ],
+    "commit": [
+      "task-execution"
     ],
     "completed": [
       "feature-update-agent"
@@ -695,6 +881,9 @@
     ],
     "components": [
       "theming-ui-shared"
+    ],
+    "composer": [
+      "task-ui"
     ],
     "composition": [
       "main-window-ui"
@@ -708,6 +897,9 @@
     "configuration": [
       "app-startup-config",
       "prompt-building"
+    ],
+    "conpty": [
+      "task-execution"
     ],
     "constants": [
       "app-settings"
@@ -752,6 +944,9 @@
     "data": [
       "export-task-data"
     ],
+    "decompose": [
+      "task-preprocessing"
+    ],
     "decomposition": [
       "task-decomposition"
     ],
@@ -764,12 +959,20 @@
     "dependencies": [
       "feature-registry"
     ],
+    "dependency": [
+      "task-ui"
+    ],
+    "dependency visualization": [
+      "task-ui"
+    ],
     "dependson": [
       "feature-registry"
     ],
     "description": [
       "feature-context-resolution",
-      "feature-registry"
+      "feature-registry",
+      "task-execution",
+      "task-preprocessing"
     ],
     "diagnostics": [
       "logging-diagnostics"
@@ -792,21 +995,43 @@
     "engine": [
       "task-execution"
     ],
+    "ensures": [
+      "task-execution"
+    ],
+    "errors": [
+      "output-processing"
+    ],
     "event wiring": [
       "main-window-ui"
     ],
     "events": [
       "main-window-ui"
     ],
+    "executing": [
+      "task-execution"
+    ],
     "execution": [
       "feature-mode-execution",
-      "task-execution"
+      "task-execution",
+      "task-preprocessing"
     ],
     "export": [
       "export-task-data"
     ],
+    "extended": [
+      "task-preprocessing"
+    ],
+    "extract": [
+      "output-processing"
+    ],
+    "extractandspawnsubtasks": [
+      "output-processing"
+    ],
     "extraction": [
       "output-processing"
+    ],
+    "facing": [
+      "task-ui"
     ],
     "feature": [
       "feature-context-menu",
@@ -816,7 +1041,8 @@
       "feature-mode-execution",
       "feature-registry",
       "feature-update-agent",
-      "prompt-building"
+      "prompt-building",
+      "task-preprocessing"
     ],
     "feature context": [
       "feature-context-resolution"
@@ -874,11 +1100,18 @@
     "flag": [
       "task-preprocessing"
     ],
+    "flag inference": [
+      "task-preprocessing"
+    ],
+    "flags": [
+      "task-preprocessing"
+    ],
     "forget": [
       "feature-update-agent"
     ],
     "full": [
-      "prompt-building"
+      "prompt-building",
+      "task-execution"
     ],
     "gamerules": [
       "prompt-building"
@@ -886,15 +1119,34 @@
     "gemini": [
       "llm-services"
     ],
+    "geminiservice": [
+      "llm-services"
+    ],
+    "generation": [
+      "llm-services"
+    ],
     "git": [
       "git-operations",
-      "git-ui"
+      "git-ui",
+      "task-execution"
     ],
     "given": [
       "feature-context-resolution"
     ],
+    "google": [
+      "llm-services"
+    ],
     "graph": [
       "task-graph-ui",
+      "task-ui"
+    ],
+    "graphinteractionhandler": [
+      "task-ui"
+    ],
+    "graphlayoutengine": [
+      "task-ui"
+    ],
+    "graphrenderer": [
       "task-ui"
     ],
     "group": [
@@ -902,7 +1154,8 @@
       "task-history"
     ],
     "haiku": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "task-preprocessing"
     ],
     "haiku update": [
       "feature-update-agent"
@@ -910,7 +1163,11 @@
     "handles": [
       "feature-context-resolution",
       "main-window-ui",
+      "output-processing",
       "prompt-building"
+    ],
+    "handling": [
+      "task-execution"
     ],
     "helper": [
       "helper-suggestions"
@@ -931,13 +1188,28 @@
     "hybridsearchmanager": [
       "semantic-search"
     ],
+    "image": [
+      "llm-services"
+    ],
+    "image generation": [
+      "llm-services"
+    ],
     "improved": [
       "main-window-ui"
+    ],
+    "including": [
+      "llm-services"
     ],
     "indexing": [
       "codebase-indexing"
     ],
+    "infer": [
+      "task-preprocessing"
+    ],
     "inference": [
+      "task-preprocessing"
+    ],
+    "inferred": [
       "task-preprocessing"
     ],
     "infrastructure": [
@@ -946,9 +1218,16 @@
     "initialization": [
       "feature-initialization"
     ],
+    "inject": [
+      "output-processing"
+    ],
     "injection": [
       "feature-context-resolution",
-      "feature-registry"
+      "feature-registry",
+      "task-execution"
+    ],
+    "injectsubtaskresult": [
+      "output-processing"
     ],
     "input": [
       "prompt-building"
@@ -967,13 +1246,23 @@
     ],
     "interface": [
       "chat",
-      "chat-interface"
+      "chat-interface",
+      "task-ui"
+    ],
+    "interfaces": [
+      "llm-services"
     ],
     "iprojectpanelview": [
       "main-window-ui"
     ],
+    "json": [
+      "llm-services"
+    ],
     "keeps": [
       "feature-update-agent"
+    ],
+    "key": [
+      "llm-services"
     ],
     "keyword": [
       "semantic-search"
@@ -993,6 +1282,9 @@
     "last": [
       "main-window-ui"
     ],
+    "launches": [
+      "task-execution"
+    ],
     "layout": [
       "main-window-ui"
     ],
@@ -1001,13 +1293,19 @@
     ],
     "lifecycle": [
       "feature-update-agent",
+      "task-execution",
       "task-lifecycle"
     ],
     "limit": [
-      "prompt-building"
+      "output-processing",
+      "prompt-building",
+      "task-execution"
     ],
     "list": [
       "project-tasks"
+    ],
+    "live": [
+      "task-ui"
     ],
     "llm": [
       "llm-services"
@@ -1023,6 +1321,9 @@
     "lookup": [
       "feature-registry"
     ],
+    "machine": [
+      "task-execution"
+    ],
     "main": [
       "main-window-ui"
     ],
@@ -1037,15 +1338,21 @@
     ],
     "management": [
       "file-lock-management",
+      "llm-services",
       "output-management",
       "project-management",
-      "skill-management"
+      "skill-management",
+      "task-ui"
     ],
     "managers": [
       "main-window-ui"
     ],
     "manages": [
-      "main-window-ui"
+      "main-window-ui",
+      "task-execution"
+    ],
+    "managing": [
+      "task-execution"
     ],
     "matchedfeature": [
       "feature-context-resolution"
@@ -1055,7 +1362,11 @@
     ],
     "mcp": [
       "mcp-integration",
-      "prompt-building"
+      "prompt-building",
+      "task-preprocessing"
+    ],
+    "members": [
+      "output-processing"
     ],
     "membership": [
       "feature-registry"
@@ -1066,9 +1377,23 @@
     "message": [
       "message-bus"
     ],
+    "method": [
+      "llm-services"
+    ],
     "mode": [
       "feature-mode",
-      "feature-mode-execution"
+      "feature-mode-execution",
+      "task-preprocessing"
+    ],
+    "model": [
+      "llm-services",
+      "output-processing"
+    ],
+    "model complexity": [
+      "output-processing"
+    ],
+    "model selection": [
+      "llm-services"
     ],
     "modular": [
       "prompt-building"
@@ -1078,14 +1403,26 @@
       "module-management",
       "module-registry"
     ],
+    "monitors": [
+      "task-execution"
+    ],
     "name": [
       "feature-registry"
     ],
     "nogitwrite": [
       "prompt-building"
     ],
+    "non": [
+      "llm-services"
+    ],
+    "o": [
+      "task-execution"
+    ],
     "operations": [
       "git-operations"
+    ],
+    "optimal": [
+      "task-preprocessing"
     ],
     "optimization": [
       "context-optimization"
@@ -1096,22 +1433,53 @@
     ],
     "output": [
       "output-management",
+      "output-processing",
+      "task-execution",
+      "task-ui"
+    ],
+    "output injection": [
       "output-processing"
+    ],
+    "output tab": [
+      "task-ui"
+    ],
+    "outputprocessor": [
+      "output-processing"
+    ],
+    "outputs": [
+      "llm-services",
+      "output-processing"
+    ],
+    "outputtabmanager": [
+      "task-ui"
     ],
     "over": [
       "semantic-search"
     ],
+    "overriding": [
+      "task-preprocessing"
+    ],
     "panel": [
-      "git-ui"
+      "git-ui",
+      "task-ui"
     ],
     "panels": [
       "main-window-ui"
+    ],
+    "parent": [
+      "output-processing"
     ],
     "parse": [
       "main-window-ui"
     ],
     "partial class": [
       "main-window-ui"
+    ],
+    "pause": [
+      "task-execution"
+    ],
+    "pause resume cancel": [
+      "task-execution"
     ],
     "persistence": [
       "history-management"
@@ -1122,6 +1490,9 @@
     "placeholders": [
       "main-window-ui"
     ],
+    "planning": [
+      "task-preprocessing"
+    ],
     "post": [
       "feature-context-resolution",
       "feature-update-agent"
@@ -1129,11 +1500,29 @@
     "post-completion": [
       "feature-update-agent"
     ],
+    "preprocessasync": [
+      "task-preprocessing"
+    ],
     "preprocessing": [
       "task-preprocessing"
     ],
     "preprocessor": [
       "preprocessor-skip-rules"
+    ],
+    "preprocessresult": [
+      "task-preprocessing"
+    ],
+    "primary": [
+      "task-ui"
+    ],
+    "process": [
+      "task-execution"
+    ],
+    "process management": [
+      "task-execution"
+    ],
+    "processes": [
+      "output-processing"
     ],
     "processing": [
       "output-processing"
@@ -1169,12 +1558,23 @@
       "task-templates",
       "task-templates-storage"
     ],
+    "proper": [
+      "task-execution"
+    ],
     "provides": [
       "feature-registry",
-      "semantic-search"
+      "llm-services",
+      "semantic-search",
+      "task-ui"
+    ],
+    "queued": [
+      "task-execution"
     ],
     "ranking": [
       "semantic-search"
+    ],
+    "raw": [
+      "output-processing"
     ],
     "reduction": [
       "prompt-building"
@@ -1194,6 +1594,9 @@
     "relevant": [
       "feature-context-resolution"
     ],
+    "renders": [
+      "task-ui"
+    ],
     "repeated": [
       "prompt-building"
     ],
@@ -1209,8 +1612,15 @@
     "resourcedictionary": [
       "main-window-ui"
     ],
+    "resume": [
+      "task-execution"
+    ],
     "retries": [
-      "prompt-building"
+      "prompt-building",
+      "task-execution"
+    ],
+    "retry": [
+      "output-processing"
     ],
     "root": [
       "main-window-ui"
@@ -1218,6 +1628,9 @@
     "rules": [
       "preprocessor-skip-rules",
       "prompt-building"
+    ],
+    "running": [
+      "task-execution"
     ],
     "safe": [
       "logging-infrastructure"
@@ -1233,11 +1646,23 @@
       "feature-context-resolution",
       "semantic-search"
     ],
+    "selection": [
+      "llm-services"
+    ],
     "semantic": [
       "semantic-search"
     ],
     "semanticindexinitializer": [
       "semantic-search"
+    ],
+    "sendchatmessagestreamingasync": [
+      "llm-services"
+    ],
+    "sends": [
+      "task-preprocessing"
+    ],
+    "sendstructuredhaikuasync": [
+      "llm-services"
     ],
     "separate": [
       "main-window-ui"
@@ -1247,6 +1672,9 @@
     ],
     "services": [
       "llm-services"
+    ],
+    "set": [
+      "task-preprocessing"
     ],
     "settings": [
       "app-settings",
@@ -1274,6 +1702,9 @@
     "source": [
       "semantic-search"
     ],
+    "spawn": [
+      "task-preprocessing"
+    ],
     "spawning": [
       "task-decomposition"
     ],
@@ -1291,20 +1722,43 @@
       "main-window-ui"
     ],
     "state": [
+      "task-execution",
       "task-lifecycle"
+    ],
+    "status": [
+      "task-execution"
     ],
     "stored": [
       "semantic-search",
-      "stored-task-viewer"
+      "stored-task-viewer",
+      "task-execution"
+    ],
+    "stream-json": [
+      "output-processing",
+      "task-execution"
+    ],
+    "streaming": [
+      "llm-services",
+      "task-ui"
+    ],
+    "structured": [
+      "llm-services"
     ],
     "style": [
       "ui-theming"
     ],
     "subtask": [
+      "output-processing",
+      "task-execution"
+    ],
+    "subtasks": [
       "output-processing"
     ],
     "suggestions": [
       "helper-suggestions"
+    ],
+    "switching": [
+      "output-processing"
     ],
     "symbol": [
       "codebase-indexing",
@@ -1322,6 +1776,12 @@
     ],
     "system prompt": [
       "prompt-building"
+    ],
+    "tab": [
+      "task-ui"
+    ],
+    "tabs": [
+      "task-ui"
     ],
     "task": [
       "completion-analysis",
@@ -1350,11 +1810,44 @@
       "task-templates-storage",
       "task-ui"
     ],
+    "task card": [
+      "task-ui"
+    ],
+    "task graph": [
+      "task-ui"
+    ],
+    "task launch": [
+      "task-execution"
+    ],
     "task relevance": [
       "feature-context-resolution"
     ],
+    "taskexecutionmanager": [
+      "task-execution"
+    ],
+    "taskexecutionservices": [
+      "task-execution"
+    ],
+    "tasknodegraphpanel": [
+      "task-ui"
+    ],
+    "taskpreprocessor": [
+      "task-preprocessing"
+    ],
+    "taskprocesslauncher": [
+      "task-execution"
+    ],
+    "tasks": [
+      "output-processing",
+      "task-execution"
+    ],
     "team": [
-      "task-decomposition"
+      "output-processing",
+      "task-decomposition",
+      "task-preprocessing"
+    ],
+    "team spawn": [
+      "output-processing"
     ],
     "templates": [
       "main-window-ui",
@@ -1376,10 +1869,15 @@
       "main-window-ui"
     ],
     "token": [
-      "prompt-building"
+      "output-processing",
+      "prompt-building",
+      "task-execution"
     ],
     "token limit retry": [
       "prompt-building"
+    ],
+    "tokenlimithandler": [
+      "output-processing"
     ],
     "top": [
       "main-window-ui"
@@ -1388,9 +1886,16 @@
       "main-window-ui"
     ],
     "tracking": [
+      "llm-services",
       "progress-tracking",
       "task-group-tracking",
       "task-history"
+    ],
+    "transition": [
+      "task-execution"
+    ],
+    "transitions": [
+      "task-execution"
     ],
     "types": [
       "preprocessor-skip-rules"
@@ -1415,8 +1920,13 @@
     "updates": [
       "feature-context-resolution"
     ],
+    "usage": [
+      "llm-services"
+    ],
     "user": [
-      "prompt-building"
+      "prompt-building",
+      "task-preprocessing",
+      "task-ui"
     ],
     "uses": [
       "feature-update-agent"
@@ -1428,6 +1938,9 @@
     "validation": [
       "task-factory"
     ],
+    "values": [
+      "task-preprocessing"
+    ],
     "vector": [
       "semantic-search"
     ],
@@ -1436,6 +1949,9 @@
     ],
     "vectorstore": [
       "semantic-search"
+    ],
+    "via": [
+      "llm-services"
     ],
     "viewer": [
       "stored-task-viewer"
@@ -1456,7 +1972,14 @@
       "main-window-ui"
     ],
     "without": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "task-preprocessing"
+    ],
+    "workflow": [
+      "task-ui"
+    ],
+    "workflow composer": [
+      "task-ui"
     ],
     "workflows": [
       "main-window-ui"

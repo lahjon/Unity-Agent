@@ -94,7 +94,7 @@ namespace Spritely.Managers
             _getOpusEffortLevel = services.GetOpusEffortLevel ?? (() => "high");
             _messageBusManager = services.MessageBusManager;
             _dispatcher = services.Dispatcher;
-            _taskPreprocessor = services.TaskPreprocessor ?? new TaskPreprocessor();
+            _taskPreprocessor = services.TaskPreprocessor ?? new TaskPreprocessor(services.ClaudeService);
 
             var retryMinutesFunc = services.GetTokenLimitRetryMinutes ?? (() => 30);
 
@@ -105,8 +105,8 @@ namespace Spritely.Managers
 
             // Feature System (injectable for testability)
             _featureRegistryManager = services.FeatureRegistryManager ?? new FeatureRegistryManager();
-            _featureContextResolver = services.FeatureContextResolver ?? new FeatureContextResolver(_featureRegistryManager);
-            _featureUpdateAgent = services.FeatureUpdateAgent ?? new FeatureUpdateAgent(_featureRegistryManager);
+            _featureContextResolver = services.FeatureContextResolver ?? new FeatureContextResolver(_featureRegistryManager, claudeService: services.ClaudeService);
+            _featureUpdateAgent = services.FeatureUpdateAgent ?? new FeatureUpdateAgent(_featureRegistryManager, claudeService: services.ClaudeService);
             _hybridSearchManager = services.HybridSearchManager;
             _featureModeHandler = new FeatureModeHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, services.PromptBuilder, services.TaskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
             _tokenLimitHandler = new TokenLimitHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.FileLockManager, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, retryMinutesFunc);

@@ -522,13 +522,18 @@ namespace Spritely.Managers
                 TrimOutputIfNeeded(task);
             }
 
-            if (_animationControllers.TryGetValue(taskId, out var controller))
+            if (!_animationControllers.TryGetValue(taskId, out var controller))
             {
-                if (_dispatcher.CheckAccess())
-                    controller.Enqueue(text, baseBrush);
-                else
-                    _dispatcher.BeginInvoke(() => controller.Enqueue(text, baseBrush));
+                // Re-create animation controller if it was removed on task completion
+                // but the tab/output box still exists (e.g. follow-up messages).
+                controller = new TypewriterAnimationController(box, _dispatcher);
+                _animationControllers[taskId] = controller;
             }
+
+            if (_dispatcher.CheckAccess())
+                controller.Enqueue(text, baseBrush);
+            else
+                _dispatcher.BeginInvoke(() => controller.Enqueue(text, baseBrush));
         }
 
         public void AppendColoredOutput(string taskId, string text, Brush foreground,
@@ -578,13 +583,16 @@ namespace Spritely.Managers
                 TrimOutputIfNeeded(task);
             }
 
-            if (_animationControllers.TryGetValue(taskId, out var controller))
+            if (!_animationControllers.TryGetValue(taskId, out var controller))
             {
-                if (_dispatcher.CheckAccess())
-                    controller.Enqueue(text, foreground);
-                else
-                    _dispatcher.BeginInvoke(() => controller.Enqueue(text, foreground));
+                controller = new TypewriterAnimationController(box, _dispatcher);
+                _animationControllers[taskId] = controller;
             }
+
+            if (_dispatcher.CheckAccess())
+                controller.Enqueue(text, foreground);
+            else
+                _dispatcher.BeginInvoke(() => controller.Enqueue(text, foreground));
         }
 
         /// <summary>Stops typewriter animation and removes pulsing dots for a task (call on task completion).</summary>

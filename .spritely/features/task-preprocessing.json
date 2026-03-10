@@ -45,8 +45,8 @@
         "content": "class TaskFactory : ITaskFactory\n  L18: ValidateTaskInput(string? description) -\u003E bool\n  L73: PrepareTaskForFeatureModeStart(AgentTask task) -\u003E void\n  L93: GenerateLocalSummary(string description) -\u003E string\n  L255: GenerateClaudeMdAsync(string projectPath, bool isGame, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring\u003E"
       },
       "Managers/TaskPreprocessor.cs": {
-        "hash": "23f15582737d",
-        "content": "class PreprocessResult\n  Header: string\n  EnhancedPrompt: string\n  ApplyFix: bool\n  ExtendedPlanning: bool\n  IsFeatureMode: bool\n  AutoDecompose: bool\n  SpawnTeam: bool\n  UseMcp: bool\n  Iterations: int\n  SentPrompt: string\nclass TaskPreprocessor\n  L42: PreprocessPrompt: string = PromptLoader.Load(\u0022TaskPreprocessorPr...\n  L44: PreprocessAsync(string taskDescription, CancellationToken ct = default) -\u003E Task\u003CPreprocessResult?\u003E\n  L153: ApplyToTask(AgentTask task, PreprocessResult result) -\u003E void  // Applies preprocessor results to an AgentTask. Only overrides toggles the user...\n  L180: FormatActiveToggles(AgentTask task) -\u003E string  // Formats the active toggles for display in task output."
+        "hash": "0ced6060ce6e",
+        "content": "class PreprocessResult\n  Header: string\n  EnhancedPrompt: string\n  ApplyFix: bool\n  ExtendedPlanning: bool\n  IsFeatureMode: bool\n  AutoDecompose: bool\n  SpawnTeam: bool\n  UseMcp: bool\n  Iterations: int\n  SentPrompt: string\nclass TaskPreprocessor\n  L40: PreprocessPrompt: string = PromptLoader.Load(\u0022TaskPreprocessorPr...\n  L49: PreprocessAsync(string taskDescription, CancellationToken ct = default) -\u003E Task\u003CPreprocessResult?\u003E\n  L125: ApplyToTask(AgentTask task, PreprocessResult result) -\u003E void  // Applies preprocessor results to an AgentTask. Only overrides toggles the user...\n  L152: FormatActiveToggles(AgentTask task) -\u003E string  // Formats the active toggles for display in task output."
       }
     },
     "keyTypes": [
@@ -88,6 +88,7 @@
     "UseMcp",
     "ValidateTaskInput"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.0006226Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-10T07:28:31.2874755Z",
+  "lastUpdatedByTaskId": "f06809fdd4064ab7"
 }

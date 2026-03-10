@@ -214,12 +214,12 @@ namespace Spritely
             var vectorStore = new VectorStore();
             var featureContextResolver = new FeatureContextResolver(
                 featureRegistryManager, codebaseIndexManager, moduleRegistryManager,
-                embeddingService, vectorStore);
+                embeddingService, vectorStore, _claudeService);
             var hybridSearchManager = new HybridSearchManager(
                 embeddingService, vectorStore, featureRegistryManager,
                 featureContextResolver, codebaseIndexManager);
             var featureUpdateAgent = new FeatureUpdateAgent(
-                featureRegistryManager, codebaseIndexManager, moduleRegistryManager);
+                featureRegistryManager, codebaseIndexManager, moduleRegistryManager, _claudeService);
 
             featureUpdateAgent.StartBackgroundRetryWorker(
                 isBusy: () => { lock (_activeTasksLock) return _activeTasks.Any(t => !t.IsFinished); },
@@ -254,6 +254,7 @@ namespace Spritely
                 FeatureContextResolver = featureContextResolver,
                 FeatureUpdateAgent = featureUpdateAgent,
                 HybridSearchManager = hybridSearchManager,
+                ClaudeService = _claudeService,
             });
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;

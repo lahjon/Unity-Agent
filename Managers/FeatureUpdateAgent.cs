@@ -135,6 +135,21 @@ namespace Spritely.Managers
             }
         }
 
+        private async Task<JsonElement?> CallHaikuWithFallbackAsync(
+            string prompt, string callerName, CancellationToken ct)
+        {
+            if (_claudeService?.IsConfigured == true)
+            {
+                var apiResult = await _claudeService.SendStructuredHaikuAsync(prompt, UpdateJsonSchema, ct);
+                if (apiResult is not null)
+                    return apiResult;
+                AppLogger.Info(callerName, "API returned null, falling back to CLI");
+            }
+
+            return await FeatureSystemCliRunner.RunAsync(
+                prompt, UpdateJsonSchema, callerName, HaikuTimeout, ct);
+        }
+
         public void Dispose()
         {
             _retryTimer?.Dispose();
@@ -201,11 +216,10 @@ namespace Spritely.Managers
                     string.Join("\n", relativeFiles),
                     indexJson);
 
-                // Call Haiku CLI for intelligent feature update analysis
-                AppLogger.Info("FeatureUpdateAgent", $"Calling Haiku CLI for feature update. Task: {taskId}, changed files: {relativeFiles.Count}");
+                // Prefer direct API; fall back to CLI
+                AppLogger.Info("FeatureUpdateAgent", $"Calling Haiku for feature update. Task: {taskId}, changed files: {relativeFiles.Count}");
 
-                var rootResult = await FeatureSystemCliRunner.RunAsync(
-                    prompt, UpdateJsonSchema, "FeatureUpdateAgent", HaikuTimeout, ct);
+                var rootResult = await CallHaikuWithFallbackAsync(prompt, "FeatureUpdateAgent", ct);
 
                 if (rootResult is null)
                 {
@@ -764,8 +778,7 @@ namespace Spritely.Managers
                         string.Join("\n", pending.ChangedFiles),
                         indexJson);
 
-                    var rootResult = await FeatureSystemCliRunner.RunAsync(
-                        prompt, UpdateJsonSchema, "FeatureUpdateAgent-drain", HaikuTimeout, ct);
+                    var rootResult = await CallHaikuWithFallbackAsync(prompt, "FeatureUpdateAgent-drain", ct);
 
                     if (rootResult is null)
                     {
