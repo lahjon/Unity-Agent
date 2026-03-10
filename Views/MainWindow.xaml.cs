@@ -109,6 +109,7 @@ namespace Spritely
 
         // Track when any splitter is being dragged to prevent RestoreStarRows interference
         private bool _isSplitterDragging;
+        private bool _restoreStarRowsPending;
 
 
         // IProjectPanelView — expose named XAML controls to ProjectManager
@@ -167,7 +168,6 @@ namespace Spritely
                 appDataDir,
                 PeekInitialProjectPath(appDataDir),
                 this);
-            _projectManager.McpInvestigationRequested += OnMcpInvestigationRequested;
             _projectManager.McpOutputChanged += OnMcpOutputChanged;
             _projectManager.ProjectSwapStarted += OnProjectSwapStarted;
             _projectManager.ProjectSwapCompleted += OnProjectSwapCompleted;
@@ -353,6 +353,12 @@ namespace Spritely
 
             MainTabs.SelectionChanged += MainTabs_SelectionChanged;
             StatisticsTabs.SelectionChanged += StatisticsTabs_SelectionChanged;
+        }
+
+        protected override void OnActivated(EventArgs e)
+        {
+            base.OnActivated(e);
+            App.ClearTrayBadge();
         }
 
         /// <summary>

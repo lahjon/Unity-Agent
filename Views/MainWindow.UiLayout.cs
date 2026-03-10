@@ -12,11 +12,8 @@ namespace Spritely
 {
     public partial class MainWindow
     {
-        // ── Splitter drag (Thumb-based, window-relative DIP tracking) ──
-
-        private double _tmDragStartTopHeight;
-        private double _tmDragStartBottomHeight;
-        private double _tmDragStartMouseY;
+        // ── Splitter drag (Thumb-based, uses ActualHeight + e.VerticalChange to
+        //    self-compensate for the Thumb coordinate feedback loop) ──
 
         private void TopMiddleSplitter_DragStarted(object sender, DragStartedEventArgs e)
         {
@@ -25,12 +22,9 @@ namespace Spritely
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
 
-            _tmDragStartTopHeight = topRow.ActualHeight;
-            _tmDragStartBottomHeight = bottomRow.ActualHeight;
-            _tmDragStartMouseY = Mouse.GetPosition(this).Y;
-
-            topRow.Height = new GridLength(_tmDragStartTopHeight);
-            bottomRow.Height = new GridLength(_tmDragStartBottomHeight);
+            // Lock to pixel values so star re-proportioning doesn't fight the drag
+            topRow.Height = new GridLength(topRow.ActualHeight);
+            bottomRow.Height = new GridLength(bottomRow.ActualHeight);
         }
 
         private void TopMiddleSplitter_DragDelta(object sender, DragDeltaEventArgs e)
@@ -38,14 +32,14 @@ namespace Spritely
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
 
-            double currentY = Mouse.GetPosition(this).Y;
-            double offset = currentY - _tmDragStartMouseY;
+            // ActualHeight already includes prior Thumb movement, and e.VerticalChange
+            // underreports by exactly that amount, so the sum is the correct target.
+            double newTop = topRow.ActualHeight + e.VerticalChange;
+            double newBottom = bottomRow.ActualHeight - e.VerticalChange;
 
-            double newTop = _tmDragStartTopHeight + offset;
-            double newBottom = _tmDragStartBottomHeight - offset;
-
-            if (newTop < topRow.MinHeight) { newTop = topRow.MinHeight; newBottom = _tmDragStartTopHeight + _tmDragStartBottomHeight - topRow.MinHeight; }
-            if (newBottom < bottomRow.MinHeight) { newBottom = bottomRow.MinHeight; newTop = _tmDragStartTopHeight + _tmDragStartBottomHeight - bottomRow.MinHeight; }
+            double total = topRow.ActualHeight + bottomRow.ActualHeight;
+            if (newTop < topRow.MinHeight) { newTop = topRow.MinHeight; newBottom = total - topRow.MinHeight; }
+            if (newBottom < bottomRow.MinHeight) { newBottom = bottomRow.MinHeight; newTop = total - bottomRow.MinHeight; }
 
             topRow.Height = new GridLength(newTop);
             bottomRow.Height = new GridLength(newBottom);
@@ -68,34 +62,23 @@ namespace Spritely
         }
 
         // ── Task List ↔ Features splitter drag ──
-        // Uses window-relative DIP tracking to avoid Thumb coordinate feedback
-        // (the Thumb moves as row heights change, skewing element-relative deltas).
-
-        private double _tfDragStartTaskHeight;
-        private double _tfDragStartFeaturesHeight;
-        private double _tfDragStartMouseY;
 
         private void TaskFeaturesSplitter_DragStarted(object sender, DragStartedEventArgs e)
         {
             _isSplitterDragging = true;
-            _tfDragStartTaskHeight = TaskListRow.ActualHeight;
-            _tfDragStartFeaturesHeight = FeaturesPanelRow.ActualHeight;
-            _tfDragStartMouseY = Mouse.GetPosition(this).Y;
-            TaskListRow.Height = new GridLength(_tfDragStartTaskHeight);
-            FeaturesPanelRow.Height = new GridLength(_tfDragStartFeaturesHeight);
+            TaskListRow.Height = new GridLength(TaskListRow.ActualHeight);
+            FeaturesPanelRow.Height = new GridLength(FeaturesPanelRow.ActualHeight);
         }
 
         private void TaskFeaturesSplitter_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            double currentY = Mouse.GetPosition(this).Y;
-            double offset = currentY - _tfDragStartMouseY;
+            double newTask = TaskListRow.ActualHeight + e.VerticalChange;
+            double newFeatures = FeaturesPanelRow.ActualHeight - e.VerticalChange;
 
-            double newTask = _tfDragStartTaskHeight + offset;
-            double newFeatures = _tfDragStartFeaturesHeight - offset;
-
+            double total = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
             const double minHeight = 60;
-            if (newTask < minHeight) { newTask = minHeight; newFeatures = _tfDragStartTaskHeight + _tfDragStartFeaturesHeight - minHeight; }
-            if (newFeatures < minHeight) { newFeatures = minHeight; newTask = _tfDragStartTaskHeight + _tfDragStartFeaturesHeight - minHeight; }
+            if (newTask < minHeight) { newTask = minHeight; newFeatures = total - minHeight; }
+            if (newFeatures < minHeight) { newFeatures = minHeight; newTask = total - minHeight; }
 
             TaskListRow.Height = new GridLength(newTask);
             FeaturesPanelRow.Height = new GridLength(newFeatures);
@@ -135,6 +118,10 @@ namespace Spritely
         private void TerminalSend_Click(object sender, RoutedEventArgs e) => _terminalManager?.SendCommand();
 
         private void TerminalInput_PreviewKeyDown(object sender, KeyEventArgs e) => _terminalManager?.HandleKeyDown(e);
+
+        private void TerminalOutput_PreviewKeyDown(object sender, KeyEventArgs e) => _terminalManager?.HandleOutputKeyDown(e);
+
+        private void TerminalOutput_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e) => _terminalManager?.HandleOutputTextInput(e);
 
         private void TerminalInterrupt_Click(object sender, RoutedEventArgs e) => _terminalManager?.SendInterrupt();
 

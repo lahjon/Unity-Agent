@@ -1,7 +1,7 @@
 {
   "id": "terminal",
   "name": "Integrated Terminal",
-  "description": "Embeds a real ConPTY-backed terminal within the application supporting multiple named tabs, full VT100 emulation, command history, working directory tracking, and Ctrl\u002BC interrupt.",
+  "description": "Embeds a real ConPTY-backed terminal within the application supporting multiple named tabs, full VT100 emulation, command history, working directory tracking, keyboard input handling (arrow keys, Enter, and other keypresses forwarded to the active process), and Ctrl\u002BC interrupt.",
   "category": "ui",
   "keywords": [
     "ConPTY",
@@ -9,15 +9,26 @@
     "SendLine",
     "TerminalTabManager",
     "VtScreenBuffer",
+    "buffer",
+    "clear",
+    "close",
+    "command",
     "command history",
+    "con",
+    "directory",
+    "dispose",
+    "history",
+    "input",
+    "process",
+    "send",
     "shell",
     "terminal",
     "working directory"
   ],
   "primaryFiles": [
     "ConPtyTerminal.cs",
-    "Models/VtScreenBuffer.cs",
-    "TerminalTabManager.cs"
+    "Managers/TerminalTabManager.cs",
+    "Models/VtScreenBuffer.cs"
   ],
   "secondaryFiles": [
     "Constants/AppConstants.cs"
@@ -56,9 +67,9 @@
         "hash": "5aee9794a554",
         "content": "class VtScreenBuffer\n  L19: MaxScrollbackLines: int = Constants.AppConstants.ScrollbackLimit\n  L48: Process(string data) -\u003E void\n  L57: Render() -\u003E string\n  L89: Clear() -\u003E void"
       },
-      "TerminalTabManager.cs": {
-        "hash": "5cc56f2e6acf",
-        "content": "class TerminalTabManager : IDisposable\n  L54: UpdateWorkingDirectory(string directory) -\u003E void\n  L125: AddTerminal(string? workingDirectory = null) -\u003E void\n  L224: CloseTerminal(int index) -\u003E void\n  L256: SwitchTo(int index) -\u003E void\n  L291: SendCommand() -\u003E void\n  L318: SendInterrupt() -\u003E void\n  L324: HandleKeyDown(KeyEventArgs e) -\u003E void\n  L535: Dispose() -\u003E void"
+      "Managers/TerminalTabManager.cs": {
+        "hash": "5442f5de5a51",
+        "content": "class TerminalTabManager : IDisposable\n  L54: UpdateWorkingDirectory(string directory) -\u003E void\n  L125: AddTerminal(string? workingDirectory = null) -\u003E void\n  L224: CloseTerminal(int index) -\u003E void\n  L256: SwitchTo(int index) -\u003E void\n  L291: SendCommand() -\u003E void\n  L318: SendInterrupt() -\u003E void\n  L324: HandleKeyDown(KeyEventArgs e) -\u003E void\n  L402: HandleOutputKeyDown(KeyEventArgs e) -\u003E void\n  L437: HandleOutputTextInput(System.Windows.Input.TextCompositionEventArgs e) -\u003E void\n  L629: Dispose() -\u003E void"
       }
     },
     "keyTypes": [
@@ -90,6 +101,8 @@
     "GetCommandFromEnd",
     "GetOutputText",
     "HandleKeyDown",
+    "HandleOutputKeyDown",
+    "HandleOutputTextInput",
     "HasBeenUsed",
     "HistoryIndex",
     "MaxScrollbackLines",
@@ -109,6 +122,7 @@
     "VtScreenBuffer",
     "WorkingDirectory"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.2306333Z"
+  "touchCount": 2,
+  "lastUpdatedAt": "2026-03-10T07:36:54.0362697Z",
+  "lastUpdatedByTaskId": "bd4ac148e08e43a5"
 }

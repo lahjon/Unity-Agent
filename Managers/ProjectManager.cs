@@ -51,7 +51,6 @@ namespace Spritely.Managers
         public McpConfigManager Mcp { get; }
 
         // ── Events (forwarded from sub-managers where needed) ──
-        public event Action<AgentTask>? McpInvestigationRequested;
         public event Action<string>? McpOutputChanged;
         public event Action? ProjectSwapStarted;
         public event Action? ProjectSwapCompleted;
@@ -83,7 +82,6 @@ namespace Spritely.Managers
             Mcp = new McpConfigManager(this, Colors);
 
             // Forward sub-manager events
-            Mcp.McpInvestigationRequested += task => McpInvestigationRequested?.Invoke(task);
             Mcp.McpOutputChanged += path => McpOutputChanged?.Invoke(path);
         }
 

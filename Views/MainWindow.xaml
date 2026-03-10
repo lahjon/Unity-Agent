@@ -942,8 +942,14 @@
                     </EventTrigger>
                 </Border.Triggers>
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="TASK OUTPUT" Foreground="{StaticResource Accent}" FontWeight="Bold"
-                               FontSize="10" FontFamily="Segoe UI" Margin="8,6,0,4"/>
+                    <DockPanel DockPanel.Dock="Top" Margin="8,6,4,4">
+                        <TextBlock Text="TASK OUTPUT" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                   FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                        <Button x:Name="ClearFinishedBtn" DockPanel.Dock="Right" HorizontalAlignment="Right"
+                                Content="&#xE894;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                Style="{StaticResource IconBtn}" ToolTip="Clear finished tasks"
+                                Click="ClearFinishedTasks_Click" Padding="4,2" VerticalAlignment="Center"/>
+                    </DockPanel>
                     <TabControl x:Name="OutputTabs" Style="{StaticResource OutputTabControlStyle}"
                                 SizeChanged="OutputTabs_SizeChanged"/>
                 </DockPanel>
@@ -2053,7 +2059,9 @@
                          VerticalScrollBarVisibility="Auto"
                          Background="{StaticResource BgAbyss}" Foreground="{StaticResource TextBody}"
                          FontFamily="Consolas" FontSize="12"
-                         BorderThickness="0" Padding="8,4" Visibility="Collapsed"/>
+                         BorderThickness="0" Padding="8,4" Visibility="Collapsed"
+                         PreviewKeyDown="TerminalOutput_PreviewKeyDown"
+                         PreviewTextInput="TerminalOutput_PreviewTextInput"/>
             </DockPanel>
         </Border>
 

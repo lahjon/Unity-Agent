@@ -14,10 +14,21 @@
       "id": "app-infrastructure",
       "name": "App Infrastructure \u0026 Logging",
       "category": "infrastructure",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 4,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:36:09.9343633Z",
+      "keywords": [
+        "App.xaml.cs",
+        "AppConstants",
+        "AppLogger",
+        "LogLevel",
+        "SafeFileWriter",
+        "balloon notification",
+        "crash log",
+        "hang log",
+        "tray icon"
+      ],
+      "description": "Handles application startup, crash/hang logging, system tray icon with notification badge counter, balloon notifications, structured app logging with rotation, safe background file writes, and global constants."
     },
     {
       "id": "app-settings",
@@ -243,8 +254,18 @@
       "category": "data",
       "touchCount": 0,
       "primaryFileCount": 4,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T08:41:42.5735511Z",
+      "keywords": [
+        "HistoryManager",
+        "LoadHistoryAsync",
+        "SaveHistory",
+        "StoredTaskEntry",
+        "TaskHistoryEntry",
+        "active queue restore",
+        "history persistence",
+        "retention"
+      ],
+      "description": "Persists completed tasks to disk, loads history on startup, cleans up entries beyond retention period, and saves/restores the active task queue across app restarts."
     },
     {
       "id": "llm-services",
@@ -289,9 +310,9 @@
       "id": "main-window-ui",
       "name": "Main Window \u0026 UI Composition",
       "category": "ui",
-      "touchCount": 4,
-      "primaryFileCount": 6,
-      "lastIndexedAt": "2026-03-10T07:32:42.4373433Z",
+      "touchCount": 5,
+      "primaryFileCount": 7,
+      "lastIndexedAt": "2026-03-10T08:41:42.6155559Z",
       "keywords": [
         "IProjectPanelView",
         "MainWindow",
@@ -317,10 +338,32 @@
       "id": "mcp-integration",
       "name": "MCP Server Integration",
       "category": "integration",
-      "touchCount": 1,
+      "touchCount": 2,
       "primaryFileCount": 4,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T08:34:23.1639675Z",
+      "keywords": [
+        "ConnectMcpAsync",
+        "DisconnectMcp",
+        "IsUnityRunning",
+        "MCP",
+        "McpConfigManager",
+        "McpHealthMonitor",
+        "McpHealthStatus",
+        "McpStatus",
+        "Unity Editor",
+        "async",
+        "changed",
+        "check",
+        "client",
+        "config",
+        "connect",
+        "disconnect",
+        "dispose",
+        "health",
+        "last",
+        "project"
+      ],
+      "description": "Manages MCP-for-Unity server connections: checks if the server process is running, monitors health with auto-restart, and manages per-project connection state. Automatically enables MCP when auto-mode is disabled in a game project."
     },
     {
       "id": "message-bus",
@@ -355,8 +398,19 @@
       "category": "ui",
       "touchCount": 0,
       "primaryFileCount": 2,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T08:18:24.5695649Z",
+      "keywords": [
+        "ANSI",
+        "OutputProcessor",
+        "OutputTabManager",
+        "RichTextBox",
+        "append output",
+        "follow-up output",
+        "output tab",
+        "overflow",
+        "typewriter animation"
+      ],
+      "description": "Creates and manages per-task output tabs in the UI, handles ANSI-stripped streaming output rendering, supports Gemini image galleries, manages overflow when output exceeds the cap, and provides follow-up output injection."
     },
     {
       "id": "output-processing",
@@ -402,8 +456,19 @@
       "category": "core",
       "touchCount": 0,
       "primaryFileCount": 8,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T08:30:42.9612013Z",
+      "keywords": [
+        "GetProjectRulesBlock",
+        "IsGameProject",
+        "ProjectColorManager",
+        "ProjectDescriptionManager",
+        "ProjectEntry",
+        "ProjectManager",
+        "ProjectRulesManager",
+        "project metadata",
+        "project rules"
+      ],
+      "description": "Manages the set of active projects: metadata, per-project rules and instructions, display descriptions, color assignments, crash/log paths, and game-project detection. Acts as the primary source of project configuration consumed by tasks and prompts."
     },
     {
       "id": "project-tasks",
@@ -564,8 +629,19 @@
       "category": "data",
       "touchCount": 0,
       "primaryFileCount": 2,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T08:41:42.5960162Z",
+      "keywords": [
+        "HistoryManager",
+        "TaskGroupState",
+        "TaskGroupTracker",
+        "TaskHistoryEntry",
+        "active queue",
+        "group summary",
+        "history",
+        "session recovery",
+        "stored tasks"
+      ],
+      "description": "Persists completed task history, active queue snapshots, and aggregated task group states. Enables session recovery and historical reporting."
     },
     {
       "id": "task-lifecycle",
@@ -582,8 +658,18 @@
       "category": "core",
       "touchCount": 1,
       "primaryFileCount": 4,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:33:15.97579Z",
+      "keywords": [
+        "DAG",
+        "DependsOn",
+        "TaskOrchestrator",
+        "cycle detection",
+        "dependency graph",
+        "task dependencies",
+        "task ordering",
+        "task ready"
+      ],
+      "description": "Manages a directed acyclic graph (DAG) of task dependencies, ensuring tasks are started only when all their dependencies have resolved. Properly transitions queued tasks to running status when unblocked. Fires TaskReady events and detects dependency cycles."
     },
     {
       "id": "task-preprocessing",
@@ -627,7 +713,7 @@
       "category": "ui",
       "touchCount": 5,
       "primaryFileCount": 9,
-      "lastIndexedAt": "2026-03-10T07:26:45.427525Z",
+      "lastIndexedAt": "2026-03-10T08:18:24.5873861Z",
       "keywords": [
         "GraphInteractionHandler",
         "GraphLayoutEngine",
@@ -656,10 +742,32 @@
       "id": "terminal",
       "name": "Integrated Terminal",
       "category": "ui",
-      "touchCount": 0,
+      "touchCount": 2,
       "primaryFileCount": 3,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:36:54.0385866Z",
+      "keywords": [
+        "ConPTY",
+        "ConPtyTerminal",
+        "SendLine",
+        "TerminalTabManager",
+        "VtScreenBuffer",
+        "buffer",
+        "clear",
+        "close",
+        "command",
+        "command history",
+        "con",
+        "directory",
+        "dispose",
+        "history",
+        "input",
+        "process",
+        "send",
+        "shell",
+        "terminal",
+        "working directory"
+      ],
+      "description": "Embeds a real ConPTY-backed terminal within the application supporting multiple named tabs, full VT100 emulation, command history, working directory tracking, keyboard input handling (arrow keys, Enter, and other keypresses forwarded to the active process), and Ctrl\u002BC interrupt."
     },
     {
       "id": "theming-ui-shared",
@@ -669,6 +777,25 @@
       "primaryFileCount": 3,
       "keywords": [],
       "description": ""
+    },
+    {
+      "id": "tray-icon-badge",
+      "name": "Tray Icon Task Completion Badge",
+      "category": "",
+      "touchCount": 1,
+      "primaryFileCount": 0,
+      "lastIndexedAt": "2026-03-10T07:36:10.0480446Z",
+      "keywords": [
+        "app focus",
+        "badge",
+        "circle badge",
+        "counter",
+        "finished tasks",
+        "notification",
+        "tray icon",
+        "visual indicator"
+      ],
+      "description": "New feature identified from task: Add a notification badge counter to the tray icon that displays the count of finished tasks while the app is not focused. The badge should:\n- Display in the top-right corner of the icon\n- Show the count inside a circle\n- Cap the counter at 99 (show \u002299\u0022 if exceeded)\n- Clear/hide the badge when the app is focused (activated)\n- Increment when tasks finish and the app is not focused\n- Be properly rendered on the tray icon visual"
     },
     {
       "id": "ui-theming",
@@ -682,14 +809,39 @@
   ],
   "modules": [],
   "keywordMap": {
+    "99": [
+      "tray-icon-badge"
+    ],
+    "across": [
+      "history-management"
+    ],
+    "activated": [
+      "tray-icon-badge"
+    ],
     "active": [
-      "task-ui"
+      "history-management",
+      "project-management",
+      "task-history",
+      "task-ui",
+      "terminal"
+    ],
+    "active queue": [
+      "task-history"
+    ],
+    "active queue restore": [
+      "history-management"
     ],
     "activity": [
       "activity-dashboard"
     ],
+    "acts": [
+      "project-management"
+    ],
     "actually": [
       "task-execution"
+    ],
+    "acyclic": [
+      "task-orchestration"
     ],
     "agent": [
       "feature-update-agent",
@@ -697,6 +849,9 @@
     ],
     "agenttask": [
       "task-preprocessing"
+    ],
+    "aggregated": [
+      "task-history"
     ],
     "ai": [
       "helper-suggestions",
@@ -716,6 +871,9 @@
     "animation": [
       "task-ui"
     ],
+    "ansi": [
+      "output-management"
+    ],
     "anthropic": [
       "llm-services"
     ],
@@ -730,15 +888,34 @@
     ],
     "app": [
       "app-infrastructure",
-      "app-startup-config"
+      "app-startup-config",
+      "history-management",
+      "tray-icon-badge"
+    ],
+    "app focus": [
+      "tray-icon-badge"
+    ],
+    "app.xaml.cs": [
+      "app-infrastructure"
+    ],
+    "appconstants": [
+      "app-infrastructure"
+    ],
+    "append output": [
+      "output-management"
     ],
     "application": [
+      "app-infrastructure",
       "app-settings",
       "app-startup",
-      "main-window-ui"
+      "main-window-ui",
+      "terminal"
     ],
     "applies": [
       "task-preprocessing"
+    ],
+    "applogger": [
+      "app-infrastructure"
     ],
     "apply": [
       "task-preprocessing"
@@ -746,24 +923,53 @@
     "applytotask": [
       "task-preprocessing"
     ],
+    "arrow": [
+      "terminal"
+    ],
     "assembles": [
       "prompt-building"
     ],
     "assembly": [
       "prompt-building"
     ],
+    "assignments": [
+      "project-management"
+    ],
+    "async": [
+      "mcp-integration"
+    ],
     "attach": [
       "task-ui"
     ],
     "auto": [
+      "mcp-integration",
       "task-execution",
       "task-preprocessing"
     ],
     "auto flags": [
       "task-preprocessing"
     ],
+    "automatically": [
+      "mcp-integration"
+    ],
     "back": [
       "output-processing"
+    ],
+    "backed": [
+      "terminal"
+    ],
+    "background": [
+      "app-infrastructure"
+    ],
+    "badge": [
+      "app-infrastructure",
+      "tray-icon-badge"
+    ],
+    "balloon": [
+      "app-infrastructure"
+    ],
+    "balloon notification": [
+      "app-infrastructure"
     ],
     "based": [
       "feature-update-agent",
@@ -771,6 +977,9 @@
     ],
     "basellmservice": [
       "llm-services"
+    ],
+    "beyond": [
+      "history-management"
     ],
     "block": [
       "feature-context-resolution",
@@ -791,6 +1000,9 @@
     ],
     "brush": [
       "task-ui"
+    ],
+    "buffer": [
+      "terminal"
     ],
     "builder": [
       "task-execution"
@@ -816,6 +1028,10 @@
     "canvas": [
       "task-ui"
     ],
+    "cap": [
+      "output-management",
+      "tray-icon-badge"
+    ],
     "cards": [
       "task-ui"
     ],
@@ -823,7 +1039,8 @@
       "task-ui"
     ],
     "changed": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "mcp-integration"
     ],
     "chat": [
       "chat",
@@ -833,11 +1050,23 @@
     "chatmessage": [
       "llm-services"
     ],
+    "check": [
+      "mcp-integration"
+    ],
+    "checks": [
+      "mcp-integration"
+    ],
     "child": [
       "output-processing"
     ],
     "chunks": [
       "semantic-search"
+    ],
+    "circle": [
+      "tray-icon-badge"
+    ],
+    "circle badge": [
+      "tray-icon-badge"
     ],
     "claude": [
       "llm-services",
@@ -854,16 +1083,38 @@
     "claudeusagemanager": [
       "llm-services"
     ],
+    "cleans": [
+      "history-management"
+    ],
+    "clear": [
+      "terminal",
+      "tray-icon-badge"
+    ],
     "cli": [
       "output-processing",
       "task-execution"
+    ],
+    "client": [
+      "mcp-integration"
+    ],
+    "close": [
+      "terminal"
     ],
     "codebase": [
       "codebase-indexing",
       "feature-registry"
     ],
+    "color": [
+      "project-management"
+    ],
     "combines": [
       "semantic-search"
+    ],
+    "command": [
+      "terminal"
+    ],
+    "command history": [
+      "terminal"
     ],
     "commands": [
       "task-execution"
@@ -872,12 +1123,15 @@
       "task-execution"
     ],
     "completed": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "history-management",
+      "task-history"
     ],
     "completion": [
       "completion-analysis",
       "feature-context-resolution",
-      "feature-update-agent"
+      "feature-update-agent",
+      "tray-icon-badge"
     ],
     "components": [
       "theming-ui-shared"
@@ -891,18 +1145,45 @@
     "composition root": [
       "main-window-ui"
     ],
+    "con": [
+      "terminal"
+    ],
     "confidence threshold": [
       "feature-context-resolution"
     ],
+    "config": [
+      "mcp-integration"
+    ],
     "configuration": [
       "app-startup-config",
+      "project-management",
       "prompt-building"
     ],
+    "connect": [
+      "mcp-integration"
+    ],
+    "connection": [
+      "mcp-integration"
+    ],
+    "connections": [
+      "mcp-integration"
+    ],
+    "connectmcpasync": [
+      "mcp-integration"
+    ],
     "conpty": [
-      "task-execution"
+      "task-execution",
+      "terminal"
+    ],
+    "conptyterminal": [
+      "terminal"
     ],
     "constants": [
+      "app-infrastructure",
       "app-settings"
+    ],
+    "consumed": [
+      "project-management"
     ],
     "context": [
       "context-optimization",
@@ -926,14 +1207,43 @@
     "coordinates": [
       "main-window-ui"
     ],
+    "corner": [
+      "tray-icon-badge"
+    ],
     "cosine similarity": [
       "semantic-search"
+    ],
+    "count": [
+      "tray-icon-badge"
+    ],
+    "counter": [
+      "app-infrastructure",
+      "tray-icon-badge"
+    ],
+    "crash": [
+      "app-infrastructure",
+      "project-management"
+    ],
+    "crash log": [
+      "app-infrastructure"
+    ],
+    "creates": [
+      "output-management"
     ],
     "creation": [
       "task-factory"
     ],
+    "ctrl\u002Bc": [
+      "terminal"
+    ],
     "current": [
       "feature-update-agent"
+    ],
+    "cycle detection": [
+      "task-orchestration"
+    ],
+    "cycles": [
+      "task-orchestration"
     ],
     "dag": [
       "task-orchestration"
@@ -957,16 +1267,22 @@
       "main-window-ui"
     ],
     "dependencies": [
-      "feature-registry"
+      "feature-registry",
+      "task-orchestration"
     ],
     "dependency": [
+      "task-orchestration",
       "task-ui"
+    ],
+    "dependency graph": [
+      "task-orchestration"
     ],
     "dependency visualization": [
       "task-ui"
     ],
     "dependson": [
-      "feature-registry"
+      "feature-registry",
+      "task-orchestration"
     ],
     "description": [
       "feature-context-resolution",
@@ -974,11 +1290,49 @@
       "task-execution",
       "task-preprocessing"
     ],
+    "descriptions": [
+      "project-management"
+    ],
+    "detection": [
+      "project-management"
+    ],
+    "detects": [
+      "task-orchestration"
+    ],
     "diagnostics": [
       "logging-diagnostics"
     ],
+    "directed": [
+      "task-orchestration"
+    ],
+    "directory": [
+      "terminal"
+    ],
+    "disabled": [
+      "mcp-integration"
+    ],
+    "disconnect": [
+      "mcp-integration"
+    ],
+    "disconnectmcp": [
+      "mcp-integration"
+    ],
     "discovery": [
       "feature-initialization"
+    ],
+    "disk": [
+      "history-management"
+    ],
+    "display": [
+      "project-management",
+      "tray-icon-badge"
+    ],
+    "displays": [
+      "tray-icon-badge"
+    ],
+    "dispose": [
+      "mcp-integration",
+      "terminal"
     ],
     "early": [
       "progress-tracking"
@@ -992,11 +1346,30 @@
     "embeddingservice": [
       "semantic-search"
     ],
+    "embeds": [
+      "terminal"
+    ],
+    "emulation": [
+      "terminal"
+    ],
+    "enables": [
+      "mcp-integration",
+      "task-history"
+    ],
     "engine": [
       "task-execution"
     ],
     "ensures": [
       "task-execution"
+    ],
+    "ensuring": [
+      "task-orchestration"
+    ],
+    "enter": [
+      "terminal"
+    ],
+    "entries": [
+      "history-management"
     ],
     "errors": [
       "output-processing"
@@ -1005,7 +1378,14 @@
       "main-window-ui"
     ],
     "events": [
-      "main-window-ui"
+      "main-window-ui",
+      "task-orchestration"
+    ],
+    "exceeded": [
+      "tray-icon-badge"
+    ],
+    "exceeds": [
+      "output-management"
     ],
     "executing": [
       "task-execution"
@@ -1042,7 +1422,8 @@
       "feature-registry",
       "feature-update-agent",
       "prompt-building",
-      "task-preprocessing"
+      "task-preprocessing",
+      "tray-icon-badge"
     ],
     "feature context": [
       "feature-context-resolution"
@@ -1084,6 +1465,7 @@
       "feature-update-agent"
     ],
     "file": [
+      "app-infrastructure",
       "file-lock-management",
       "logging-infrastructure",
       "semantic-search"
@@ -1091,11 +1473,23 @@
     "files": [
       "main-window-ui"
     ],
+    "finish": [
+      "tray-icon-badge"
+    ],
+    "finished": [
+      "tray-icon-badge"
+    ],
+    "finished tasks": [
+      "tray-icon-badge"
+    ],
     "fire": [
       "feature-update-agent"
     ],
     "fire and forget": [
       "feature-update-agent"
+    ],
+    "fires": [
+      "task-orchestration"
     ],
     "flag": [
       "task-preprocessing"
@@ -1106,24 +1500,48 @@
     "flags": [
       "task-preprocessing"
     ],
+    "focused": [
+      "tray-icon-badge"
+    ],
+    "follow": [
+      "output-management"
+    ],
+    "follow-up output": [
+      "output-management"
+    ],
     "forget": [
       "feature-update-agent"
     ],
+    "forwarded": [
+      "terminal"
+    ],
     "full": [
       "prompt-building",
-      "task-execution"
+      "task-execution",
+      "terminal"
+    ],
+    "galleries": [
+      "output-management"
+    ],
+    "game": [
+      "mcp-integration",
+      "project-management"
     ],
     "gamerules": [
       "prompt-building"
     ],
     "gemini": [
-      "llm-services"
+      "llm-services",
+      "output-management"
     ],
     "geminiservice": [
       "llm-services"
     ],
     "generation": [
       "llm-services"
+    ],
+    "getprojectrulesblock": [
+      "project-management"
     ],
     "git": [
       "git-operations",
@@ -1133,11 +1551,15 @@
     "given": [
       "feature-context-resolution"
     ],
+    "global": [
+      "app-infrastructure"
+    ],
     "google": [
       "llm-services"
     ],
     "graph": [
       "task-graph-ui",
+      "task-orchestration",
       "task-ui"
     ],
     "graphinteractionhandler": [
@@ -1153,6 +1575,9 @@
       "task-group-tracking",
       "task-history"
     ],
+    "group summary": [
+      "task-history"
+    ],
     "haiku": [
       "feature-update-agent",
       "task-preprocessing"
@@ -1161,21 +1586,47 @@
       "feature-update-agent"
     ],
     "handles": [
+      "app-infrastructure",
       "feature-context-resolution",
       "main-window-ui",
+      "output-management",
       "output-processing",
       "prompt-building"
     ],
     "handling": [
-      "task-execution"
+      "task-execution",
+      "terminal"
+    ],
+    "hang": [
+      "app-infrastructure"
+    ],
+    "hang log": [
+      "app-infrastructure"
+    ],
+    "health": [
+      "mcp-integration"
     ],
     "helper": [
       "helper-suggestions"
+    ],
+    "hide": [
+      "tray-icon-badge"
+    ],
+    "historical": [
+      "task-history"
     ],
     "history": [
       "history-analytics",
       "history-management",
       "semantic-search",
+      "task-history",
+      "terminal"
+    ],
+    "history persistence": [
+      "history-management"
+    ],
+    "historymanager": [
+      "history-management",
       "task-history"
     ],
     "hybrid": [
@@ -1188,8 +1639,16 @@
     "hybridsearchmanager": [
       "semantic-search"
     ],
+    "icon": [
+      "app-infrastructure",
+      "tray-icon-badge"
+    ],
+    "identified": [
+      "tray-icon-badge"
+    ],
     "image": [
-      "llm-services"
+      "llm-services",
+      "output-management"
     ],
     "image generation": [
       "llm-services"
@@ -1199,6 +1658,9 @@
     ],
     "including": [
       "llm-services"
+    ],
+    "increment": [
+      "tray-icon-badge"
     ],
     "indexing": [
       "codebase-indexing"
@@ -1224,15 +1686,21 @@
     "injection": [
       "feature-context-resolution",
       "feature-registry",
+      "output-management",
       "task-execution"
     ],
     "injectsubtaskresult": [
       "output-processing"
     ],
     "input": [
-      "prompt-building"
+      "prompt-building",
+      "terminal"
+    ],
+    "inside": [
+      "tray-icon-badge"
     ],
     "instructions": [
+      "project-management",
       "prompt-building"
     ],
     "integrated": [
@@ -1252,8 +1720,17 @@
     "interfaces": [
       "llm-services"
     ],
+    "interrupt": [
+      "terminal"
+    ],
     "iprojectpanelview": [
       "main-window-ui"
+    ],
+    "isgameproject": [
+      "project-management"
+    ],
+    "isunityrunning": [
+      "mcp-integration"
     ],
     "json": [
       "llm-services"
@@ -1263,6 +1740,15 @@
     ],
     "key": [
       "llm-services"
+    ],
+    "keyboard": [
+      "terminal"
+    ],
+    "keypresses": [
+      "terminal"
+    ],
+    "keys": [
+      "terminal"
     ],
     "keyword": [
       "semantic-search"
@@ -1280,7 +1766,8 @@
       "main-window-ui"
     ],
     "last": [
-      "main-window-ui"
+      "main-window-ui",
+      "mcp-integration"
     ],
     "launches": [
       "task-execution"
@@ -1310,13 +1797,25 @@
     "llm": [
       "llm-services"
     ],
+    "loadhistoryasync": [
+      "history-management"
+    ],
+    "loads": [
+      "history-management"
+    ],
     "lock": [
       "file-lock-management"
+    ],
+    "log": [
+      "project-management"
     ],
     "logging": [
       "app-infrastructure",
       "logging-diagnostics",
       "logging-infrastructure"
+    ],
+    "loglevel": [
+      "app-infrastructure"
     ],
     "lookup": [
       "feature-registry"
@@ -1349,7 +1848,11 @@
     ],
     "manages": [
       "main-window-ui",
-      "task-execution"
+      "mcp-integration",
+      "output-management",
+      "project-management",
+      "task-execution",
+      "task-orchestration"
     ],
     "managing": [
       "task-execution"
@@ -1365,6 +1868,18 @@
       "prompt-building",
       "task-preprocessing"
     ],
+    "mcpconfigmanager": [
+      "mcp-integration"
+    ],
+    "mcphealthmonitor": [
+      "mcp-integration"
+    ],
+    "mcphealthstatus": [
+      "mcp-integration"
+    ],
+    "mcpstatus": [
+      "mcp-integration"
+    ],
     "members": [
       "output-processing"
     ],
@@ -1377,12 +1892,16 @@
     "message": [
       "message-bus"
     ],
+    "metadata": [
+      "project-management"
+    ],
     "method": [
       "llm-services"
     ],
     "mode": [
       "feature-mode",
       "feature-mode-execution",
+      "mcp-integration",
       "task-preprocessing"
     ],
     "model": [
@@ -1404,10 +1923,20 @@
       "module-registry"
     ],
     "monitors": [
+      "mcp-integration",
       "task-execution"
+    ],
+    "multiple": [
+      "terminal"
     ],
     "name": [
       "feature-registry"
+    ],
+    "named": [
+      "terminal"
+    ],
+    "new": [
+      "tray-icon-badge"
     ],
     "nogitwrite": [
       "prompt-building"
@@ -1415,8 +1944,18 @@
     "non": [
       "llm-services"
     ],
+    "notification": [
+      "app-infrastructure",
+      "tray-icon-badge"
+    ],
+    "notifications": [
+      "app-infrastructure"
+    ],
     "o": [
       "task-execution"
+    ],
+    "only": [
+      "task-orchestration"
     ],
     "operations": [
       "git-operations"
@@ -1431,6 +1970,9 @@
       "feature-mode",
       "task-orchestration"
     ],
+    "other": [
+      "terminal"
+    ],
     "output": [
       "output-management",
       "output-processing",
@@ -1441,9 +1983,11 @@
       "output-processing"
     ],
     "output tab": [
+      "output-management",
       "task-ui"
     ],
     "outputprocessor": [
+      "output-management",
       "output-processing"
     ],
     "outputs": [
@@ -1451,10 +1995,14 @@
       "output-processing"
     ],
     "outputtabmanager": [
+      "output-management",
       "task-ui"
     ],
     "over": [
       "semantic-search"
+    ],
+    "overflow": [
+      "output-management"
     ],
     "overriding": [
       "task-preprocessing"
@@ -1475,17 +2023,32 @@
     "partial class": [
       "main-window-ui"
     ],
+    "paths": [
+      "project-management"
+    ],
     "pause": [
       "task-execution"
     ],
     "pause resume cancel": [
       "task-execution"
     ],
+    "per": [
+      "mcp-integration",
+      "output-management",
+      "project-management"
+    ],
+    "period": [
+      "history-management"
+    ],
     "persistence": [
       "history-management"
     ],
     "persistent": [
       "feature-registry"
+    ],
+    "persists": [
+      "history-management",
+      "task-history"
     ],
     "placeholders": [
       "main-window-ui"
@@ -1513,10 +2076,13 @@
       "task-preprocessing"
     ],
     "primary": [
+      "project-management",
       "task-ui"
     ],
     "process": [
-      "task-execution"
+      "mcp-integration",
+      "task-execution",
+      "terminal"
     ],
     "process management": [
       "task-execution"
@@ -1531,12 +2097,37 @@
       "progress-tracking"
     ],
     "project": [
+      "mcp-integration",
       "project-management",
       "project-tasks",
       "prompt-building"
     ],
+    "project metadata": [
+      "project-management"
+    ],
     "project panel": [
       "main-window-ui"
+    ],
+    "project rules": [
+      "project-management"
+    ],
+    "projectcolormanager": [
+      "project-management"
+    ],
+    "projectdescriptionmanager": [
+      "project-management"
+    ],
+    "projectentry": [
+      "project-management"
+    ],
+    "projectmanager": [
+      "project-management"
+    ],
+    "projectrulesmanager": [
+      "project-management"
+    ],
+    "projects": [
+      "project-management"
     ],
     "prompt": [
       "feature-context-resolution",
@@ -1554,6 +2145,7 @@
       "prompt-building"
     ],
     "prompts": [
+      "project-management",
       "prompt-building",
       "task-templates",
       "task-templates-storage"
@@ -1561,20 +2153,36 @@
     "proper": [
       "task-execution"
     ],
+    "properly": [
+      "task-orchestration",
+      "tray-icon-badge"
+    ],
     "provides": [
       "feature-registry",
       "llm-services",
+      "output-management",
       "semantic-search",
       "task-ui"
     ],
+    "queue": [
+      "history-management",
+      "task-history"
+    ],
     "queued": [
-      "task-execution"
+      "task-execution",
+      "task-orchestration"
     ],
     "ranking": [
       "semantic-search"
     ],
     "raw": [
       "output-processing"
+    ],
+    "real": [
+      "terminal"
+    ],
+    "recovery": [
+      "task-history"
     ],
     "reduction": [
       "prompt-building"
@@ -1594,11 +2202,20 @@
     "relevant": [
       "feature-context-resolution"
     ],
+    "rendered": [
+      "tray-icon-badge"
+    ],
+    "rendering": [
+      "output-management"
+    ],
     "renders": [
       "task-ui"
     ],
     "repeated": [
       "prompt-building"
+    ],
+    "reporting": [
+      "task-history"
     ],
     "resolution": [
       "feature-context-resolution"
@@ -1606,14 +2223,29 @@
     "resolveasync": [
       "feature-context-resolution"
     ],
+    "resolved": [
+      "task-orchestration"
+    ],
     "resolves": [
       "feature-context-resolution"
     ],
     "resourcedictionary": [
       "main-window-ui"
     ],
+    "restart": [
+      "mcp-integration"
+    ],
+    "restarts": [
+      "history-management"
+    ],
+    "restores": [
+      "history-management"
+    ],
     "resume": [
       "task-execution"
+    ],
+    "retention": [
+      "history-management"
     ],
     "retries": [
       "prompt-building",
@@ -1622,22 +2254,44 @@
     "retry": [
       "output-processing"
     ],
+    "richtextbox": [
+      "output-management"
+    ],
+    "right": [
+      "tray-icon-badge"
+    ],
     "root": [
       "main-window-ui"
     ],
+    "rotation": [
+      "app-infrastructure"
+    ],
     "rules": [
       "preprocessor-skip-rules",
+      "project-management",
       "prompt-building"
     ],
     "running": [
-      "task-execution"
+      "mcp-integration",
+      "task-execution",
+      "task-orchestration"
     ],
     "safe": [
+      "app-infrastructure",
       "logging-infrastructure"
+    ],
+    "safefilewriter": [
+      "app-infrastructure"
     ],
     "saved": [
       "task-templates",
       "task-templates-storage"
+    ],
+    "savehistory": [
+      "history-management"
+    ],
+    "saves": [
+      "history-management"
     ],
     "scoring": [
       "semantic-search"
@@ -1655,8 +2309,14 @@
     "semanticindexinitializer": [
       "semantic-search"
     ],
+    "send": [
+      "terminal"
+    ],
     "sendchatmessagestreamingasync": [
       "llm-services"
+    ],
+    "sendline": [
+      "terminal"
     ],
     "sends": [
       "task-preprocessing"
@@ -1673,7 +2333,14 @@
     "services": [
       "llm-services"
     ],
+    "session": [
+      "task-history"
+    ],
+    "session recovery": [
+      "task-history"
+    ],
     "set": [
+      "project-management",
       "task-preprocessing"
     ],
     "settings": [
@@ -1682,6 +2349,12 @@
     ],
     "shared": [
       "theming-ui-shared"
+    ],
+    "shell": [
+      "terminal"
+    ],
+    "show": [
+      "tray-icon-badge"
     ],
     "signatures": [
       "feature-registry"
@@ -1699,7 +2372,11 @@
     "skip": [
       "preprocessor-skip-rules"
     ],
+    "snapshots": [
+      "task-history"
+    ],
     "source": [
+      "project-management",
       "semantic-search"
     ],
     "spawn": [
@@ -1717,21 +2394,37 @@
     "stale": [
       "main-window-ui"
     ],
+    "started": [
+      "task-orchestration"
+    ],
     "startup": [
+      "app-infrastructure",
       "app-startup-config",
+      "history-management",
       "main-window-ui"
     ],
     "state": [
+      "mcp-integration",
       "task-execution",
       "task-lifecycle"
     ],
+    "states": [
+      "task-history"
+    ],
     "status": [
-      "task-execution"
+      "task-execution",
+      "task-orchestration"
     ],
     "stored": [
       "semantic-search",
       "stored-task-viewer",
       "task-execution"
+    ],
+    "stored tasks": [
+      "task-history"
+    ],
+    "storedtaskentry": [
+      "history-management"
     ],
     "stream-json": [
       "output-processing",
@@ -1739,9 +2432,14 @@
     ],
     "streaming": [
       "llm-services",
+      "output-management",
       "task-ui"
     ],
+    "stripped": [
+      "output-management"
+    ],
     "structured": [
+      "app-infrastructure",
       "llm-services"
     ],
     "style": [
@@ -1757,6 +2455,12 @@
     "suggestions": [
       "helper-suggestions"
     ],
+    "supporting": [
+      "terminal"
+    ],
+    "supports": [
+      "output-management"
+    ],
     "switching": [
       "output-processing"
     ],
@@ -1769,6 +2473,7 @@
       "feature-registry"
     ],
     "system": [
+      "app-infrastructure",
       "main-window-ui",
       "prompt-building",
       "skills-system",
@@ -1781,7 +2486,9 @@
       "task-ui"
     ],
     "tabs": [
-      "task-ui"
+      "output-management",
+      "task-ui",
+      "terminal"
     ],
     "task": [
       "completion-analysis",
@@ -1808,16 +2515,26 @@
       "task-preprocessing",
       "task-templates",
       "task-templates-storage",
-      "task-ui"
+      "task-ui",
+      "tray-icon-badge"
     ],
     "task card": [
       "task-ui"
+    ],
+    "task dependencies": [
+      "task-orchestration"
     ],
     "task graph": [
       "task-ui"
     ],
     "task launch": [
       "task-execution"
+    ],
+    "task ordering": [
+      "task-orchestration"
+    ],
+    "task ready": [
+      "task-orchestration"
     ],
     "task relevance": [
       "feature-context-resolution"
@@ -1828,8 +2545,21 @@
     "taskexecutionservices": [
       "task-execution"
     ],
+    "taskgroupstate": [
+      "task-history"
+    ],
+    "taskgrouptracker": [
+      "task-history"
+    ],
+    "taskhistoryentry": [
+      "history-management",
+      "task-history"
+    ],
     "tasknodegraphpanel": [
       "task-ui"
+    ],
+    "taskorchestrator": [
+      "task-orchestration"
     ],
     "taskpreprocessor": [
       "task-preprocessing"
@@ -1837,9 +2567,16 @@
     "taskprocesslauncher": [
       "task-execution"
     ],
+    "taskready": [
+      "task-orchestration"
+    ],
     "tasks": [
+      "history-management",
       "output-processing",
-      "task-execution"
+      "project-management",
+      "task-execution",
+      "task-orchestration",
+      "tray-icon-badge"
     ],
     "team": [
       "output-processing",
@@ -1858,8 +2595,14 @@
     "terminal": [
       "terminal"
     ],
+    "terminaltabmanager": [
+      "terminal"
+    ],
     "termination": [
       "progress-tracking"
+    ],
+    "their": [
+      "task-orchestration"
     ],
     "theming": [
       "theming-ui-shared",
@@ -1880,7 +2623,8 @@
       "output-processing"
     ],
     "top": [
-      "main-window-ui"
+      "main-window-ui",
+      "tray-icon-badge"
     ],
     "total": [
       "main-window-ui"
@@ -1889,20 +2633,34 @@
       "llm-services",
       "progress-tracking",
       "task-group-tracking",
-      "task-history"
+      "task-history",
+      "terminal"
     ],
     "transition": [
       "task-execution"
     ],
     "transitions": [
-      "task-execution"
+      "task-execution",
+      "task-orchestration"
+    ],
+    "tray": [
+      "app-infrastructure",
+      "tray-icon-badge"
+    ],
+    "tray icon": [
+      "app-infrastructure",
+      "tray-icon-badge"
     ],
     "types": [
       "preprocessor-skip-rules"
     ],
+    "typewriter animation": [
+      "output-management"
+    ],
     "ui": [
       "git-ui",
       "main-window-ui",
+      "output-management",
       "task-graph-ui",
       "task-ui",
       "theming-ui-shared",
@@ -1910,6 +2668,19 @@
     ],
     "ui orchestration": [
       "main-window-ui"
+    ],
+    "unblocked": [
+      "task-orchestration"
+    ],
+    "unity": [
+      "mcp-integration"
+    ],
+    "unity editor": [
+      "mcp-integration"
+    ],
+    "up": [
+      "history-management",
+      "output-management"
     ],
     "update registry": [
       "feature-update-agent"
@@ -1956,6 +2727,12 @@
     "viewer": [
       "stored-task-viewer"
     ],
+    "visual": [
+      "tray-icon-badge"
+    ],
+    "visual indicator": [
+      "tray-icon-badge"
+    ],
     "visualization": [
       "task-ui"
     ],
@@ -1965,11 +2742,23 @@
     "voyage embeddings": [
       "semantic-search"
     ],
+    "vt100": [
+      "terminal"
+    ],
+    "vtscreenbuffer": [
+      "terminal"
+    ],
+    "while": [
+      "tray-icon-badge"
+    ],
     "window": [
       "main-window-ui"
     ],
     "wires": [
       "main-window-ui"
+    ],
+    "within": [
+      "terminal"
     ],
     "without": [
       "feature-update-agent",
@@ -1984,8 +2773,17 @@
     "workflows": [
       "main-window-ui"
     ],
+    "working": [
+      "terminal"
+    ],
+    "working directory": [
+      "terminal"
+    ],
     "wpf": [
       "main-window-ui"
+    ],
+    "writes": [
+      "app-infrastructure"
     ],
     "writing": [
       "logging-infrastructure"

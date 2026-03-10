@@ -97,11 +97,18 @@ namespace Spritely
                 bottomRow.Height = new GridLength(bottomRow.ActualHeight);
         }
 
-        /// <summary>Restores both star rows to proportional sizing after layout settles, preserving their current ratio.</summary>
+        /// <summary>Restores both star rows to proportional sizing, preserving their current ratio.
+        /// Uses Normal priority (above Render) so the restore completes before the next
+        /// render frame, preventing a single-frame snap when rows are temporarily pixel-pinned.</summary>
         private void RestoreStarRows()
         {
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+            if (_restoreStarRowsPending) return;
+            _restoreStarRowsPending = true;
+
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, () =>
             {
+                _restoreStarRowsPending = false;
+
                 // Don't restore star sizing while the user is actively dragging the splitter
                 if (_isSplitterDragging) return;
 
@@ -249,6 +256,10 @@ namespace Spritely
         /// </summary>
         private void PerformTaskTeardown(AgentTask task, bool closeTab = true)
         {
+            // Close tab immediately so the UI feels responsive
+            if (closeTab)
+                _outputTabManager.CloseTab(task);
+
             // Persist changed files before releasing locks so manual commit can find them later
             if (task.ChangedFiles.Count == 0)
             {
@@ -273,13 +284,14 @@ namespace Spritely
             _fileLockManager.RemoveQueuedInfo(task.Id);
             _taskExecutionManager.RemoveStreamingState(task.Id);
 
+            // Increment tray badge if app is not focused
+            if (!IsActive)
+                App.IncrementTrayBadge();
+
             // Move from active to history (skip if already present to avoid duplicates)
             _activeTasks.Remove(task);
             if (!_historyTasks.Contains(task))
                 _historyTasks.Insert(0, task);
-
-            if (closeTab)
-                _outputTabManager.CloseTab(task);
 
             _historyManager.SaveHistory(_historyTasks);
             RefreshActivityDashboard();
@@ -549,15 +561,6 @@ namespace Spritely
                 RefreshFilterCombos();
                 UpdateStatus();
             });
-        }
-
-        private void OnMcpInvestigationRequested(AgentTask task)
-        {
-            AddActiveTask(task);
-            _outputTabManager.CreateTab(task);
-            _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-            RefreshFilterCombos();
-            UpdateStatus();
         }
 
         private void OnMcpOutputChanged(string projectPath)

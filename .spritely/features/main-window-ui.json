@@ -28,7 +28,8 @@
     "MainWindow.Settings.cs",
     "MainWindow.TaskExecution.cs",
     "Views/MainWindow.Orchestration.cs",
-    "Views/MainWindow.UiLayout.cs"
+    "Views/MainWindow.UiLayout.cs",
+    "Views/MainWindow.xaml.cs"
   ],
   "secondaryFiles": [
     "Controls/Templates/TaskCardTemplates.xaml",
@@ -137,7 +138,7 @@
         "content": "class MainWindow"
       },
       "Views/MainWindow.UiLayout.cs": {
-        "hash": "154bf92268e0",
+        "hash": "3f3755e44f9d",
         "content": "class MainWindow"
       },
       "MainWindow.Settings.cs": {
@@ -145,8 +146,12 @@
         "content": "class MainWindow"
       },
       "Views/MainWindow.Orchestration.cs": {
-        "hash": "480d5ab49e9d",
+        "hash": "d8e6ccaa2700",
         "content": "class MainWindow"
+      },
+      "Views/MainWindow.xaml.cs": {
+        "hash": "99fba8fff766",
+        "content": "class MainWindow : Window, IDisposable, IProjectPanelView\n  L36: DefaultSystemPrompt: string = PromptBuilder.DefaultSystemPrompt"
       }
     },
     "keyTypes": [
@@ -174,7 +179,7 @@
     "Stale",
     "Total"
   ],
-  "touchCount": 4,
-  "lastUpdatedAt": "2026-03-09T21:45:13.0307752Z",
-  "lastUpdatedByTaskId": "7b4a08c6ee8f4408"
+  "touchCount": 5,
+  "lastUpdatedAt": "2026-03-10T07:36:10.0353374Z",
+  "lastUpdatedByTaskId": "4866d541d9e44604"
 }

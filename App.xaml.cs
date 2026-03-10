@@ -18,6 +18,79 @@ namespace Spritely
         private static string HangLogFile => Path.Combine(LogDir, "hang.log");
 
         private static System.Windows.Forms.NotifyIcon? _notifyIcon;
+        private static System.Drawing.Icon? _originalIcon;
+        private static int _trayBadgeCount;
+
+        /// <summary>
+        /// Increments the tray icon badge counter and redraws the icon overlay.
+        /// Call from the UI thread when a task completes while the app is not focused.
+        /// </summary>
+        public static void IncrementTrayBadge()
+        {
+            _trayBadgeCount++;
+            UpdateTrayBadgeIcon();
+        }
+
+        /// <summary>
+        /// Clears the tray icon badge counter and restores the original icon.
+        /// Call when the app window is activated/focused.
+        /// </summary>
+        public static void ClearTrayBadge()
+        {
+            if (_trayBadgeCount == 0) return;
+            _trayBadgeCount = 0;
+            if (_notifyIcon != null && _originalIcon != null)
+                _notifyIcon.Icon = _originalIcon;
+        }
+
+        private static void UpdateTrayBadgeIcon()
+        {
+            if (_notifyIcon == null || _originalIcon == null) return;
+
+            var count = Math.Min(_trayBadgeCount, 99);
+            var text = count.ToString();
+
+            try
+            {
+                // Get the original icon bitmap at its native size
+                using var originalBmp = _originalIcon.ToBitmap();
+                var size = originalBmp.Width;
+                using var bmp = new System.Drawing.Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                using var g = System.Drawing.Graphics.FromImage(bmp);
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+
+                // Draw the original icon
+                g.DrawImage(originalBmp, 0, 0, size, size);
+
+                // Badge circle dimensions — top-right quadrant
+                var badgeSize = (int)(size * 0.55f);
+                var badgeX = size - badgeSize;
+                var badgeY = 0;
+
+                // Draw badge circle with border
+                using var bgBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(220, 220, 50, 50));
+                using var borderPen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(200, 30, 30, 30), size * 0.04f);
+                g.FillEllipse(bgBrush, badgeX, badgeY, badgeSize, badgeSize);
+                g.DrawEllipse(borderPen, badgeX, badgeY, badgeSize, badgeSize);
+
+                // Draw count text centered in badge
+                var fontSize = count < 10 ? badgeSize * 0.55f : badgeSize * 0.42f;
+                using var font = new System.Drawing.Font("Segoe UI", fontSize, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Pixel);
+                using var textBrush = new System.Drawing.SolidBrush(System.Drawing.Color.White);
+                var textSize = g.MeasureString(text, font);
+                var textX = badgeX + (badgeSize - textSize.Width) / 2f;
+                var textY = badgeY + (badgeSize - textSize.Height) / 2f;
+                g.DrawString(text, font, textBrush, textX, textY);
+
+                var hIcon = bmp.GetHicon();
+                _notifyIcon.Icon = System.Drawing.Icon.FromHandle(hIcon);
+            }
+            catch (Exception ex)
+            {
+                Managers.AppLogger.Debug("App", $"Failed to update tray badge icon: {ex.Message}");
+            }
+        }
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -44,6 +117,7 @@ namespace Spritely
                     _notifyIcon.Icon = System.Drawing.SystemIcons.Application;
                     Managers.AppLogger.Warn("App", "icon.ico not found, using default system icon");
                 }
+                _originalIcon = (System.Drawing.Icon)_notifyIcon.Icon.Clone();
                 _notifyIcon.Text = "Spritely";
                 _notifyIcon.Visible = true;
             }

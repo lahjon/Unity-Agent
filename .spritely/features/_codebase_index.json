@@ -285,7 +285,7 @@
     },
     "sendinterrupt": {
       "featureId": "terminal",
-      "filePath": "TerminalTabManager.cs",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "SendInterrupt() -\u003E void"
     },
@@ -302,16 +302,16 @@
       "shortSignature": "ClearOutput() -\u003E void"
     },
     "dispose": {
-      "featureId": "task-orchestration",
-      "filePath": "Spritely.Tests/SessionDataCleanupTests.cs",
+      "featureId": "terminal",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "Dispose() -\u003E void"
     },
     "mainwindow": {
       "featureId": "main-window-ui",
-      "filePath": "Views/MainWindow.UiLayout.cs",
+      "filePath": "Views/MainWindow.xaml.cs",
       "kind": "Class",
-      "shortSignature": "class MainWindow"
+      "shortSignature": "class MainWindow : Window, IDisposable, IProjectPanelView"
     },
     "releasetasklocksaftercommit": {
       "featureId": "task-execution",
@@ -344,50 +344,50 @@
       "shortSignature": "LastUpdated: DateTime"
     },
     "defaultsystemprompt": {
-      "featureId": "prompt-building",
-      "filePath": "Managers/PromptBuilder.cs",
+      "featureId": "main-window-ui",
+      "filePath": "Views/MainWindow.xaml.cs",
       "kind": "Const",
-      "shortSignature": "DefaultSystemPrompt: string = PromptLoader.Load(\u0022DefaultSystemPromp..."
+      "shortSignature": "DefaultSystemPrompt: string = PromptBuilder.DefaultSystemPrompt"
     },
     "terminaltabmanager": {
       "featureId": "terminal",
-      "filePath": "TerminalTabManager.cs",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Class",
       "shortSignature": "class TerminalTabManager : IDisposable"
     },
     "updateworkingdirectory": {
       "featureId": "terminal",
-      "filePath": "TerminalTabManager.cs",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "UpdateWorkingDirectory(string directory) -\u003E void"
     },
     "addterminal": {
       "featureId": "terminal",
-      "filePath": "TerminalTabManager.cs",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "AddTerminal(string? workingDirectory = null) -\u003E void"
     },
     "closeterminal": {
       "featureId": "terminal",
-      "filePath": "TerminalTabManager.cs",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "CloseTerminal(int index) -\u003E void"
     },
     "switchto": {
       "featureId": "terminal",
-      "filePath": "TerminalTabManager.cs",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "SwitchTo(int index) -\u003E void"
     },
     "sendcommand": {
       "featureId": "terminal",
-      "filePath": "TerminalTabManager.cs",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "SendCommand() -\u003E void"
     },
     "handlekeydown": {
       "featureId": "terminal",
-      "filePath": "TerminalTabManager.cs",
+      "filePath": "Managers/TerminalTabManager.cs",
       "kind": "Method",
       "shortSignature": "HandleKeyDown(KeyEventArgs e) -\u003E void"
     },
@@ -8178,6 +8178,18 @@
       "filePath": "Spritely.Tests/TaskOrchestratorTests.cs",
       "kind": "Method",
       "shortSignature": "RemoveTask_UnknownTaskId_DoesNotThrow() -\u003E void"
+    },
+    "handleoutputkeydown": {
+      "featureId": "terminal",
+      "filePath": "Managers/TerminalTabManager.cs",
+      "kind": "Method",
+      "shortSignature": "HandleOutputKeyDown(KeyEventArgs e) -\u003E void"
+    },
+    "handleoutputtextinput": {
+      "featureId": "terminal",
+      "filePath": "Managers/TerminalTabManager.cs",
+      "kind": "Method",
+      "shortSignature": "HandleOutputTextInput(System.Windows.Input.TextCompositionEventArgs e) -\u003E void"
     }
   }
 }

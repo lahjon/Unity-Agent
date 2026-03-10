@@ -278,6 +278,8 @@ namespace Spritely
 
         private void OutputTabs_SizeChanged(object sender, SizeChangedEventArgs e) => _outputTabManager.UpdateOutputTabWidths();
 
+        private void ClearFinishedTasks_Click(object sender, RoutedEventArgs e) => _outputTabManager.ClearFinishedTabs(_activeTasks, _historyTasks);
+
         private void OnTabCloseRequested(AgentTask task) => CloseTab(task);
 
         private void OnTabStoreRequested(AgentTask task)
@@ -320,18 +322,25 @@ namespace Spritely
             FinalizeTask(task);
         }
 
-        private void OnTabResumeRequested(AgentTask task)
+        /// <summary>
+        /// Moves a task from history back to active if needed, preventing layout jitter.
+        /// </summary>
+        private void MoveToActiveIfNeeded(AgentTask task)
         {
-            if (!task.IsFinished) return;
-
-            // If the task was already moved to history, bring it back to active
-            if (_historyTasks.Contains(task))
+            if (_historyTasks.Contains(task) && !_activeTasks.Contains(task))
             {
                 _historyTasks.Remove(task);
                 PinRowHeights();
                 _activeTasks.Insert(0, task);
                 RestoreStarRows();
             }
+        }
+
+        private void OnTabResumeRequested(AgentTask task)
+        {
+            if (!task.IsFinished) return;
+
+            MoveToActiveIfNeeded(task);
 
             var resumeMethod = !string.IsNullOrEmpty(task.ConversationId) ? "--resume (session tracked)" : "fresh session (no session ID)";
             _outputTabManager.AppendOutput(task.Id,
@@ -351,8 +360,11 @@ namespace Spritely
             exportDialog.ShowDialog();
         }
 
-        private void OnTabInputSent(AgentTask task, TextBox inputBox) =>
+        private void OnTabInputSent(AgentTask task, TextBox inputBox)
+        {
+            MoveToActiveIfNeeded(task);
             _taskExecutionManager.SendInput(task, inputBox, _activeTasks, _historyTasks);
+        }
 
         private void OnTabInterruptInputSent(AgentTask task, TextBox inputBox)
         {
@@ -372,6 +384,7 @@ namespace Spritely
                 return;
             }
             inputBox.Clear();
+            MoveToActiveIfNeeded(task);
             _taskExecutionManager.SendFollowUp(task, text, _activeTasks, _historyTasks, isInterrupt: true);
         }
 
@@ -880,14 +893,7 @@ namespace Spritely
 
             OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
 
-            // Move from history to active if needed
-            if (_historyTasks.Contains(task) && !_activeTasks.Any(t => t.Id == task.Id))
-            {
-                _historyTasks.Remove(task);
-                PinRowHeights();
-                _activeTasks.Insert(0, task);
-                RestoreStarRows();
-            }
+            MoveToActiveIfNeeded(task);
 
             UpdateStatus();
         }
@@ -926,14 +932,7 @@ namespace Spritely
             }
             OutputTabs.SelectedItem = _outputTabManager.GetTab(task.Id);
 
-            // Move from history to active if needed
-            if (_historyTasks.Contains(task))
-            {
-                _historyTasks.Remove(task);
-                PinRowHeights();
-                _activeTasks.Insert(0, task);
-                RestoreStarRows();
-            }
+            MoveToActiveIfNeeded(task);
 
             // Send the follow-up with recommendations
             _taskExecutionManager.SendFollowUp(task, followUpPrompt, _activeTasks, _historyTasks);

@@ -1,7 +1,7 @@
 {
   "id": "app-infrastructure",
   "name": "App Infrastructure \u0026 Logging",
-  "description": "Handles application startup, crash/hang logging, system tray icon, balloon notifications, structured app logging with rotation, safe background file writes, and global constants.",
+  "description": "Handles application startup, crash/hang logging, system tray icon with notification badge counter, balloon notifications, structured app logging with rotation, safe background file writes, and global constants.",
   "category": "infrastructure",
   "keywords": [
     "App.xaml.cs",
@@ -35,8 +35,8 @@
   "context": {
     "signatures": {
       "App.xaml.cs": {
-        "hash": "8176c0ac5e47",
-        "content": "class App : Application\n  L184: ShowBalloonNotification(string title, string message, System.Windows.Forms.ToolTipIcon icon) -\u003E void  // Shows a balloon notification in the system tray.\n  L208: TraceUi(string action) -\u003E void\n  L431: LogCrash(string source, Exception? ex) -\u003E void"
+        "hash": "47c1a15b22e5",
+        "content": "class App : Application\n  L28: IncrementTrayBadge() -\u003E void  // Increments the tray icon badge counter and redraws the icon overlay. Call fro...\n  L38: ClearTrayBadge() -\u003E void  // Clears the tray icon badge counter and restores the original icon. Call when ...\n  L260: TraceUi(string action) -\u003E void\n  L483: LogCrash(string source, Exception? ex) -\u003E void"
       },
       "Constants/AppConstants.cs": {
         "hash": "d8d6967eef6d",
@@ -129,6 +129,7 @@
     "_recentEntries",
     "_writeQueue"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.2591728Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-10T07:36:09.9255707Z",
+  "lastUpdatedByTaskId": "4866d541d9e44604"
 }

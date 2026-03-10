@@ -107,40 +107,21 @@ namespace Spritely.Managers
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
 
-                var jsonRequest = new
+                var ping = JsonSerializer.Serialize(new
                 {
                     jsonrpc = "2.0",
                     method = "ping",
                     @params = new { },
-                    id = Guid.NewGuid().ToString()
-                };
-
-                var json = JsonSerializer.Serialize(jsonRequest);
+                    id = 1
+                });
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, entry.McpAddress);
-                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                request.Content = new StringContent(ping, Encoding.UTF8, "application/json");
 
                 using var response = await _httpClient.SendAsync(request, timeoutCts.Token);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    // Check response body for Unity disconnection indicators
-                    var responseBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
-                    var lower = responseBody?.ToLowerInvariant() ?? "";
-                    if (lower.Contains("no unity") || lower.Contains("not connected") || lower.Contains("no editor"))
-                    {
-                        HandleFailure("Unity not connected to MCP server");
-                        return;
-                    }
-
-                    _consecutiveFailures = 0;
-                    UpdateStatus(McpHealthStatus.Connected);
-                }
-                else
-                {
-                    HandleFailure($"HTTP {(int)response.StatusCode}");
-                }
+                // Any HTTP response means server is alive — even 400/405
+                _consecutiveFailures = 0;
+                UpdateStatus(McpHealthStatus.Connected);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {

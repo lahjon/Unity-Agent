@@ -341,8 +341,9 @@ namespace Spritely
                 SendCommand();
                 e.Handled = true;
             }
-            else if (e.Key == Key.Up)
+            else if (e.Key == Key.Up && Keyboard.Modifiers == ModifierKeys.Control)
             {
+                // Ctrl+Up: client-side command history (previous)
                 if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
                 {
                     var t = _terminals[_activeIndex];
@@ -361,8 +362,9 @@ namespace Spritely
                 }
                 e.Handled = true;
             }
-            else if (e.Key == Key.Down)
+            else if (e.Key == Key.Down && Keyboard.Modifiers == ModifierKeys.Control)
             {
+                // Ctrl+Down: client-side command history (next)
                 if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
                 {
                     var t = _terminals[_activeIndex];
@@ -384,6 +386,98 @@ namespace Spritely
                 }
                 e.Handled = true;
             }
+            else if (TryGetVtSequence(e.Key, out var vtSeq))
+            {
+                // Forward special keys as VT escape sequences to the terminal process
+                if (_activeIndex >= 0 && _activeIndex < _terminals.Count)
+                {
+                    _terminals[_activeIndex].SendRaw(vtSeq);
+                    _terminals[_activeIndex].HasBeenUsed = true;
+                }
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>Handles key presses on the output TextBox, forwarding them to the terminal process.</summary>
+        public void HandleOutputKeyDown(KeyEventArgs e)
+        {
+            if (_terminals.Count == 0 || _activeIndex < 0 || _activeIndex >= _terminals.Count) return;
+
+            var terminal = _terminals[_activeIndex];
+            if (terminal.HasExited) return;
+
+            if (e.Key == Key.Enter)
+            {
+                terminal.SendRaw("\r");
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Tab)
+            {
+                terminal.SendRaw("\t");
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Back)
+            {
+                terminal.SendRaw("\x7f");
+                e.Handled = true;
+            }
+            else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                terminal.SendInterrupt();
+                e.Handled = true;
+            }
+            else if (TryGetVtSequence(e.Key, out var vtSeq))
+            {
+                terminal.SendRaw(vtSeq);
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>Handles text input on the output TextBox, forwarding typed characters to the terminal.</summary>
+        public void HandleOutputTextInput(System.Windows.Input.TextCompositionEventArgs e)
+        {
+            if (_terminals.Count == 0 || _activeIndex < 0 || _activeIndex >= _terminals.Count) return;
+
+            var terminal = _terminals[_activeIndex];
+            if (terminal.HasExited || string.IsNullOrEmpty(e.Text)) return;
+
+            terminal.SendRaw(e.Text);
+            terminal.HasBeenUsed = true;
+            e.Handled = true;
+        }
+
+        // ── VT Escape Sequence Mapping ────────────────────────────
+
+        private static bool TryGetVtSequence(Key key, out string sequence)
+        {
+            sequence = key switch
+            {
+                Key.Up => "\x1b[A",
+                Key.Down => "\x1b[B",
+                Key.Right => "\x1b[C",
+                Key.Left => "\x1b[D",
+                Key.Home => "\x1b[H",
+                Key.End => "\x1b[F",
+                Key.Insert => "\x1b[2~",
+                Key.Delete => "\x1b[3~",
+                Key.PageUp => "\x1b[5~",
+                Key.PageDown => "\x1b[6~",
+                Key.Escape => "\x1b",
+                Key.F1 => "\x1bOP",
+                Key.F2 => "\x1bOQ",
+                Key.F3 => "\x1bOR",
+                Key.F4 => "\x1bOS",
+                Key.F5 => "\x1b[15~",
+                Key.F6 => "\x1b[17~",
+                Key.F7 => "\x1b[18~",
+                Key.F8 => "\x1b[19~",
+                Key.F9 => "\x1b[20~",
+                Key.F10 => "\x1b[21~",
+                Key.F11 => "\x1b[23~",
+                Key.F12 => "\x1b[24~",
+                _ => null!
+            };
+            return sequence != null;
         }
 
         // ── Root Path Display ──────────────────────────────────────

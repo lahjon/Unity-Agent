@@ -669,6 +669,29 @@ namespace Spritely.Managers
             }
         }
 
+        public void ClearFinishedTabs(ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            var finishedTaskIds = _tabs.Keys
+                .Where(id =>
+                {
+                    var task = activeTasks.FirstOrDefault(t => t.Id == id)
+                            ?? historyTasks.FirstOrDefault(t => t.Id == id);
+                    return task == null || task.IsFinished;
+                })
+                .ToList();
+
+            foreach (var taskId in finishedTaskIds)
+            {
+                if (_tabs.TryGetValue(taskId, out var tab))
+                {
+                    var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
+                            ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
+                    if (task != null)
+                        RemoveTabImmediate(task, tab);
+                }
+            }
+        }
+
         public bool HasTab(string taskId) => _tabs.ContainsKey(taskId);
 
         public TabItem? GetTab(string taskId) => _tabs.GetValueOrDefault(taskId);

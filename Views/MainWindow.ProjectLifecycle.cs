@@ -102,7 +102,6 @@ namespace Spritely
             _outputTabManager.InputSent -= OnTabInputSent;
             _outputTabManager.InterruptInputSent -= OnTabInterruptInputSent;
 
-            _projectManager.McpInvestigationRequested -= OnMcpInvestigationRequested;
             _projectManager.McpOutputChanged -= OnMcpOutputChanged;
             _projectManager.ProjectSwapStarted -= OnProjectSwapStarted;
             _projectManager.ProjectSwapCompleted -= OnProjectSwapCompleted;
