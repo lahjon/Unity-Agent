@@ -82,6 +82,7 @@ namespace Spritely.Managers
         private readonly ModuleRegistryManager? _moduleRegistryManager;
         private readonly EmbeddingService? _embeddingService;
         private readonly VectorStore? _vectorStore;
+        private readonly ClaudeService? _claudeService;
 
         // Cache for task-description embeddings (keyed by description text, evicted by TTL + LRU)
         private readonly Dictionary<string, (float[] Vector, DateTime CachedAt)> _taskEmbeddingCache = new();
@@ -94,13 +95,15 @@ namespace Spritely.Managers
             CodebaseIndexManager? codebaseIndexManager = null,
             ModuleRegistryManager? moduleRegistryManager = null,
             EmbeddingService? embeddingService = null,
-            VectorStore? vectorStore = null)
+            VectorStore? vectorStore = null,
+            ClaudeService? claudeService = null)
         {
             _registryManager = registryManager;
             _codebaseIndexManager = codebaseIndexManager;
             _moduleRegistryManager = moduleRegistryManager;
             _embeddingService = embeddingService;
             _vectorStore = vectorStore;
+            _claudeService = claudeService;
 
             // Invalidate feature embedding cache when features are saved
             _registryManager.FeatureSaved += InvalidateFeatureCache;
@@ -347,16 +350,33 @@ namespace Spritely.Managers
                 var template = PromptLoader.Load("FeatureContextResolverPrompt.md");
                 var prompt = string.Format(template, taskDescription, candidatesJson);
 
-                // Call Haiku CLI for intelligent matching
-                AppLogger.Info("FeatureContextResolver", $"Calling Haiku CLI for feature resolution. Prompt length: {prompt.Length} chars");
-
-                var rootResult = await FeatureSystemCliRunner.RunAsync(
-                    prompt, ResolverJsonSchema, "FeatureContextResolver", HaikuTimeout, ct);
-
-                if (rootResult is null)
-                    return null;
-
-                var root = rootResult.Value;
+                // Prefer direct API; fall back to CLI
+                JsonElement root;
+                if (_claudeService?.IsConfigured == true)
+                {
+                    AppLogger.Info("FeatureContextResolver", $"Calling Haiku API for feature resolution. Prompt length: {prompt.Length} chars");
+                    var apiResult = await _claudeService.SendStructuredHaikuAsync(prompt, ResolverJsonSchema, ct);
+                    if (apiResult is null)
+                    {
+                        AppLogger.Info("FeatureContextResolver", "API returned null, falling back to CLI");
+                        var cliResult = await FeatureSystemCliRunner.RunAsync(
+                            prompt, ResolverJsonSchema, "FeatureContextResolver", HaikuTimeout, ct);
+                        if (cliResult is null) return null;
+                        root = cliResult.Value;
+                    }
+                    else
+                    {
+                        root = apiResult.Value;
+                    }
+                }
+                else
+                {
+                    AppLogger.Info("FeatureContextResolver", $"Calling Haiku CLI for feature resolution. Prompt length: {prompt.Length} chars");
+                    var cliResult = await FeatureSystemCliRunner.RunAsync(
+                        prompt, ResolverJsonSchema, "FeatureContextResolver", HaikuTimeout, ct);
+                    if (cliResult is null) return null;
+                    root = cliResult.Value;
+                }
 
                 // Parse relevant features from the response
                 var relevantFeatures = new List<MatchedFeature>();

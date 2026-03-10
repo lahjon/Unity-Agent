@@ -38,6 +38,7 @@ namespace Spritely.Managers
         private readonly FeatureRegistryManager _registryManager;
         private readonly CodebaseIndexManager? _codebaseIndexManager;
         private readonly ModuleRegistryManager? _moduleRegistryManager;
+        private readonly ClaudeService? _claudeService;
 
         // Background retry worker state
         private Timer? _retryTimer;
@@ -49,11 +50,13 @@ namespace Spritely.Managers
         public FeatureUpdateAgent(
             FeatureRegistryManager registryManager,
             CodebaseIndexManager? codebaseIndexManager = null,
-            ModuleRegistryManager? moduleRegistryManager = null)
+            ModuleRegistryManager? moduleRegistryManager = null,
+            ClaudeService? claudeService = null)
         {
             _registryManager = registryManager;
             _codebaseIndexManager = codebaseIndexManager;
             _moduleRegistryManager = moduleRegistryManager;
+            _claudeService = claudeService;
         }
 
         /// <summary>

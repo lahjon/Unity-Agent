@@ -165,6 +165,109 @@ namespace Spritely.Managers
             }
         }
 
+        /// <summary>
+        /// Sends a single-turn prompt to the Haiku model via direct API call and returns
+        /// structured JSON output. Uses tool_use with forced tool_choice to guarantee
+        /// schema-conformant JSON. Returns null on any failure.
+        /// </summary>
+        public async Task<JsonElement?> SendStructuredHaikuAsync(
+            string prompt,
+            string jsonSchema,
+            CancellationToken ct = default)
+        {
+            if (!IsConfigured)
+            {
+                AppLogger.Warn("ClaudeService", "SendStructuredHaikuAsync: API key not configured");
+                return null;
+            }
+
+            var apiKey = GetApiKey();
+
+            try
+            {
+                // Parse the JSON schema to use as tool input_schema
+                using var schemaDoc = JsonDocument.Parse(jsonSchema);
+                var inputSchema = schemaDoc.RootElement.Clone();
+
+                var requestObj = new Dictionary<string, object>
+                {
+                    ["model"] = AppConstants.ClaudeHaiku,
+                    ["max_tokens"] = 4096,
+                    ["stream"] = false,
+                    ["messages"] = new[]
+                    {
+                        new { role = "user", content = prompt }
+                    },
+                    ["tools"] = new[]
+                    {
+                        new
+                        {
+                            name = "structured_result",
+                            description = "Return the structured result",
+                            input_schema = inputSchema
+                        }
+                    },
+                    ["tool_choice"] = new { type = "tool", name = "structured_result" }
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestObj);
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, ApiBaseUrl);
+                request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                request.Headers.Add("x-api-key", apiKey);
+                request.Headers.Add("anthropic-version", "2023-06-01");
+
+                using var response = await _httpClient.SendAsync(request, ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+                    var errorMsg = TryExtractErrorMessage(errorBody);
+                    AppLogger.Warn("ClaudeService",
+                        $"SendStructuredHaikuAsync API error ({(int)response.StatusCode}): {errorMsg}");
+                    return null;
+                }
+
+                var responseText = await response.Content.ReadAsStringAsync(ct);
+                using var responseDoc = JsonDocument.Parse(responseText);
+                var root = responseDoc.RootElement;
+
+                // Track usage
+                if (root.TryGetProperty("usage", out var usage))
+                {
+                    long inputTokens = 0, outputTokens = 0, cacheReadTokens = 0, cacheCreationTokens = 0;
+                    if (usage.TryGetProperty("input_tokens", out var inp)) inputTokens = inp.GetInt64();
+                    if (usage.TryGetProperty("output_tokens", out var outp)) outputTokens = outp.GetInt64();
+                    if (usage.TryGetProperty("cache_read_input_tokens", out var cr)) cacheReadTokens = cr.GetInt64();
+                    if (usage.TryGetProperty("cache_creation_input_tokens", out var cc)) cacheCreationTokens = cc.GetInt64();
+                    _usageManager?.AddUsage(AppConstants.ClaudeHaiku, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
+                }
+
+                // Extract tool_use input from content blocks
+                if (root.TryGetProperty("content", out var content))
+                {
+                    foreach (var block in content.EnumerateArray())
+                    {
+                        if (block.TryGetProperty("type", out var typeProp) &&
+                            typeProp.GetString() == "tool_use" &&
+                            block.TryGetProperty("input", out var input))
+                        {
+                            return input.Clone();
+                        }
+                    }
+                }
+
+                AppLogger.Warn("ClaudeService", "SendStructuredHaikuAsync: no tool_use block in response");
+                return null;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ClaudeService", $"SendStructuredHaikuAsync failed: {ex.Message}");
+                return null;
+            }
+        }
+
         private static object BuildClaudeContent(string text, List<string>? imagePaths)
         {
             if (imagePaths == null || imagePaths.Count == 0)

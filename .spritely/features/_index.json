@@ -181,8 +181,16 @@
       "category": "core",
       "touchCount": 2,
       "primaryFileCount": 2,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-10T07:23:48.722165Z",
+      "keywords": [
+        "FeatureUpdateAgent",
+        "Haiku update",
+        "feature refresh",
+        "fire and forget",
+        "post-completion",
+        "update registry"
+      ],
+      "description": "Post-completion fire-and-forget agent that uses Haiku to update the feature registry based on what a completed task changed. Keeps the registry current without blocking the task lifecycle."
     },
     {
       "id": "file-lock-management",
@@ -631,10 +639,14 @@
       "prompt-building"
     ],
     "based": [
+      "feature-update-agent",
       "semantic-search"
     ],
     "block": [
       "feature-context-resolution"
+    ],
+    "blocking": [
+      "feature-update-agent"
     ],
     "blocks": [
       "feature-registry",
@@ -653,6 +665,9 @@
     "bus": [
       "message-bus"
     ],
+    "changed": [
+      "feature-update-agent"
+    ],
     "chat": [
       "chat",
       "chat-interface"
@@ -670,9 +685,13 @@
     "combines": [
       "semantic-search"
     ],
+    "completed": [
+      "feature-update-agent"
+    ],
     "completion": [
       "completion-analysis",
-      "feature-context-resolution"
+      "feature-context-resolution",
+      "feature-update-agent"
     ],
     "components": [
       "theming-ui-shared"
@@ -720,6 +739,9 @@
     ],
     "creation": [
       "task-factory"
+    ],
+    "current": [
+      "feature-update-agent"
     ],
     "dag": [
       "task-orchestration"
@@ -805,6 +827,9 @@
     "feature lookup": [
       "feature-registry"
     ],
+    "feature refresh": [
+      "feature-update-agent"
+    ],
     "featureconstants": [
       "feature-registry"
     ],
@@ -829,7 +854,8 @@
       "semantic-search"
     ],
     "featureupdateagent": [
-      "feature-context-resolution"
+      "feature-context-resolution",
+      "feature-update-agent"
     ],
     "file": [
       "file-lock-management",
@@ -839,8 +865,17 @@
     "files": [
       "main-window-ui"
     ],
+    "fire": [
+      "feature-update-agent"
+    ],
+    "fire and forget": [
+      "feature-update-agent"
+    ],
     "flag": [
       "task-preprocessing"
+    ],
+    "forget": [
+      "feature-update-agent"
     ],
     "full": [
       "prompt-building"
@@ -865,6 +900,12 @@
     "group": [
       "task-group-tracking",
       "task-history"
+    ],
+    "haiku": [
+      "feature-update-agent"
+    ],
+    "haiku update": [
+      "feature-update-agent"
     ],
     "handles": [
       "feature-context-resolution",
@@ -931,6 +972,9 @@
     "iprojectpanelview": [
       "main-window-ui"
     ],
+    "keeps": [
+      "feature-update-agent"
+    ],
     "keyword": [
       "semantic-search"
     ],
@@ -956,6 +1000,7 @@
       "main-window-ui"
     ],
     "lifecycle": [
+      "feature-update-agent",
       "task-lifecycle"
     ],
     "limit": [
@@ -1078,7 +1123,11 @@
       "main-window-ui"
     ],
     "post": [
-      "feature-context-resolution"
+      "feature-context-resolution",
+      "feature-update-agent"
+    ],
+    "post-completion": [
+      "feature-update-agent"
     ],
     "preprocessing": [
       "task-preprocessing"
@@ -1135,6 +1184,7 @@
     ],
     "registry": [
       "feature-registry",
+      "feature-update-agent",
       "module-management",
       "module-registry"
     ],
@@ -1278,6 +1328,7 @@
       "export-task-data",
       "feature-context-resolution",
       "feature-registry",
+      "feature-update-agent",
       "history-analytics",
       "history-management",
       "message-bus",
@@ -1355,6 +1406,9 @@
     "ui orchestration": [
       "main-window-ui"
     ],
+    "update registry": [
+      "feature-update-agent"
+    ],
     "updated": [
       "main-window-ui"
     ],
@@ -1363,6 +1417,9 @@
     ],
     "user": [
       "prompt-building"
+    ],
+    "uses": [
+      "feature-update-agent"
     ],
     "using": [
       "feature-context-resolution",
@@ -1397,6 +1454,9 @@
     ],
     "wires": [
       "main-window-ui"
+    ],
+    "without": [
+      "feature-update-agent"
     ],
     "workflows": [
       "main-window-ui"

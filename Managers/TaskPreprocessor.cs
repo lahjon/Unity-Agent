@@ -1,6 +1,4 @@
 using System;
-using System.Diagnostics;
-using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -41,84 +39,58 @@ namespace Spritely.Managers
 
         private static readonly string PreprocessPrompt = PromptLoader.Load("TaskPreprocessorPrompt.md");
 
+        private readonly ClaudeService? _claudeService;
+
+        public TaskPreprocessor(ClaudeService? claudeService = null)
+        {
+            _claudeService = claudeService;
+        }
+
         public async Task<PreprocessResult?> PreprocessAsync(
             string taskDescription, CancellationToken ct = default)
         {
             try
             {
                 var prompt = string.Format(PreprocessPrompt, taskDescription);
-                var sentPrompt = prompt; // Capture for diagnostics
+                var sentPrompt = prompt;
 
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "claude",
-                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 3 --json-schema \"{PreprocessJsonSchema.Replace("\"", "\\\"")}\"",
-                    UseShellExecute = false,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8
-                };
-                // Remove all Claude Code session env vars so the CLI doesn't detect a nested session
-                psi.Environment.Remove("CLAUDECODE");
-                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
-                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
-
-                using var process = new Process { StartInfo = psi };
-                process.Start();
-
-                await process.StandardInput.WriteAsync(prompt.AsMemory(), ct);
-                process.StandardInput.Close();
-
-                var output = await process.StandardOutput.ReadToEndAsync(ct);
-                await process.WaitForExitAsync(ct);
-
-                var text = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
-                AppLogger.Debug("TaskPreprocessor", $"CLI raw output ({text.Length} chars): {(text.Length > 500 ? text[..500] + "..." : text)}");
-
-                using var doc = JsonDocument.Parse(text);
-                var root = doc.RootElement;
-
-                // The CLI with --output-format json + --json-schema puts structured data
-                // in "structured_output"; fall back to "result" for plain text responses
                 JsonElement data;
-                if (root.TryGetProperty("structured_output", out var structured)
-                    && structured.ValueKind == JsonValueKind.Object)
+
+                // Prefer direct API call; fall back to CLI if ClaudeService unavailable
+                if (_claudeService?.IsConfigured == true)
                 {
-                    data = structured;
-                    AppLogger.Debug("TaskPreprocessor", "Using structured_output path");
-                }
-                else if (root.TryGetProperty("result", out var resultElement))
-                {
-                    AppLogger.Debug("TaskPreprocessor", $"No structured_output; result kind={resultElement.ValueKind}");
-                    if (resultElement.ValueKind == JsonValueKind.String)
+                    AppLogger.Debug("TaskPreprocessor", $"Using direct API call. Prompt length: {prompt.Length}");
+                    var result = await _claudeService.SendStructuredHaikuAsync(prompt, PreprocessJsonSchema, ct);
+                    if (result is null)
                     {
-                        using var innerDoc = JsonDocument.Parse(resultElement.GetString()!);
-                        data = innerDoc.RootElement.Clone();
+                        AppLogger.Debug("TaskPreprocessor", "Direct API returned null, falling back to CLI");
+                        var cliResult = await FeatureSystemCliRunner.RunAsync(
+                            prompt, PreprocessJsonSchema, "TaskPreprocessor", TimeSpan.FromMinutes(2), ct);
+                        if (cliResult is null) return null;
+                        data = cliResult.Value;
                     }
                     else
                     {
-                        data = resultElement;
+                        data = result.Value;
                     }
                 }
                 else
                 {
-                    AppLogger.Debug("TaskPreprocessor", "No structured_output or result; using root");
-                    data = root;
+                    AppLogger.Debug("TaskPreprocessor", "ClaudeService not available, using CLI");
+                    var cliResult = await FeatureSystemCliRunner.RunAsync(
+                        prompt, PreprocessJsonSchema, "TaskPreprocessor", TimeSpan.FromMinutes(2), ct);
+                    if (cliResult is null) return null;
+                    data = cliResult.Value;
                 }
 
                 var header = data.TryGetProperty("header", out var h) ? h.GetString() ?? "" : "";
-                // Fallback: derive header from first 4 words of the task description
                 if (string.IsNullOrWhiteSpace(header))
                 {
-                    AppLogger.Debug("TaskPreprocessor", "Header empty from CLI response, deriving from description");
                     var descWords = taskDescription.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     header = string.Join(' ', descWords.Length > 4 ? descWords[..4] : descWords);
                     if (header.Length > 40)
                         header = header[..40].TrimEnd();
                 }
-                // Enforce 2-5 words
                 var words = header.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (words.Length > 5)
                     header = string.Join(' ', words[..5]);

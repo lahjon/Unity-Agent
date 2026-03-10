@@ -79,8 +79,8 @@
   "context": {
     "signatures": {
       "Managers/FeatureUpdateAgent.cs": {
-        "hash": "ced477e83723",
-        "content": "class FeatureUpdateAgent\n  L25: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L35: MaxPendingUpdates: int = 20\n  L505: MaxKeywords: int = 20\n  L506: CamelCaseSplitRegex: Regex = new(@\u0022(?\u003C=[a-z])(?=[A-Z])|(?\u003C=[A-Z])(...\nclass PendingFeatureUpdate\n  TaskId: string\n  TaskDescription: string\n  CompletionSummary: string?\n  ChangedFiles: List\u003Cstring\u003E\n  QueuedAt: DateTime"
+        "hash": "e0abf7b662f8",
+        "content": "class FeatureUpdateAgent : IDisposable\n  L25: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)\n  L26: RetryInterval: TimeSpan = TimeSpan.FromMinutes(5)\n  L36: MaxPendingUpdates: int = 20\n  L66: StartBackgroundRetryWorker(Func\u003Cbool\u003E isBusy, Func\u003CIReadOnlyList\u003Cstring\u003E\u003E getProjectPaths, CancellationToken shutdownToken) -\u003E void  // Starts a background timer that drains pending feature updates every 5 minutes...\n  L135: Dispose() -\u003E void\n  L595: MaxKeywords: int = 20\n  L596: CamelCaseSplitRegex: Regex = new(@\u0022(?\u003C=[a-z])(?=[A-Z])|(?\u003C=[A-Z])(...\nclass PendingFeatureUpdate\n  TaskId: string\n  TaskDescription: string\n  CompletionSummary: string?\n  ChangedFiles: List\u003Cstring\u003E\n  QueuedAt: DateTime"
       },
       "MainWindow.Features.cs": {
         "hash": "e990d0c40e91",
