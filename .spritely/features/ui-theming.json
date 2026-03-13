@@ -55,8 +55,8 @@
         "content": "  root: ResourceDictionary\n  Bd: Border\n  BdScale: ScaleTransform\n  Bd: Border\n  BdBg: SolidColorBrush\n  GhostScale: ScaleTransform\n  Bd: Border"
       },
       "Themes/Colors.xaml": {
-        "hash": "15783534ed8b",
-        "content": "  root: ResourceDictionary"
+        "hash": "c873b552ec03",
+        "content": ""
       },
       "Themes/TabControl.xaml": {
         "hash": "726bd816fdca",

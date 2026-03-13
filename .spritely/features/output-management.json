@@ -1,7 +1,7 @@
 {
   "id": "output-management",
   "name": "Task Output Management",
-  "description": "Creates and manages per-task output tabs in the UI, handles ANSI-stripped streaming output rendering, supports Gemini image galleries, manages overflow when output exceeds the cap, and provides follow-up output injection.",
+  "description": "Creates and manages per-task output tabs in the UI, handles ANSI-stripped streaming output rendering and structured code diffs with syntax highlighting (green for additions, red for removals), supports Gemini image galleries, manages overflow when output exceeds the cap, and provides follow-up output injection.",
   "category": "ui",
   "keywords": [
     "ANSI",
@@ -38,8 +38,8 @@
   "context": {
     "signatures": {
       "Managers/OutputProcessor.cs": {
-        "hash": "953035aa8da7",
-        "content": "class OutputProcessor\n  L36: AppendOutput(string taskId, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L42: AppendColoredOutput(string taskId, string text, Brush foreground, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L229: TryInjectSubtaskResult(AgentTask child, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Synchronous wrapper kept for backward compatibility (non-UI-thread callers).\n  L305: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // Synchronous wrapper kept for backward compatibility (non-UI-thread callers)."
+        "hash": "9dabe8b581b8",
+        "content": "class OutputProcessor\n  L38: AppendOutput(string taskId, string text, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L44: AppendColoredOutput(string taskId, string text, Brush foreground, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void\n  L308: TryInjectSubtaskResult(AgentTask child, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks) -\u003E void  // Synchronous wrapper kept for backward compatibility (non-UI-thread callers).\n  L384: InjectSubtaskResult(AgentTask parent, AgentTask child) -\u003E void  // Synchronous wrapper kept for backward compatibility (non-UI-thread callers)."
       },
       "Managers/OutputTabManager.cs": {
         "hash": "5b8e2b918205",
@@ -83,6 +83,7 @@
     "UpdateOutputTabWidths",
     "UpdateTabHeader"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.1504007Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-13T09:06:07.90198Z",
+  "lastUpdatedByTaskId": "d1fba1aa8b4549b1"
 }

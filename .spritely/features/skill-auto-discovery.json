@@ -1,0 +1,32 @@
+{
+  "id": "skill-auto-discovery",
+  "name": "Skill Auto-Discovery from Completed Tasks",
+  "description": "New feature identified from task: Implement automatic skill discovery from completed tasks. After a task completes successfully in TaskExecutionManager.CompleteWithVerification, launch a SkillDiscoveryAgent (fire-and-forget, similar to FeatureUpdateAgent) that:\n\n1. Passes the task summary and a condensed excerpt of the task output to Haiku\n2. Prompts Haiku to identify any generalizable technique, pattern, or reusable instruction from the completed work\n3. If Haiku returns a candidate skill, surfaces a non-blocking toast notification to the user offering to save it via SkillManager\n\nThe SkillDiscoveryAgent should follow the existing FeatureUpdateAgent pattern in Managers/, use the Haiku service for analysis, and integrate seamlessly with the task completion flow without blocking task UI updates or next-task execution.",
+  "category": "",
+  "keywords": [
+    "auto-discovery",
+    "haiku verification",
+    "reusable instructions",
+    "skill discovery",
+    "skill extraction",
+    "skill manager",
+    "task analysis"
+  ],
+  "primaryFiles": [],
+  "secondaryFiles": [],
+  "relatedFeatureIds": [],
+  "dependsOn": [],
+  "context": {
+    "signatures": {},
+    "keyTypes": [],
+    "patterns": [],
+    "dependencies": []
+  },
+  "childFeatureIds": [],
+  "hierarchyLevel": 0,
+  "symbolNames": [],
+  "touchCount": 1,
+  "placeholderCreatedAt": "2026-03-13T09:00:22.5689461Z",
+  "lastUpdatedAt": "2026-03-13T09:00:22.5689463Z",
+  "lastUpdatedByTaskId": "bc53421ad38c4535"
+}

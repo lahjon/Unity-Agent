@@ -237,5 +237,19 @@ namespace Spritely.Managers
 
             return result.Output;
         }
+
+        /// <inheritdoc />
+        public async Task<string?> GetFullDiffAsync(string projectPath, string? gitStartHash,
+            CancellationToken cancellationToken = default)
+        {
+            var diffRef = gitStartHash ?? "HEAD";
+            var result = await RunGitCommandAsync(projectPath, $"diff {diffRef}", cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!result.IsSuccess || string.IsNullOrWhiteSpace(result.Output))
+                return null;
+
+            return result.Output;
+        }
     }
 }

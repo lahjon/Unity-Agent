@@ -119,6 +119,9 @@ namespace Spritely
                     UseShellExecute = true,
                 };
                 System.Diagnostics.Process.Start(psi);
+
+                // Close current instance so build.bat can replace the exe and launch fresh
+                Application.Current.Shutdown();
             }
             catch (Exception ex)
             {

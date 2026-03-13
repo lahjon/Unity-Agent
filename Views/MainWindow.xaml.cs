@@ -79,6 +79,7 @@ namespace Spritely
         private readonly TaskGroupTracker _taskGroupTracker;
         private readonly TaskOrchestrator _taskOrchestrator;
         private SkillManager _skillManager = null!;
+        private ImprovementTaskGenerator _improvementTaskGenerator = null!;
         private DispatcherTimer? _helperAnimTimer;
         private int _helperAnimTick;
 
@@ -230,6 +231,18 @@ namespace Spritely
                     .ToList(),
                 shutdownToken: _windowCts.Token);
 
+            // Feedback System: self-improving feedback loop
+            var feedbackStore = new FeedbackStore(appDataDir);
+            var improvementTaskGenerator = new ImprovementTaskGenerator(appDataDir);
+            var feedbackAnalyzer = new FeedbackAnalyzer();
+            var feedbackApplicator = new FeedbackApplicator(
+                getProjectEntry: path => _projectManager.SavedProjects.FirstOrDefault(p => p.Path == path),
+                saveProjects: () => _projectManager.SaveProjects(),
+                rulesManager: _projectManager.Rules,
+                taskGenerator: improvementTaskGenerator);
+            var feedbackCollector = new FeedbackCollector(feedbackStore, feedbackAnalyzer, feedbackApplicator);
+            _improvementTaskGenerator = improvementTaskGenerator;
+
             _taskExecutionManager = new TaskExecutionManager(new TaskExecutionServices
             {
                 ScriptDir = scriptDir,
@@ -248,6 +261,7 @@ namespace Spritely
                 IsGameProject = path => _projectManager.IsGameProject(path),
                 GetTokenLimitRetryMinutes = () => _settingsManager.TokenLimitRetryMinutes,
                 GetAutoVerify = () => _settingsManager.AutoVerify,
+                GetShowCodeChanges = () => _settingsManager.ShowCodeChanges,
                 GetSkillsBlock = () => GetActiveSkillsBlock(),
                 GetOpusEffortLevel = () => _settingsManager.OpusEffortLevel,
                 FeatureRegistryManager = featureRegistryManager,
@@ -255,6 +269,8 @@ namespace Spritely
                 FeatureUpdateAgent = featureUpdateAgent,
                 HybridSearchManager = hybridSearchManager,
                 ClaudeService = _claudeService,
+                FeedbackCollector = feedbackCollector,
+                SkillDiscoveryAgent = new SkillDiscoveryAgent(_claudeService, _skillManager, Dispatcher),
             });
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
@@ -265,6 +281,9 @@ namespace Spritely
 
             _taskGroupTracker = new TaskGroupTracker();
             _taskGroupTracker.GroupCompleted += OnTaskGroupCompleted;
+
+            // Wire improvement suggestions → stored tasks
+            _improvementTaskGenerator.TaskQueued += OnImprovementTaskQueued;
 
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
 
@@ -481,6 +500,7 @@ namespace Spritely
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
             TaskTimeoutBox.Text = _settingsManager.TaskTimeoutMinutes.ToString();
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
+            ShowCodeChangesToggle.IsChecked = _settingsManager.ShowCodeChanges;
             DefaultMcpServerNameBox.Text = _settingsManager.DefaultMcpServerName;
             DefaultMcpAddressBox.Text = _settingsManager.DefaultMcpAddress;
             DefaultMcpStartCommandBox.Text = _settingsManager.DefaultMcpStartCommand;
@@ -1624,6 +1644,30 @@ namespace Spritely
             _storedTasks.Insert(0, storedTask);
             _historyManager.SaveStoredTasks(_storedTasks);
             RefreshFilterCombos();
+        }
+
+        private void OnImprovementTaskQueued(ImprovementTaskEntry entry)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                var storedTask = new AgentTask
+                {
+                    Description = ImprovementTaskGenerator.BuildTaskDescription(entry),
+                    ProjectPath = entry.ProjectPath,
+                    ProjectColor = _projectManager.GetProjectColor(entry.ProjectPath),
+                    ProjectDisplayName = _projectManager.GetProjectDisplayName(entry.ProjectPath),
+                    StoredPrompt = ImprovementTaskGenerator.BuildTaskDescription(entry),
+                    StartTime = DateTime.Now
+                };
+                storedTask.Summary = $"[Feedback] {entry.Title}";
+                storedTask.Status = AgentTaskStatus.Completed;
+
+                _storedTasks.Insert(0, storedTask);
+                _historyManager.SaveStoredTasks(_storedTasks);
+                _improvementTaskGenerator.MarkLaunched(entry.Id);
+
+                AppLogger.Info("Feedback", $"Created stored task from improvement suggestion: {entry.Title}");
+            });
         }
 
         // ── Scroll Fix ────────────────────────────────────────────

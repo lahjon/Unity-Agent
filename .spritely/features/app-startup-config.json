@@ -90,12 +90,12 @@
   "context": {
     "signatures": {
       "App.xaml.cs": {
-        "hash": "8176c0ac5e47",
-        "content": "class App\n  ShowBalloonNotification(string title, string message, System.Windows.Forms.ToolTipIcon icon) -\u003E void\n  TraceUi(string action) -\u003E void\n  LogCrash(string source, Exception? ex) -\u003E void"
+        "hash": "47c1a15b22e5",
+        "content": "class App : Application\n  L28: IncrementTrayBadge() -\u003E void  // Increments the tray icon badge counter and redraws the icon overlay. Call fro...\n  L38: ClearTrayBadge() -\u003E void  // Clears the tray icon badge counter and restores the original icon. Call when ...\n  L260: TraceUi(string action) -\u003E void\n  L483: LogCrash(string source, Exception? ex) -\u003E void"
       },
       "Constants/AppConstants.cs": {
-        "hash": "d8d6967eef6d",
-        "content": "class AppConstants"
+        "hash": "6fd7a7a0bcc2",
+        "content": "class AppConstants\n  L14: ClaudeOpus: string = \u0022claude-opus-4-6\u0022\n  L17: ClaudeSonnet: string = \u0022claude-sonnet-4-6\u0022\n  L20: ClaudeHaiku: string = \u0022claude-haiku-4-5-20251001\u0022\n  L23: ClaudeDefaultChatModel: string = ClaudeSonnet\n  L26: ClaudeDefaultPromptModel: string = ClaudeOpus\n  L29: ClaudeAvailableModels: string[] = { ClaudeOpus, ClaudeSonnet, ClaudeHai...\n  L34: MaxOutputTailLines: int = 50\n  L37: MaxOutputCharLength: int = 3000\n  L40: MaxShortDescriptionLength: int = 200\n  L43: MaxLongDescriptionLength: int = 800\n  L46: RecommendationContextBefore: int = 20\n  L49: RecommendationContextAfter: int = 15\n  L54: TerminalBufferSize: int = 4096\n  L57: ScrollbackLimit: int = 5000\n  L62: StatusTimerIntervalSeconds: int = 3\n  L67: MessageBusTTLMinutes: int = 60\n  L70: MessageBusMaxMessages: int = 500\n  L73: MessageBusCleanupIntervalSeconds: int = 300\n  L76: MessageBusActivePollSeconds: int = 5\n  L79: MessageBusIdlePollSeconds: int = 30\n  L84: DefaultTaskTimeoutMinutes: int = 120\n  L87: TaskTimeoutWarningPercent: double = 0.8\n  L92: MaxTokenLimitRetries: int = 4\n  L95: TokenRetryReductionFactors: double[] = { 0.8, 0.6, 0.4, 0.3 }\n  L98: MaxChildResultTokens: int = 2000\n  L101: ModelComplexityThreshold: double = 0.5\n  L106: FeedbackAnalysisThreshold: int = 10\n  L109: FeedbackAnalysisWindow: int = 30\n  L112: FeedbackLlmAnalysisThreshold: int = 15"
       },
       "MainWindow.xaml.cs": {
         "hash": "35e7a0412f6b",

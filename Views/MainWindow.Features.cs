@@ -321,6 +321,9 @@ namespace Spritely
 
         private void ToggleFeaturesPanel_Click(object sender, RoutedEventArgs e)
         {
+            // Pin RootGrid rows to prevent layout jitter from the left panel's inner grid changes
+            PinRowHeights();
+
             _featuresPanelExpanded = !_featuresPanelExpanded;
             FeaturesPanelContent.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
             FeaturesListBox.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
@@ -345,6 +348,8 @@ namespace Spritely
             }
 
             FeaturesPanelToggleBtn.Content = _featuresPanelExpanded ? "\uE70D" : "\uE70E";
+
+            RestoreStarRows();
         }
 
         private void ToggleFeaturesPanel_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)

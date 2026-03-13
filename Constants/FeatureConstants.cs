@@ -17,20 +17,31 @@ namespace Spritely.Constants
         /// <summary>Subdirectory under <see cref="SpritelyDir"/> where feature JSON files live.</summary>
         public const string FeaturesDir = "features";
 
-        /// <summary>Filename of the feature index manifest inside the features directory.</summary>
+        /// <summary>Filename of the feature index manifest inside the features directory (legacy, used for migration).</summary>
         public const string IndexFileName = "_index.json";
 
         /// <summary>Filename of the codebase-wide symbol index.</summary>
         public const string CodebaseIndexFileName = "_codebase_index.json";
 
-        /// <summary>Filename of the module index manifest.</summary>
+        /// <summary>Filename of the module index manifest (legacy, used for migration).</summary>
         public const string ModuleIndexFileName = "_module_index.json";
 
-        /// <summary>File extension for individual module JSON files.</summary>
+        /// <summary>File extension for individual module JSON files (legacy, used for migration).</summary>
         public const string ModuleFileExtension = ".module.json";
 
         /// <summary>Filename for the pending feature update queue (failed fire-and-forget updates).</summary>
         public const string PendingUpdatesFileName = "_pending_updates.json";
+
+        // ── JSONL Database Files ─────────────────────────────────────────
+
+        /// <summary>JSONL file containing all features, one per line, sorted by ID.</summary>
+        public const string FeaturesDatabaseFileName = "features.jsonl";
+
+        /// <summary>JSONL file containing all modules, one per line, sorted by ID.</summary>
+        public const string ModulesDatabaseFileName = "modules.jsonl";
+
+        /// <summary>Small JSON file with schema version and symbol index version hash.</summary>
+        public const string MetadataFileName = "_metadata.json";
 
         // ── Context Budget ─────────────────────────────────────────────
 

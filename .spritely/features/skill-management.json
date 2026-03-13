@@ -8,13 +8,26 @@
     "SkillEditorDialog",
     "SkillEntry",
     "SkillManager",
+    "agent",
+    "async",
+    "block",
+    "build",
+    "categories",
+    "category",
+    "clear",
+    "content",
     "custom instructions",
+    "discovery",
     "global skills",
+    "haiku",
     "per-project skills",
+    "save",
+    "skill",
     "skill injection"
   ],
   "primaryFiles": [
     "Dialogs/SkillEditorDialog.cs",
+    "Managers/SkillDiscoveryAgent.cs",
     "Managers/SkillManager.cs",
     "Models/SkillEntry.cs"
   ],
@@ -82,7 +95,7 @@
   "context": {
     "signatures": {
       "Dialogs/SkillEditorDialog.cs": {
-        "hash": "4f20f610c3d8",
+        "hash": "57176f273e47",
         "content": "class SkillEditorDialog\n  L22: Show(SkillManager skillManager, string? projectPath) -\u003E bool  // Shows the full skill manager dialog. Returns true if any changes were made.\n  L275: ShowSkillEditDialog(SkillEntry? existing, bool isGlobal, SkillManager skillManager, string? projectPath = null) -\u003E bool  // Shows a dialog to create or edit a single skill. Returns true if saved."
       },
       "Managers/SkillManager.cs": {
@@ -92,6 +105,10 @@
       "Models/SkillEntry.cs": {
         "hash": "d97b0904e816",
         "content": "class SkillEntry\n  Id: string\n  Name: string\n  Description: string\n  Category: string\n  Content: string\n  IsGlobal: bool\n  IsEnabled: bool\n  CreatedAt: DateTime\n  UpdatedAt: DateTime"
+      },
+      "Managers/SkillDiscoveryAgent.cs": {
+        "hash": "c01b9e3f297f",
+        "content": "class SkillDiscoveryAgent\n  L21: HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(1)\n  L37: DiscoverSkillAsync(string taskSummary, string? completionSummary, string? projectPath) -\u003E Task  // Analyzes a completed task for discoverable skills. Fire-and-forget \u2014 call wit..."
       }
     },
     "keyTypes": [
@@ -118,8 +135,10 @@
     "CreatedAt",
     "DeleteSkill",
     "Description",
+    "DiscoverSkillAsync",
     "GetCategories",
     "GetEnabledSkillIds",
+    "HaikuTimeout",
     "Id",
     "IsEnabled",
     "IsGlobal",
@@ -130,12 +149,13 @@
     "SetEnabledSkills",
     "Show",
     "ShowSkillEditDialog",
+    "SkillDiscoveryAgent",
     "SkillEditorDialog",
     "SkillEntry",
     "SkillManager",
     "UpdatedAt"
   ],
-  "touchCount": 1,
-  "lastUpdatedAt": "2026-03-09T12:27:45.7676005Z",
-  "lastUpdatedByTaskId": "516c259326b44921"
+  "touchCount": 2,
+  "lastUpdatedAt": "2026-03-13T09:00:22.4680942Z",
+  "lastUpdatedByTaskId": "bc53421ad38c4535"
 }

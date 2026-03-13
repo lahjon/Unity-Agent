@@ -605,11 +605,15 @@ namespace Spritely.Managers
                 ? task.Runtime.FeatureContextBlock + "\n"
                 : "";
 
+            // Format iteration template with current iteration number
+            var iterationTemplate = string.Format(PromptBuilder.FeatureModeIterationPlanningTemplate,
+                task.CurrentIteration);
+
             var prompt = featureCtx +
                 PromptBuilder.FeatureModeInitialTemplate +
                 task.OriginalFeatureDescription +
                 iterationContext +
-                "\n\n" + PromptBuilder.FeatureModeIterationPlanningTemplate +
+                "\n\n" + iterationTemplate +
                 previousEvaluation;
 
             StartFeatureModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);

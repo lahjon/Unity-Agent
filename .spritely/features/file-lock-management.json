@@ -46,7 +46,7 @@
   "context": {
     "signatures": {
       "Managers/FileLockManager.cs": {
-        "hash": "be0d3833678d",
+        "hash": "44f267d0eb35",
         "content": "class FileLockManager\n  L17: MaxLocks: int = 500\n  L18: MaxLocksPerTask: int = 100\n  LockCount: int\n  L42: TryAcquireOrConflict(string taskId, string filePath, string toolName, ObservableCollection\u003CAgentTask\u003E activeTasks, Action\u003Cstring, string\u003E appendOutput) -\u003E bool\n  L69: TryAcquireFileLock(string taskId, string filePath, string toolName, ObservableCollection\u003CAgentTask\u003E activeTasks, bool isIgnored = false) -\u003E bool\n  L184: ReleaseTaskLocks(string taskId) -\u003E void\n  L235: IsFileLocked(string normalizedPath) -\u003E bool\n  L247: GetTaskLockedFiles(string taskId) -\u003E HashSet\u003Cstring\u003E  // Returns a snapshot of the normalized file paths currently locked by the given...\n  L257: HandleFileLockConflict(string taskId, string filePath, string toolName, ObservableCollection\u003CAgentTask\u003E activeTasks, Action\u003Cstring, string\u003E appendOutput) -\u003E void\n  L359: CheckQueuedTasks(ObservableCollection\u003CAgentTask\u003E activeTasks) -\u003E void\n  L423: ForceStartQueuedTask(AgentTask task) -\u003E void\n  L450: AddQueuedTaskInfo(string taskId, QueuedTaskInfo info) -\u003E void\n  L458: RemoveQueuedInfo(string taskId) -\u003E void\n  L466: ClearAll() -\u003E void\n  L487: SetGitOperationInProgress(bool inProgress) -\u003E void  // Sets the git operation in progress flag to prevent new lock acquisitions. Thi...\n  L558: TryExtractFilePathFromPartial(string partialJson) -\u003E string?\n  L572: ExtractFilePath(JsonElement input) -\u003E string?"
       }
     },

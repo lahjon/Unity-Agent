@@ -1157,16 +1157,22 @@ public class FeatureInitializer
             // Check .gitattributes in project root
             var gitattributesPath = Path.Combine(projectPath, ".gitattributes");
             const string spritelyAttributes =
-                ".spritely/features/_index.json merge=union text eol=lf\n" +
-                ".spritely/features/*.json text eol=lf\n";
+                ".spritely/features/features.jsonl merge=union text eol=lf\n" +
+                ".spritely/features/modules.jsonl merge=union text eol=lf\n" +
+                ".spritely/features/_metadata.json text eol=lf\n";
 
             if (File.Exists(gitattributesPath))
             {
                 var existing = File.ReadAllText(gitattributesPath, Encoding.UTF8);
-                if (!existing.Contains(".spritely/features/"))
+                if (!existing.Contains(".spritely/features/features.jsonl"))
                 {
-                    var suffix = existing.EndsWith('\n') ? "" : "\n";
-                    File.AppendAllText(gitattributesPath, suffix + spritelyAttributes, Encoding.UTF8);
+                    // Remove legacy patterns if present
+                    var cleaned = existing
+                        .Replace(".spritely/features/_index.json merge=union text eol=lf\n", "")
+                        .Replace(".spritely/features/*.json text eol=lf\n", "");
+                    var suffix = cleaned.EndsWith('\n') ? "" : "\n";
+                    File.WriteAllText(gitattributesPath,
+                        cleaned + suffix + spritelyAttributes, Encoding.UTF8);
                 }
             }
             // If .gitattributes doesn't exist, don't create it — only append if it's already there

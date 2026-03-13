@@ -60,5 +60,12 @@ namespace Spritely.Managers
         /// </summary>
         Task<string?> GetPendingDiffAsync(string projectPath,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Returns the full unified diff of all changes since the given commit hash.
+        /// Used to display code changes in task output when "See Code Changes" is enabled.
+        /// </summary>
+        Task<string?> GetFullDiffAsync(string projectPath, string? gitStartHash,
+            CancellationToken cancellationToken = default);
     }
 }

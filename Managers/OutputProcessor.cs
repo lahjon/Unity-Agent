@@ -17,6 +17,7 @@ namespace Spritely.Managers
     {
         private readonly OutputTabManager _outputTabManager;
         private readonly Func<bool> _getAutoVerify;
+        private readonly Func<bool> _getShowCodeChanges;
         private readonly ICompletionAnalyzer _completionAnalyzer;
         private readonly IGitHelper _gitHelper;
 
@@ -25,12 +26,13 @@ namespace Spritely.Managers
 
         public OutputProcessor(OutputTabManager outputTabManager,
             ICompletionAnalyzer completionAnalyzer, IGitHelper gitHelper,
-            Func<bool>? getAutoVerify = null)
+            Func<bool>? getAutoVerify = null, Func<bool>? getShowCodeChanges = null)
         {
             _outputTabManager = outputTabManager;
             _completionAnalyzer = completionAnalyzer;
             _gitHelper = gitHelper;
             _getAutoVerify = getAutoVerify ?? (() => false);
+            _getShowCodeChanges = getShowCodeChanges ?? (() => false);
         }
 
         public void AppendOutput(string taskId, string text,
@@ -82,6 +84,10 @@ namespace Spritely.Managers
                     if (!string.IsNullOrEmpty(summary))
                         AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
+
+                // Display colored code diff if "See Code Changes" is enabled
+                if (_getShowCodeChanges())
+                    await AppendCodeChangeDiffAsync(task, activeTasks, historyTasks);
 
                 // Run result verification if auto-verify is enabled
                 // This now also extracts next steps via Haiku (cheap, no extra LLM call)
@@ -201,6 +207,79 @@ namespace Spritely.Managers
             {
                 task.VerificationResult = "Verification failed";
                 AppLogger.Debug("TaskExecution", "Result verification failed", ex);
+            }
+        }
+
+        /// <summary>
+        /// Fetches the full unified diff since task start and appends it to the output
+        /// with green coloring for added lines and red coloring for removed lines.
+        /// </summary>
+        private async System.Threading.Tasks.Task AppendCodeChangeDiffAsync(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            try
+            {
+                var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
+                var diff = await _gitHelper.GetFullDiffAsync(task.ProjectPath, task.GitStartHash, ct)
+                    .ConfigureAwait(false);
+
+                if (string.IsNullOrWhiteSpace(diff)) return;
+
+                var greenBrush = new SolidColorBrush(Color.FromRgb(0x4E, 0xC9, 0x4E)); // green for additions
+                var redBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x5D, 0x5D));   // red for removals
+                var cyanBrush = new SolidColorBrush(Color.FromRgb(0x6C, 0xB6, 0xD6));  // cyan for file headers
+                var mutedBrush = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));  // muted for hunk headers
+                greenBrush.Freeze();
+                redBrush.Freeze();
+                cyanBrush.Freeze();
+                mutedBrush.Freeze();
+
+                AppendOutput(task.Id, "\n═══ Code Changes ═══════════════════════════\n", activeTasks, historyTasks);
+
+                string? currentFile = null;
+                foreach (var line in diff.Split('\n'))
+                {
+                    if (line.StartsWith("diff --git"))
+                    {
+                        // Extract file name from "diff --git a/path b/path"
+                        var parts = line.Split(" b/", 2);
+                        var fileName = parts.Length > 1 ? parts[1] : line;
+                        if (currentFile != null)
+                            AppendOutput(task.Id, "\n", activeTasks, historyTasks);
+                        currentFile = fileName;
+                        AppendColoredOutput(task.Id, $"── {fileName} ──\n", cyanBrush, activeTasks, historyTasks);
+                    }
+                    else if (line.StartsWith("@@"))
+                    {
+                        AppendColoredOutput(task.Id, line + "\n", mutedBrush, activeTasks, historyTasks);
+                    }
+                    else if (line.StartsWith("+") && !line.StartsWith("+++"))
+                    {
+                        AppendColoredOutput(task.Id, line + "\n", greenBrush, activeTasks, historyTasks);
+                    }
+                    else if (line.StartsWith("-") && !line.StartsWith("---"))
+                    {
+                        AppendColoredOutput(task.Id, line + "\n", redBrush, activeTasks, historyTasks);
+                    }
+                    else if (line.StartsWith("---") || line.StartsWith("+++") ||
+                             line.StartsWith("index ") || line.StartsWith("new file") ||
+                             line.StartsWith("deleted file") || line.StartsWith("Binary"))
+                    {
+                        // Skip git metadata lines
+                    }
+                    else
+                    {
+                        // Context lines
+                        AppendOutput(task.Id, line + "\n", activeTasks, historyTasks);
+                    }
+                }
+
+                AppendOutput(task.Id, "═══════════════════════════════════════════\n", activeTasks, historyTasks);
+            }
+            catch (OperationCanceledException) { /* ignore */ }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("OutputProcessor", "Failed to append code change diff", ex);
             }
         }
 

@@ -765,8 +765,8 @@ namespace Spritely
         {
             if (task.IsFinished)
             {
-                // Dismiss Recommendation tasks: transition to Completed so FinalizeTask
-                // performs normal teardown instead of keeping the task in the active list.
+                // Dismiss Recommendation tasks: transition to Completed so teardown
+                // performs normal cleanup instead of keeping the task in the active list.
                 if (task.Status == AgentTaskStatus.Recommendation)
                 {
                     task.Recommendations = "";
@@ -774,14 +774,17 @@ namespace Spritely
                 }
 
                 _outputTabManager.UpdateTabHeader(task);
+                // User explicitly dismissed this task — go straight to teardown,
+                // bypassing FinalizeTask which would re-trigger auto-commit and
+                // keep the task stuck in the active list.
                 if (sender != null)
                 {
                     _outputTabManager.AppendOutput(task.Id, "\nTask removed.\n", _activeTasks, _historyTasks);
-                    AnimateRemoval(sender, () => MoveToHistory(task));
+                    AnimateRemoval(sender, () => PerformTaskTeardown(task));
                 }
                 else
                 {
-                    MoveToHistory(task);
+                    PerformTaskTeardown(task);
                 }
                 return;
             }
@@ -800,7 +803,7 @@ namespace Spritely
                     _outputTabManager.UpdateTabHeader(task);
                     if (!_activeTasks.Contains(task))
                         return;
-                    MoveToHistory(task);
+                    PerformTaskTeardown(task);
                     return;
                 }
             }
@@ -857,8 +860,10 @@ namespace Spritely
             var finished = _activeTasks.Where(t => t.IsFinished).ToList();
             if (finished.Count == 0) return;
 
+            // User explicitly clearing finished tasks — bypass FinalizeTask to avoid
+            // re-triggering auto-commit which would keep tasks stuck in active list.
             foreach (var task in finished)
-                MoveToHistory(task);
+                PerformTaskTeardown(task);
 
             _outputTabManager.UpdateOutputTabWidths();
         }

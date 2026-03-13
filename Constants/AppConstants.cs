@@ -99,5 +99,16 @@ namespace Spritely.Constants
 
         /// <summary>Threshold for using Sonnet vs Opus in feature mode consolidation (0-1 scale).</summary>
         public const double ModelComplexityThreshold = 0.5;
+
+        // ── Feedback System ──────────────────────────────────────────────
+
+        /// <summary>Number of completed tasks before triggering a feedback analysis cycle.</summary>
+        public const int FeedbackAnalysisThreshold = 10;
+
+        /// <summary>Number of recent entries to include in each analysis window.</summary>
+        public const int FeedbackAnalysisWindow = 30;
+
+        /// <summary>Minimum entries required before invoking the LLM for deep analysis.</summary>
+        public const int FeedbackLlmAnalysisThreshold = 15;
     }
 }

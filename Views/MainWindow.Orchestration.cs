@@ -89,6 +89,10 @@ namespace Spritely
         /// </summary>
         private void PinRowHeights()
         {
+            // Don't re-pin while the user is actively dragging a splitter —
+            // it would overwrite the drag handler's pixel values with stale ActualHeight.
+            if (_isSplitterDragging) return;
+
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
             if (topRow.ActualHeight > 0)

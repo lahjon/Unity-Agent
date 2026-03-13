@@ -56,8 +56,8 @@
       "shortSignature": "TaskNumber: int"
     },
     "description": {
-      "featureId": "task-lifecycle",
-      "filePath": "Models/AgentTask.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Description: string"
     },
@@ -164,10 +164,10 @@
       "shortSignature": "FullOutput: string?"
     },
     "model": {
-      "featureId": "task-lifecycle",
-      "filePath": "Models/AgentTask.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
-      "shortSignature": "Model: ModelType"
+      "shortSignature": "Model: string"
     },
     "maxiterations": {
       "featureId": "task-lifecycle",
@@ -1790,26 +1790,26 @@
       "shortSignature": "class ModelUsage"
     },
     "inputtokens": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "InputTokens: long"
     },
     "outputtokens": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "OutputTokens: long"
     },
     "cachereadtokens": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "CacheReadTokens: long"
     },
     "cachecreationtokens": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "CacheCreationTokens: long"
     },
@@ -2078,8 +2078,8 @@
       "shortSignature": "class DeduplicatedPrompt"
     },
     "taskid": {
-      "featureId": "progress-tracking",
-      "filePath": "Models/ProgressMetrics.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "TaskId: string"
     },
@@ -2168,8 +2168,8 @@
       "shortSignature": "ReducePromptContext(string originalPrompt, int retryCount, long lastTokenEstimate) -\u003E string"
     },
     "priority": {
-      "featureId": "prompt-building",
-      "filePath": "Managers/ContextReducer.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Priority: double"
     },
@@ -2348,8 +2348,8 @@
       "shortSignature": "Explanation: string"
     },
     "confidence": {
-      "featureId": "codebase-indexing",
-      "filePath": "Models/SymbolEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Confidence: double"
     },
@@ -2366,8 +2366,8 @@
       "shortSignature": "Checks: List\u003CTerminationCheck\u003E"
     },
     "timestamp": {
-      "featureId": "activity-dashboard",
-      "filePath": "Models/ProjectActivityStats.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Timestamp: DateTime"
     },
@@ -2462,10 +2462,10 @@
       "shortSignature": "SiblingScoreMultiplier: double = 0.5"
     },
     "haikutimeout": {
-      "featureId": "feature-update-agent",
-      "filePath": "Managers/FeatureUpdateAgent.cs",
+      "featureId": "skill-management",
+      "filePath": "Managers/SkillDiscoveryAgent.cs",
       "kind": "Const",
-      "shortSignature": "HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(2)"
+      "shortSignature": "HaikuTimeout: TimeSpan = TimeSpan.FromMinutes(1)"
     },
     "resolveasync": {
       "featureId": "feature-context-resolution",
@@ -2486,14 +2486,14 @@
       "shortSignature": "Features: List\u003CFeatureIndexEntry\u003E"
     },
     "id": {
-      "featureId": "settings-management",
-      "filePath": "Models/TaskConfigBase.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Id: string"
     },
     "category": {
-      "featureId": "skill-management",
-      "filePath": "Models/SkillEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Category: string"
     },
@@ -2671,11 +2671,11 @@
       "kind": "Method",
       "shortSignature": "RegistryExists(string projectPath) -\u003E bool"
     },
-    "getfeaturespath": {
-      "featureId": "feature-registry",
-      "filePath": "Managers/FeatureRegistryManager.cs",
+    "databaseexists": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
       "kind": "Method",
-      "shortSignature": "GetFeaturesPath(string projectPath) -\u003E string"
+      "shortSignature": "DatabaseExists(string projectPath) -\u003E bool"
     },
     "loadfeatureasync": {
       "featureId": "feature-registry",
@@ -2695,11 +2695,11 @@
       "kind": "Method",
       "shortSignature": "SaveFeatureAsync(string projectPath, FeatureEntry feature) -\u003E Task"
     },
-    "removefeatureasync": {
-      "featureId": "feature-registry",
-      "filePath": "Managers/FeatureRegistryManager.cs",
+    "getmetadatapath": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
       "kind": "Method",
-      "shortSignature": "RemoveFeatureAsync(string projectPath, string featureId) -\u003E Task"
+      "shortSignature": "GetMetadataPath(string projectPath) -\u003E string"
     },
     "rebuildsymbolindexasync": {
       "featureId": "feature-registry",
@@ -2798,8 +2798,8 @@
       "shortSignature": "TaskDescription: string"
     },
     "completionsummary": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "CompletionSummary: string"
     },
@@ -3098,8 +3098,8 @@
       "shortSignature": "class GitFileChange"
     },
     "status": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Status: string"
     },
@@ -3122,8 +3122,8 @@
       "shortSignature": "class Suggestion"
     },
     "title": {
-      "featureId": "helper-suggestions",
-      "filePath": "Managers/HelperManager.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Title: string"
     },
@@ -3746,8 +3746,8 @@
       "shortSignature": "Weight: double"
     },
     "occurrences": {
-      "featureId": "progress-tracking",
-      "filePath": "Managers/ModelComplexityAnalyzer.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Occurrences: int"
     },
@@ -3847,11 +3847,11 @@
       "kind": "Method",
       "shortSignature": "SaveModuleAsync(string projectPath, ModuleEntry module) -\u003E Task"
     },
-    "removemoduleasync": {
+    "getmodulespath": {
       "featureId": "module-registry",
-      "filePath": "Managers/ModuleRegistryManager.cs",
+      "filePath": "Managers/FeatureDatabase.cs",
       "kind": "Method",
-      "shortSignature": "RemoveModuleAsync(string projectPath, string moduleId) -\u003E Task"
+      "shortSignature": "GetModulesPath(string projectPath) -\u003E string"
     },
     "getfeaturesinmodule": {
       "featureId": "module-registry",
@@ -4862,8 +4862,8 @@
       "shortSignature": "IsGlobal: bool"
     },
     "createdat": {
-      "featureId": "settings-management",
-      "filePath": "Models/TaskConfigBase.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
       "kind": "Property",
       "shortSignature": "CreatedAt: DateTime"
     },
@@ -5246,8 +5246,8 @@
       "shortSignature": "EndTime: DateTime?"
     },
     "recommendations": {
-      "featureId": "history-management",
-      "filePath": "Models/TaskHistoryEntry.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "Recommendations: string"
     },
@@ -5552,8 +5552,8 @@
       "shortSignature": "CurrentIteration: int"
     },
     "projectpath": {
-      "featureId": "task-lifecycle",
-      "filePath": "Models/AgentTask.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "ProjectPath: string"
     },
@@ -5774,8 +5774,8 @@
       "shortSignature": "PlaceholderCreatedAt: DateTime?"
     },
     "lastupdatedat": {
-      "featureId": "module-registry",
-      "filePath": "Models/ModuleEntry.cs",
+      "featureId": "feature-registry",
+      "filePath": "Models/FeatureMetadata.cs",
       "kind": "Property",
       "shortSignature": "LastUpdatedAt: DateTime"
     },
@@ -5810,8 +5810,8 @@
       "shortSignature": "class FeatureIndex"
     },
     "version": {
-      "featureId": "codebase-indexing",
-      "filePath": "Models/SymbolEntry.cs",
+      "featureId": "feature-registry",
+      "filePath": "Models/FeatureMetadata.cs",
       "kind": "Property",
       "shortSignature": "Version: int"
     },
@@ -6110,8 +6110,8 @@
       "shortSignature": "RunningTasks: int"
     },
     "successrate": {
-      "featureId": "activity-dashboard",
-      "filePath": "Models/ProjectActivityStats.cs",
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
       "kind": "Property",
       "shortSignature": "SuccessRate: double"
     },
@@ -8280,6 +8280,450 @@
       "filePath": "Models/AgentTask.cs",
       "kind": "Method",
       "shortSignature": "ClearToolActivity() -\u003E void"
+    },
+    "skilldiscoveryagent": {
+      "featureId": "skill-management",
+      "filePath": "Managers/SkillDiscoveryAgent.cs",
+      "kind": "Class",
+      "shortSignature": "class SkillDiscoveryAgent"
+    },
+    "discoverskillasync": {
+      "featureId": "skill-management",
+      "filePath": "Managers/SkillDiscoveryAgent.cs",
+      "kind": "Method",
+      "shortSignature": "DiscoverSkillAsync(string taskSummary, string? completionSummary, string? projectPath) -\u003E Task"
+    },
+    "feedbackanalyzer": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackAnalyzer.cs",
+      "kind": "Class",
+      "shortSignature": "class FeedbackAnalyzer"
+    },
+    "analyzeentries": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackAnalyzer.cs",
+      "kind": "Method",
+      "shortSignature": "AnalyzeEntries(List\u003CFeedbackEntry\u003E entries, string projectPath) -\u003E FeedbackInsight"
+    },
+    "feedbackapplicator": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackApplicator.cs",
+      "kind": "Class",
+      "shortSignature": "class FeedbackApplicator"
+    },
+    "autoapplyconfidence": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackApplicator.cs",
+      "kind": "Const",
+      "shortSignature": "AutoApplyConfidence: double = 0.6"
+    },
+    "maxautoaddrules": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackApplicator.cs",
+      "kind": "Const",
+      "shortSignature": "MaxAutoAddRules: int = 2"
+    },
+    "applyinsight": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackApplicator.cs",
+      "kind": "Method",
+      "shortSignature": "ApplyInsight(FeedbackInsight insight) -\u003E void"
+    },
+    "feedbackcollector": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackCollector.cs",
+      "kind": "Class",
+      "shortSignature": "class FeedbackCollector"
+    },
+    "collectandanalyze": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackCollector.cs",
+      "kind": "Method",
+      "shortSignature": "CollectAndAnalyze(AgentTask task) -\u003E void"
+    },
+    "feedbackstore": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackStore.cs",
+      "kind": "Class",
+      "shortSignature": "class FeedbackStore"
+    },
+    "saveentry": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackStore.cs",
+      "kind": "Method",
+      "shortSignature": "SaveEntry(FeedbackEntry entry) -\u003E void"
+    },
+    "loadentries": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackStore.cs",
+      "kind": "Method",
+      "shortSignature": "LoadEntries(string projectPath) -\u003E List\u003CFeedbackEntry\u003E"
+    },
+    "loadallentries": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackStore.cs",
+      "kind": "Method",
+      "shortSignature": "LoadAllEntries() -\u003E List\u003CFeedbackEntry\u003E"
+    },
+    "saveinsight": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackStore.cs",
+      "kind": "Method",
+      "shortSignature": "SaveInsight(FeedbackInsight insight) -\u003E void"
+    },
+    "loadinsights": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackStore.cs",
+      "kind": "Method",
+      "shortSignature": "LoadInsights(string projectPath) -\u003E List\u003CFeedbackInsight\u003E"
+    },
+    "getentriessincelastinsight": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/FeedbackStore.cs",
+      "kind": "Method",
+      "shortSignature": "GetEntriesSinceLastInsight(string projectPath) -\u003E int"
+    },
+    "improvementtaskgenerator": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Class",
+      "shortSignature": "class ImprovementTaskGenerator"
+    },
+    "queuesuggestion": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Method",
+      "shortSignature": "QueueSuggestion(string projectPath, ImprovementSuggestion suggestion) -\u003E void"
+    },
+    "getpendingsuggestions": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Method",
+      "shortSignature": "GetPendingSuggestions(string? projectPath = null) -\u003E List\u003CImprovementTaskEntry\u003E"
+    },
+    "dismiss": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Method",
+      "shortSignature": "Dismiss(string id) -\u003E void"
+    },
+    "marklaunched": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Method",
+      "shortSignature": "MarkLaunched(string id) -\u003E void"
+    },
+    "buildtaskdescription": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Method",
+      "shortSignature": "BuildTaskDescription(ImprovementTaskEntry entry) -\u003E string"
+    },
+    "improvementtaskentry": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Class",
+      "shortSignature": "class ImprovementTaskEntry"
+    },
+    "islargechange": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Property",
+      "shortSignature": "IsLargeChange: bool"
+    },
+    "dismissed": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Property",
+      "shortSignature": "Dismissed: bool"
+    },
+    "launched": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "kind": "Property",
+      "shortSignature": "Launched: bool"
+    },
+    "feedbackentry": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Class",
+      "shortSignature": "class FeedbackEntry"
+    },
+    "verificationpassed": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "VerificationPassed: bool"
+    },
+    "verificationsummary": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "VerificationSummary: string"
+    },
+    "durationminutes": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "DurationMinutes: double"
+    },
+    "changedfilecount": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "ChangedFileCount: int"
+    },
+    "iterationcount": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "IterationCount: int"
+    },
+    "wasfeaturemode": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "WasFeatureMode: bool"
+    },
+    "usedmcp": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "UsedMcp: bool"
+    },
+    "usedextendedplanning": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "UsedExtendedPlanning: bool"
+    },
+    "usedautodecompose": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "UsedAutoDecompose: bool"
+    },
+    "successfactors": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "SuccessFactors: List\u003Cstring\u003E"
+    },
+    "failurefactors": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "FailureFactors: List\u003Cstring\u003E"
+    },
+    "analysissummary": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "AnalysisSummary: string"
+    },
+    "feedbackinsight": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Class",
+      "shortSignature": "class FeedbackInsight"
+    },
+    "generatedat": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "GeneratedAt: DateTime"
+    },
+    "tasksanalyzed": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "TasksAnalyzed: int"
+    },
+    "averagedurationminutes": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "AverageDurationMinutes: double"
+    },
+    "averagecost": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "AverageCost: double"
+    },
+    "averageiterations": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "AverageIterations: double"
+    },
+    "successpatterns": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "SuccessPatterns: List\u003CPatternEntry\u003E"
+    },
+    "failurepatterns": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "FailurePatterns: List\u003CPatternEntry\u003E"
+    },
+    "suggestedruleadditions": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "SuggestedRuleAdditions: List\u003Cstring\u003E"
+    },
+    "suggestedruleremovals": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "SuggestedRuleRemovals: List\u003Cstring\u003E"
+    },
+    "largeimprovements": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "LargeImprovements: List\u003CImprovementSuggestion\u003E"
+    },
+    "autoapplied": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "AutoApplied: bool"
+    },
+    "tasksgenerated": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "TasksGenerated: bool"
+    },
+    "patternentry": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Class",
+      "shortSignature": "class PatternEntry"
+    },
+    "pattern": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Property",
+      "shortSignature": "Pattern: string"
+    },
+    "improvementsuggestion": {
+      "featureId": "self-improvement-engine",
+      "filePath": "Models/FeedbackEntry.cs",
+      "kind": "Class",
+      "shortSignature": "class ImprovementSuggestion"
+    },
+    "getfeaturespath": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "GetFeaturesPath(string projectPath) -\u003E string"
+    },
+    "getfeaturesdir": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "GetFeaturesDir(string projectPath) -\u003E string"
+    },
+    "migrateifneededasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "MigrateIfNeededAsync(string projectPath) -\u003E Task\u003Cbool\u003E"
+    },
+    "savemetadataasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "SaveMetadataAsync(string projectPath, FeatureMetadata metadata) -\u003E Task"
+    },
+    "loadmetadataasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "LoadMetadataAsync(string projectPath) -\u003E Task\u003CFeatureMetadata\u003E"
+    },
+    "removemoduleasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "RemoveModuleAsync(string projectPath, string moduleId) -\u003E Task"
+    },
+    "upsertmoduleasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "UpsertModuleAsync(string projectPath, ModuleEntry module) -\u003E Task"
+    },
+    "loadmodulebyidasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "LoadModuleByIdAsync(string projectPath, string moduleId) -\u003E Task\u003CModuleEntry?\u003E"
+    },
+    "savemodulesasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "SaveModulesAsync(string projectPath, List\u003CModuleEntry\u003E modules) -\u003E Task"
+    },
+    "loadmodulesasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "LoadModulesAsync(string projectPath) -\u003E Task\u003CList\u003CModuleEntry\u003E\u003E"
+    },
+    "removefeatureasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "RemoveFeatureAsync(string projectPath, string featureId) -\u003E Task"
+    },
+    "upsertfeatureasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "UpsertFeatureAsync(string projectPath, FeatureEntry feature) -\u003E Task"
+    },
+    "loadfeaturebyidasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "LoadFeatureByIdAsync(string projectPath, string featureId) -\u003E Task\u003CFeatureEntry?\u003E"
+    },
+    "savefeaturesasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "SaveFeaturesAsync(string projectPath, List\u003CFeatureEntry\u003E features) -\u003E Task"
+    },
+    "loadfeaturesasync": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Method",
+      "shortSignature": "LoadFeaturesAsync(string projectPath) -\u003E Task\u003CList\u003CFeatureEntry\u003E\u003E"
+    },
+    "featuredatabase": {
+      "featureId": "module-registry",
+      "filePath": "Managers/FeatureDatabase.cs",
+      "kind": "Class",
+      "shortSignature": "class FeatureDatabase"
+    },
+    "featuremetadata": {
+      "featureId": "feature-registry",
+      "filePath": "Models/FeatureMetadata.cs",
+      "kind": "Class",
+      "shortSignature": "class FeatureMetadata"
+    },
+    "symbolindexversion": {
+      "featureId": "feature-registry",
+      "filePath": "Models/FeatureMetadata.cs",
+      "kind": "Property",
+      "shortSignature": "SymbolIndexVersion: string?"
     }
   }
 }

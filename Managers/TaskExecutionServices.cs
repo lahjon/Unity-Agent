@@ -38,11 +38,14 @@ namespace Spritely.Managers
         public ClaudeService? ClaudeService { get; init; }
         public Func<int>? GetTokenLimitRetryMinutes { get; init; }
         public Func<bool>? GetAutoVerify { get; init; }
+        public Func<bool>? GetShowCodeChanges { get; init; }
         public Func<string>? GetSkillsBlock { get; init; }
         public Func<string>? GetOpusEffortLevel { get; init; }
         public FeatureRegistryManager? FeatureRegistryManager { get; init; }
         public FeatureContextResolver? FeatureContextResolver { get; init; }
         public FeatureUpdateAgent? FeatureUpdateAgent { get; init; }
         public HybridSearchManager? HybridSearchManager { get; init; }
+        public FeedbackCollector? FeedbackCollector { get; init; }
+        public SkillDiscoveryAgent? SkillDiscoveryAgent { get; init; }
     }
 }

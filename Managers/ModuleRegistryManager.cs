@@ -1,11 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Spritely.Constants;
@@ -15,40 +12,19 @@ namespace Spritely.Managers
 {
     /// <summary>
     /// Manages the module layer of the feature hierarchy.
-    /// Modules are the top-level grouping above features, stored as individual
-    /// <c>{module-id}.module.json</c> files with a <c>_module_index.json</c> manifest.
+    /// Modules are stored in the JSONL database (<c>modules.jsonl</c>).
     /// </summary>
     public class ModuleRegistryManager
     {
-        private static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNameCaseInsensitive = true
-        };
-
         // ── Persistence ──────────────────────────────────────────────────
 
-        /// <summary>Returns the absolute path to the features directory (shared with feature files).</summary>
-        private static string GetFeaturesPath(string projectPath)
-            => Path.Combine(projectPath, FeatureConstants.SpritelyDir, FeatureConstants.FeaturesDir);
-
-        /// <summary>Returns the file path for a module's JSON file.</summary>
-        private static string GetModuleFilePath(string projectPath, string moduleId)
-            => Path.Combine(GetFeaturesPath(projectPath), $"{moduleId}{FeatureConstants.ModuleFileExtension}");
-
-        /// <summary>Loads and deserializes <c>_module_index.json</c>. Returns empty index if missing.</summary>
+        /// <summary>Builds a <see cref="ModuleIndex"/> in memory from the JSONL database.</summary>
         public async Task<ModuleIndex> LoadModuleIndexAsync(string projectPath)
         {
-            var indexPath = Path.Combine(GetFeaturesPath(projectPath), FeatureConstants.ModuleIndexFileName);
             try
             {
-                if (!File.Exists(indexPath))
-                    return new ModuleIndex();
-
-                var json = await File.ReadAllTextAsync(indexPath);
-                return JsonSerializer.Deserialize<ModuleIndex>(json, JsonOptions) ?? new ModuleIndex();
+                var modules = await FeatureDatabase.LoadModulesAsync(projectPath);
+                return RebuildModuleIndex(modules);
             }
             catch (Exception ex)
             {
@@ -57,24 +33,32 @@ namespace Spritely.Managers
             }
         }
 
-        /// <summary>Saves the module index, sorted by Id.</summary>
+        /// <summary>Saves all modules from the index back to the JSONL database.</summary>
         public async Task SaveModuleIndexAsync(string projectPath, ModuleIndex index)
         {
             using var guard = AcquireMutex(projectPath);
-            await SaveModuleIndexInternalAsync(projectPath, index);
+            var modules = await FeatureDatabase.LoadModulesAsync(projectPath);
+
+            // Sync index entries back to module objects
+            foreach (var entry in index.Modules)
+            {
+                var module = modules.FirstOrDefault(m => m.Id == entry.Id);
+                if (module != null)
+                {
+                    module.Name = entry.Name;
+                    module.FeatureIds = new List<string>(entry.FeatureIds);
+                }
+            }
+
+            await FeatureDatabase.SaveModulesAsync(projectPath, modules);
         }
 
-        /// <summary>Loads a single module entry by id. Returns null if not found.</summary>
+        /// <summary>Loads a single module entry by id from the JSONL database.</summary>
         public async Task<ModuleEntry?> LoadModuleAsync(string projectPath, string moduleId)
         {
-            var filePath = GetModuleFilePath(projectPath, moduleId);
             try
             {
-                if (!File.Exists(filePath))
-                    return null;
-
-                var json = await File.ReadAllTextAsync(filePath);
-                return JsonSerializer.Deserialize<ModuleEntry>(json, JsonOptions);
+                return await FeatureDatabase.LoadModuleByIdAsync(projectPath, moduleId);
             }
             catch (Exception ex)
             {
@@ -83,60 +67,29 @@ namespace Spritely.Managers
             }
         }
 
-        /// <summary>Loads all modules referenced in the index.</summary>
+        /// <summary>Loads all modules from the JSONL database.</summary>
         public async Task<List<ModuleEntry>> LoadAllModulesAsync(string projectPath)
         {
-            var index = await LoadModuleIndexAsync(projectPath);
-            var results = new List<ModuleEntry>();
-
-            foreach (var entry in index.Modules)
+            try
             {
-                var module = await LoadModuleAsync(projectPath, entry.Id);
-                if (module != null)
-                    results.Add(module);
+                return await FeatureDatabase.LoadModulesAsync(projectPath);
             }
-
-            return results;
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ModuleRegistry", $"Failed to load all modules: {ex.Message}", ex);
+                return new List<ModuleEntry>();
+            }
         }
 
-        /// <summary>
-        /// Saves a module file and updates the index if the module is new.
-        /// All list properties are sorted before serialization.
-        /// </summary>
+        /// <summary>Saves a module to the JSONL database (upsert).</summary>
         public async Task SaveModuleAsync(string projectPath, ModuleEntry module)
         {
             using var guard = AcquireMutex(projectPath);
 
             try
             {
-                var featuresPath = GetFeaturesPath(projectPath);
-                Directory.CreateDirectory(featuresPath);
-
                 SortModuleLists(module);
-
-                var json = SerializeDeterministic(module);
-                var filePath = GetModuleFilePath(projectPath, module.Id);
-                await File.WriteAllTextAsync(filePath, json);
-
-                var index = await LoadModuleIndexAsync(projectPath);
-                if (!index.Modules.Any(m => m.Id == module.Id))
-                {
-                    index.Modules.Add(new ModuleIndexEntry
-                    {
-                        Id = module.Id,
-                        Name = module.Name,
-                        FeatureIds = new List<string>(module.FeatureIds)
-                    });
-                    await SaveModuleIndexInternalAsync(projectPath, index);
-                }
-                else
-                {
-                    // Update existing entry's name and feature list
-                    var existing = index.Modules.First(m => m.Id == module.Id);
-                    existing.Name = module.Name;
-                    existing.FeatureIds = new List<string>(module.FeatureIds);
-                    await SaveModuleIndexInternalAsync(projectPath, index);
-                }
+                await FeatureDatabase.UpsertModuleAsync(projectPath, module);
             }
             catch (Exception ex)
             {
@@ -144,20 +97,14 @@ namespace Spritely.Managers
             }
         }
 
-        /// <summary>Removes a module file and its index entry.</summary>
+        /// <summary>Removes a module from the JSONL database.</summary>
         public async Task RemoveModuleAsync(string projectPath, string moduleId)
         {
             using var guard = AcquireMutex(projectPath);
 
             try
             {
-                var filePath = GetModuleFilePath(projectPath, moduleId);
-                if (File.Exists(filePath))
-                    File.Delete(filePath);
-
-                var index = await LoadModuleIndexAsync(projectPath);
-                index.Modules.RemoveAll(m => m.Id == moduleId);
-                await SaveModuleIndexInternalAsync(projectPath, index);
+                await FeatureDatabase.RemoveModuleAsync(projectPath, moduleId);
             }
             catch (Exception ex)
             {
@@ -219,32 +166,6 @@ namespace Spritely.Managers
         }
 
         // ── Private Helpers ──────────────────────────────────────────────
-
-        /// <summary>Saves the module index without acquiring the mutex (caller must hold it).</summary>
-        private async Task SaveModuleIndexInternalAsync(string projectPath, ModuleIndex index)
-        {
-            try
-            {
-                var featuresPath = GetFeaturesPath(projectPath);
-                Directory.CreateDirectory(featuresPath);
-
-                index.Modules = index.Modules.OrderBy(m => m.Id, StringComparer.Ordinal).ToList();
-
-                var json = SerializeDeterministic(index);
-                var indexPath = Path.Combine(featuresPath, FeatureConstants.ModuleIndexFileName);
-                await File.WriteAllTextAsync(indexPath, json);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ModuleRegistry", $"Failed to save module index: {ex.Message}", ex);
-            }
-        }
-
-        private static string SerializeDeterministic<T>(T value)
-        {
-            var json = JsonSerializer.Serialize(value, JsonOptions);
-            return json.Replace("\r\n", "\n");
-        }
 
         private static void SortModuleLists(ModuleEntry module)
         {

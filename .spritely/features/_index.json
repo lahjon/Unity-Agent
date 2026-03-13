@@ -54,8 +54,20 @@
       "category": "config",
       "touchCount": 0,
       "primaryFileCount": 3,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-13T09:23:59.6313998Z",
+      "keywords": [
+        "App.xaml",
+        "AppConstants",
+        "MainWindow",
+        "bootstrap",
+        "composition root",
+        "configuration",
+        "constants",
+        "initialization",
+        "startup",
+        "tray icon"
+      ],
+      "description": "Bootstraps the WPF application, wires up managers and services at the composition root (MainWindow), manages app-wide constants, and handles tray icon and window lifecycle."
     },
     {
       "id": "chat",
@@ -145,8 +157,17 @@
       "category": "core",
       "touchCount": 1,
       "primaryFileCount": 3,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-13T09:00:15.0989283Z",
+      "keywords": [
+        "DependencyAnalyzer",
+        "FeatureInitializer",
+        "InferModuleMembership",
+        "SonnetFeature",
+        "feature discovery",
+        "initialize features",
+        "project scan"
+      ],
+      "description": "Performs initial codebase analysis to discover and create features by scanning source files and calling Claude Sonnet to identify logical features with their files, keywords, and dependencies. Excludes non-code assets (.png, .meta files) from discovery scans to focus on relevant source code."
     },
     {
       "id": "feature-mode",
@@ -154,8 +175,30 @@
       "category": "core",
       "touchCount": 2,
       "primaryFileCount": 4,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-13T08:53:09.2349162Z",
+      "keywords": [
+        "FeatureModeHandler",
+        "FeatureModeMaxRuntimeHours",
+        "FeatureModePhase",
+        "TokenBudgetConfig",
+        "action",
+        "analyzer",
+        "async",
+        "budget",
+        "budgets",
+        "burn",
+        "cancel",
+        "consecutive failures",
+        "context",
+        "evaluation phase",
+        "feature",
+        "feature mode",
+        "iteration",
+        "mode",
+        "planning phase",
+        "task"
+      ],
+      "description": "Manages long-running iterative AI feature development cycles: multi-phase execution (TeamPlanning, PlanConsolidation, Execution, Evaluation), runtime cap enforcement, consecutive failure tracking, and token budget management."
     },
     {
       "id": "feature-mode-execution",
@@ -170,21 +213,32 @@
       "id": "feature-registry",
       "name": "Feature Registry",
       "category": "data",
-      "touchCount": 2,
-      "primaryFileCount": 6,
-      "lastIndexedAt": "2026-03-09T21:46:14.5963079Z",
+      "touchCount": 3,
+      "primaryFileCount": 8,
+      "lastIndexedAt": "2026-03-13T09:09:16.5169062Z",
       "keywords": [
         "DependsOn",
         "FeatureConstants",
         "FeatureEntry",
         "FeatureIndex",
         "FeatureRegistryManager",
+        "context",
+        "database",
+        "feature",
         "feature context block",
         "feature lookup",
+        "features",
+        "file",
+        "files",
         "keyword matching",
-        "symbol lookup"
+        "level",
+        "per",
+        "project",
+        "spritely",
+        "symbol lookup",
+        "task"
       ],
-      "description": "Maintains a persistent registry of codebase features with signatures, keywords, dependencies, and module membership. Provides feature lookup by task description or symbol name and builds context blocks for prompt injection."
+      "description": "Maintains a persistent registry of codebase features with signatures, keywords, dependencies, and module membership using a database-backed storage system that reduces merge conflicts compared to the previous JSON-per-file approach. Provides feature lookup by task description or symbol name and builds context blocks for prompt injection."
     },
     {
       "id": "feature-update-agent",
@@ -209,17 +263,37 @@
       "category": "core",
       "touchCount": 0,
       "primaryFileCount": 1,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-13T09:03:03.9296673Z",
+      "keywords": [
+        "FileLockManager",
+        "QueuedTaskInfo",
+        "ReleaseTaskLocks",
+        "SetGitOperationInProgress",
+        "TryAcquireFileLock",
+        "file lock",
+        "lock conflict",
+        "task queueing"
+      ],
+      "description": "Coordinates exclusive file access between concurrently running tasks to prevent conflicts. Queues tasks that conflict on locked files and unblocks them when locks are released, including a Git operation guard."
     },
     {
       "id": "git-operations",
       "name": "Git Operations",
       "category": "integration",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 4,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-13T09:06:07.9932631Z",
+      "keywords": [
+        "CaptureGitHeadAsync",
+        "CommitSecureAsync",
+        "GitHelper",
+        "GitResult",
+        "IGitHelper",
+        "RunGitCommandAsync",
+        "git command",
+        "git commit"
+      ],
+      "description": "Provides a safe, testable wrapper around Git CLI commands: running arbitrary git commands, capturing HEAD, committing with path specs, listing changed files, and retrieving file diffs for output display. Enforces safe practices via GitOperationGuard."
     },
     {
       "id": "git-ui",
@@ -310,9 +384,9 @@
       "id": "main-window-ui",
       "name": "Main Window \u0026 UI Composition",
       "category": "ui",
-      "touchCount": 6,
-      "primaryFileCount": 6,
-      "lastIndexedAt": "2026-03-10T10:46:11.4417899Z",
+      "touchCount": 7,
+      "primaryFileCount": 7,
+      "lastIndexedAt": "2026-03-13T09:23:18.1513917Z",
       "keywords": [
         "IProjectPanelView",
         "MainWindow",
@@ -387,18 +461,40 @@
       "id": "module-registry",
       "name": "Module Registry",
       "category": "data",
-      "touchCount": 0,
-      "primaryFileCount": 2,
-      "keywords": [],
-      "description": ""
+      "touchCount": 1,
+      "primaryFileCount": 3,
+      "lastIndexedAt": "2026-03-13T09:09:16.6581455Z",
+      "keywords": [
+        "ModuleEntry",
+        "ModuleIndex",
+        "ModuleRegistryManager",
+        "async",
+        "category",
+        "database",
+        "description",
+        "dir",
+        "dispose",
+        "entry",
+        "exists",
+        "feature",
+        "feature grouping",
+        "features",
+        "get",
+        "id",
+        "ids",
+        "index",
+        "module",
+        "module index"
+      ],
+      "description": "Manages module-level groupings of features, persisting ModuleEntry data alongside the feature registry. Provides lookup of which features belong to which module."
     },
     {
       "id": "output-management",
       "name": "Task Output Management",
       "category": "ui",
-      "touchCount": 0,
+      "touchCount": 1,
       "primaryFileCount": 2,
-      "lastIndexedAt": "2026-03-10T08:18:24.5695649Z",
+      "lastIndexedAt": "2026-03-13T09:06:07.9294501Z",
       "keywords": [
         "ANSI",
         "OutputProcessor",
@@ -410,7 +506,7 @@
         "overflow",
         "typewriter animation"
       ],
-      "description": "Creates and manages per-task output tabs in the UI, handles ANSI-stripped streaming output rendering, supports Gemini image galleries, manages overflow when output exceeds the cap, and provides follow-up output injection."
+      "description": "Creates and manages per-task output tabs in the UI, handles ANSI-stripped streaming output rendering and structured code diffs with syntax highlighting (green for additions, red for removals), supports Gemini image galleries, manages overflow when output exceeds the cap, and provides follow-up output injection."
     },
     {
       "id": "output-processing",
@@ -501,6 +597,37 @@
       "description": "Assembles full AI prompts from modular blocks: system instructions, project rules, MCP configuration, feature context, skills, and user input. Also handles context reduction for token-limit retries and deduplication of repeated context."
     },
     {
+      "id": "self-improvement-engine",
+      "name": "Self-Improvement Engine",
+      "category": "",
+      "touchCount": 2,
+      "primaryFileCount": 6,
+      "lastIndexedAt": "2026-03-13T09:00:22.561557Z",
+      "keywords": [
+        "additions",
+        "analysis",
+        "analyze",
+        "analyzed",
+        "analyzer",
+        "applicator",
+        "claude.md auto-update",
+        "completion",
+        "feedback analysis",
+        "improvement generation",
+        "learning history",
+        "outcome optimization",
+        "output",
+        "pattern",
+        "pattern detection",
+        "save",
+        "summary",
+        "task",
+        "task reflection",
+        "tasks"
+      ],
+      "description": "New feature identified from task: Design and implement a self-improving feedback system for Spritely that:\n\n1. **Feedback Collection**: After each task execution, automatically analyze outcomes:\n   - What went well (successes, efficient solutions, good prompts)\n   - What went poorly (failures, inefficiencies, misunderstandings)\n   - Capture execution metrics, user feedback, and task results\n\n2. **Automated Small Improvements**: Apply low-risk tweaks automatically:\n   - Update CLAUDE.md with discovered best practices\n   - Refine system prompts based on patterns\n   - Adjust task parameters and workflows\n\n3. **Task-Based Large Improvements**: Generate actionable tasks for substantial changes:\n   - Architecture improvements\n   - New features or system redesigns\n   - Significant refactoring needs\n\n4. **Project-Wide Application**: Extend learning to new projects:\n   - Similar feedback loop for each project\u0027s workflow\n   - Project-specific rule improvements\n   - Knowledge sharing across projects\n\n5. **Implementation Approach**:\n   - First, investigate the current task execution pipeline, task history storage, and CLAUDE.md management\n   - Design the feedback analysis engine (what metrics matter, how to score success)\n   - Design the learning/update engine (when/how to modify CLAUDE.md vs create tasks)\n   - Integrate into TaskExecutionManager and task completion flow\n   - Test feedback loop with real tasks\n\nStart with proper investigation of existing systems, then design and implement the full learning loop."
+    },
+    {
       "id": "semantic-search",
       "name": "Semantic \u0026 Hybrid Search",
       "category": "data",
@@ -530,13 +657,53 @@
       "description": ""
     },
     {
+      "id": "skill-auto-discovery",
+      "name": "Skill Auto-Discovery from Completed Tasks",
+      "category": "",
+      "touchCount": 1,
+      "primaryFileCount": 0,
+      "lastIndexedAt": "2026-03-13T09:00:22.5883337Z",
+      "keywords": [
+        "auto-discovery",
+        "haiku verification",
+        "reusable instructions",
+        "skill discovery",
+        "skill extraction",
+        "skill manager",
+        "task analysis"
+      ],
+      "description": "New feature identified from task: Implement automatic skill discovery from completed tasks. After a task completes successfully in TaskExecutionManager.CompleteWithVerification, launch a SkillDiscoveryAgent (fire-and-forget, similar to FeatureUpdateAgent) that:\n\n1. Passes the task summary and a condensed excerpt of the task output to Haiku\n2. Prompts Haiku to identify any generalizable technique, pattern, or reusable instruction from the completed work\n3. If Haiku returns a candidate skill, surfaces a non-blocking toast notification to the user offering to save it via SkillManager\n\nThe SkillDiscoveryAgent should follow the existing FeatureUpdateAgent pattern in Managers/, use the Haiku service for analysis, and integrate seamlessly with the task completion flow without blocking task UI updates or next-task execution."
+    },
+    {
       "id": "skill-management",
       "name": "Skill Management",
       "category": "core",
-      "touchCount": 1,
-      "primaryFileCount": 3,
-      "keywords": [],
-      "description": ""
+      "touchCount": 2,
+      "primaryFileCount": 4,
+      "lastIndexedAt": "2026-03-13T09:00:22.472252Z",
+      "keywords": [
+        "BuildSkillsBlock",
+        "SkillEditorDialog",
+        "SkillEntry",
+        "SkillManager",
+        "agent",
+        "async",
+        "block",
+        "build",
+        "categories",
+        "category",
+        "clear",
+        "content",
+        "custom instructions",
+        "discovery",
+        "global skills",
+        "haiku",
+        "per-project skills",
+        "save",
+        "skill",
+        "skill injection"
+      ],
+      "description": "Manages user-defined custom instruction blocks (skills) that can be toggled on/off and injected into AI task prompts. Supports global and per-project skills with a full CRUD editor dialog."
     },
     {
       "id": "skills-system",
@@ -562,8 +729,19 @@
       "category": "core",
       "touchCount": 0,
       "primaryFileCount": 2,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-13T08:53:09.3212973Z",
+      "keywords": [
+        "AutoDecompose",
+        "ExtractAndSpawnSubtasks",
+        "ExtractAndSpawnTeam",
+        "HandleDecompositionCompletion",
+        "SpawnTeam",
+        "WorkflowComposer",
+        "subtask",
+        "task decomposition",
+        "team member"
+      ],
+      "description": "Handles automatic decomposition of complex tasks into subtasks and spawning of parallel agent teams. Parses SUBTASKS and TEAM JSON blocks from agent output, creates child tasks with dependencies, and coordinates phase completion."
     },
     {
       "id": "task-execution",
@@ -571,7 +749,7 @@
       "category": "core",
       "touchCount": 5,
       "primaryFileCount": 5,
-      "lastIndexedAt": "2026-03-10T10:46:11.2958608Z",
+      "lastIndexedAt": "2026-03-13T09:23:23.1453263Z",
       "keywords": [
         "Claude CLI",
         "ConPty",
@@ -680,7 +858,7 @@
       "category": "core",
       "touchCount": 2,
       "primaryFileCount": 5,
-      "lastIndexedAt": "2026-03-10T10:46:11.5129111Z",
+      "lastIndexedAt": "2026-03-13T09:03:03.8372952Z",
       "keywords": [
         "DAG",
         "DependsOn",
@@ -809,8 +987,20 @@
       "category": "ui",
       "touchCount": 0,
       "primaryFileCount": 3,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-13T09:22:22.1838161Z",
+      "keywords": [
+        "BrushCache",
+        "Colors.xaml",
+        "DarkDialog",
+        "DarkDialogWindow",
+        "brush",
+        "converters",
+        "dark theme",
+        "semantic brushes",
+        "styles",
+        "theming"
+      ],
+      "description": "Defines the app-wide dark theme through XAML resource dictionaries, semantic brush keys, and value converters. Provides shared dialog infrastructure (DarkDialog, DarkDialogWindow) and common UI helpers."
     },
     {
       "id": "tray-icon-badge",
@@ -837,20 +1027,61 @@
       "category": "ui",
       "touchCount": 0,
       "primaryFileCount": 5,
-      "keywords": [],
-      "description": ""
+      "lastIndexedAt": "2026-03-13T08:58:29.2974365Z",
+      "keywords": [
+        "Buttons.xaml",
+        "Colors.xaml",
+        "DarkDialog",
+        "TabControl.xaml",
+        "TextBox.xaml",
+        "brush keys",
+        "control template",
+        "dark theme",
+        "resource dictionary",
+        "themes"
+      ],
+      "description": "WPF resource dictionaries defining the dark theme, semantic color brushes, and control templates for all UI elements. Ensures visual consistency across dialogs, controls, and the main window."
     }
   ],
   "modules": [],
   "keywordMap": {
+    "1": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
+    ],
+    "2": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
+    ],
+    "3": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
+    ],
+    "4": [
+      "self-improvement-engine"
+    ],
+    "5": [
+      "self-improvement-engine"
+    ],
     "99": [
       "tray-icon-badge"
+    ],
+    "access": [
+      "file-lock-management"
     ],
     "acquire": [
       "task-orchestration"
     ],
     "across": [
-      "history-management"
+      "history-management",
+      "self-improvement-engine",
+      "ui-theming"
+    ],
+    "action": [
+      "feature-mode"
+    ],
+    "actionable": [
+      "self-improvement-engine"
     ],
     "activated": [
       "tray-icon-badge"
@@ -889,8 +1120,17 @@
     "additional": [
       "task-lifecycle"
     ],
+    "additions": [
+      "output-management",
+      "self-improvement-engine"
+    ],
+    "adjust": [
+      "self-improvement-engine"
+    ],
     "agent": [
       "feature-update-agent",
+      "skill-management",
+      "task-decomposition",
       "task-execution",
       "task-lifecycle"
     ],
@@ -908,21 +1148,37 @@
       "task-history"
     ],
     "ai": [
+      "feature-mode",
       "helper-suggestions",
       "prompt-building",
       "semantic-search",
+      "skill-management",
       "task-execution"
     ],
     "allow": [
       "task-lifecycle"
     ],
+    "alongside": [
+      "module-registry"
+    ],
     "analysis": [
-      "completion-analysis"
+      "completion-analysis",
+      "feature-initialization",
+      "self-improvement-engine",
+      "skill-auto-discovery"
     ],
     "analytics": [
       "history-analytics"
     ],
+    "analyze": [
+      "self-improvement-engine"
+    ],
+    "analyzed": [
+      "self-improvement-engine"
+    ],
     "analyzer": [
+      "feature-mode",
+      "self-improvement-engine",
       "task-execution"
     ],
     "animation": [
@@ -947,16 +1203,21 @@
       "app-infrastructure",
       "app-startup-config",
       "history-management",
+      "theming-ui-shared",
       "tray-icon-badge"
     ],
     "app focus": [
       "tray-icon-badge"
     ],
+    "app.xaml": [
+      "app-startup-config"
+    ],
     "app.xaml.cs": [
       "app-infrastructure"
     ],
     "appconstants": [
-      "app-infrastructure"
+      "app-infrastructure",
+      "app-startup-config"
     ],
     "append output": [
       "output-management"
@@ -965,8 +1226,13 @@
       "app-infrastructure",
       "app-settings",
       "app-startup",
+      "app-startup-config",
       "main-window-ui",
+      "self-improvement-engine",
       "terminal"
+    ],
+    "applicator": [
+      "self-improvement-engine"
     ],
     "applies": [
       "task-preprocessing"
@@ -975,11 +1241,25 @@
       "app-infrastructure"
     ],
     "apply": [
+      "self-improvement-engine",
       "task-lifecycle",
       "task-preprocessing"
     ],
     "applytotask": [
       "task-preprocessing"
+    ],
+    "approach": [
+      "feature-registry",
+      "self-improvement-engine"
+    ],
+    "arbitrary": [
+      "git-operations"
+    ],
+    "architecture": [
+      "self-improvement-engine"
+    ],
+    "around": [
+      "git-operations"
     ],
     "arrow": [
       "terminal"
@@ -990,11 +1270,17 @@
     "assembly": [
       "prompt-building"
     ],
+    "assets": [
+      "feature-initialization"
+    ],
     "assignments": [
       "project-management"
     ],
     "async": [
-      "mcp-integration"
+      "feature-mode",
+      "mcp-integration",
+      "module-registry",
+      "skill-management"
     ],
     "attach": [
       "task-ui"
@@ -1002,6 +1288,7 @@
     "auto": [
       "main-window-ui",
       "mcp-integration",
+      "skill-auto-discovery",
       "task-execution",
       "task-lifecycle",
       "task-preprocessing"
@@ -1009,13 +1296,28 @@
     "auto flags": [
       "task-preprocessing"
     ],
+    "auto-discovery": [
+      "skill-auto-discovery"
+    ],
+    "autodecompose": [
+      "task-decomposition"
+    ],
+    "automated": [
+      "self-improvement-engine"
+    ],
+    "automatic": [
+      "skill-auto-discovery",
+      "task-decomposition"
+    ],
     "automatically": [
-      "mcp-integration"
+      "mcp-integration",
+      "self-improvement-engine"
     ],
     "back": [
       "output-processing"
     ],
     "backed": [
+      "feature-registry",
       "terminal"
     ],
     "background": [
@@ -1033,16 +1335,27 @@
     ],
     "based": [
       "feature-update-agent",
+      "self-improvement-engine",
       "semantic-search"
     ],
     "basellmservice": [
       "llm-services"
+    ],
+    "belong": [
+      "module-registry"
+    ],
+    "best": [
+      "self-improvement-engine"
+    ],
+    "between": [
+      "file-lock-management"
     ],
     "beyond": [
       "history-management"
     ],
     "block": [
       "feature-context-resolution",
+      "skill-management",
       "task-execution",
       "task-lifecycle"
     ],
@@ -1050,23 +1363,49 @@
       "task-lifecycle"
     ],
     "blocking": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "skill-auto-discovery"
     ],
     "blocks": [
       "feature-registry",
-      "prompt-building"
+      "prompt-building",
+      "skill-management",
+      "task-decomposition"
     ],
     "bootstrap": [
-      "app-startup"
+      "app-startup",
+      "app-startup-config"
+    ],
+    "bootstraps": [
+      "app-startup-config"
     ],
     "box": [
       "task-ui"
     ],
     "brush": [
-      "task-ui"
+      "task-ui",
+      "theming-ui-shared"
+    ],
+    "brush keys": [
+      "ui-theming"
+    ],
+    "brushcache": [
+      "theming-ui-shared"
+    ],
+    "brushes": [
+      "ui-theming"
+    ],
+    "budget": [
+      "feature-mode"
+    ],
+    "budgets": [
+      "feature-mode"
     ],
     "buffer": [
       "terminal"
+    ],
+    "build": [
+      "skill-management"
     ],
     "builder": [
       "task-execution"
@@ -1079,6 +1418,12 @@
       "feature-context-resolution",
       "feature-registry"
     ],
+    "buildskillsblock": [
+      "skill-management"
+    ],
+    "burn": [
+      "feature-mode"
+    ],
     "bus": [
       "message-bus",
       "task-execution"
@@ -1086,22 +1431,49 @@
     "button": [
       "task-ui"
     ],
+    "buttons.xaml": [
+      "ui-theming"
+    ],
     "callback": [
       "task-orchestration"
     ],
+    "calling": [
+      "feature-initialization"
+    ],
     "cancel": [
+      "feature-mode",
       "task-execution",
       "task-orchestration"
+    ],
+    "candidate": [
+      "skill-auto-discovery"
     ],
     "canvas": [
       "task-ui"
     ],
     "cap": [
+      "feature-mode",
       "output-management",
       "tray-icon-badge"
     ],
+    "capture": [
+      "self-improvement-engine"
+    ],
+    "capturegitheadasync": [
+      "git-operations"
+    ],
+    "capturing": [
+      "git-operations"
+    ],
     "cards": [
       "task-ui"
+    ],
+    "categories": [
+      "skill-management"
+    ],
+    "category": [
+      "module-registry",
+      "skill-management"
     ],
     "center": [
       "task-ui"
@@ -1111,7 +1483,11 @@
     ],
     "changed": [
       "feature-update-agent",
+      "git-operations",
       "mcp-integration"
+    ],
+    "changes": [
+      "self-improvement-engine"
     ],
     "chat": [
       "chat",
@@ -1129,7 +1505,8 @@
       "mcp-integration"
     ],
     "child": [
-      "output-processing"
+      "output-processing",
+      "task-decomposition"
     ],
     "chunks": [
       "semantic-search"
@@ -1141,13 +1518,18 @@
       "tray-icon-badge"
     ],
     "claude": [
+      "feature-initialization",
       "llm-services",
       "output-processing",
+      "self-improvement-engine",
       "task-execution",
       "task-preprocessing"
     ],
     "claude cli": [
       "task-execution"
+    ],
+    "claude.md auto-update": [
+      "self-improvement-engine"
     ],
     "claudeservice": [
       "llm-services"
@@ -1162,11 +1544,13 @@
       "task-orchestration"
     ],
     "clear": [
+      "skill-management",
       "task-orchestration",
       "terminal",
       "tray-icon-badge"
     ],
     "cli": [
+      "git-operations",
       "output-processing",
       "task-execution"
     ],
@@ -1176,12 +1560,25 @@
     "close": [
       "terminal"
     ],
+    "code": [
+      "feature-initialization",
+      "output-management"
+    ],
     "codebase": [
       "codebase-indexing",
+      "feature-initialization",
       "feature-registry"
     ],
+    "collection": [
+      "self-improvement-engine"
+    ],
     "color": [
-      "project-management"
+      "project-management",
+      "ui-theming"
+    ],
+    "colors.xaml": [
+      "theming-ui-shared",
+      "ui-theming"
     ],
     "combines": [
       "semantic-search"
@@ -1193,25 +1590,51 @@
       "terminal"
     ],
     "commands": [
+      "git-operations",
       "task-execution"
     ],
     "commit": [
       "task-execution"
     ],
+    "commitsecureasync": [
+      "git-operations"
+    ],
+    "committing": [
+      "git-operations"
+    ],
+    "common": [
+      "theming-ui-shared"
+    ],
+    "compared": [
+      "feature-registry"
+    ],
     "completed": [
       "feature-update-agent",
       "history-management",
       "main-window-ui",
+      "skill-auto-discovery",
       "task-history",
       "task-lifecycle",
       "task-orchestration"
+    ],
+    "completes": [
+      "skill-auto-discovery"
+    ],
+    "completewithverification": [
+      "skill-auto-discovery"
     ],
     "completion": [
       "completion-analysis",
       "feature-context-resolution",
       "feature-update-agent",
+      "self-improvement-engine",
+      "skill-auto-discovery",
+      "task-decomposition",
       "task-orchestration",
       "tray-icon-badge"
+    ],
+    "complex": [
+      "task-decomposition"
     ],
     "components": [
       "theming-ui-shared"
@@ -1220,13 +1643,21 @@
       "task-ui"
     ],
     "composition": [
+      "app-startup-config",
       "main-window-ui"
     ],
     "composition root": [
+      "app-startup-config",
       "main-window-ui"
     ],
     "con": [
       "terminal"
+    ],
+    "concurrently": [
+      "file-lock-management"
+    ],
+    "condensed": [
+      "skill-auto-discovery"
     ],
     "confidence threshold": [
       "feature-context-resolution"
@@ -1238,6 +1669,13 @@
       "app-startup-config",
       "project-management",
       "prompt-building"
+    ],
+    "conflict": [
+      "file-lock-management"
+    ],
+    "conflicts": [
+      "feature-registry",
+      "file-lock-management"
     ],
     "connect": [
       "mcp-integration"
@@ -1258,17 +1696,31 @@
     "conptyterminal": [
       "terminal"
     ],
+    "consecutive": [
+      "feature-mode"
+    ],
+    "consecutive failures": [
+      "feature-mode"
+    ],
+    "consistency": [
+      "ui-theming"
+    ],
     "constants": [
       "app-infrastructure",
-      "app-settings"
+      "app-settings",
+      "app-startup-config"
     ],
     "consumed": [
       "project-management"
+    ],
+    "content": [
+      "skill-management"
     ],
     "context": [
       "context-optimization",
       "feature-context-menu",
       "feature-context-resolution",
+      "feature-mode",
       "feature-registry",
       "prompt-building",
       "task-lifecycle"
@@ -1285,14 +1737,26 @@
     "contract": [
       "task-lifecycle"
     ],
+    "control": [
+      "ui-theming"
+    ],
+    "control template": [
+      "ui-theming"
+    ],
     "controls": [
-      "main-window-ui"
+      "main-window-ui",
+      "ui-theming"
     ],
     "conversation": [
       "task-lifecycle"
     ],
+    "converters": [
+      "theming-ui-shared"
+    ],
     "coordinates": [
-      "main-window-ui"
+      "file-lock-management",
+      "main-window-ui",
+      "task-decomposition"
     ],
     "core": [
       "task-lifecycle"
@@ -1318,32 +1782,64 @@
       "app-infrastructure"
     ],
     "creates": [
-      "output-management"
+      "output-management",
+      "task-decomposition"
     ],
     "creation": [
       "task-factory"
+    ],
+    "crud": [
+      "skill-management"
     ],
     "ctrl\u002Bc": [
       "terminal"
     ],
     "current": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "self-improvement-engine"
+    ],
+    "custom": [
+      "skill-management"
+    ],
+    "custom instructions": [
+      "skill-management"
     ],
     "cycle detection": [
       "task-orchestration"
     ],
     "cycles": [
+      "feature-mode",
       "task-orchestration"
     ],
     "dag": [
       "task-orchestration"
+    ],
+    "dark": [
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "dark theme": [
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "darkdialog": [
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "darkdialogwindow": [
+      "theming-ui-shared"
     ],
     "dashboard": [
       "activity-dashboard"
     ],
     "data": [
       "export-task-data",
+      "module-registry",
       "task-lifecycle"
+    ],
+    "database": [
+      "feature-registry",
+      "module-registry"
     ],
     "decompose": [
       "task-preprocessing"
@@ -1357,11 +1853,20 @@
     "default": [
       "main-window-ui"
     ],
+    "defined": [
+      "skill-management"
+    ],
     "defines": [
-      "task-lifecycle"
+      "task-lifecycle",
+      "theming-ui-shared"
+    ],
+    "defining": [
+      "ui-theming"
     ],
     "dependencies": [
+      "feature-initialization",
       "feature-registry",
+      "task-decomposition",
       "task-orchestration"
     ],
     "dependency": [
@@ -1374,6 +1879,9 @@
     "dependency visualization": [
       "task-ui"
     ],
+    "dependencyanalyzer": [
+      "feature-initialization"
+    ],
     "dependson": [
       "feature-registry",
       "task-orchestration"
@@ -1381,11 +1889,15 @@
     "description": [
       "feature-context-resolution",
       "feature-registry",
+      "module-registry",
       "task-execution",
       "task-preprocessing"
     ],
     "descriptions": [
       "project-management"
+    ],
+    "design": [
+      "self-improvement-engine"
     ],
     "detection": [
       "project-management"
@@ -1393,8 +1905,29 @@
     "detects": [
       "task-orchestration"
     ],
+    "development": [
+      "feature-mode"
+    ],
     "diagnostics": [
       "logging-diagnostics"
+    ],
+    "dialog": [
+      "skill-management",
+      "theming-ui-shared"
+    ],
+    "dialogs": [
+      "ui-theming"
+    ],
+    "dictionaries": [
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "diffs": [
+      "git-operations",
+      "output-management"
+    ],
+    "dir": [
+      "module-registry"
     ],
     "directed": [
       "task-orchestration"
@@ -1411,13 +1944,22 @@
     "disconnectmcp": [
       "mcp-integration"
     ],
-    "discovery": [
+    "discover": [
       "feature-initialization"
+    ],
+    "discovered": [
+      "self-improvement-engine"
+    ],
+    "discovery": [
+      "feature-initialization",
+      "skill-auto-discovery",
+      "skill-management"
     ],
     "disk": [
       "history-management"
     ],
     "display": [
+      "git-operations",
       "project-management",
       "tray-icon-badge"
     ],
@@ -1426,10 +1968,20 @@
     ],
     "dispose": [
       "mcp-integration",
+      "module-registry",
       "terminal"
     ],
     "early": [
       "progress-tracking"
+    ],
+    "editor": [
+      "skill-management"
+    ],
+    "efficient": [
+      "self-improvement-engine"
+    ],
+    "elements": [
+      "ui-theming"
     ],
     "embeddingconstants": [
       "semantic-search"
@@ -1453,12 +2005,20 @@
     "enabling": [
       "main-window-ui"
     ],
+    "enforcement": [
+      "feature-mode"
+    ],
+    "enforces": [
+      "git-operations"
+    ],
     "engine": [
+      "self-improvement-engine",
       "task-execution"
     ],
     "ensures": [
       "task-execution",
-      "task-lifecycle"
+      "task-lifecycle",
+      "ui-theming"
     ],
     "ensuring": [
       "task-orchestration"
@@ -1469,8 +2029,17 @@
     "entries": [
       "history-management"
     ],
+    "entry": [
+      "module-registry"
+    ],
     "errors": [
       "output-processing"
+    ],
+    "evaluation": [
+      "feature-mode"
+    ],
+    "evaluation phase": [
+      "feature-mode"
     ],
     "event wiring": [
       "main-window-ui"
@@ -1485,20 +2054,40 @@
     "exceeds": [
       "output-management"
     ],
+    "excerpt": [
+      "skill-auto-discovery"
+    ],
+    "excludes": [
+      "feature-initialization"
+    ],
     "exclusive": [
+      "file-lock-management",
       "task-lifecycle"
     ],
     "executing": [
       "task-execution"
     ],
     "execution": [
+      "feature-mode",
       "feature-mode-execution",
+      "self-improvement-engine",
+      "skill-auto-discovery",
       "task-execution",
       "task-lifecycle",
       "task-preprocessing"
     ],
+    "existing": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
+    ],
+    "exists": [
+      "module-registry"
+    ],
     "export": [
       "export-task-data"
+    ],
+    "extend": [
+      "self-improvement-engine"
     ],
     "extended": [
       "task-preprocessing"
@@ -1507,13 +2096,23 @@
       "output-processing"
     ],
     "extractandspawnsubtasks": [
-      "output-processing"
+      "output-processing",
+      "task-decomposition"
+    ],
+    "extractandspawnteam": [
+      "task-decomposition"
     ],
     "extraction": [
       "output-processing"
     ],
     "facing": [
       "task-ui"
+    ],
+    "failure": [
+      "feature-mode"
+    ],
+    "failures": [
+      "self-improvement-engine"
     ],
     "feature": [
       "feature-context-menu",
@@ -1523,7 +2122,10 @@
       "feature-mode-execution",
       "feature-registry",
       "feature-update-agent",
+      "module-registry",
       "prompt-building",
+      "self-improvement-engine",
+      "skill-auto-discovery",
       "task-preprocessing",
       "tray-icon-badge"
     ],
@@ -1533,8 +2135,17 @@
     "feature context block": [
       "feature-registry"
     ],
+    "feature discovery": [
+      "feature-initialization"
+    ],
+    "feature grouping": [
+      "module-registry"
+    ],
     "feature lookup": [
       "feature-registry"
+    ],
+    "feature mode": [
+      "feature-mode"
     ],
     "feature refresh": [
       "feature-update-agent"
@@ -1554,26 +2165,60 @@
     "featureindex": [
       "feature-registry"
     ],
+    "featureinitializer": [
+      "feature-initialization"
+    ],
+    "featuremodehandler": [
+      "feature-mode"
+    ],
+    "featuremodemaxruntimehours": [
+      "feature-mode"
+    ],
+    "featuremodephase": [
+      "feature-mode"
+    ],
     "featureregistrymanager": [
       "feature-registry"
     ],
     "features": [
       "feature-context-resolution",
+      "feature-initialization",
       "feature-registry",
+      "module-registry",
+      "self-improvement-engine",
       "semantic-search",
       "task-lifecycle"
     ],
     "featureupdateagent": [
       "feature-context-resolution",
-      "feature-update-agent"
+      "feature-update-agent",
+      "skill-auto-discovery"
+    ],
+    "feedback": [
+      "self-improvement-engine"
+    ],
+    "feedback analysis": [
+      "self-improvement-engine"
     ],
     "file": [
       "app-infrastructure",
+      "feature-registry",
       "file-lock-management",
+      "git-operations",
       "logging-infrastructure",
       "semantic-search"
     ],
+    "file lock": [
+      "file-lock-management"
+    ],
+    "filelockmanager": [
+      "file-lock-management"
+    ],
     "files": [
+      "feature-initialization",
+      "feature-registry",
+      "file-lock-management",
+      "git-operations",
       "main-window-ui"
     ],
     "finish": [
@@ -1586,13 +2231,17 @@
       "tray-icon-badge"
     ],
     "fire": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "skill-auto-discovery"
     ],
     "fire and forget": [
       "feature-update-agent"
     ],
     "fires": [
       "task-orchestration"
+    ],
+    "first": [
+      "self-improvement-engine"
     ],
     "flag": [
       "task-preprocessing"
@@ -1604,25 +2253,36 @@
       "task-lifecycle",
       "task-preprocessing"
     ],
+    "flow": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
+    ],
+    "focus": [
+      "feature-initialization"
+    ],
     "focused": [
       "tray-icon-badge"
     ],
     "follow": [
       "main-window-ui",
       "output-management",
+      "skill-auto-discovery",
       "task-orchestration"
     ],
     "follow-up output": [
       "output-management"
     ],
     "forget": [
-      "feature-update-agent"
+      "feature-update-agent",
+      "skill-auto-discovery"
     ],
     "forwarded": [
       "terminal"
     ],
     "full": [
       "prompt-building",
+      "self-improvement-engine",
+      "skill-management",
       "task-execution",
       "task-lifecycle",
       "terminal"
@@ -1644,22 +2304,54 @@
     "geminiservice": [
       "llm-services"
     ],
+    "generalizable": [
+      "skill-auto-discovery"
+    ],
+    "generate": [
+      "self-improvement-engine"
+    ],
     "generation": [
       "llm-services"
+    ],
+    "get": [
+      "module-registry"
     ],
     "getprojectrulesblock": [
       "project-management"
     ],
     "git": [
+      "file-lock-management",
       "git-operations",
       "git-ui",
       "task-execution"
+    ],
+    "git command": [
+      "git-operations"
+    ],
+    "git commit": [
+      "git-operations"
+    ],
+    "githelper": [
+      "git-operations"
+    ],
+    "gitoperationguard": [
+      "git-operations"
+    ],
+    "gitresult": [
+      "git-operations"
     ],
     "given": [
       "feature-context-resolution"
     ],
     "global": [
-      "app-infrastructure"
+      "app-infrastructure",
+      "skill-management"
+    ],
+    "global skills": [
+      "skill-management"
+    ],
+    "good": [
+      "self-improvement-engine"
     ],
     "google": [
       "llm-services"
@@ -1678,6 +2370,9 @@
     "graphrenderer": [
       "task-ui"
     ],
+    "green": [
+      "output-management"
+    ],
     "group": [
       "task-group-tracking",
       "task-history"
@@ -1685,20 +2380,36 @@
     "group summary": [
       "task-history"
     ],
+    "groupings": [
+      "module-registry"
+    ],
+    "guard": [
+      "file-lock-management"
+    ],
     "haiku": [
       "feature-update-agent",
+      "skill-auto-discovery",
+      "skill-management",
       "task-preprocessing"
     ],
     "haiku update": [
       "feature-update-agent"
     ],
+    "haiku verification": [
+      "skill-auto-discovery"
+    ],
+    "handledecompositioncompletion": [
+      "task-decomposition"
+    ],
     "handles": [
       "app-infrastructure",
+      "app-startup-config",
       "feature-context-resolution",
       "main-window-ui",
       "output-management",
       "output-processing",
-      "prompt-building"
+      "prompt-building",
+      "task-decomposition"
     ],
     "handling": [
       "task-execution",
@@ -1710,11 +2421,17 @@
     "hang log": [
       "app-infrastructure"
     ],
+    "head": [
+      "git-operations"
+    ],
     "health": [
       "mcp-integration"
     ],
     "helper": [
       "helper-suggestions"
+    ],
+    "helpers": [
+      "theming-ui-shared"
     ],
     "hide": [
       "tray-icon-badge"
@@ -1722,12 +2439,16 @@
     "hiding": [
       "main-window-ui"
     ],
+    "highlighting": [
+      "output-management"
+    ],
     "historical": [
       "task-history"
     ],
     "history": [
       "history-analytics",
       "history-management",
+      "self-improvement-engine",
       "semantic-search",
       "task-history",
       "terminal"
@@ -1751,10 +2472,26 @@
     ],
     "icon": [
       "app-infrastructure",
+      "app-startup-config",
       "tray-icon-badge"
     ],
+    "id": [
+      "module-registry"
+    ],
     "identified": [
+      "self-improvement-engine",
+      "skill-auto-discovery",
       "tray-icon-badge"
+    ],
+    "identify": [
+      "feature-initialization",
+      "skill-auto-discovery"
+    ],
+    "ids": [
+      "module-registry"
+    ],
+    "igithelper": [
+      "git-operations"
     ],
     "image": [
       "llm-services",
@@ -1763,17 +2500,39 @@
     "image generation": [
       "llm-services"
     ],
+    "implementation": [
+      "self-improvement-engine"
+    ],
     "improved": [
       "main-window-ui"
     ],
+    "improvement": [
+      "self-improvement-engine"
+    ],
+    "improvement generation": [
+      "self-improvement-engine"
+    ],
+    "improvements": [
+      "self-improvement-engine"
+    ],
+    "improving": [
+      "self-improvement-engine"
+    ],
     "including": [
+      "file-lock-management",
       "llm-services"
     ],
     "increment": [
       "tray-icon-badge"
     ],
+    "index": [
+      "module-registry"
+    ],
     "indexing": [
       "codebase-indexing"
+    ],
+    "inefficiencies": [
+      "self-improvement-engine"
     ],
     "infer": [
       "task-preprocessing"
@@ -1781,17 +2540,31 @@
     "inference": [
       "task-preprocessing"
     ],
+    "infermodulemembership": [
+      "feature-initialization"
+    ],
     "inferred": [
       "task-preprocessing"
     ],
     "infrastructure": [
-      "app-infrastructure"
+      "app-infrastructure",
+      "theming-ui-shared"
+    ],
+    "initial": [
+      "feature-initialization"
     ],
     "initialization": [
+      "app-startup-config",
+      "feature-initialization"
+    ],
+    "initialize features": [
       "feature-initialization"
     ],
     "inject": [
       "output-processing"
+    ],
+    "injected": [
+      "skill-management"
     ],
     "injection": [
       "feature-context-resolution",
@@ -1812,9 +2585,17 @@
     "inside": [
       "tray-icon-badge"
     ],
+    "instruction": [
+      "skill-auto-discovery",
+      "skill-management"
+    ],
     "instructions": [
       "project-management",
       "prompt-building"
+    ],
+    "integrate": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
     ],
     "integrated": [
       "terminal"
@@ -1836,6 +2617,12 @@
     "interrupt": [
       "terminal"
     ],
+    "investigate": [
+      "self-improvement-engine"
+    ],
+    "investigation": [
+      "self-improvement-engine"
+    ],
     "iprojectpanelview": [
       "main-window-ui"
     ],
@@ -1848,8 +2635,16 @@
     "itaskflags": [
       "task-lifecycle"
     ],
+    "iteration": [
+      "feature-mode"
+    ],
+    "iterative": [
+      "feature-mode"
+    ],
     "json": [
-      "llm-services"
+      "feature-registry",
+      "llm-services",
+      "task-decomposition"
     ],
     "keep": [
       "main-window-ui"
@@ -1867,7 +2662,8 @@
       "terminal"
     ],
     "keys": [
-      "terminal"
+      "terminal",
+      "theming-ui-shared"
     ],
     "keyword": [
       "semantic-search"
@@ -1879,14 +2675,24 @@
       "feature-context-resolution"
     ],
     "keywords": [
+      "feature-initialization",
       "feature-registry"
     ],
     "kill": [
       "task-orchestration"
     ],
+    "knowledge": [
+      "self-improvement-engine"
+    ],
+    "large": [
+      "self-improvement-engine"
+    ],
     "last": [
       "main-window-ui",
       "mcp-integration"
+    ],
+    "launch": [
+      "skill-auto-discovery"
     ],
     "launches": [
       "task-execution"
@@ -1894,10 +2700,19 @@
     "layout": [
       "main-window-ui"
     ],
+    "learning": [
+      "self-improvement-engine"
+    ],
+    "learning history": [
+      "self-improvement-engine"
+    ],
     "level": [
-      "main-window-ui"
+      "feature-registry",
+      "main-window-ui",
+      "module-registry"
     ],
     "lifecycle": [
+      "app-startup-config",
       "feature-update-agent",
       "task-execution",
       "task-lifecycle"
@@ -1909,6 +2724,9 @@
     ],
     "list": [
       "project-tasks"
+    ],
+    "listing": [
+      "git-operations"
     ],
     "live": [
       "task-ui"
@@ -1925,6 +2743,15 @@
     "lock": [
       "file-lock-management"
     ],
+    "lock conflict": [
+      "file-lock-management"
+    ],
+    "locked": [
+      "file-lock-management"
+    ],
+    "locks": [
+      "file-lock-management"
+    ],
     "log": [
       "project-management"
     ],
@@ -1933,41 +2760,64 @@
       "logging-diagnostics",
       "logging-infrastructure"
     ],
+    "logical": [
+      "feature-initialization"
+    ],
     "loglevel": [
       "app-infrastructure"
     ],
+    "long": [
+      "feature-mode"
+    ],
     "lookup": [
-      "feature-registry"
+      "feature-registry",
+      "module-registry"
+    ],
+    "loop": [
+      "self-improvement-engine"
+    ],
+    "low": [
+      "self-improvement-engine"
     ],
     "machine": [
       "task-execution",
       "task-lifecycle"
     ],
     "main": [
-      "main-window-ui"
+      "main-window-ui",
+      "ui-theming"
     ],
     "maintains": [
       "feature-registry"
     ],
     "mainwindow": [
+      "app-startup-config",
       "main-window-ui"
     ],
     "management": [
+      "feature-mode",
       "file-lock-management",
       "llm-services",
       "output-management",
       "project-management",
+      "self-improvement-engine",
       "skill-management",
       "task-ui"
     ],
     "managers": [
-      "main-window-ui"
+      "app-startup-config",
+      "main-window-ui",
+      "skill-auto-discovery"
     ],
     "manages": [
+      "app-startup-config",
+      "feature-mode",
       "main-window-ui",
       "mcp-integration",
+      "module-registry",
       "output-management",
       "project-management",
+      "skill-management",
       "task-execution",
       "task-orchestration"
     ],
@@ -1979,6 +2829,9 @@
     ],
     "matching": [
       "semantic-search"
+    ],
+    "matter": [
+      "self-improvement-engine"
     ],
     "mcp": [
       "mcp-integration",
@@ -1997,6 +2850,9 @@
     "mcpstatus": [
       "mcp-integration"
     ],
+    "md": [
+      "self-improvement-engine"
+    ],
     "members": [
       "output-processing"
     ],
@@ -2006,14 +2862,26 @@
     "menu": [
       "feature-context-menu"
     ],
+    "merge": [
+      "feature-registry"
+    ],
     "message": [
       "message-bus"
+    ],
+    "meta": [
+      "feature-initialization"
     ],
     "metadata": [
       "project-management"
     ],
     "method": [
       "llm-services"
+    ],
+    "metrics": [
+      "self-improvement-engine"
+    ],
+    "misunderstandings": [
+      "self-improvement-engine"
     ],
     "mode": [
       "feature-mode",
@@ -2040,9 +2908,24 @@
       "module-management",
       "module-registry"
     ],
+    "module index": [
+      "module-registry"
+    ],
+    "moduleentry": [
+      "module-registry"
+    ],
+    "moduleindex": [
+      "module-registry"
+    ],
+    "moduleregistrymanager": [
+      "module-registry"
+    ],
     "monitors": [
       "mcp-integration",
       "task-execution"
+    ],
+    "multi": [
+      "feature-mode"
     ],
     "multiple": [
       "terminal"
@@ -2056,17 +2939,28 @@
     "named": [
       "terminal"
     ],
+    "needs": [
+      "self-improvement-engine"
+    ],
     "new": [
+      "self-improvement-engine",
+      "skill-auto-discovery",
       "tray-icon-badge"
+    ],
+    "next": [
+      "skill-auto-discovery"
     ],
     "nogitwrite": [
       "prompt-building"
     ],
     "non": [
-      "llm-services"
+      "feature-initialization",
+      "llm-services",
+      "skill-auto-discovery"
     ],
     "notification": [
       "app-infrastructure",
+      "skill-auto-discovery",
       "tray-icon-badge"
     ],
     "notifications": [
@@ -2076,8 +2970,17 @@
     "o": [
       "task-execution"
     ],
+    "off": [
+      "skill-management"
+    ],
+    "offering": [
+      "skill-auto-discovery"
+    ],
     "only": [
       "task-orchestration"
+    ],
+    "operation": [
+      "file-lock-management"
     ],
     "operations": [
       "git-operations"
@@ -2095,9 +2998,19 @@
     "other": [
       "terminal"
     ],
+    "outcome optimization": [
+      "self-improvement-engine"
+    ],
+    "outcomes": [
+      "self-improvement-engine"
+    ],
     "output": [
+      "git-operations",
       "output-management",
       "output-processing",
+      "self-improvement-engine",
+      "skill-auto-discovery",
+      "task-decomposition",
       "task-execution",
       "task-ui"
     ],
@@ -2136,17 +3049,42 @@
     "panels": [
       "main-window-ui"
     ],
+    "parallel": [
+      "task-decomposition"
+    ],
+    "parameters": [
+      "self-improvement-engine"
+    ],
     "parent": [
       "output-processing"
     ],
     "parse": [
       "main-window-ui"
     ],
+    "parses": [
+      "task-decomposition"
+    ],
     "partial class": [
       "main-window-ui"
     ],
+    "passes": [
+      "skill-auto-discovery"
+    ],
+    "path": [
+      "git-operations"
+    ],
     "paths": [
       "project-management"
+    ],
+    "pattern": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
+    ],
+    "pattern detection": [
+      "self-improvement-engine"
+    ],
+    "patterns": [
+      "self-improvement-engine"
     ],
     "pause": [
       "task-execution"
@@ -2155,9 +3093,17 @@
       "task-execution"
     ],
     "per": [
+      "feature-registry",
       "mcp-integration",
       "output-management",
-      "project-management"
+      "project-management",
+      "skill-management"
+    ],
+    "per-project skills": [
+      "skill-management"
+    ],
+    "performs": [
+      "feature-initialization"
     ],
     "period": [
       "history-management"
@@ -2168,15 +3114,37 @@
     "persistent": [
       "feature-registry"
     ],
+    "persisting": [
+      "module-registry"
+    ],
     "persists": [
       "history-management",
       "task-history"
     ],
+    "phase": [
+      "feature-mode",
+      "task-decomposition"
+    ],
+    "pipeline": [
+      "self-improvement-engine"
+    ],
     "placeholders": [
       "main-window-ui"
     ],
+    "planconsolidation": [
+      "feature-mode"
+    ],
     "planning": [
       "task-preprocessing"
+    ],
+    "planning phase": [
+      "feature-mode"
+    ],
+    "png": [
+      "feature-initialization"
+    ],
+    "poorly": [
+      "self-improvement-engine"
     ],
     "post": [
       "feature-context-resolution",
@@ -2184,6 +3152,10 @@
     ],
     "post-completion": [
       "feature-update-agent"
+    ],
+    "practices": [
+      "git-operations",
+      "self-improvement-engine"
     ],
     "preprocessasync": [
       "task-preprocessing"
@@ -2197,8 +3169,14 @@
     "preprocessresult": [
       "task-preprocessing"
     ],
+    "prevent": [
+      "file-lock-management"
+    ],
     "preventing": [
       "main-window-ui"
+    ],
+    "previous": [
+      "feature-registry"
     ],
     "primary": [
       "project-management",
@@ -2222,10 +3200,13 @@
       "progress-tracking"
     ],
     "project": [
+      "feature-registry",
       "mcp-integration",
       "project-management",
       "project-tasks",
-      "prompt-building"
+      "prompt-building",
+      "self-improvement-engine",
+      "skill-management"
     ],
     "project metadata": [
       "project-management"
@@ -2235,6 +3216,9 @@
     ],
     "project rules": [
       "project-management"
+    ],
+    "project scan": [
+      "feature-initialization"
     ],
     "projectcolormanager": [
       "project-management"
@@ -2252,7 +3236,8 @@
       "project-management"
     ],
     "projects": [
-      "project-management"
+      "project-management",
+      "self-improvement-engine"
     ],
     "prompt": [
       "feature-context-resolution",
@@ -2272,10 +3257,14 @@
     "prompts": [
       "project-management",
       "prompt-building",
+      "self-improvement-engine",
+      "skill-auto-discovery",
+      "skill-management",
       "task-templates",
       "task-templates-storage"
     ],
     "proper": [
+      "self-improvement-engine",
       "task-execution",
       "task-lifecycle"
     ],
@@ -2288,10 +3277,13 @@
     ],
     "provides": [
       "feature-registry",
+      "git-operations",
       "llm-services",
+      "module-registry",
       "output-management",
       "semantic-search",
-      "task-ui"
+      "task-ui",
+      "theming-ui-shared"
     ],
     "queue": [
       "history-management",
@@ -2302,6 +3294,12 @@
       "task-lifecycle",
       "task-orchestration"
     ],
+    "queuedtaskinfo": [
+      "file-lock-management"
+    ],
+    "queues": [
+      "file-lock-management"
+    ],
     "ranking": [
       "semantic-search"
     ],
@@ -2309,13 +3307,29 @@
       "output-processing"
     ],
     "real": [
+      "self-improvement-engine",
       "terminal"
     ],
     "recovery": [
       "task-history"
     ],
+    "red": [
+      "output-management"
+    ],
+    "redesigns": [
+      "self-improvement-engine"
+    ],
+    "reduces": [
+      "feature-registry"
+    ],
     "reduction": [
       "prompt-building"
+    ],
+    "refactoring": [
+      "self-improvement-engine"
+    ],
+    "refine": [
+      "self-improvement-engine"
     ],
     "registry": [
       "feature-registry",
@@ -2326,11 +3340,21 @@
     "related": [
       "task-lifecycle"
     ],
+    "released": [
+      "file-lock-management"
+    ],
+    "releasetasklocks": [
+      "file-lock-management"
+    ],
     "relevance": [
       "semantic-search"
     ],
     "relevant": [
-      "feature-context-resolution"
+      "feature-context-resolution",
+      "feature-initialization"
+    ],
+    "removals": [
+      "output-management"
     ],
     "rendered": [
       "tray-icon-badge"
@@ -2359,6 +3383,13 @@
     "resolves": [
       "feature-context-resolution"
     ],
+    "resource": [
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "resource dictionary": [
+      "ui-theming"
+    ],
     "resourcedictionary": [
       "main-window-ui"
     ],
@@ -2373,6 +3404,9 @@
     "restores": [
       "history-management"
     ],
+    "results": [
+      "self-improvement-engine"
+    ],
     "resume": [
       "task-execution"
     ],
@@ -2383,8 +3417,20 @@
       "prompt-building",
       "task-execution"
     ],
+    "retrieving": [
+      "git-operations"
+    ],
     "retry": [
       "output-processing"
+    ],
+    "returns": [
+      "skill-auto-discovery"
+    ],
+    "reusable": [
+      "skill-auto-discovery"
+    ],
+    "reusable instructions": [
+      "skill-auto-discovery"
     ],
     "richtextbox": [
       "output-management"
@@ -2392,35 +3438,58 @@
     "right": [
       "tray-icon-badge"
     ],
+    "risk": [
+      "self-improvement-engine"
+    ],
     "root": [
+      "app-startup-config",
       "main-window-ui"
     ],
     "rotation": [
       "app-infrastructure"
+    ],
+    "rule": [
+      "self-improvement-engine"
     ],
     "rules": [
       "preprocessor-skip-rules",
       "project-management",
       "prompt-building"
     ],
+    "rungitcommandasync": [
+      "git-operations"
+    ],
     "running": [
+      "feature-mode",
+      "file-lock-management",
+      "git-operations",
       "mcp-integration",
       "task-execution",
       "task-lifecycle",
       "task-orchestration"
     ],
     "runtime": [
+      "feature-mode",
       "task-lifecycle"
     ],
     "runtimetaskcontext": [
       "task-lifecycle"
     ],
+    "s": [
+      "self-improvement-engine"
+    ],
     "safe": [
       "app-infrastructure",
+      "git-operations",
       "logging-infrastructure"
     ],
     "safefilewriter": [
       "app-infrastructure"
+    ],
+    "save": [
+      "self-improvement-engine",
+      "skill-auto-discovery",
+      "skill-management"
     ],
     "saved": [
       "task-templates",
@@ -2432,8 +3501,20 @@
     "saves": [
       "history-management"
     ],
+    "scanning": [
+      "feature-initialization"
+    ],
+    "scans": [
+      "feature-initialization"
+    ],
+    "score": [
+      "self-improvement-engine"
+    ],
     "scoring": [
       "semantic-search"
+    ],
+    "seamlessly": [
+      "skill-auto-discovery"
     ],
     "search": [
       "feature-context-resolution",
@@ -2442,8 +3523,16 @@
     "selection": [
       "llm-services"
     ],
+    "self": [
+      "self-improvement-engine"
+    ],
     "semantic": [
-      "semantic-search"
+      "semantic-search",
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "semantic brushes": [
+      "theming-ui-shared"
     ],
     "semanticindexinitializer": [
       "semantic-search"
@@ -2469,7 +3558,11 @@
     "server": [
       "mcp-integration"
     ],
+    "service": [
+      "skill-auto-discovery"
+    ],
     "services": [
+      "app-startup-config",
       "llm-services"
     ],
     "session": [
@@ -2483,6 +3576,9 @@
       "project-management",
       "task-preprocessing"
     ],
+    "setgitoperationinprogress": [
+      "file-lock-management"
+    ],
     "settings": [
       "app-settings",
       "settings-management"
@@ -2490,6 +3586,9 @@
     "shared": [
       "task-lifecycle",
       "theming-ui-shared"
+    ],
+    "sharing": [
+      "self-improvement-engine"
     ],
     "shell": [
       "terminal"
@@ -2500,23 +3599,70 @@
     "signatures": [
       "feature-registry"
     ],
+    "significant": [
+      "self-improvement-engine"
+    ],
+    "similar": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
+    ],
     "similarity": [
       "semantic-search"
     ],
     "skill": [
+      "skill-auto-discovery",
+      "skill-management"
+    ],
+    "skill discovery": [
+      "skill-auto-discovery"
+    ],
+    "skill extraction": [
+      "skill-auto-discovery"
+    ],
+    "skill injection": [
+      "skill-management"
+    ],
+    "skill manager": [
+      "skill-auto-discovery"
+    ],
+    "skilldiscoveryagent": [
+      "skill-auto-discovery"
+    ],
+    "skilleditordialog": [
+      "skill-management"
+    ],
+    "skillentry": [
+      "skill-management"
+    ],
+    "skillmanager": [
+      "skill-auto-discovery",
       "skill-management"
     ],
     "skills": [
       "prompt-building",
+      "skill-management",
       "skills-system"
     ],
     "skip": [
       "preprocessor-skip-rules"
     ],
+    "small": [
+      "self-improvement-engine"
+    ],
     "snapshots": [
       "task-history"
     ],
+    "solutions": [
+      "self-improvement-engine"
+    ],
+    "sonnet": [
+      "feature-initialization"
+    ],
+    "sonnetfeature": [
+      "feature-initialization"
+    ],
     "source": [
+      "feature-initialization",
       "project-management",
       "semantic-search"
     ],
@@ -2526,11 +3672,27 @@
     "spawning": [
       "task-decomposition"
     ],
+    "spawnteam": [
+      "task-decomposition"
+    ],
+    "specific": [
+      "self-improvement-engine"
+    ],
+    "specs": [
+      "git-operations"
+    ],
+    "spritely": [
+      "feature-registry",
+      "self-improvement-engine"
+    ],
     "sqlite": [
       "semantic-search"
     ],
     "stale": [
       "main-window-ui"
+    ],
+    "start": [
+      "self-improvement-engine"
     ],
     "started": [
       "task-orchestration"
@@ -2554,6 +3716,10 @@
       "task-execution",
       "task-lifecycle",
       "task-orchestration"
+    ],
+    "storage": [
+      "feature-registry",
+      "self-improvement-engine"
     ],
     "stored": [
       "semantic-search",
@@ -2581,26 +3747,52 @@
     ],
     "structured": [
       "app-infrastructure",
-      "llm-services"
+      "llm-services",
+      "output-management"
     ],
     "style": [
       "ui-theming"
     ],
+    "styles": [
+      "theming-ui-shared"
+    ],
+    "substantial": [
+      "self-improvement-engine"
+    ],
     "subtask": [
       "output-processing",
+      "task-decomposition",
       "task-execution"
     ],
     "subtasks": [
-      "output-processing"
+      "output-processing",
+      "task-decomposition"
+    ],
+    "success": [
+      "self-improvement-engine"
+    ],
+    "successes": [
+      "self-improvement-engine"
+    ],
+    "successfully": [
+      "skill-auto-discovery"
     ],
     "suggestions": [
       "helper-suggestions"
+    ],
+    "summary": [
+      "self-improvement-engine",
+      "skill-auto-discovery"
     ],
     "supporting": [
       "terminal"
     ],
     "supports": [
-      "output-management"
+      "output-management",
+      "skill-management"
+    ],
+    "surfaces": [
+      "skill-auto-discovery"
     ],
     "switching": [
       "output-processing"
@@ -2613,18 +3805,29 @@
     "symbol lookup": [
       "feature-registry"
     ],
+    "syntax": [
+      "output-management"
+    ],
     "system": [
       "app-infrastructure",
+      "feature-registry",
       "main-window-ui",
       "prompt-building",
+      "self-improvement-engine",
       "skills-system",
       "ui-theming"
     ],
     "system prompt": [
       "prompt-building"
     ],
+    "systems": [
+      "self-improvement-engine"
+    ],
     "tab": [
       "task-ui"
+    ],
+    "tabcontrol.xaml": [
+      "ui-theming"
     ],
     "tabs": [
       "main-window-ui",
@@ -2636,6 +3839,7 @@
       "completion-analysis",
       "export-task-data",
       "feature-context-resolution",
+      "feature-mode",
       "feature-registry",
       "feature-update-agent",
       "history-analytics",
@@ -2644,7 +3848,10 @@
       "output-management",
       "preprocessor-skip-rules",
       "project-tasks",
+      "self-improvement-engine",
       "semantic-search",
+      "skill-auto-discovery",
+      "skill-management",
       "stored-task-viewer",
       "task-decomposition",
       "task-execution",
@@ -2660,8 +3867,14 @@
       "task-ui",
       "tray-icon-badge"
     ],
+    "task analysis": [
+      "skill-auto-discovery"
+    ],
     "task card": [
       "task-ui"
+    ],
+    "task decomposition": [
+      "task-decomposition"
     ],
     "task dependencies": [
       "task-orchestration"
@@ -2678,8 +3891,14 @@
     "task ordering": [
       "task-orchestration"
     ],
+    "task queueing": [
+      "file-lock-management"
+    ],
     "task ready": [
       "task-orchestration"
+    ],
+    "task reflection": [
+      "self-improvement-engine"
     ],
     "task relevance": [
       "feature-context-resolution"
@@ -2688,6 +3907,8 @@
       "task-lifecycle"
     ],
     "taskexecutionmanager": [
+      "self-improvement-engine",
+      "skill-auto-discovery",
       "task-execution"
     ],
     "taskexecutionservices": [
@@ -2719,10 +3940,14 @@
       "task-orchestration"
     ],
     "tasks": [
+      "file-lock-management",
       "history-management",
       "main-window-ui",
       "output-processing",
       "project-management",
+      "self-improvement-engine",
+      "skill-auto-discovery",
+      "task-decomposition",
       "task-execution",
       "task-orchestration",
       "tray-icon-badge"
@@ -2735,14 +3960,27 @@
       "task-decomposition",
       "task-preprocessing"
     ],
+    "team member": [
+      "task-decomposition"
+    ],
     "team spawn": [
       "output-processing"
+    ],
+    "teamplanning": [
+      "feature-mode"
+    ],
+    "teams": [
+      "task-decomposition"
+    ],
+    "technique": [
+      "skill-auto-discovery"
     ],
     "templates": [
       "main-window-ui",
       "settings-management",
       "task-templates",
-      "task-templates-storage"
+      "task-templates-storage",
+      "ui-theming"
     ],
     "terminal": [
       "terminal"
@@ -2754,8 +3992,28 @@
       "main-window-ui",
       "progress-tracking"
     ],
+    "test": [
+      "self-improvement-engine"
+    ],
+    "testable": [
+      "git-operations"
+    ],
+    "textbox.xaml": [
+      "ui-theming"
+    ],
     "their": [
+      "feature-initialization",
       "task-orchestration"
+    ],
+    "them": [
+      "file-lock-management"
+    ],
+    "theme": [
+      "theming-ui-shared",
+      "ui-theming"
+    ],
+    "themes": [
+      "ui-theming"
     ],
     "theming": [
       "theming-ui-shared",
@@ -2767,13 +4025,23 @@
     "time": [
       "main-window-ui"
     ],
+    "toast": [
+      "skill-auto-discovery"
+    ],
+    "toggled": [
+      "skill-management"
+    ],
     "token": [
+      "feature-mode",
       "output-processing",
       "prompt-building",
       "task-execution"
     ],
     "token limit retry": [
       "prompt-building"
+    ],
+    "tokenbudgetconfig": [
+      "feature-mode"
     ],
     "tokenlimithandler": [
       "output-processing"
@@ -2786,6 +4054,7 @@
       "main-window-ui"
     ],
     "tracking": [
+      "feature-mode",
       "llm-services",
       "progress-tracking",
       "task-group-tracking",
@@ -2802,11 +4071,19 @@
     ],
     "tray": [
       "app-infrastructure",
+      "app-startup-config",
       "tray-icon-badge"
     ],
     "tray icon": [
       "app-infrastructure",
+      "app-startup-config",
       "tray-icon-badge"
+    ],
+    "tryacquirefilelock": [
+      "file-lock-management"
+    ],
+    "tweaks": [
+      "self-improvement-engine"
     ],
     "types": [
       "preprocessor-skip-rules"
@@ -2818,6 +4095,7 @@
       "git-ui",
       "main-window-ui",
       "output-management",
+      "skill-auto-discovery",
       "task-graph-ui",
       "task-ui",
       "theming-ui-shared",
@@ -2829,6 +4107,9 @@
     "unblocked": [
       "task-orchestration"
     ],
+    "unblocks": [
+      "file-lock-management"
+    ],
     "unity": [
       "mcp-integration"
     ],
@@ -2836,6 +4117,7 @@
       "mcp-integration"
     ],
     "up": [
+      "app-startup-config",
       "history-management",
       "main-window-ui",
       "output-management",
@@ -2848,13 +4130,20 @@
       "main-window-ui"
     ],
     "updates": [
-      "feature-context-resolution"
+      "feature-context-resolution",
+      "skill-auto-discovery"
     ],
     "usage": [
       "llm-services"
     ],
+    "use": [
+      "skill-auto-discovery"
+    ],
     "user": [
       "prompt-building",
+      "self-improvement-engine",
+      "skill-auto-discovery",
+      "skill-management",
       "task-preprocessing",
       "task-ui"
     ],
@@ -2864,10 +4153,14 @@
     ],
     "using": [
       "feature-context-resolution",
+      "feature-registry",
       "semantic-search"
     ],
     "validation": [
       "task-factory"
+    ],
+    "value": [
+      "theming-ui-shared"
     ],
     "values": [
       "task-preprocessing"
@@ -2882,7 +4175,9 @@
       "semantic-search"
     ],
     "via": [
-      "llm-services"
+      "git-operations",
+      "llm-services",
+      "skill-auto-discovery"
     ],
     "viewer": [
       "stored-task-viewer"
@@ -2891,7 +4186,8 @@
       "main-window-ui"
     ],
     "visual": [
-      "tray-icon-badge"
+      "tray-icon-badge",
+      "ui-theming"
     ],
     "visual indicator": [
       "tray-icon-badge"
@@ -2905,19 +4201,36 @@
     "voyage embeddings": [
       "semantic-search"
     ],
+    "vs": [
+      "self-improvement-engine"
+    ],
     "vt100": [
       "terminal"
     ],
     "vtscreenbuffer": [
       "terminal"
     ],
+    "well": [
+      "self-improvement-engine"
+    ],
+    "went": [
+      "self-improvement-engine"
+    ],
     "while": [
       "tray-icon-badge"
     ],
+    "wide": [
+      "app-startup-config",
+      "self-improvement-engine",
+      "theming-ui-shared"
+    ],
     "window": [
-      "main-window-ui"
+      "app-startup-config",
+      "main-window-ui",
+      "ui-theming"
     ],
     "wires": [
+      "app-startup-config",
       "main-window-ui"
     ],
     "within": [
@@ -2926,19 +4239,26 @@
     "without": [
       "feature-update-agent",
       "main-window-ui",
+      "skill-auto-discovery",
       "task-preprocessing"
     ],
     "work": [
-      "main-window-ui"
+      "main-window-ui",
+      "skill-auto-discovery"
     ],
     "workflow": [
+      "self-improvement-engine",
       "task-ui"
     ],
     "workflow composer": [
       "task-ui"
     ],
+    "workflowcomposer": [
+      "task-decomposition"
+    ],
     "workflows": [
-      "main-window-ui"
+      "main-window-ui",
+      "self-improvement-engine"
     ],
     "working": [
       "terminal"
@@ -2947,7 +4267,12 @@
       "terminal"
     ],
     "wpf": [
-      "main-window-ui"
+      "app-startup-config",
+      "main-window-ui",
+      "ui-theming"
+    ],
+    "wrapper": [
+      "git-operations"
     ],
     "writes": [
       "app-infrastructure"
@@ -2956,7 +4281,8 @@
       "logging-infrastructure"
     ],
     "xaml": [
-      "main-window-ui"
+      "main-window-ui",
+      "theming-ui-shared"
     ],
     "\u2192": [
       "task-lifecycle"

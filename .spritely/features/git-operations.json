@@ -1,7 +1,7 @@
 {
   "id": "git-operations",
   "name": "Git Operations",
-  "description": "Provides a safe, testable wrapper around Git CLI commands: running arbitrary git commands, capturing HEAD, committing with path specs, and listing changed files. Enforces safe practices via GitOperationGuard.",
+  "description": "Provides a safe, testable wrapper around Git CLI commands: running arbitrary git commands, capturing HEAD, committing with path specs, listing changed files, and retrieving file diffs for output display. Enforces safe practices via GitOperationGuard.",
   "category": "integration",
   "keywords": [
     "CaptureGitHeadAsync",
@@ -82,11 +82,11 @@
   "context": {
     "signatures": {
       "Managers/GitHelper.cs": {
-        "hash": "bcc7c7f2482b",
-        "content": "class GitHelper : IGitHelper\n  L24: RunGitCommandAsync(string workingDirectory, string arguments, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L30: RunGitCommandAsync(string workingDirectory, string arguments, TimeSpan timeout, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L36: RunGitCommandAsync(string workingDirectory, string arguments, string? standardInput, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L42: RunGitCommandAsync(string workingDirectory, string arguments, string? standardInput, TimeSpan timeout, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L101: CaptureGitHeadAsync(string projectPath, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring?\u003E\n  L108: CommitSecureAsync(string workingDirectory, string message, string? pathSpec = null, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L159: GetChangedFileNamesAsync(string projectPath, string? gitStartHash, CancellationToken cancellationToken = default) -\u003E Task\u003CList\u003Cstring\u003E?\u003E  // Returns relative file paths changed since the given commit hash, including bo...\n  L202: EscapeGitPath(string path) -\u003E string  // Escapes a file path for safe use in git command-line arguments. Public static...\n  L216: IsValidGitHash(string? hash) -\u003E bool  // Validates that a string is a valid git commit hash (SHA-1). Valid hashes are ..."
+        "hash": "a57babdf9d6e",
+        "content": "class GitHelper : IGitHelper\n  L24: RunGitCommandAsync(string workingDirectory, string arguments, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L30: RunGitCommandAsync(string workingDirectory, string arguments, TimeSpan timeout, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L36: RunGitCommandAsync(string workingDirectory, string arguments, string? standardInput, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L42: RunGitCommandAsync(string workingDirectory, string arguments, string? standardInput, TimeSpan timeout, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L101: CaptureGitHeadAsync(string projectPath, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring?\u003E\n  L108: CommitSecureAsync(string workingDirectory, string message, string? pathSpec = null, CancellationToken cancellationToken = default) -\u003E Task\u003CGitResult\u003E\n  L159: GetChangedFileNamesAsync(string projectPath, string? gitStartHash, CancellationToken cancellationToken = default) -\u003E Task\u003CList\u003Cstring\u003E?\u003E  // Returns relative file paths changed since the given commit hash, including bo...\n  L202: EscapeGitPath(string path) -\u003E string  // Escapes a file path for safe use in git command-line arguments. Public static...\n  L216: IsValidGitHash(string? hash) -\u003E bool  // Validates that a string is a valid git commit hash (SHA-1). Valid hashes are ...\n  L228: GetPendingDiffAsync(string projectPath, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring?\u003E\n  L242: GetFullDiffAsync(string projectPath, string? gitStartHash, CancellationToken cancellationToken = default) -\u003E Task\u003Cstring?\u003E"
       },
       "Managers/IGitHelper.cs": {
-        "hash": "dba0a2dc56c0",
+        "hash": "8ea369cbd99c",
         "content": "interface IGitHelper"
       },
       "Models/GitResult.cs": {
@@ -130,6 +130,7 @@
     "IsValidGitHash",
     "RunGitCommandAsync"
   ],
-  "touchCount": 0,
-  "lastUpdatedAt": "2026-03-09T07:18:27.0901244Z"
+  "touchCount": 1,
+  "lastUpdatedAt": "2026-03-13T09:06:07.97156Z",
+  "lastUpdatedByTaskId": "d1fba1aa8b4549b1"
 }

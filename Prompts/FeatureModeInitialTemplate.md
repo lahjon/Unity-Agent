@@ -7,7 +7,8 @@
 - Stay in project root (./).
 
 ## TASK
-- Design 2-5 specialist agents to plan the feature below.
+- Design specialist agents to explore and plan the feature below.
+- Scale team size dynamically based on feature complexity (2-8 members typical).
 - Each explores different codebase/architecture aspects.
 
 ## TEAM DESIGN
@@ -16,6 +17,9 @@
 - Each member explores specific files, patterns, constraints.
 - Coordinate via shared message bus.
 - Planning/exploration only — NO implementation.
+- **MAXIMIZE PARALLELISM**: Most team members should have NO dependencies.
+  - Layer 1: All independent exploration/analysis (most members)
+  - Layer 2+: Only if a member truly needs another's output first (rare)
 - **CRITICAL**: Each member description MUST include:
   1. "Do NOT create/modify files or write documentation."
   2. "Post all findings to message bus. Output auto-collected."

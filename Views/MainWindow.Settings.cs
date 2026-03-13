@@ -26,6 +26,13 @@ namespace Spritely
             _settingsManager.AutoVerify = AutoVerifyToggle.IsChecked == true;
         }
 
+        private void ShowCodeChangesToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_settingsManager == null || _projectManager == null) return;
+            _settingsManager.ShowCodeChanges = ShowCodeChangesToggle.IsChecked == true;
+            _settingsManager.SaveSettings(_projectManager.ProjectPath);
+        }
+
         // ── Auto-Mode / Feature-Mode Toggles ────────────────────────
 
         private void AutoModeToggle_Changed(object sender, RoutedEventArgs e)

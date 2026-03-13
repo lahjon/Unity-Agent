@@ -89,9 +89,14 @@ namespace Spritely.Managers
 
             var sb = new StringBuilder();
             sb.AppendLine("\n# PREVIOUS ITERATION HISTORY");
-            sb.AppendLine("Learn from these previous attempts to avoid repeating mistakes:");
+            sb.AppendLine("Use this to REFINE and IMPROVE — do NOT redo work that already succeeded.");
 
-            foreach (var memory in memories.Take(3)) // Limit to last 3 iterations
+            // Separate successful work from gaps across all iterations
+            var allSuccesses = new List<string>();
+            var allFailures = new List<FailedApproach>();
+            var allFiles = new HashSet<string>();
+
+            foreach (var memory in memories.TakeLast(3)) // Last 3 iterations
             {
                 sb.AppendLine($"\n## Iteration {memory.Iteration}");
 
@@ -106,6 +111,16 @@ namespace Spritely.Managers
                     }
                 }
 
+                if (memory.SuccessfulWork.Any())
+                {
+                    sb.AppendLine("### Completed Successfully (DO NOT REDO):");
+                    foreach (var success in memory.SuccessfulWork)
+                    {
+                        sb.AppendLine($"- {success}");
+                        allSuccesses.Add(success);
+                    }
+                }
+
                 if (memory.FailedApproaches.Any())
                 {
                     sb.AppendLine("### Failed Approaches (DO NOT REPEAT):");
@@ -114,6 +129,16 @@ namespace Spritely.Managers
                         sb.AppendLine($"- **{failure.Approach}**: {failure.Reason}");
                         if (!string.IsNullOrEmpty(failure.ErrorDetails))
                             sb.AppendLine($"  Error: {failure.ErrorDetails}");
+                        allFailures.Add(failure);
+                    }
+                }
+
+                if (memory.RemainingGaps.Any())
+                {
+                    sb.AppendLine("### Remaining Gaps (FOCUS HERE):");
+                    foreach (var gap in memory.RemainingGaps)
+                    {
+                        sb.AppendLine($"- {gap}");
                     }
                 }
 
@@ -123,6 +148,7 @@ namespace Spritely.Managers
                     foreach (var file in memory.ImportantFiles.Take(5))
                     {
                         sb.AppendLine($"- `{file.Path}`: {file.Purpose}");
+                        allFiles.Add(file.Path);
                     }
                 }
 
@@ -149,6 +175,24 @@ namespace Spritely.Managers
                 }
             }
 
+            // Add refinement summary
+            if (allSuccesses.Any() || allFailures.Any())
+            {
+                sb.AppendLine("\n## REFINEMENT DIRECTIVE");
+                if (allSuccesses.Any())
+                {
+                    sb.AppendLine($"**{allSuccesses.Count} items already completed** — verify they exist, don't recreate.");
+                }
+                if (allFailures.Any())
+                {
+                    sb.AppendLine($"**{allFailures.Count} approaches failed** — use different strategies for these areas.");
+                }
+                if (allFiles.Any())
+                {
+                    sb.AppendLine($"**{allFiles.Count} files already modified** — build on existing changes.");
+                }
+            }
+
             return sb.ToString();
         }
 
@@ -171,6 +215,10 @@ namespace Spritely.Managers
 
             // Extract file references
             ExtractFileReferences(output, memory);
+
+            // Extract successful work and remaining gaps from structured evaluation output
+            ExtractSuccessfulWork(output, memory);
+            ExtractRemainingGaps(output, memory);
 
             // Calculate progress metrics
             memory.ProgressMetrics = CalculateProgressMetrics(output);
@@ -264,6 +312,109 @@ namespace Spritely.Managers
                     }
                 }
             }
+        }
+
+        private void ExtractSuccessfulWork(string output, IterationMemory memory)
+        {
+            // Look for "WHAT WORKED" section from structured evaluation output
+            var whatWorkedMatch = System.Text.RegularExpressions.Regex.Match(
+                output, @"###?\s*WHAT WORKED\s*\n((?:- .+\n?)+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (whatWorkedMatch.Success)
+            {
+                var lines = whatWorkedMatch.Groups[1].Value.Split('\n');
+                foreach (var line in lines)
+                {
+                    var trimmed = line.TrimStart('-', ' ').Trim();
+                    if (!string.IsNullOrWhiteSpace(trimmed))
+                        memory.SuccessfulWork.Add(trimmed);
+                }
+            }
+
+            // Also extract from completion patterns
+            var successPatterns = new[]
+            {
+                @"(?:successfully|correctly)\s+(?:implemented|added|created|configured)\s+(.+?)(?:\.|$)",
+                @"(?:completed|finished):\s*(.+?)(?:\.|$)"
+            };
+
+            foreach (var pattern in successPatterns)
+            {
+                var matches = System.Text.RegularExpressions.Regex.Matches(
+                    output, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                foreach (System.Text.RegularExpressions.Match match in matches)
+                {
+                    if (match.Groups.Count > 1)
+                    {
+                        var item = match.Groups[1].Value.Trim();
+                        if (!string.IsNullOrWhiteSpace(item) && item.Length < 200)
+                            memory.SuccessfulWork.Add(item);
+                    }
+                }
+            }
+
+            // Deduplicate
+            memory.SuccessfulWork = memory.SuccessfulWork.Distinct().Take(10).ToList();
+        }
+
+        private void ExtractRemainingGaps(string output, IterationMemory memory)
+        {
+            // Look for "GAPS IDENTIFIED" section from structured evaluation output
+            var gapsMatch = System.Text.RegularExpressions.Regex.Match(
+                output, @"###?\s*GAPS IDENTIFIED\s*\n((?:(?:- |\*\*).+\n?)+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+
+            if (gapsMatch.Success)
+            {
+                var lines = gapsMatch.Groups[1].Value.Split('\n');
+                foreach (var line in lines)
+                {
+                    var trimmed = line.TrimStart('-', '*', ' ').Trim();
+                    if (!string.IsNullOrWhiteSpace(trimmed) && trimmed.Length > 3)
+                        memory.RemainingGaps.Add(trimmed);
+                }
+            }
+
+            // Look for "RECOMMENDED FOCUS" section
+            var focusMatch = System.Text.RegularExpressions.Regex.Match(
+                output, @"###?\s*RECOMMENDED FOCUS\s*\n((?:- .+\n?)+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (focusMatch.Success)
+            {
+                var lines = focusMatch.Groups[1].Value.Split('\n');
+                foreach (var line in lines)
+                {
+                    var trimmed = line.TrimStart('-', ' ').Trim();
+                    if (!string.IsNullOrWhiteSpace(trimmed) && !memory.RemainingGaps.Contains(trimmed))
+                        memory.RemainingGaps.Add(trimmed);
+                }
+            }
+
+            // Also extract from NEEDS_MORE_WORK patterns
+            var gapPatterns = new[]
+            {
+                @"(?:missing|incomplete|not implemented|TODO|needs?):\s*(.+?)(?:\.|$)",
+                @"(?:gap|issue|problem):\s*(.+?)(?:\.|$)"
+            };
+
+            foreach (var pattern in gapPatterns)
+            {
+                var matches = System.Text.RegularExpressions.Regex.Matches(
+                    output, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                foreach (System.Text.RegularExpressions.Match match in matches)
+                {
+                    if (match.Groups.Count > 1)
+                    {
+                        var item = match.Groups[1].Value.Trim();
+                        if (!string.IsNullOrWhiteSpace(item) && item.Length < 200 && !memory.RemainingGaps.Contains(item))
+                            memory.RemainingGaps.Add(item);
+                    }
+                }
+            }
+
+            memory.RemainingGaps = memory.RemainingGaps.Take(10).ToList();
         }
 
         private ProgressMetrics CalculateProgressMetrics(string output)
@@ -463,6 +614,8 @@ namespace Spritely.Managers
         public List<Discovery> KeyDiscoveries { get; set; } = new();
         public List<FailedApproach> FailedApproaches { get; set; } = new();
         public List<FileReference> ImportantFiles { get; set; } = new();
+        public List<string> SuccessfulWork { get; set; } = new();
+        public List<string> RemainingGaps { get; set; } = new();
         public ProgressMetrics? ProgressMetrics { get; set; }
     }
 

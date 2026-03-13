@@ -61,6 +61,9 @@ namespace Spritely.Managers
         private readonly FeatureUpdateAgent _featureUpdateAgent;
         private readonly HybridSearchManager? _hybridSearchManager;
 
+        // ── Feedback System ──────────────────────────────────────────────
+        private readonly FeedbackCollector? _feedbackCollector;
+
         /// <summary>Exposes the streaming tool state dictionary for external consumers.</summary>
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _processLauncher.StreamingToolState;
 
@@ -99,7 +102,7 @@ namespace Spritely.Managers
             var retryMinutesFunc = services.GetTokenLimitRetryMinutes ?? (() => 30);
 
             // Wire up sub-handlers
-            _outputProcessor = new OutputProcessor(services.OutputTabManager, services.CompletionAnalyzer, services.GitHelper, services.GetAutoVerify);
+            _outputProcessor = new OutputProcessor(services.OutputTabManager, services.CompletionAnalyzer, services.GitHelper, services.GetAutoVerify, services.GetShowCodeChanges);
             _processLauncher = new TaskProcessLauncher(services.ScriptDir, services.FileLockManager, services.OutputTabManager, _outputProcessor, services.PromptBuilder, services.Dispatcher);
             _earlyTerminationManager = new EarlyTerminationManager(new ProgressAnalyzer());
 
@@ -108,6 +111,7 @@ namespace Spritely.Managers
             _featureContextResolver = services.FeatureContextResolver ?? new FeatureContextResolver(_featureRegistryManager, claudeService: services.ClaudeService);
             _featureUpdateAgent = services.FeatureUpdateAgent ?? new FeatureUpdateAgent(_featureRegistryManager, claudeService: services.ClaudeService);
             _hybridSearchManager = services.HybridSearchManager;
+            _feedbackCollector = services.FeedbackCollector;
             _featureModeHandler = new FeatureModeHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, services.PromptBuilder, services.TaskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
             _tokenLimitHandler = new TokenLimitHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.FileLockManager, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, retryMinutesFunc);
 
@@ -685,6 +689,16 @@ namespace Spritely.Managers
                     _ = _hybridSearchManager.UpdateChangedFileEmbeddingsAsync(
                         task.ProjectPath, changedFilesList);
                 }
+            }
+
+            // Feedback System: collect execution feedback (fire-and-forget, never blocks teardown)
+            if (_feedbackCollector != null)
+            {
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try { _feedbackCollector.CollectAndAnalyze(task); }
+                    catch (Exception ex) { AppLogger.Debug("TaskExecution", "Feedback collection failed (non-critical)", ex); }
+                });
             }
 
             // If a follow-up was started during summary generation, the status will
@@ -1291,9 +1305,9 @@ namespace Spritely.Managers
                 return null;
             }
 
-            // Cap at 5 subtasks
-            if (entries.Count > 5)
-                entries = entries.GetRange(0, 5);
+            // Safety cap to prevent runaway spawning (dynamic scaling allowed up to 15)
+            if (entries.Count > 15)
+                entries = entries.GetRange(0, 15);
 
             // Spawn all subtasks
             var children = new List<AgentTask>();

@@ -4,8 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,14 +25,6 @@ namespace Spritely.Managers
         /// </summary>
         public event Action<string>? FeatureSaved;
 
-        private static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNameCaseInsensitive = true
-        };
-
         internal static readonly HashSet<string> Stopwords = new(StringComparer.OrdinalIgnoreCase)
         {
             "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
@@ -53,30 +43,55 @@ namespace Spritely.Managers
 
         // ── Persistence ──────────────────────────────────────────────────
 
-        /// <summary>Checks if the feature index exists for the given project.</summary>
+        /// <summary>Checks if the feature database exists for the given project.</summary>
         public bool RegistryExists(string projectPath)
-        {
-            var indexPath = Path.Combine(GetFeaturesPath(projectPath), FeatureConstants.IndexFileName);
-            return File.Exists(indexPath);
-        }
+            => FeatureDatabase.DatabaseExists(projectPath);
 
         /// <summary>Returns the absolute path to the features directory.</summary>
         public string GetFeaturesPath(string projectPath)
-        {
-            return Path.Combine(projectPath, FeatureConstants.SpritelyDir, FeatureConstants.FeaturesDir);
-        }
+            => FeatureDatabase.GetFeaturesDir(projectPath);
 
-        /// <summary>Loads and deserializes <c>_index.json</c>.</summary>
+        /// <summary>
+        /// Builds a <see cref="FeatureIndex"/> in memory from the JSONL database.
+        /// The keyword map is computed at load time (not persisted) to avoid merge conflicts.
+        /// </summary>
         public async Task<FeatureIndex> LoadIndexAsync(string projectPath)
         {
-            var indexPath = Path.Combine(GetFeaturesPath(projectPath), FeatureConstants.IndexFileName);
             try
             {
-                if (!File.Exists(indexPath))
-                    return new FeatureIndex();
+                await FeatureDatabase.MigrateIfNeededAsync(projectPath);
 
-                var json = await File.ReadAllTextAsync(indexPath);
-                return JsonSerializer.Deserialize<FeatureIndex>(json, JsonOptions) ?? new FeatureIndex();
+                var features = await FeatureDatabase.LoadFeaturesAsync(projectPath);
+                var metadata = await FeatureDatabase.LoadMetadataAsync(projectPath);
+
+                var index = new FeatureIndex
+                {
+                    Version = metadata.Version,
+                    SymbolIndexVersion = metadata.SymbolIndexVersion,
+                    Features = features.Select(f => new FeatureIndexEntry
+                    {
+                        Id = f.Id,
+                        Name = f.Name,
+                        Category = f.Category,
+                        TouchCount = f.TouchCount,
+                        PrimaryFileCount = f.PrimaryFiles.Count,
+                        LastIndexedAt = f.LastUpdatedAt,
+                        Keywords = new List<string>(f.Keywords),
+                        Description = f.Description ?? ""
+                    }).ToList()
+                };
+
+                // Load modules for inline index
+                var modules = await FeatureDatabase.LoadModulesAsync(projectPath);
+                index.Modules = modules.Select(m => new ModuleIndexEntry
+                {
+                    Id = m.Id,
+                    Name = m.Name,
+                    FeatureIds = new List<string>(m.FeatureIds)
+                }).ToList();
+
+                RebuildKeywordMap(index);
+                return index;
             }
             catch (Exception ex)
             {
@@ -85,17 +100,13 @@ namespace Spritely.Managers
             }
         }
 
-        /// <summary>Loads a single feature entry by id.</summary>
+        /// <summary>Loads a single feature entry by id from the JSONL database.</summary>
         public async Task<FeatureEntry?> LoadFeatureAsync(string projectPath, string featureId)
         {
-            var filePath = Path.Combine(GetFeaturesPath(projectPath), $"{featureId}.json");
             try
             {
-                if (!File.Exists(filePath))
-                    return null;
-
-                var json = await File.ReadAllTextAsync(filePath);
-                return JsonSerializer.Deserialize<FeatureEntry>(json, JsonOptions);
+                await FeatureDatabase.MigrateIfNeededAsync(projectPath);
+                return await FeatureDatabase.LoadFeatureByIdAsync(projectPath, featureId);
             }
             catch (Exception ex)
             {
@@ -104,19 +115,21 @@ namespace Spritely.Managers
             }
         }
 
-        /// <summary>Loads all features referenced in the index.</summary>
+        /// <summary>Loads all features from the JSONL database.</summary>
         public async Task<List<FeatureEntry>> LoadAllFeaturesAsync(string projectPath)
         {
-            var index = await LoadIndexAsync(projectPath);
-
-            var tasks = index.Features.Select(entry => LoadFeatureAsync(projectPath, entry.Id));
-            var loaded = await Task.WhenAll(tasks);
-
-            var features = loaded.Where(f => f != null).Cast<FeatureEntry>().ToList();
-
-            await CleanupStalePlaceholdersAsync(projectPath, features);
-
-            return features;
+            try
+            {
+                await FeatureDatabase.MigrateIfNeededAsync(projectPath);
+                var features = await FeatureDatabase.LoadFeaturesAsync(projectPath);
+                await CleanupStalePlaceholdersAsync(projectPath, features);
+                return features;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("FeatureRegistry", $"Failed to load all features: {ex.Message}", ex);
+                return new List<FeatureEntry>();
+            }
         }
 
         /// <summary>
@@ -210,7 +223,7 @@ namespace Spritely.Managers
         }
 
         /// <summary>
-        /// Saves a feature file and updates the index if the feature is new.
+        /// Saves a feature to the JSONL database (upsert).
         /// All <see cref="List{T}"/> properties are sorted alphabetically before serialization.
         /// </summary>
         public async Task SaveFeatureAsync(string projectPath, FeatureEntry feature)
@@ -219,59 +232,13 @@ namespace Spritely.Managers
 
             try
             {
-                var featuresPath = GetFeaturesPath(projectPath);
-                Directory.CreateDirectory(featuresPath);
-
                 var hadSymbolNames = feature.SymbolNames.Count > 0;
                 PopulateSymbolNamesIfEmpty(feature);
                 if (!hadSymbolNames && feature.SymbolNames.Count > 0)
                     feature.SymbolNames = FilterSymbolNames(feature.SymbolNames, feature);
                 SortFeatureLists(feature);
 
-                var json = SerializeDeterministic(feature);
-                var filePath = Path.Combine(featuresPath, $"{feature.Id}.json");
-                await File.WriteAllTextAsync(filePath, json);
-
-                // Update index: add if missing, sync fields if changed
-                var index = await LoadIndexAsync(projectPath);
-                var indexEntry = index.Features.FirstOrDefault(f => f.Id == feature.Id);
-                var now = DateTime.UtcNow;
-                if (indexEntry == null)
-                {
-                    index.Features.Add(new FeatureIndexEntry
-                    {
-                        Id = feature.Id,
-                        Name = feature.Name,
-                        Category = feature.Category,
-                        TouchCount = feature.TouchCount,
-                        PrimaryFileCount = feature.PrimaryFiles.Count,
-                        LastIndexedAt = now,
-                        Keywords = new List<string>(feature.Keywords),
-                        Description = feature.Description ?? ""
-                    });
-                    await SaveIndexInternalAsync(projectPath, index);
-                }
-                else
-                {
-                    var changed = indexEntry.Name != feature.Name
-                                  || indexEntry.Category != feature.Category
-                                  || indexEntry.TouchCount != feature.TouchCount
-                                  || indexEntry.PrimaryFileCount != feature.PrimaryFiles.Count;
-
-                    indexEntry.LastIndexedAt = now;
-                    var keywordsChanged = !indexEntry.Keywords.SequenceEqual(feature.Keywords)
-                                         || indexEntry.Description != (feature.Description ?? "");
-                    if (changed || keywordsChanged)
-                    {
-                        indexEntry.Name = feature.Name;
-                        indexEntry.Category = feature.Category;
-                        indexEntry.TouchCount = feature.TouchCount;
-                        indexEntry.PrimaryFileCount = feature.PrimaryFiles.Count;
-                        indexEntry.Keywords = new List<string>(feature.Keywords);
-                        indexEntry.Description = feature.Description ?? "";
-                    }
-                    await SaveIndexInternalAsync(projectPath, index);
-                }
+                await FeatureDatabase.UpsertFeatureAsync(projectPath, feature);
 
                 FeatureSaved?.Invoke(feature.Id);
             }
@@ -281,20 +248,14 @@ namespace Spritely.Managers
             }
         }
 
-        /// <summary>Removes a feature file and its index entry.</summary>
+        /// <summary>Removes a feature from the JSONL database.</summary>
         public async Task RemoveFeatureAsync(string projectPath, string featureId)
         {
             using var guard = AcquireMutex(projectPath);
 
             try
             {
-                var filePath = Path.Combine(GetFeaturesPath(projectPath), $"{featureId}.json");
-                if (File.Exists(filePath))
-                    File.Delete(filePath);
-
-                var index = await LoadIndexAsync(projectPath);
-                index.Features.RemoveAll(f => f.Id == featureId);
-                await SaveIndexInternalAsync(projectPath, index);
+                await FeatureDatabase.RemoveFeatureAsync(projectPath, featureId);
             }
             catch (Exception ex)
             {
@@ -302,11 +263,13 @@ namespace Spritely.Managers
             }
         }
 
-        /// <summary>Saves the feature index, sorted by Id.</summary>
+        /// <summary>Saves the metadata (symbolIndexVersion). The index is computed at load time.</summary>
         public async Task SaveIndexAsync(string projectPath, FeatureIndex index)
         {
             using var guard = AcquireMutex(projectPath);
-            await SaveIndexInternalAsync(projectPath, index);
+            var metadata = await FeatureDatabase.LoadMetadataAsync(projectPath);
+            metadata.SymbolIndexVersion = index.SymbolIndexVersion;
+            await FeatureDatabase.SaveMetadataAsync(projectPath, metadata);
         }
 
         /// <summary>
@@ -793,27 +756,6 @@ namespace Spritely.Managers
 
         // ── Private Helpers ──────────────────────────────────────────────
 
-        /// <summary>Saves the index without acquiring the mutex (caller must hold it).</summary>
-        private async Task SaveIndexInternalAsync(string projectPath, FeatureIndex index)
-        {
-            try
-            {
-                var featuresPath = GetFeaturesPath(projectPath);
-                Directory.CreateDirectory(featuresPath);
-
-                index.Features = index.Features.OrderBy(f => f.Id).ToList();
-                RebuildKeywordMap(index);
-
-                var json = SerializeDeterministic(index);
-                var indexPath = Path.Combine(featuresPath, FeatureConstants.IndexFileName);
-                await File.WriteAllTextAsync(indexPath, json);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("FeatureRegistry", $"Failed to save index: {ex.Message}", ex);
-            }
-        }
-
         /// <summary>
         /// Rebuilds the inverted keyword map from all index entries.
         /// Tokenizes each entry's keywords, name, and description, mapping each token to the feature IDs that contain it.
@@ -859,13 +801,6 @@ namespace Spritely.Managers
             index.KeywordMap = new Dictionary<string, List<string>>(
                 map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
                    .ToDictionary(kv => kv.Key, kv => kv.Value));
-        }
-
-        /// <summary>Serializes an object to JSON with deterministic formatting and LF line endings.</summary>
-        private static string SerializeDeterministic<T>(T value)
-        {
-            var json = JsonSerializer.Serialize(value, JsonOptions);
-            return json.Replace("\r\n", "\n");
         }
 
         /// <summary>Sorts all list properties on a feature entry for deterministic serialization.</summary>
