@@ -122,11 +122,24 @@ namespace Spritely.Managers
                 if (totalTokens == 0)
                     return "Claude: No usage yet";
 
-                var cost = Helpers.FormatHelpers.EstimateCost(
-                    _usage.TotalInputTokens,
-                    _usage.TotalOutputTokens,
-                    _usage.TotalCacheReadTokens,
-                    _usage.TotalCacheCreationTokens);
+                // Calculate cost per-model for accuracy instead of using aggregate totals with Opus fallback
+                var cost = 0m;
+                if (_usage.ModelUsage.Count > 0)
+                {
+                    foreach (var kvp in _usage.ModelUsage)
+                    {
+                        cost += Helpers.FormatHelpers.EstimateCost(
+                            kvp.Value.InputTokens, kvp.Value.OutputTokens,
+                            kvp.Value.CacheReadTokens, kvp.Value.CacheCreationTokens,
+                            kvp.Key);
+                    }
+                }
+                else
+                {
+                    cost = Helpers.FormatHelpers.EstimateCost(
+                        _usage.TotalInputTokens, _usage.TotalOutputTokens,
+                        _usage.TotalCacheReadTokens, _usage.TotalCacheCreationTokens);
+                }
 
                 var costStr = Helpers.FormatHelpers.FormatCost(cost);
                 var tokenStr = Helpers.FormatHelpers.FormatTokenCount(totalTokens);

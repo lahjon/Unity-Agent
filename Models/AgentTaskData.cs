@@ -97,6 +97,9 @@ namespace Spritely
         public long CacheReadTokens { get; set; }
         public long CacheCreationTokens { get; set; }
 
+        /// <summary>CLI model string used for this task (e.g. "claude-opus-4-6"). Persisted for accurate cost display.</summary>
+        public string? LastUsedCliModel { get; set; }
+
         // Feature mode multi-phase tracking
         public FeatureModePhase FeatureModePhase { get; set; }
 

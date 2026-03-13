@@ -301,7 +301,7 @@ namespace Spritely
             get
             {
                 if (!HasTokenData) return "";
-                var cost = Helpers.FormatHelpers.EstimateCost(InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens);
+                var cost = Helpers.FormatHelpers.EstimateCost(InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens, Data.LastUsedCliModel ?? Runtime.LastCliModel);
                 var costStr = Helpers.FormatHelpers.FormatCost(cost);
                 if (CacheReadTokens > 0 || CacheCreationTokens > 0)
                     return $"{FormatTokenCount(TotalAllTokens)} tokens (~{costStr}) | {FormatTokenCount(InputTokens)} in / {FormatTokenCount(OutputTokens)} out / {FormatTokenCount(CacheReadTokens)} cached";
@@ -315,6 +315,10 @@ namespace Spritely
             OutputTokens += outputTokens;
             CacheReadTokens += cacheReadTokens;
             CacheCreationTokens += cacheCreationTokens;
+
+            // Persist the CLI model for accurate cost display across sessions
+            if (Data.LastUsedCliModel == null && Runtime.LastCliModel != null)
+                Data.LastUsedCliModel = Runtime.LastCliModel;
         }
 
         private static string FormatTokenCount(long count) => Helpers.FormatHelpers.FormatTokenCount(count);

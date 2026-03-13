@@ -1286,6 +1286,13 @@
                             </TabItem.Header>
                             <ScrollViewer x:Name="ActivityTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
                         </TabItem>
+                        <!-- IDE tab -->
+                        <TabItem x:Name="IdeTabItem">
+                            <TabItem.Header>
+                                <TextBlock Text="IDE" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                            </TabItem.Header>
+                            <ScrollViewer x:Name="IdeTabContent" VerticalScrollBarVisibility="Auto" Padding="12"/>
+                        </TabItem>
                         <!-- MCP tab -->
                         <TabItem x:Name="McpProjectTabItem" Visibility="Collapsed">
                             <TabItem.Header>

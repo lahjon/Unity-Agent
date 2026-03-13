@@ -176,6 +176,7 @@ namespace Spritely
             _mcpHealthMonitor?.Dispose();
             _gitPanelManager?.Dispose();
             _remoteServer?.Dispose();
+            _idePanelManager?.Dispose();
 
             foreach (var task in _activeTasks)
             {

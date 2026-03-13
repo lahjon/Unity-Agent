@@ -74,6 +74,7 @@ namespace Spritely
         private HelperManager _helperManager = null!;
         private ActivityDashboardManager _activityDashboard = null!;
         private GitPanelManager _gitPanelManager = null!;
+        private IdePanelManager _idePanelManager = null!;
         private GitOperationGuard _gitOperationGuard = null!;
         private CommitOrchestrator _commitOrchestrator = null!;
         private readonly TaskGroupTracker _taskGroupTracker;
@@ -306,6 +307,15 @@ namespace Spritely
                 _settingsManager);
             _taskExecutionManager.TaskCompleted += _gitPanelManager.OnTaskCompleted;
             _gitPanelManager.StartWatching();
+
+            _idePanelManager = new IdePanelManager(
+                _gitHelper,
+                () => _projectManager.ProjectPath,
+                _fileLockManager,
+                () => { lock (_activeTasksLock) return _activeTasks.ToList(); },
+                () => { lock (_historyTasksLock) return _historyTasks.ToList(); },
+                Dispatcher);
+            _taskExecutionManager.TaskCompleted += _idePanelManager.OnTaskCompleted;
 
             _projectManager.SetTaskCollections(_activeTasks, _historyTasks);
 
