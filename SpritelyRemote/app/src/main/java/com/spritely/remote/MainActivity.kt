@@ -1,0 +1,93 @@
+package com.spritely.remote
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.spritely.remote.ui.screens.*
+import com.spritely.remote.ui.theme.SpritelyRemoteTheme
+import com.spritely.remote.viewmodel.ConnectionViewModel
+import com.spritely.remote.viewmodel.TaskViewModel
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        setContent {
+            SpritelyRemoteTheme {
+                SpritelyApp(applicationContext = this)
+            }
+        }
+    }
+}
+
+@Composable
+fun SpritelyApp(
+    applicationContext: android.content.Context,
+    connectionVM: ConnectionViewModel = viewModel(),
+    taskVM: TaskViewModel = viewModel()
+) {
+    val connState by connectionVM.state.collectAsState()
+    val taskState by taskVM.state.collectAsState()
+
+    // Initialize connection VM with context for DataStore
+    LaunchedEffect(Unit) {
+        connectionVM.initialize(applicationContext)
+    }
+
+    // When connected, start polling tasks
+    LaunchedEffect(connState.isConnected) {
+        if (connState.isConnected) {
+            val port = connState.port.toIntOrNull() ?: 7923
+            taskVM.setConnection(connState.host, port)
+            taskVM.startPolling()
+        } else {
+            taskVM.stopPolling()
+        }
+    }
+
+    // Navigation state
+    if (!connState.isConnected) {
+        // Connection screen
+        ConnectScreen(
+            state = connState,
+            onHostChange = connectionVM::updateHost,
+            onPortChange = connectionVM::updatePort,
+            onConnect = connectionVM::connect
+        )
+    } else if (taskState.selectedTask != null) {
+        // Task detail screen
+        val task = taskState.selectedTask!!
+        TaskDetailScreen(
+            task = task,
+            onBack = { taskVM.clearSelectedTask() },
+            onCancel = { taskVM.cancelTask(task.id); taskVM.clearSelectedTask() },
+            onPause = { taskVM.pauseTask(task.id) },
+            onResume = { taskVM.resumeTask(task.id) }
+        )
+    } else {
+        // Dashboard
+        DashboardScreen(
+            state = taskState,
+            onTaskClick = { taskVM.loadTaskDetail(it.id) },
+            onCreateTask = { taskVM.showCreateDialog() },
+            onCancelTask = taskVM::cancelTask,
+            onPauseTask = taskVM::pauseTask,
+            onResumeTask = taskVM::resumeTask,
+            onDisconnect = { connectionVM.disconnect() },
+            onRefresh = { taskVM.refresh() }
+        )
+
+        // Create task dialog
+        if (taskState.showCreateDialog) {
+            CreateTaskDialog(
+                projects = taskState.projects,
+                onDismiss = { taskVM.hideCreateDialog() },
+                onCreate = { taskVM.createTask(it) }
+            )
+        }
+    }
+}

@@ -118,6 +118,11 @@ namespace Spritely.Constants
         public const decimal HaikuCacheReadPerM = 0.08m;
         public const decimal HaikuCacheCreationPerM = 1.00m;
 
+        // ── Remote Server ──────────────────────────────────────────────
+
+        /// <summary>Default port for the SpritelyRemote REST API server.</summary>
+        public const int DefaultRemoteServerPort = 7923;
+
         // ── Feedback System ──────────────────────────────────────────────
 
         /// <summary>Number of completed tasks before triggering a feedback analysis cycle.</summary>

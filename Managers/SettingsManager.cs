@@ -26,6 +26,8 @@ namespace Spritely.Managers
         private string _defaultMcpStartCommand = @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
         private string _opusEffortLevel = "high";
         private bool _showCodeChanges;
+        private bool _remoteServerEnabled;
+        private int _remoteServerPort = 7923;
 
         public List<TaskTemplate> TaskTemplates { get; } = new();
 
@@ -113,6 +115,18 @@ namespace Spritely.Managers
             set => _showCodeChanges = value;
         }
 
+        public bool RemoteServerEnabled
+        {
+            get => _remoteServerEnabled;
+            set => _remoteServerEnabled = value;
+        }
+
+        public int RemoteServerPort
+        {
+            get => _remoteServerPort;
+            set => _remoteServerPort = Math.Max(1024, Math.Min(65535, value));
+        }
+
         public SettingsManager(string appDataDir)
         {
             _settingsFile = Path.Combine(appDataDir, "settings.json");
@@ -156,6 +170,10 @@ namespace Spritely.Managers
                     OpusEffortLevel = oel.GetString() ?? "high";
                 if (dict.TryGetValue("showCodeChanges", out var scc))
                     _showCodeChanges = scc.GetBoolean();
+                if (dict.TryGetValue("remoteServerEnabled", out var rse))
+                    _remoteServerEnabled = rse.GetBoolean();
+                if (dict.TryGetValue("remoteServerPort", out var rsp))
+                    _remoteServerPort = Math.Max(1024, Math.Min(65535, rsp.GetInt32()));
             }
             catch (Exception ex) { AppLogger.Warn("SettingsManager", "Failed to load settings", ex); }
         }
@@ -179,7 +197,9 @@ namespace Spritely.Managers
                     ["defaultMcpAddress"] = _defaultMcpAddress,
                     ["defaultMcpStartCommand"] = _defaultMcpStartCommand,
                     ["opusEffortLevel"] = _opusEffortLevel,
-                    ["showCodeChanges"] = _showCodeChanges
+                    ["showCodeChanges"] = _showCodeChanges,
+                    ["remoteServerEnabled"] = _remoteServerEnabled,
+                    ["remoteServerPort"] = _remoteServerPort
                 };
                 var json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
                 SafeFileWriter.WriteInBackground(_settingsFile, json, "SettingsManager");

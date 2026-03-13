@@ -1777,6 +1777,33 @@
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
 
+                                <TextBlock Text="Remote Server (SpritelyRemote)" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <TextBlock Text="Enable the REST API server so the SpritelyRemote Android app can trigger and monitor tasks over your local network."
+                                           Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <DockPanel Margin="0,0,0,6">
+                                    <ToggleButton x:Name="RemoteServerToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  Checked="RemoteServerToggle_Changed"
+                                                  Unchecked="RemoteServerToggle_Changed"
+                                                  DockPanel.Dock="Right" Margin="12,0,0,0"/>
+                                    <TextBlock Text="Enable Remote Server" Foreground="{StaticResource TextLight}"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </DockPanel>
+                                <DockPanel Margin="0,0,0,6">
+                                    <TextBox x:Name="RemoteServerPortBox" Width="70" Text="7923"
+                                             Style="{StaticResource InputBox}" FontSize="11"
+                                             PreviewTextInput="RemoteServerPortBox_PreviewTextInput"
+                                             LostFocus="RemoteServerPortBox_LostFocus"
+                                             DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                    <TextBlock Text="Port" Foreground="{StaticResource TextLight}"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </DockPanel>
+                                <TextBlock x:Name="RemoteServerStatus" Text="Stopped"
+                                           Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,4"/>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
+
                                 <TextBlock Text="Diagnostics" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
                                 <Button x:Name="ViewLogsBtn" Content="View Application Log"
