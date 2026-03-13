@@ -424,6 +424,8 @@ namespace Spritely
                 _gitPanelManager.RefreshIfNeeded(GitTabContent);
             else if (StatisticsTabs.SelectedItem == TasksTabItem)
                 LoadTasksForDisplay();
+            else if (StatisticsTabs.SelectedItem == IdeTabItem)
+                StatisticsTabs_IdeTabSelected();
         }
 
         // ── Tab Overflow ─────────────────────────────────────────────
