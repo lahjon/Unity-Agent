@@ -48,6 +48,7 @@ namespace Spritely.Managers
 
             using var process = new Process { StartInfo = psi };
             process.Start();
+            JobObjectManager.Instance.AssignProcess(process);
 
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             linkedCts.CancelAfter(timeout);

@@ -149,6 +149,7 @@ namespace Spritely.Managers
 
                 process = new Process { StartInfo = psi };
                 process.Start();
+                JobObjectManager.Instance.AssignProcess(process);
 
                 string prompt;
                 if (isGame)
@@ -276,6 +277,7 @@ namespace Spritely.Managers
 
                 process = new Process { StartInfo = psi };
                 process.Start();
+                JobObjectManager.Instance.AssignProcess(process);
 
                 await process.StandardInput.WriteAsync(PromptBuilder.ClaudeMdGenerationPrompt);
                 process.StandardInput.Close();

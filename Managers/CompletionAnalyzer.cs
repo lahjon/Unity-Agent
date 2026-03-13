@@ -197,6 +197,7 @@ namespace Spritely.Managers
 
                 using var process = new Process { StartInfo = psi };
                 process.Start();
+                JobObjectManager.Instance.AssignProcess(process);
 
                 await process.StandardInput.WriteAsync(prompt.AsMemory(), ct);
                 process.StandardInput.Close();

@@ -1025,6 +1025,7 @@ public class FeatureInitializer
             using var process = new Process { StartInfo = psi };
 
             process.Start();
+            JobObjectManager.Instance.AssignProcess(process);
             AppLogger.Info("FeatureInitializer", $"Sonnet CLI process started (PID: {process.Id})");
 
             // Write the prompt to stdin and close it

@@ -25,6 +25,16 @@ namespace Spritely
             // Lock to pixel values so star re-proportioning doesn't fight the drag
             topRow.Height = new GridLength(topRow.ActualHeight);
             bottomRow.Height = new GridLength(bottomRow.ActualHeight);
+
+            // Also pin inner task/features rows to prevent their star sizing
+            // from causing the outer grid to re-proportion during drag
+            if (_featuresPanelExpanded)
+            {
+                if (TaskListRow.ActualHeight > 0)
+                    TaskListRow.Height = new GridLength(TaskListRow.ActualHeight);
+                if (FeaturesPanelRow.ActualHeight > 0)
+                    FeaturesPanelRow.Height = new GridLength(FeaturesPanelRow.ActualHeight);
+            }
         }
 
         private void TopMiddleSplitter_DragDelta(object sender, DragDeltaEventArgs e)
@@ -59,6 +69,17 @@ namespace Spritely
 
             topRow.Height = new GridLength(topProportion, GridUnitType.Star);
             bottomRow.Height = new GridLength(bottomProportion, GridUnitType.Star);
+
+            // Restore inner task/features rows to star sizing
+            if (_featuresPanelExpanded)
+            {
+                double innerTotal = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
+                if (innerTotal > 0)
+                {
+                    TaskListRow.Height = new GridLength(TaskListRow.ActualHeight / innerTotal, GridUnitType.Star);
+                    FeaturesPanelRow.Height = new GridLength(FeaturesPanelRow.ActualHeight / innerTotal, GridUnitType.Star);
+                }
+            }
         }
 
         // ── Task List ↔ Features splitter drag ──
