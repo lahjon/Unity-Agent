@@ -48,10 +48,10 @@ namespace Spritely.Managers
                     // Keep last 200 entries per project to bound storage
                     if (entries.Count > 200)
                         entries = entries.Skip(entries.Count - 200).ToList();
-                }
 
-                var json = JsonSerializer.Serialize(entries, JsonOptions);
-                SafeFileWriter.WriteInBackground(file, json, "FeedbackStore");
+                    var json = JsonSerializer.Serialize(entries, JsonOptions);
+                    SafeFileWriter.WriteInBackground(file, json, "FeedbackStore");
+                }
             }
             catch (Exception ex)
             {
@@ -114,10 +114,10 @@ namespace Spritely.Managers
                     // Keep last 50 insights per project
                     if (insights.Count > 50)
                         insights = insights.Skip(insights.Count - 50).ToList();
-                }
 
-                var json = JsonSerializer.Serialize(insights, JsonOptions);
-                SafeFileWriter.WriteInBackground(file, json, "FeedbackStore");
+                    var json = JsonSerializer.Serialize(insights, JsonOptions);
+                    SafeFileWriter.WriteInBackground(file, json, "FeedbackStore");
+                }
             }
             catch (Exception ex)
             {

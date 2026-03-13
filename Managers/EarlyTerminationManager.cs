@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Spritely.Helpers;
 using Spritely.Models;
 
 namespace Spritely.Managers
@@ -279,16 +280,8 @@ namespace Spritely.Managers
             return decision;
         }
 
-        private double EstimateCost(AgentTask task)
-        {
-            // Rough cost estimation based on token usage
-            // Adjust these rates based on actual pricing
-            const double InputTokenRate = 0.003; // per 1K tokens
-            const double OutputTokenRate = 0.015; // per 1K tokens
-
-            return (task.InputTokens / 1000.0 * InputTokenRate) +
-                   (task.OutputTokens / 1000.0 * OutputTokenRate);
-        }
+        private double EstimateCost(AgentTask task) =>
+            (double)FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens);
 
         /// <summary>
         /// Clears termination state for a task.
@@ -456,11 +449,8 @@ namespace Spritely.Managers
             }
         }
 
-        private double EstimateTokenCost(long tokens)
-        {
-            const double TokenRate = 0.01; // per 1K tokens average
-            return tokens / 1000.0 * TokenRate;
-        }
+        private double EstimateTokenCost(long tokens) =>
+            (double)FormatHelpers.EstimateCost(tokens, 0);
     }
 
     public class TokenUsage

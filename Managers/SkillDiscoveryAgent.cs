@@ -101,8 +101,8 @@ namespace Spritely.Managers
                     IsGlobal = false
                 };
 
-                // Surface toast on the UI thread
-                _dispatcher.BeginInvoke(() =>
+                // Surface toast on the UI thread (fire-and-forget)
+                _ = _dispatcher.BeginInvoke(() =>
                 {
                     var result = MessageBox.Show(
                         $"Discovered a potential skill from completed task:\n\n" +

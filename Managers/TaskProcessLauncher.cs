@@ -31,6 +31,10 @@ namespace Spritely.Managers
         private readonly IPromptBuilder _promptBuilder;
         private readonly Dispatcher _dispatcher;
 
+        // Line batching: accumulate lines from background thread, drain on UI thread
+        private readonly ConcurrentQueue<(string TaskId, string Line)> _pendingLines = new();
+        private int _batchScheduled; // 0 = no drain scheduled, 1 = drain scheduled
+
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _streamingToolState;
 
         /// <summary>Fires when a managed process is started for a task.</summary>
@@ -91,7 +95,18 @@ namespace Spritely.Managers
                 var lineNum = System.Threading.Interlocked.Increment(ref stdoutLineCount);
                 if (lineNum <= 3)
                     AppLogger.Debug("FollowUp", $"[{taskId}] stdout line #{lineNum}: {(line.Length > 200 ? line[..200] + "..." : line)}");
-                _dispatcher.BeginInvoke(() => ParseStreamJson(taskId, line, activeTasks, historyTasks));
+
+                // Skip no-op JSON types before dispatching to UI thread.
+                // During conversation replay dumps, hundreds of "user"/"rate_limit_event"/"ping"
+                // lines would otherwise flood the dispatcher queue causing UI hangs.
+                if (IsNoOpStreamType(line))
+                    return;
+
+                // Batch lines and schedule a single dispatcher drain instead of one BeginInvoke per line.
+                // This dramatically reduces dispatcher queue pressure during high-throughput output.
+                _pendingLines.Enqueue((taskId, line));
+                if (System.Threading.Interlocked.CompareExchange(ref _batchScheduled, 1, 0) == 0)
+                    _dispatcher.BeginInvoke(DispatcherPriority.Background, () => DrainPendingLines(activeTasks, historyTasks));
             };
 
             process.ErrorDataReceived += (_, e) =>
@@ -128,6 +143,7 @@ namespace Spritely.Managers
             _preProcessTokenBaseline[task.Id] = (task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens);
 
             process.Start();
+            JobObjectManager.Instance.AssignProcess(process);
             task.Process = process;
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
@@ -413,6 +429,67 @@ namespace Spritely.Managers
         }
 
         // ── Stream JSON Parsing ─────────────────────────────────────
+
+        /// <summary>
+        /// Drains all queued stdout lines in a single dispatcher call, then resets the batch flag.
+        /// Processes up to 50 lines per drain to keep the UI responsive; reschedules if more remain.
+        /// </summary>
+        private void DrainPendingLines(
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            const int maxPerDrain = 50;
+            int processed = 0;
+
+            while (processed < maxPerDrain && _pendingLines.TryDequeue(out var item))
+            {
+                ParseStreamJson(item.TaskId, item.Line, activeTasks, historyTasks);
+                processed++;
+            }
+
+            if (!_pendingLines.IsEmpty)
+            {
+                // More lines remain — schedule another drain at Background priority
+                // so the dispatcher can process user input between batches
+                _dispatcher.BeginInvoke(DispatcherPriority.Background, () => DrainPendingLines(activeTasks, historyTasks));
+            }
+            else
+            {
+                System.Threading.Interlocked.Exchange(ref _batchScheduled, 0);
+
+                // Race: a line may have been enqueued between IsEmpty check and flag reset
+                if (!_pendingLines.IsEmpty &&
+                    System.Threading.Interlocked.CompareExchange(ref _batchScheduled, 1, 0) == 0)
+                {
+                    _dispatcher.BeginInvoke(DispatcherPriority.Background, () => DrainPendingLines(activeTasks, historyTasks));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Fast pre-filter on the background thread to avoid dispatching no-op JSON types
+        /// to the UI thread. These types produce no UI output in ParseStreamJson.
+        /// During conversation replay dumps, hundreds of these lines would flood the dispatcher.
+        /// </summary>
+        private static bool IsNoOpStreamType(string line)
+        {
+            // Quick check: must start with { to be valid JSON
+            if (line.Length < 15 || line[0] != '{') return false;
+
+            // Types that ParseStreamJson ignores (filtered in default case)
+            if (line.Contains("\"type\":\"user\"", StringComparison.Ordinal)) return true;
+            if (line.Contains("\"type\":\"rate_limit_event\"", StringComparison.Ordinal)) return true;
+            if (line.Contains("\"type\":\"ping\"", StringComparison.Ordinal)) return true;
+
+            // System subtypes about subtasks don't carry session_id at root — no-op in ParseStreamJson
+            if (line.Contains("\"type\":\"system\"", StringComparison.Ordinal))
+            {
+                if (line.Contains("\"subtype\":\"task_progress\"", StringComparison.Ordinal)) return true;
+                if (line.Contains("\"subtype\":\"task_started\"", StringComparison.Ordinal)) return true;
+                if (line.Contains("\"subtype\":\"task_completed\"", StringComparison.Ordinal)) return true;
+            }
+
+            return false;
+        }
 
         internal static string FormatToolAction(string toolName, JsonElement? input)
         {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Spritely.Helpers;
 
 namespace Spritely.Models
 {
@@ -42,12 +43,9 @@ namespace Spritely.Models
         public List<string> FailureFactors { get; set; } = new();
         public string AnalysisSummary { get; set; } = "";
 
-        /// <summary>Estimated cost in USD based on token usage.</summary>
-        public double EstimatedCost =>
-            (InputTokens * 15.0 / 1_000_000) +
-            (OutputTokens * 75.0 / 1_000_000) +
-            (CacheReadTokens * 1.5 / 1_000_000) +
-            (CacheCreationTokens * 18.75 / 1_000_000);
+        /// <summary>Estimated cost in USD based on token usage and model.</summary>
+        public double EstimatedCost => (double)FormatHelpers.EstimateCost(
+            InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens, Model);
     }
 
     /// <summary>

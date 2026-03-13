@@ -243,6 +243,8 @@ namespace Spritely
             var feedbackCollector = new FeedbackCollector(feedbackStore, feedbackAnalyzer, feedbackApplicator);
             _improvementTaskGenerator = improvementTaskGenerator;
 
+            _gitOperationGuard = new GitOperationGuard(_fileLockManager);
+
             _taskExecutionManager = new TaskExecutionManager(new TaskExecutionServices
             {
                 ScriptDir = scriptDir,
@@ -287,7 +289,6 @@ namespace Spritely
 
             _activityDashboard = new ActivityDashboardManager(_activeTasks, _historyTasks, _projectManager.SavedProjects);
 
-            _gitOperationGuard = new GitOperationGuard(_fileLockManager);
             _commitOrchestrator = new CommitOrchestrator(
                 _gitHelper,
                 _gitOperationGuard,

@@ -694,7 +694,7 @@ namespace Spritely.Managers
             // Feedback System: collect execution feedback (fire-and-forget, never blocks teardown)
             if (_feedbackCollector != null)
             {
-                System.Threading.Tasks.Task.Run(() =>
+                _ = System.Threading.Tasks.Task.Run(() =>
                 {
                     try { _feedbackCollector.CollectAndAnalyze(task); }
                     catch (Exception ex) { AppLogger.Debug("TaskExecution", "Feedback collection failed (non-critical)", ex); }
@@ -713,6 +713,15 @@ namespace Spritely.Managers
                 task.Status = finalStatus;
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);
+
+                // Process any messages that were queued while the task was busy.
+                // The process has exited so message_stop won't fire — this is the
+                // last chance to deliver queued follow-ups before the task leaves Running.
+                if (task.Runtime.PendingMessageCount > 0)
+                {
+                    AppLogger.Info("TaskExecution", $"[{task.Id}] Processing {task.Runtime.PendingMessageCount} queued message(s) after completion");
+                    ProcessQueuedMessages(task, activeTasks, historyTasks);
+                }
             }
 
             // Always check queued tasks and fire TaskCompleted event,
@@ -771,6 +780,14 @@ namespace Spritely.Managers
                 task.EndTime = DateTime.Now;
                 _outputProcessor.AppendOutput(task.Id, "\nFollow-up complete.\n", activeTasks, historyTasks);
                 _outputTabManager.UpdateTabHeader(task);
+
+                // Process any messages that were queued while the follow-up was busy.
+                // The process has exited so message_stop won't fire — deliver them now.
+                if (task.Runtime.PendingMessageCount > 0)
+                {
+                    AppLogger.Info("FollowUp", $"[{task.Id}] Processing {task.Runtime.PendingMessageCount} queued message(s) after follow-up completion");
+                    ProcessQueuedMessages(task, activeTasks, historyTasks);
+                }
             }
 
             // Always check queued tasks and fire TaskCompleted event,
@@ -797,7 +814,9 @@ namespace Spritely.Managers
             psi.WorkingDirectory = projectPath;
             try
             {
-                Process.Start(psi);
+                var proc = Process.Start(psi);
+                if (proc != null)
+                    JobObjectManager.Instance.AssignProcess(proc);
             }
             catch (Exception ex)
             {

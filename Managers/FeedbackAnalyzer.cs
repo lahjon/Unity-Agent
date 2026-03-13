@@ -1,14 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using Spritely.Constants;
-using Spritely.Helpers;
 using Spritely.Models;
 
 namespace Spritely.Managers
@@ -221,34 +217,15 @@ namespace Spritely.Managers
             {
                 var prompt = BuildAnalysisPrompt(entries, insight);
 
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "claude",
-                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 1 " +
-                                $"--json-schema \"{AnalysisJsonSchema.Replace("\"", "\\\"")}\"",
-                    UseShellExecute = false,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8
-                };
-                psi.Environment.Remove("CLAUDECODE");
-                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
-                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
+                var root = await FeatureSystemCliRunner.RunAsync(
+                    prompt,
+                    AnalysisJsonSchema,
+                    "FeedbackAnalyzer",
+                    TimeSpan.FromMinutes(2));
 
-                using var process = new Process { StartInfo = psi };
-                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-                process.Start();
+                if (root == null) return;
 
-                await process.StandardInput.WriteAsync(prompt.AsMemory(), cts.Token);
-                process.StandardInput.Close();
-
-                var output = await process.StandardOutput.ReadToEndAsync(cts.Token);
-                await process.WaitForExitAsync(cts.Token);
-
-                var processedText = FormatHelpers.StripAnsiCodes(output).Trim();
-                ParseLlmResponse(processedText, insight);
+                ParseLlmResponse(root.Value, insight);
 
                 AppLogger.Info("FeedbackAnalyzer", $"LLM analysis complete: {insight.LargeImprovements.Count} improvements found");
             }
@@ -301,28 +278,10 @@ namespace Spritely.Managers
             return sb.ToString();
         }
 
-        private static void ParseLlmResponse(string responseText, FeedbackInsight insight)
+        private static void ParseLlmResponse(JsonElement root, FeedbackInsight insight)
         {
             try
             {
-                using var doc = JsonDocument.Parse(responseText);
-                var root = doc.RootElement;
-
-                // Navigate to structured_output if present
-                if (root.TryGetProperty("structured_output", out var structured)
-                    && structured.ValueKind == JsonValueKind.Object)
-                    root = structured;
-                else if (root.TryGetProperty("result", out var resultEl) &&
-                    resultEl.ValueKind == JsonValueKind.String)
-                {
-                    var resultStr = resultEl.GetString()!;
-                    if (resultStr.TrimStart().StartsWith("{"))
-                    {
-                        using var innerDoc = JsonDocument.Parse(resultStr);
-                        root = innerDoc.RootElement.Clone();
-                    }
-                }
-
                 // Merge LLM patterns with statistical ones
                 if (root.TryGetProperty("success_patterns", out var sp))
                 {

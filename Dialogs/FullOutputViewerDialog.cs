@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using Spritely.Helpers;
 using Spritely.Managers;
 
 namespace Spritely.Dialogs
@@ -50,7 +51,7 @@ namespace Spritely.Dialogs
 
             var pageInfo = new TextBlock
             {
-                Foreground = (Brush)Application.Current.FindResource("TextSubtle"),
+                Foreground = BrushCache.Theme("TextSubtle"),
                 FontSize = 12,
                 FontFamily = new FontFamily("Segoe UI"),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -83,7 +84,7 @@ namespace Spritely.Dialogs
 
             var sizeInfo = new TextBlock
             {
-                Foreground = (Brush)Application.Current.FindResource("TextSubtle"),
+                Foreground = BrushCache.Theme("TextSubtle"),
                 FontSize = 11,
                 FontFamily = new FontFamily("Segoe UI"),
                 VerticalAlignment = VerticalAlignment.Center,

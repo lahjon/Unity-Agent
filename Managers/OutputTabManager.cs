@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Spritely.Helpers;
 
 namespace Spritely.Managers
 {
@@ -154,7 +155,7 @@ namespace Spritely.Managers
                 FontSize = 14,
                 Style = (Style)Application.Current.FindResource("Btn"),
                 Background = (Brush)Application.Current.FindResource("BgCard"),
-                Foreground = (Brush)Application.Current.FindResource("TextSubtle"),
+                Foreground = BrushCache.Theme("TextSubtle"),
                 Padding = new Thickness(8, 6, 8, 6),
                 Margin = new Thickness(4, 0, 0, 0),
                 ToolTip = "View full output from disk"
@@ -375,6 +376,12 @@ namespace Spritely.Managers
 
         public void CloseTab(AgentTask task)
         {
+            if (!_dispatcher.CheckAccess())
+            {
+                _dispatcher.BeginInvoke(() => CloseTab(task));
+                return;
+            }
+
             if (!_tabs.TryGetValue(task.Id, out var tab))
             {
                 _outputBoxes.TryRemove(task.Id, out _);
@@ -697,6 +704,104 @@ namespace Spritely.Managers
         public TabItem? GetTab(string taskId) => _tabs.GetValueOrDefault(taskId);
 
         public RichTextBox? GetOutputBox(string taskId) => _outputBoxes.GetValueOrDefault(taskId);
+
+        /// <summary>
+        /// Appends a "Code Changes" section with clickable file names.
+        /// Each file name is a Hyperlink that opens a colored diff dialog when clicked.
+        /// </summary>
+        public void AppendCodeChangeSummary(string taskId,
+            List<(string fileName, int added, int removed, string diffContent)> fileDiffs,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            // Stream summary to disk
+            var summaryText = "\n═══ Code Changes ═══════════════════════════\n";
+            foreach (var (fileName, added, removed, _) in fileDiffs)
+                summaryText += $"  {fileName}  (+{added}/-{removed})\n";
+            summaryText += "═══════════════════════════════════════════\n";
+            _outputWriter.WriteChunk(taskId, summaryText);
+
+            var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
+                    ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
+            if (task != null)
+            {
+                task.OutputBuilder.Append(summaryText);
+                TrimOutputIfNeeded(task);
+            }
+
+            void BuildUi()
+            {
+                if (!_outputBoxes.TryGetValue(taskId, out var box)) return;
+
+                // Stop typewriter so we can append directly
+                if (_animationControllers.TryGetValue(taskId, out var controller))
+                    controller.Stop();
+
+                var cyanBrush = new SolidColorBrush(Color.FromRgb(0x6C, 0xB6, 0xD6));
+                var greenBrush = new SolidColorBrush(Color.FromRgb(0x4E, 0xC9, 0x4E));
+                var redBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x5D, 0x5D));
+                var mutedBrush = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
+                var bodyBrush = (Brush)Application.Current.FindResource("TextBody");
+                cyanBrush.Freeze();
+                greenBrush.Freeze();
+                redBrush.Freeze();
+                mutedBrush.Freeze();
+
+                // Header
+                var headerPara = new System.Windows.Documents.Paragraph(
+                    new System.Windows.Documents.Run("\n═══ Code Changes ═══════════════════════════\n") { Foreground = bodyBrush })
+                { Margin = new Thickness(0) };
+                box.Document.Blocks.Add(headerPara);
+
+                // File list with clickable names
+                foreach (var (fileName, added, removed, diffContent) in fileDiffs)
+                {
+                    var filePara = new System.Windows.Documents.Paragraph { Margin = new Thickness(0) };
+                    filePara.Inlines.Add(new System.Windows.Documents.Run("  ") { Foreground = bodyBrush });
+
+                    var link = new System.Windows.Documents.Hyperlink(
+                        new System.Windows.Documents.Run(fileName) { Foreground = cyanBrush })
+                    {
+                        Cursor = System.Windows.Input.Cursors.Hand,
+                        TextDecorations = null
+                    };
+                    // Capture for closure
+                    var capturedName = fileName;
+                    var capturedDiff = diffContent;
+                    link.Click += (_, _) => Dialogs.FileDiffViewerDialog.Show(capturedName, capturedDiff);
+                    link.MouseEnter += (_, _) =>
+                    {
+                        if (link.Inlines.FirstInline is System.Windows.Documents.Run r)
+                            r.TextDecorations = System.Windows.TextDecorations.Underline;
+                    };
+                    link.MouseLeave += (_, _) =>
+                    {
+                        if (link.Inlines.FirstInline is System.Windows.Documents.Run r)
+                            r.TextDecorations = null;
+                    };
+                    filePara.Inlines.Add(link);
+
+                    var stats = $"  +{added}/-{removed}";
+                    filePara.Inlines.Add(new System.Windows.Documents.Run(stats) { Foreground = mutedBrush });
+                    box.Document.Blocks.Add(filePara);
+                }
+
+                // Footer
+                var footerPara = new System.Windows.Documents.Paragraph(
+                    new System.Windows.Documents.Run("═══════════════════════════════════════════\n") { Foreground = bodyBrush })
+                { Margin = new Thickness(0) };
+                box.Document.Blocks.Add(footerPara);
+
+                box.ScrollToEnd();
+
+                // Re-create animation controller for subsequent output
+                _animationControllers[taskId] = new TypewriterAnimationController(box, _dispatcher);
+            }
+
+            if (_dispatcher.CheckAccess())
+                BuildUi();
+            else
+                _dispatcher.BeginInvoke(BuildUi);
+        }
 
         public void EnsureOverflowButton()
         {

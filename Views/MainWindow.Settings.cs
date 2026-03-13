@@ -40,8 +40,6 @@ namespace Spritely
             if (AdvancedBorder == null) return;
             var autoMode = AutoModeToggle.IsChecked == true;
             AdvancedBorder.Visibility = autoMode ? Visibility.Collapsed : Visibility.Visible;
-            if (AdvancedTabItem != null)
-                AdvancedTabItem.Visibility = autoMode ? Visibility.Collapsed : Visibility.Visible;
 
             // When disabling Auto-Mode on a game project, default MCP toggle to enabled
             if (!autoMode)

@@ -1583,7 +1583,7 @@
                         </DockPanel>
                     </TabItem>
                     <!-- Advanced tab -->
-                    <TabItem x:Name="AdvancedTabItem" Visibility="Collapsed">
+                    <TabItem x:Name="AdvancedTabItem">
                         <TabItem.Header>
                             <TextBlock Text="Advanced" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                         </TabItem.Header>
@@ -1765,10 +1765,6 @@
                                     </ComboBox>
                                 </StackPanel>
 
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
-
-                                <TextBlock Text="Options" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
                                 <DockPanel Margin="0,0,0,10">
                                     <ToggleButton x:Name="ShowCodeChangesToggle" IsChecked="False"
                                                   Style="{StaticResource ToggleSwitch}"
@@ -1778,9 +1774,6 @@
                                     <TextBlock Text="See Code Changes" Foreground="{StaticResource TextLight}"
                                                FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                 </DockPanel>
-                                <TextBlock Text="When enabled, task output will display a colored diff of all code changes (green = added, red = removed)."
-                                           Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
-                                           TextWrapping="Wrap" Margin="0,0,0,14"/>
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
 

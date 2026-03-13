@@ -1166,10 +1166,10 @@
       "shortSignature": "class ActivityDashboardDialog"
     },
     "show": {
-      "featureId": "stored-task-viewer",
-      "filePath": "Dialogs/StoredTaskViewerDialog.cs",
+      "featureId": "output-management",
+      "filePath": "Dialogs/FileDiffViewerDialog.cs",
       "kind": "Method",
-      "shortSignature": "Show(AgentTask task) -\u003E void"
+      "shortSignature": "Show(string fileName, string diffContent) -\u003E void"
     },
     "commitresult": {
       "featureId": "git-ui",
@@ -8724,6 +8724,12 @@
       "filePath": "Models/FeatureMetadata.cs",
       "kind": "Property",
       "shortSignature": "SymbolIndexVersion: string?"
+    },
+    "filediffviewerdialog": {
+      "featureId": "output-management",
+      "filePath": "Dialogs/FileDiffViewerDialog.cs",
+      "kind": "Class",
+      "shortSignature": "class FileDiffViewerDialog"
     }
   }
 }

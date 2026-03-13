@@ -100,6 +100,24 @@ namespace Spritely.Constants
         /// <summary>Threshold for using Sonnet vs Opus in feature mode consolidation (0-1 scale).</summary>
         public const double ModelComplexityThreshold = 0.5;
 
+        // ── Token Cost Rates (USD per million tokens) ──────────────────
+        // Single source of truth for all cost estimation across the app.
+
+        public const decimal OpusInputPerM = 15.00m;
+        public const decimal OpusOutputPerM = 75.00m;
+        public const decimal OpusCacheReadPerM = 1.50m;
+        public const decimal OpusCacheCreationPerM = 18.75m;
+
+        public const decimal SonnetInputPerM = 3.00m;
+        public const decimal SonnetOutputPerM = 15.00m;
+        public const decimal SonnetCacheReadPerM = 0.30m;
+        public const decimal SonnetCacheCreationPerM = 3.75m;
+
+        public const decimal HaikuInputPerM = 0.80m;
+        public const decimal HaikuOutputPerM = 4.00m;
+        public const decimal HaikuCacheReadPerM = 0.08m;
+        public const decimal HaikuCacheCreationPerM = 1.00m;
+
         // ── Feedback System ──────────────────────────────────────────────
 
         /// <summary>Number of completed tasks before triggering a feedback analysis cycle.</summary>

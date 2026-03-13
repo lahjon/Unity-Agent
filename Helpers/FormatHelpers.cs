@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
+using Spritely.Constants;
 
 namespace Spritely.Helpers
 {
@@ -14,25 +15,36 @@ namespace Spritely.Helpers
         }
 
         /// <summary>
-        /// Estimates cost in USD based on token usage and model pricing.
-        /// Prices per million tokens (as of 2025):
-        ///   Sonnet 4:   $3 input, $15 output, $0.30 cache read, $3.75 cache creation
-        ///   Haiku 3.5:  $0.80 input, $4 output, $0.08 cache read, $1.00 cache creation
-        /// Claude Code tasks default to Sonnet pricing since that's the typical model.
+        /// Estimates cost in USD using rates from AppConstants, dispatching on model name.
+        /// Falls back to Opus pricing when model is null/unknown (conservative estimate).
         /// </summary>
         public static decimal EstimateCost(long inputTokens, long outputTokens,
-            long cacheReadTokens = 0, long cacheCreationTokens = 0)
+            long cacheReadTokens = 0, long cacheCreationTokens = 0, string? model = null)
         {
-            // Sonnet 4 pricing (per million tokens)
-            const decimal inputPricePerM = 3.00m;
-            const decimal outputPricePerM = 15.00m;
-            const decimal cacheReadPricePerM = 0.30m;
-            const decimal cacheCreationPricePerM = 3.75m;
+            var (inputPerM, outputPerM, cacheReadPerM, cacheCreatePerM) = GetRatesForModel(model);
 
-            return (inputTokens * inputPricePerM
-                  + outputTokens * outputPricePerM
-                  + cacheReadTokens * cacheReadPricePerM
-                  + cacheCreationTokens * cacheCreationPricePerM) / 1_000_000m;
+            return (inputTokens * inputPerM
+                  + outputTokens * outputPerM
+                  + cacheReadTokens * cacheReadPerM
+                  + cacheCreationTokens * cacheCreatePerM) / 1_000_000m;
+        }
+
+        private static (decimal input, decimal output, decimal cacheRead, decimal cacheCreate) GetRatesForModel(string? model)
+        {
+            if (model != null)
+            {
+                if (model.Contains("haiku", StringComparison.OrdinalIgnoreCase))
+                    return (AppConstants.HaikuInputPerM, AppConstants.HaikuOutputPerM,
+                            AppConstants.HaikuCacheReadPerM, AppConstants.HaikuCacheCreationPerM);
+
+                if (model.Contains("sonnet", StringComparison.OrdinalIgnoreCase))
+                    return (AppConstants.SonnetInputPerM, AppConstants.SonnetOutputPerM,
+                            AppConstants.SonnetCacheReadPerM, AppConstants.SonnetCacheCreationPerM);
+            }
+
+            // Default to Opus (most expensive = conservative)
+            return (AppConstants.OpusInputPerM, AppConstants.OpusOutputPerM,
+                    AppConstants.OpusCacheReadPerM, AppConstants.OpusCacheCreationPerM);
         }
 
         public static string FormatCost(decimal cost)

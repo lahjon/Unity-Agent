@@ -88,7 +88,8 @@ namespace Spritely.Managers
 
                     if (depNode.UnresolvedDependencies.Count == 0
                         && depNode.Task != null
-                        && !depNode.IsResolved)
+                        && !depNode.IsResolved
+                        && IsEligibleForReady(depNode.Task))
                     {
                         nowReady.Add(depNode.Task);
                     }
@@ -154,7 +155,8 @@ namespace Spritely.Managers
                 ready = _nodes.Values
                     .Where(n => n.Task != null
                                 && n.UnresolvedDependencies.Count == 0
-                                && !n.IsResolved)
+                                && !n.IsResolved
+                                && IsEligibleForReady(n.Task!))
                     .OrderByDescending(n => (int)n.Task!.PriorityLevel)
                     .ThenByDescending(n => n.Task!.Priority)
                     .Select(n => n.Task!)
@@ -217,6 +219,10 @@ namespace Spritely.Managers
                     node.IsResolved = true;
             }
         }
+
+        /// Only tasks that are waiting to start should fire TaskReady.
+        private static bool IsEligibleForReady(AgentTask task) =>
+            task.Status is AgentTaskStatus.Queued or AgentTaskStatus.InitQueued;
 
         private TaskNode GetOrCreateNode(string id)
         {
