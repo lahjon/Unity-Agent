@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using Spritely.Dialogs;
 using Spritely.Helpers;
 
 namespace Spritely.Managers
@@ -629,14 +630,95 @@ namespace Spritely.Managers
         {
             var diffPanel = new StackPanel();
 
-            // Loading indicator initially
+            // Action buttons toolbar
+            var actionBar = new WrapPanel
+            {
+                Margin = new Thickness(8, 6, 8, 4)
+            };
+
+            // View File button
+            if (entry.Exists)
+            {
+                var viewBtn = MakeFileActionButton("\uE8A5", "View File");
+                viewBtn.Click += (_, _) =>
+                {
+                    IdeFileViewerDialog.Show(entry.FullPath);
+                };
+                actionBar.Children.Add(viewBtn);
+            }
+
+            // Compare (side-by-side) button
+            var compareBtn = MakeFileActionButton("\uE89A", "Compare");
+            // Capture diff for the compare dialog
+            string? capturedDiff = null;
+            compareBtn.Click += async (_, _) =>
+            {
+                capturedDiff ??= await GetFileDiffAsync(task, entry.RelativePath);
+                IdeCompareDialog.Show(entry.FileName, capturedDiff);
+            };
+            actionBar.Children.Add(compareBtn);
+
+            // Open in Editor button
+            if (entry.Exists)
+            {
+                var openBtn = MakeFileActionButton("\uE7AC", "Open in Editor");
+                openBtn.Click += (_, _) =>
+                {
+                    IdeFileViewerDialog.OpenFileExternal(entry.FullPath);
+                };
+                actionBar.Children.Add(openBtn);
+            }
+
+            // Show in Explorer button
+            if (entry.Exists)
+            {
+                var explorerBtn = MakeFileActionButton("\uEC50", "Show in Explorer");
+                explorerBtn.Click += (_, _) =>
+                {
+                    IdeFileViewerDialog.ShowInExplorer(entry.FullPath);
+                };
+                actionBar.Children.Add(explorerBtn);
+            }
+
+            // Copy path button
+            var copyBtn = MakeFileActionButton("\uE8C8", "Copy Path");
+            copyBtn.Click += (_, _) =>
+            {
+                try { System.Windows.Clipboard.SetText(entry.FullPath); }
+                catch { /* clipboard access can fail */ }
+            };
+            actionBar.Children.Add(copyBtn);
+
+            // Path display
+            actionBar.Children.Add(new TextBlock
+            {
+                Text = entry.RelativePath,
+                FontSize = 10,
+                FontFamily = new FontFamily("Consolas"),
+                Foreground = BrushCache.Theme("TextDim"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Thickness(8, 0, 0, 0)
+            });
+
+            diffPanel.Children.Add(actionBar);
+
+            // Separator between toolbar and diff
+            diffPanel.Children.Add(new Border
+            {
+                Height = 1,
+                Background = BrushCache.Get("#252525"),
+                Margin = new Thickness(0, 2, 0, 0)
+            });
+
+            // Loading indicator
             var loadingText = new TextBlock
             {
                 Text = "Loading diff...",
                 FontSize = 11,
                 FontFamily = new FontFamily("Consolas"),
                 Foreground = BrushCache.Theme("TextMuted"),
-                Margin = new Thickness(4)
+                Margin = new Thickness(8, 4, 4, 4)
             };
 
             var richTextBox = new RichTextBox
@@ -666,6 +748,7 @@ namespace Spritely.Managers
             _dispatcher.InvokeAsync(async () =>
             {
                 var diff = await GetFileDiffAsync(task, entry.RelativePath);
+                capturedDiff = diff;
                 RenderDiffContent(richTextBox, diff);
                 loadingText.Visibility = Visibility.Collapsed;
                 richTextBox.Visibility = Visibility.Visible;
@@ -680,6 +763,27 @@ namespace Spritely.Managers
                 Margin = new Thickness(8, 0, 0, 4),
                 Child = diffPanel
             };
+        }
+
+        private static Button MakeFileActionButton(string icon, string tooltip)
+        {
+            var btn = new Button
+            {
+                Content = icon,
+                ToolTip = tooltip,
+                Style = Application.Current.TryFindResource("IconBtn") as Style,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 12,
+                Width = 22,
+                Height = 22,
+                Margin = new Thickness(0, 0, 2, 0),
+                Foreground = BrushCache.Theme("AccentBlue")
+            };
+
+            btn.MouseEnter += (_, _) => btn.Foreground = BrushCache.Theme("TextPrimary");
+            btn.MouseLeave += (_, _) => btn.Foreground = BrushCache.Theme("AccentBlue");
+
+            return btn;
         }
 
         private static void RenderDiffContent(RichTextBox richTextBox, string diffContent)
