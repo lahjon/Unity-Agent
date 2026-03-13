@@ -525,6 +525,11 @@ namespace Spritely
                 }
             }
 
+            // Remote Server settings
+            RemoteServerToggle.IsChecked = _settingsManager.RemoteServerEnabled;
+            RemoteServerPortBox.Text = _settingsManager.RemoteServerPort.ToString();
+            InitializeRemoteServer();
+
             if (_settingsManager.SettingsPanelCollapsed)
                 ApplySettingsPanelCollapsed(true);
             if (_settingsManager.LeftPanelCollapsed)
