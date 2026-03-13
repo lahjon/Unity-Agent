@@ -150,6 +150,18 @@ namespace Spritely
             UpdateExecuteButtonText();
         }
 
+        /// <summary>Re-applies the currently selected template after task execution so its settings persist.</summary>
+        private void ReapplySelectedTemplate()
+        {
+            if (TemplateCombo.SelectedItem is not ComboBoxItem selected) return;
+            var tag = selected.Tag?.ToString();
+            if (string.IsNullOrEmpty(tag) || tag == "__manage__") return;
+
+            var template = _settingsManager.TaskTemplates.Find(t => t.Id == tag);
+            if (template != null)
+                ApplyTemplate(template);
+        }
+
         private void ShowTemplateManagement()
         {
             if (_settingsManager.TaskTemplates.Count == 0)

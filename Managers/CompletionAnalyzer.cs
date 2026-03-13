@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Spritely.Constants;
+using Spritely.Helpers;
 
 namespace Spritely.Managers
 {
@@ -330,8 +331,45 @@ namespace Spritely.Managers
             long inputTokens = 0, long outputTokens = 0,
             long cacheReadTokens = 0, long cacheCreationTokens = 0)
         {
-            // Status is already shown in the task tab header — don't duplicate it in the output
-            return "";
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine("── Task Summary ──────────────────────────────");
+
+            // Duration
+            var durationStr = duration.TotalHours >= 1
+                ? $"{duration.Hours}h {duration.Minutes}m {duration.Seconds}s"
+                : duration.TotalMinutes >= 1
+                    ? $"{duration.Minutes}m {duration.Seconds}s"
+                    : $"{duration.Seconds}s";
+            sb.AppendLine($"  Duration: {durationStr}");
+
+            // Token usage
+            var totalTokens = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+            if (totalTokens > 0)
+            {
+                sb.AppendLine($"  Tokens: {FormatHelpers.FormatTokenCount(inputTokens)} in / {FormatHelpers.FormatTokenCount(outputTokens)} out");
+                if (cacheReadTokens > 0 || cacheCreationTokens > 0)
+                    sb.AppendLine($"  Cache: {FormatHelpers.FormatTokenCount(cacheReadTokens)} read / {FormatHelpers.FormatTokenCount(cacheCreationTokens)} created");
+
+                var cost = FormatHelpers.EstimateCost(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
+                sb.AppendLine($"  Est. cost: {FormatHelpers.FormatCost(cost)}");
+            }
+
+            // File changes
+            if (fileChanges is { Count: > 0 })
+            {
+                var totalAdded = 0;
+                var totalRemoved = 0;
+                foreach (var (_, added, removed) in fileChanges)
+                {
+                    totalAdded += added;
+                    totalRemoved += removed;
+                }
+                sb.AppendLine($"  Files changed: {fileChanges.Count} (+{totalAdded} -{totalRemoved})");
+            }
+
+            sb.Append("──────────────────────────────────────────────");
+            return sb.ToString();
         }
 
         public async Task<string> GenerateCompletionSummaryAsync(string projectPath, string? gitStartHash,

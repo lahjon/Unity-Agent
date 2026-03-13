@@ -52,9 +52,9 @@ data class TaskDto(
 data class CreateTaskRequest(
     @SerializedName("description") val description: String,
     @SerializedName("projectPath") val projectPath: String = "",
-    @SerializedName("model") val model: String = "ClaudeCode",
+    @SerializedName("model") val model: String? = null,
     @SerializedName("priority") val priority: String = "Normal",
-    @SerializedName("isFeatureMode") val isFeatureMode: Boolean = false,
+    @SerializedName("isFeatureMode") val isFeatureMode: Boolean = true,
     @SerializedName("useMcp") val useMcp: Boolean = false,
     @SerializedName("autoDecompose") val autoDecompose: Boolean = false,
     @SerializedName("extendedPlanning") val extendedPlanning: Boolean = false

@@ -262,9 +262,10 @@
                         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                             <TextBlock Text="PROMPT" Foreground="{StaticResource Accent}" FontWeight="Bold"
                                        FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="PromptProjectLabel" Text="" Foreground="{StaticResource TextPrimary}" FontFamily="Segoe UI"
-                                       FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"
-                                       TextTrimming="CharacterEllipsis" MaxWidth="160"/>
+                            <ComboBox x:Name="PromptProjectLabel" Foreground="{StaticResource TextPrimary}" FontFamily="Segoe UI"
+                                      FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"
+                                      MaxWidth="180" MinWidth="60" Background="Transparent"
+                                      BorderThickness="0" Cursor="Hand"/>
                             <!-- Model combo (hidden, used by code) -->
                             <ComboBox x:Name="ModelCombo" SelectedIndex="0" Visibility="Collapsed"
                                       SelectionChanged="ModelCombo_Changed">
@@ -1784,33 +1785,6 @@
 
                                 <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
 
-                                <TextBlock Text="Remote Server (SpritelyRemote)" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
-                                <TextBlock Text="Enable the REST API server so the SpritelyRemote Android app can trigger and monitor tasks over your local network."
-                                           Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                <DockPanel Margin="0,0,0,6">
-                                    <ToggleButton x:Name="RemoteServerToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleSwitch}"
-                                                  Checked="RemoteServerToggle_Changed"
-                                                  Unchecked="RemoteServerToggle_Changed"
-                                                  DockPanel.Dock="Right" Margin="12,0,0,0"/>
-                                    <TextBlock Text="Enable Remote Server" Foreground="{StaticResource TextLight}"
-                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                                </DockPanel>
-                                <DockPanel Margin="0,0,0,6">
-                                    <TextBox x:Name="RemoteServerPortBox" Width="70" Text="7923"
-                                             Style="{StaticResource InputBox}" FontSize="11"
-                                             PreviewTextInput="RemoteServerPortBox_PreviewTextInput"
-                                             LostFocus="RemoteServerPortBox_LostFocus"
-                                             DockPanel.Dock="Right" Margin="8,0,0,0"/>
-                                    <TextBlock Text="Port" Foreground="{StaticResource TextLight}"
-                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                                </DockPanel>
-                                <TextBlock x:Name="RemoteServerStatus" Text="Stopped"
-                                           Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,4"/>
-
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
-
                                 <TextBlock Text="Diagnostics" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
                                            FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
                                 <Button x:Name="ViewLogsBtn" Content="View Application Log"
@@ -2019,6 +1993,122 @@
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
+                    <!-- Remote tab -->
+                    <TabItem x:Name="RemoteTabItem">
+                        <TabItem.Header>
+                            <TextBlock Text="Remote" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0">
+                            <StackPanel Margin="12">
+                                <!-- Server status indicator -->
+                                <Border x:Name="RemoteServerIndicator" CornerRadius="6" Padding="12,10" Margin="0,0,0,12"
+                                        Background="{StaticResource BgElevated}" BorderThickness="1" BorderBrush="{StaticResource BgElevated}">
+                                    <DockPanel>
+                                        <Ellipse x:Name="RemoteServerDot" Width="10" Height="10"
+                                                 Fill="#FF5555" DockPanel.Dock="Left" VerticalAlignment="Center"
+                                                 Margin="0,0,10,0"/>
+                                        <TextBlock x:Name="RemoteServerStatus" Text="Server Stopped"
+                                                   Foreground="{StaticResource TextLight}" FontSize="12"
+                                                   FontFamily="Segoe UI" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                </Border>
+
+                                <!-- Server controls -->
+                                <TextBlock Text="REST API Server" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,4"/>
+                                <TextBlock Text="Enable the REST API so the SpritelyRemote Android app can trigger and monitor tasks over your local network."
+                                           Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBox x:Name="RemoteServerPortBox" Width="70" Text="7923"
+                                             FontSize="11"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             Padding="6,4" BorderThickness="1"
+                                             PreviewTextInput="RemoteServerPortBox_PreviewTextInput"
+                                             LostFocus="RemoteServerPortBox_LostFocus"
+                                             DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                    <TextBlock Text="Port" Foreground="{StaticResource TextLight}"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <!-- API Key -->
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button x:Name="CopyApiKeyBtn" Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                            Click="CopyApiKey_Click" ToolTip="Copy API key"
+                                            Style="{StaticResource IconBtn}" DockPanel.Dock="Right" Margin="6,0,0,0"
+                                            VerticalAlignment="Center"/>
+                                    <TextBlock Text="API Key" Foreground="{StaticResource TextLight}"
+                                               FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               DockPanel.Dock="Left" Margin="0,0,8,0"/>
+                                    <TextBox x:Name="RemoteApiKeyBox" IsReadOnly="True" FontSize="10"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextMuted}"
+                                             Padding="6,4" BorderThickness="1" FontFamily="Consolas"
+                                             VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <WrapPanel Margin="0,0,0,6">
+                                    <Button x:Name="RemoteServerStartBtn" Content="&#xE768;  Start Server"
+                                            Click="RemoteServerStart_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="12,6"
+                                            HorizontalAlignment="Left"/>
+                                    <Button x:Name="RemoteServerStopBtn" Content="&#xE71A;  Stop Server"
+                                            Click="RemoteServerStop_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="12,6" IsEnabled="False"
+                                            HorizontalAlignment="Left" Margin="6,0,0,0"/>
+                                </WrapPanel>
+
+                                <!-- Hidden toggle to preserve settings persistence -->
+                                <ToggleButton x:Name="RemoteServerToggle" IsChecked="False" Visibility="Collapsed"
+                                              Checked="RemoteServerToggle_Changed"
+                                              Unchecked="RemoteServerToggle_Changed"/>
+
+                                <!-- Audit Log Badge -->
+                                <DockPanel Margin="0,8,0,0">
+                                    <TextBlock Text="&#xE7BA;  Audit Log" FontFamily="Segoe MDL2 Assets"
+                                               Foreground="{StaticResource TextMuted}" FontSize="11"
+                                               VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,8,0"/>
+                                    <Border x:Name="AuditLogBadge" Background="{StaticResource BgElevated}"
+                                            CornerRadius="8" Padding="6,2" HorizontalAlignment="Left"
+                                            VerticalAlignment="Center" Margin="0,0,8,0">
+                                        <TextBlock x:Name="AuditLogCount" Text="0" FontSize="10"
+                                                   Foreground="{StaticResource TextMuted}" FontFamily="Segoe UI"/>
+                                    </Border>
+                                    <Button x:Name="ViewAuditLogBtn" Content="View Log"
+                                            Click="ViewAuditLog_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="10" Padding="8,3"
+                                            HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,14,0,14"/>
+
+                                <!-- APK Build -->
+                                <TextBlock Text="Android APK Build" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,4"/>
+                                <TextBlock Text="Build the SpritelyRemote Android app. Requires Java/Gradle on PATH."
+                                           Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                <WrapPanel Margin="0,0,0,6">
+                                    <Button x:Name="BuildApkDebugBtn" Content="Build Debug APK"
+                                            Click="BuildApkDebug_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4"
+                                            HorizontalAlignment="Left"/>
+                                    <Button x:Name="BuildApkReleaseBtn" Content="Build Release APK"
+                                            Click="BuildApkRelease_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4"
+                                            HorizontalAlignment="Left" Margin="6,0,0,0"/>
+                                </WrapPanel>
+                                <TextBlock x:Name="BuildApkStatus" Text=""
+                                           Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI"
+                                           TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
                     <!-- MCP controls (hidden, managed via ProjectSettingsDialog gear icon) -->
                     <TabItem x:Name="McpTabItem" Visibility="Collapsed">
                         <StackPanel Visibility="Collapsed">

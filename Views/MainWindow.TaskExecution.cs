@@ -186,6 +186,7 @@ namespace Spritely
                 additionalInstructions);
 
             ResetPerTaskToggles();
+            ReapplySelectedTemplate();
             RestoreStarRows();
         }
 

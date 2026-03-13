@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace Spritely.Models;
@@ -9,6 +11,17 @@ public sealed class ApiResponse<T>
     [JsonPropertyName("success")] public bool Success { get; init; } = true;
     [JsonPropertyName("data")] public T? Data { get; init; }
     [JsonPropertyName("error")] public string? Error { get; init; }
+    [JsonPropertyName("location")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Location { get; init; }
+}
+
+public sealed class PaginatedResponse<T>
+{
+    [JsonPropertyName("items")] public List<T> Items { get; init; } = [];
+    [JsonPropertyName("totalCount")] public int TotalCount { get; init; }
+    [JsonPropertyName("page")] public int Page { get; init; }
+    [JsonPropertyName("pageSize")] public int PageSize { get; init; }
 }
 
 // ── DTOs ───────────────────────────────────────────────────────────
@@ -56,7 +69,7 @@ public sealed class CreateTaskRequest
 {
     [JsonPropertyName("description")] public string Description { get; init; } = "";
     [JsonPropertyName("projectPath")] public string ProjectPath { get; init; } = "";
-    [JsonPropertyName("model")] public string Model { get; init; } = "ClaudeCode";
+    [JsonPropertyName("model")] public string? Model { get; init; }
     [JsonPropertyName("priority")] public string Priority { get; init; } = "Normal";
     [JsonPropertyName("isFeatureMode")] public bool IsFeatureMode { get; init; }
     [JsonPropertyName("useMcp")] public bool UseMcp { get; init; }

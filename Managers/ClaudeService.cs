@@ -194,17 +194,31 @@ namespace Spritely.Managers
                     ["model"] = AppConstants.ClaudeHaiku,
                     ["max_tokens"] = 4096,
                     ["stream"] = false,
+                    // Use cache_control on the system instruction so the static schema
+                    // description is cached across repeated calls (90% cheaper within 5-min TTL).
+                    ["system"] = new[]
+                    {
+                        new
+                        {
+                            type = "text",
+                            text = "You are a structured data extraction assistant. Return results using the provided tool.",
+                            cache_control = new { type = "ephemeral" }
+                        }
+                    },
                     ["messages"] = new[]
                     {
                         new { role = "user", content = prompt }
                     },
+                    // cache_control on the tool definition caches the schema itself,
+                    // which is typically identical across calls with the same schema.
                     ["tools"] = new[]
                     {
                         new
                         {
                             name = "structured_result",
                             description = "Return the structured result",
-                            input_schema = inputSchema
+                            input_schema = inputSchema,
+                            cache_control = new { type = "ephemeral" }
                         }
                     },
                     ["tool_choice"] = new { type = "tool", name = "structured_result" }

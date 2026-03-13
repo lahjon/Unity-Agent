@@ -230,10 +230,64 @@ namespace Spritely.Managers
 
         public void RefreshProjectCombo()
         {
-            var proj = _savedProjects.Find(p => p.Path == _projectPath);
-            _view.PromptProjectLabel.Text = proj?.DisplayName ?? Path.GetFileName(_projectPath);
-            _view.PromptProjectLabel.ToolTip = _projectPath;
+            var combo = _view.PromptProjectLabel;
+            combo.SelectionChanged -= OnPromptProjectComboChanged;
+
+            combo.Items.Clear();
+            int selectedIndex = -1;
+            for (int i = 0; i < _savedProjects.Count; i++)
+            {
+                var p = _savedProjects[i];
+                combo.Items.Add(new ComboBoxItem
+                {
+                    Content = p.DisplayName,
+                    Tag = p.Path,
+                    ToolTip = p.Path
+                });
+                if (p.Path == _projectPath)
+                    selectedIndex = i;
+            }
+
+            if (selectedIndex >= 0)
+                combo.SelectedIndex = selectedIndex;
+
+            combo.SelectionChanged += OnPromptProjectComboChanged;
             Descriptions.RefreshDescriptionBoxes();
+        }
+
+        private void OnPromptProjectComboChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_view.PromptProjectLabel.SelectedItem is not ComboBoxItem item) return;
+            if (item.Tag is not string newPath) return;
+            if (newPath == _projectPath) return;
+            if (_isSwapping) return;
+
+            _isSwapping = true;
+            _projectPath = newPath;
+            ProjectSwapStarted?.Invoke();
+
+            var termCb = _storedUpdateTerminal;
+            var saveCb = _storedSaveSettings;
+            var syncCb = _storedSyncSettings;
+
+            _view.ViewDispatcher.BeginInvoke(new Action(async () =>
+            {
+                try
+                {
+                    try { termCb?.Invoke(newPath); }
+                    catch (Exception ex) { AppLogger.Warn("ProjectManager", "Terminal update failed during project swap", ex); }
+
+                    await Task.Yield();
+                    saveCb?.Invoke();
+                    syncCb?.Invoke();
+                }
+                catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed during project swap", ex); }
+                finally
+                {
+                    _isSwapping = false;
+                    ProjectSwapCompleted?.Invoke();
+                }
+            }));
         }
 
         // ── Delegating wrappers (preserve existing public API for callers) ──

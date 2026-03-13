@@ -21,7 +21,8 @@ namespace Spritely.Managers
         /// Serializes writes to the same path and tracks completion for shutdown flush.
         /// </summary>
         /// <param name="onError">Optional callback invoked on failure with the error message, for surfacing write failures to the UI.</param>
-        public static void WriteInBackground(string filePath, string content, string callerName, Action<string>? onError = null)
+        /// <param name="appendLine">When true, appends content to the file instead of overwriting it.</param>
+        public static void WriteInBackground(string filePath, string content, string callerName, Action<string>? onError = null, bool appendLine = false)
         {
             IncrementPending();
             var sem = _locks.GetOrAdd(filePath, _ => new SemaphoreSlim(1, 1));
@@ -35,9 +36,16 @@ namespace Spritely.Managers
                     if (dir != null && !Directory.Exists(dir))
                         Directory.CreateDirectory(dir);
 
-                    var tmpPath = filePath + ".tmp";
-                    File.WriteAllText(tmpPath, content);
-                    File.Move(tmpPath, filePath, overwrite: true);
+                    if (appendLine)
+                    {
+                        File.AppendAllText(filePath, content);
+                    }
+                    else
+                    {
+                        var tmpPath = filePath + ".tmp";
+                        File.WriteAllText(tmpPath, content);
+                        File.Move(tmpPath, filePath, overwrite: true);
+                    }
                 }
                 catch (Exception ex)
                 {

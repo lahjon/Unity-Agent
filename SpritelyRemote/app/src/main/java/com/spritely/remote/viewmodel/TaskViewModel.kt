@@ -16,6 +16,7 @@ data class TaskListState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val selectedTask: TaskDto? = null,
+    val selectedProject: ProjectDto? = null,
     val showCreateDialog: Boolean = false
 )
 
@@ -25,6 +26,7 @@ class TaskViewModel : ViewModel() {
     val state: StateFlow<TaskListState> = _state.asStateFlow()
 
     private var pollJob: Job? = null
+    private var detailPollJob: Job? = null
     private var host: String = ""
     private var port: Int = 7923
 
@@ -38,7 +40,14 @@ class TaskViewModel : ViewModel() {
         pollJob = viewModelScope.launch {
             while (true) {
                 refresh()
-                delay(3000) // Poll every 3 seconds
+                delay(3000)
+            }
+        }
+        detailPollJob?.cancel()
+        detailPollJob = viewModelScope.launch {
+            while (true) {
+                delay(2000)
+                refreshSelectedTaskDetail()
             }
         }
     }
@@ -46,6 +55,20 @@ class TaskViewModel : ViewModel() {
     fun stopPolling() {
         pollJob?.cancel()
         pollJob = null
+        detailPollJob?.cancel()
+        detailPollJob = null
+    }
+
+    private suspend fun refreshSelectedTaskDetail() {
+        val selected = _state.value.selectedTask ?: return
+        if (!selected.isRunning) return
+        try {
+            val api = ApiClient.getApi(host, port)
+            val resp = api.getTask(selected.id)
+            if (resp.isSuccessful) {
+                _state.update { it.copy(selectedTask = resp.body()?.data) }
+            }
+        } catch (_: Exception) {}
     }
 
     fun refresh() {
@@ -86,11 +109,23 @@ class TaskViewModel : ViewModel() {
         }
     }
 
+    fun selectProject(project: ProjectDto?) {
+        _state.update { it.copy(selectedProject = project) }
+    }
+
     fun createTask(request: CreateTaskRequest) {
+        val projectPath = request.projectPath.ifEmpty {
+            _state.value.selectedProject?.path ?: ""
+        }
+        val normalizedRequest = request.copy(
+            projectPath = projectPath,
+            isFeatureMode = true,
+            model = null
+        )
         viewModelScope.launch {
             try {
                 val api = ApiClient.getApi(host, port)
-                api.createTask(request)
+                api.createTask(normalizedRequest)
                 _state.update { it.copy(showCreateDialog = false) }
                 refresh()
             } catch (e: Exception) {

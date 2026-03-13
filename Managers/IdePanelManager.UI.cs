@@ -344,9 +344,10 @@ namespace Spritely.Managers
             // Set non-frozen background for animation
             border.Background = new SolidColorBrush(normalBg);
 
-            // Click handler — find parent ScrollViewer
-            border.MouseLeftButtonUp += (_, _) =>
+            // Click handler — use MouseLeftButtonDown for reliable click detection inside ScrollViewer
+            border.MouseLeftButtonDown += (_, e) =>
             {
+                e.Handled = true;
                 var sv = FindParentScrollViewer(border);
                 if (sv != null)
                     SelectTask(task, sv);
@@ -608,8 +609,9 @@ namespace Spritely.Managers
             fileBorder.MouseEnter += (_, _) => fileBorder.Background = BrushCache.Get("#2A2A2A");
             fileBorder.MouseLeave += (_, _) => fileBorder.Background = BrushCache.Theme("BgSurface");
 
-            fileBorder.MouseLeftButtonUp += (_, _) =>
+            fileBorder.MouseLeftButtonDown += (_, e) =>
             {
+                e.Handled = true;
                 var sv = FindParentScrollViewer(fileBorder);
                 if (sv != null) ToggleFileDiff(entry.RelativePath, sv);
             };
@@ -824,18 +826,18 @@ namespace Spritely.Managers
 
         private static SolidColorBrush GetTaskStatusBrush(AgentTask task) => task.Status switch
         {
-            AgentTaskStatus.Running => BrushCache.Get("#4EC969"),
+            AgentTaskStatus.Running => BrushCache.Get("#64B5F6"),
             AgentTaskStatus.Completed => BrushCache.Get("#5CB85C"),
             AgentTaskStatus.Failed => BrushCache.Get("#E06C75"),
             AgentTaskStatus.Cancelled => BrushCache.Get("#E0A030"),
             AgentTaskStatus.Committing => BrushCache.Get("#61AFEF"),
-            AgentTaskStatus.Paused => BrushCache.Get("#64B5F6"),
+            AgentTaskStatus.Paused => BrushCache.Get("#CE93D8"),
             _ => BrushCache.Theme("TextMuted")
         };
 
         private static SolidColorBrush GetTaskStatusBadgeBg(AgentTask task) => task.Status switch
         {
-            AgentTaskStatus.Running => BrushCache.Get("#0D2818"),
+            AgentTaskStatus.Running => BrushCache.Get("#0D1B2A"),
             AgentTaskStatus.Completed => BrushCache.Get("#122812"),
             AgentTaskStatus.Failed => BrushCache.Get("#2D0F0F"),
             AgentTaskStatus.Cancelled => BrushCache.Get("#2D2010"),

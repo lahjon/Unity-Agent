@@ -770,33 +770,13 @@ namespace Spritely.Managers
                         // Add blank line between consecutive messages for visual separation
                         if (!_hasReceivedOutput.TryAdd(taskId, true))
                             _outputProcessor.AppendOutput(taskId, "\n", activeTasks, historyTasks);
-
-                        if (root.TryGetProperty("message", out var startMsg) &&
-                            startMsg.TryGetProperty("usage", out var startUsage))
-                        {
-                            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
-                            if (task != null)
-                            {
-                                var inTok = startUsage.TryGetProperty("input_tokens", out var sit) ? sit.GetInt64() : 0;
-                                var outTok = startUsage.TryGetProperty("output_tokens", out var sot) ? sot.GetInt64() : 0;
-                                var cacheRead = startUsage.TryGetProperty("cache_read_input_tokens", out var crt) ? crt.GetInt64() : 0;
-                                var cacheCreate = startUsage.TryGetProperty("cache_creation_input_tokens", out var cct) ? cct.GetInt64() : 0;
-                                task.AddTokenUsage(inTok, outTok, cacheRead, cacheCreate);
-                            }
-                        }
+                        // Token usage from streaming events is intentionally ignored here
+                        // to avoid jitter — the authoritative counts come from the result event.
                         break;
 
                     case "message_delta":
-                        if (root.TryGetProperty("usage", out var deltaUsage))
-                        {
-                            var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
-                            if (task != null)
-                            {
-                                var outTok = deltaUsage.TryGetProperty("output_tokens", out var dot) ? dot.GetInt64() : 0;
-                                if (outTok > 0)
-                                    task.AddTokenUsage(0, outTok);
-                            }
-                        }
+                        // Token usage from streaming events is intentionally ignored here
+                        // to avoid jitter — the authoritative counts come from the result event.
                         break;
 
                     case "message_stop":

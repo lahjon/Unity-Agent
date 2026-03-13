@@ -302,8 +302,8 @@
       "shortSignature": "ClearOutput() -\u003E void"
     },
     "dispose": {
-      "featureId": "terminal",
-      "filePath": "Managers/TerminalTabManager.cs",
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
       "kind": "Method",
       "shortSignature": "Dispose() -\u003E void"
     },
@@ -1106,8 +1106,8 @@
       "shortSignature": "Initialize() -\u003E void"
     },
     "markdirty": {
-      "featureId": "git-ui",
-      "filePath": "Managers/GitPanelManager.cs",
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
       "kind": "Method",
       "shortSignature": "MarkDirty() -\u003E void"
     },
@@ -1466,8 +1466,8 @@
       "shortSignature": "SparklineMaxPoints: int = 20"
     },
     "refreshifneeded": {
-      "featureId": "git-ui",
-      "filePath": "Managers/GitPanelManager.cs",
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
       "kind": "Method",
       "shortSignature": "RefreshIfNeeded(ScrollViewer container) -\u003E void"
     },
@@ -3056,8 +3056,8 @@
       "shortSignature": "class GitPanelManager"
     },
     "refreshasync": {
-      "featureId": "git-ui",
-      "filePath": "Managers/GitPanelManager.cs",
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
       "kind": "Method",
       "shortSignature": "RefreshAsync(ScrollViewer container) -\u003E Task"
     },
@@ -3098,8 +3098,8 @@
       "shortSignature": "class GitFileChange"
     },
     "status": {
-      "featureId": "self-improvement-engine",
-      "filePath": "Models/FeedbackEntry.cs",
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
       "kind": "Property",
       "shortSignature": "Status: string"
     },
@@ -5276,8 +5276,8 @@
       "shortSignature": "RegisterTask(AgentTask task) -\u003E void"
     },
     "ontaskcompleted": {
-      "featureId": "task-orchestration",
-      "filePath": "Managers/TaskOrchestrator.cs",
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
       "kind": "Method",
       "shortSignature": "OnTaskCompleted(string taskId) -\u003E void"
     },
@@ -5888,7 +5888,7 @@
       "shortSignature": "ImageData: byte[]?"
     },
     "iprojectpanelview": {
-      "featureId": "project-management",
+      "featureId": "main-window-ui",
       "filePath": "Models/IProjectPanelView.cs",
       "kind": "Interface",
       "shortSignature": "interface IProjectPanelView"
@@ -5942,14 +5942,14 @@
       "shortSignature": "ModifiedFiles: HashSet\u003Cstring\u003E"
     },
     "linesadded": {
-      "featureId": "progress-tracking",
-      "filePath": "Models/ProgressMetrics.cs",
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
       "kind": "Property",
       "shortSignature": "LinesAdded: int"
     },
     "linesremoved": {
-      "featureId": "progress-tracking",
-      "filePath": "Models/ProgressMetrics.cs",
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
       "kind": "Property",
       "shortSignature": "LinesRemoved: int"
     },
@@ -8730,6 +8730,78 @@
       "filePath": "Dialogs/FileDiffViewerDialog.cs",
       "kind": "Class",
       "shortSignature": "class FileDiffViewerDialog"
+    },
+    "idepanelmanager": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Class",
+      "shortSignature": "class IdePanelManager : IDisposable"
+    },
+    "selecttask": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Method",
+      "shortSignature": "SelectTask(AgentTask task, ScrollViewer container) -\u003E void"
+    },
+    "clearselection": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Method",
+      "shortSignature": "ClearSelection(ScrollViewer container) -\u003E void"
+    },
+    "togglefilediff": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Method",
+      "shortSignature": "ToggleFileDiff(string filePath, ScrollViewer container) -\u003E void"
+    },
+    "getfilediffasync": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Method",
+      "shortSignature": "GetFileDiffAsync(AgentTask task, string relativePath) -\u003E Task\u003Cstring\u003E"
+    },
+    "idefileentry": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Class",
+      "shortSignature": "class IdeFileEntry"
+    },
+    "relativepath": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Property",
+      "shortSignature": "RelativePath: string"
+    },
+    "fullpath": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Property",
+      "shortSignature": "FullPath: string"
+    },
+    "filename": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Property",
+      "shortSignature": "FileName: string"
+    },
+    "directory": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Property",
+      "shortSignature": "Directory: string"
+    },
+    "extension": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Property",
+      "shortSignature": "Extension: string"
+    },
+    "exists": {
+      "featureId": "ide-panel-management",
+      "filePath": "Managers/IdePanelManager.cs",
+      "kind": "Property",
+      "shortSignature": "Exists: bool"
     }
   }
 }

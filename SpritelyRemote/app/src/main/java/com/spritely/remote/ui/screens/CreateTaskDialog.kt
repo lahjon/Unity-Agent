@@ -22,34 +22,32 @@ fun CreateTaskDialog(
 ) {
     var description by remember { mutableStateOf("") }
     var selectedProject by remember { mutableStateOf(projects.firstOrNull()) }
-    var selectedModel by remember { mutableStateOf("ClaudeCode") }
-    var selectedPriority by remember { mutableStateOf("Normal") }
-    var isFeatureMode by remember { mutableStateOf(false) }
-    var useMcp by remember { mutableStateOf(false) }
-    var extendedPlanning by remember { mutableStateOf(false) }
     var projectMenuExpanded by remember { mutableStateOf(false) }
-    var modelMenuExpanded by remember { mutableStateOf(false) }
-    var priorityMenuExpanded by remember { mutableStateOf(false) }
+    val isValid = description.trim().length >= 10
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SpriteBgElevated,
         title = {
-            Text("Create Task", fontWeight = FontWeight.Bold, color = SpriteTextPrimary)
+            Text("New Task", fontWeight = FontWeight.Bold, color = SpriteTextPrimary)
         },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Description
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Task Description") },
-                    minLines = 3,
-                    maxLines = 6,
+                    label = { Text("Prompt") },
+                    placeholder = { Text("Describe what you want done...", color = SpriteTextDisabled) },
+                    minLines = 4,
+                    maxLines = 8,
                     modifier = Modifier.fillMaxWidth(),
+                    isError = description.isNotEmpty() && !isValid,
+                    supportingText = if (description.isNotEmpty() && !isValid) {
+                        { Text("Minimum 10 characters", color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
+                    } else null,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = SpriteAccent,
                         unfocusedBorderColor = SpriteTextDisabled,
@@ -57,7 +55,6 @@ fun CreateTaskDialog(
                     )
                 )
 
-                // Project selector
                 ExposedDropdownMenuBox(
                     expanded = projectMenuExpanded,
                     onExpandedChange = { projectMenuExpanded = it }
@@ -103,104 +100,30 @@ fun CreateTaskDialog(
                         }
                     }
                 }
-
-                // Model selector
-                ExposedDropdownMenuBox(
-                    expanded = modelMenuExpanded,
-                    onExpandedChange = { modelMenuExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = selectedModel,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Model") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelMenuExpanded) },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = SpriteAccent,
-                            unfocusedBorderColor = SpriteTextDisabled
-                        )
-                    )
-                    ExposedDropdownMenu(
-                        expanded = modelMenuExpanded,
-                        onDismissRequest = { modelMenuExpanded = false }
-                    ) {
-                        listOf("ClaudeCode", "Gemini").forEach { model ->
-                            DropdownMenuItem(
-                                text = { Text(model) },
-                                onClick = {
-                                    selectedModel = model
-                                    modelMenuExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                // Priority selector
-                ExposedDropdownMenuBox(
-                    expanded = priorityMenuExpanded,
-                    onExpandedChange = { priorityMenuExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = selectedPriority,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Priority") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = priorityMenuExpanded) },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = SpriteAccent,
-                            unfocusedBorderColor = SpriteTextDisabled
-                        )
-                    )
-                    ExposedDropdownMenu(
-                        expanded = priorityMenuExpanded,
-                        onDismissRequest = { priorityMenuExpanded = false }
-                    ) {
-                        listOf("Low", "Normal", "High", "Critical").forEach { priority ->
-                            DropdownMenuItem(
-                                text = { Text(priority) },
-                                onClick = {
-                                    selectedPriority = priority
-                                    priorityMenuExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                // Toggle options
-                ToggleRow("Feature Mode", isFeatureMode) { isFeatureMode = it }
-                ToggleRow("Use MCP", useMcp) { useMcp = it }
-                ToggleRow("Extended Planning", extendedPlanning) { extendedPlanning = it }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    if (description.isNotBlank()) {
+                    if (isValid) {
                         onCreate(
                             CreateTaskRequest(
-                                description = description,
+                                description = description.trim(),
                                 projectPath = selectedProject?.path ?: "",
-                                model = selectedModel,
-                                priority = selectedPriority,
-                                isFeatureMode = isFeatureMode,
-                                useMcp = useMcp,
-                                extendedPlanning = extendedPlanning
+                                model = null,
+                                priority = "Normal",
+                                isFeatureMode = true,
+                                useMcp = false,
+                                autoDecompose = false,
+                                extendedPlanning = false
                             )
                         )
                     }
                 },
-                enabled = description.isNotBlank(),
+                enabled = isValid,
                 colors = ButtonDefaults.buttonColors(containerColor = SpriteAccent)
             ) {
-                Text("Create")
+                Text("Submit")
             }
         },
         dismissButton = {
@@ -209,22 +132,4 @@ fun CreateTaskDialog(
             }
         }
     )
-}
-
-@Composable
-private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, fontSize = 13.sp, color = SpriteTextPrimary)
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = SpriteAccent,
-                checkedTrackColor = SpriteAccent.copy(alpha = 0.3f)
-            )
-        )
-    }
 }

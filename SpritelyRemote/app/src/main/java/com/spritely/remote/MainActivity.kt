@@ -49,6 +49,14 @@ fun SpritelyApp(
         }
     }
 
+    // Track whether user has passed through project selection
+    var hasSelectedProject by remember { mutableStateOf(false) }
+
+    // Reset project selection when disconnected
+    LaunchedEffect(connState.isConnected) {
+        if (!connState.isConnected) hasSelectedProject = false
+    }
+
     // Navigation state
     if (!connState.isConnected) {
         // Connection screen
@@ -58,6 +66,20 @@ fun SpritelyApp(
             onPortChange = connectionVM::updatePort,
             onConnect = connectionVM::connect
         )
+    } else if (!hasSelectedProject) {
+        // Project selection screen (shown once after connecting)
+        ProjectSelectionScreen(
+            projects = taskState.projects,
+            isLoading = taskState.projects.isEmpty() && taskState.error == null,
+            onSelectProject = { project ->
+                taskVM.selectProject(project)
+                hasSelectedProject = true
+            },
+            onSkip = {
+                taskVM.selectProject(null)
+                hasSelectedProject = true
+            }
+        )
     } else if (taskState.selectedTask != null) {
         // Task detail screen
         val task = taskState.selectedTask!!
@@ -66,7 +88,8 @@ fun SpritelyApp(
             onBack = { taskVM.clearSelectedTask() },
             onCancel = { taskVM.cancelTask(task.id); taskVM.clearSelectedTask() },
             onPause = { taskVM.pauseTask(task.id) },
-            onResume = { taskVM.resumeTask(task.id) }
+            onResume = { taskVM.resumeTask(task.id) },
+            onRefresh = { taskVM.loadTaskDetail(it) }
         )
     } else {
         // Dashboard

@@ -42,12 +42,16 @@ namespace Spritely
             var topRow = RootGrid.RowDefinitions[0];
             var bottomRow = RootGrid.RowDefinitions[2];
 
-            // ActualHeight already includes prior Thumb movement, and e.VerticalChange
-            // underreports by exactly that amount, so the sum is the correct target.
-            double newTop = topRow.ActualHeight + e.VerticalChange;
-            double newBottom = bottomRow.ActualHeight - e.VerticalChange;
+            // Use Height.Value (the pixel value we set) rather than ActualHeight,
+            // which only updates after a layout pass and can be stale when multiple
+            // DragDelta events fire before layout runs — causing snap-back.
+            double currentTop = topRow.Height.Value;
+            double currentBottom = bottomRow.Height.Value;
 
-            double total = topRow.ActualHeight + bottomRow.ActualHeight;
+            double newTop = currentTop + e.VerticalChange;
+            double newBottom = currentBottom - e.VerticalChange;
+
+            double total = currentTop + currentBottom;
             if (newTop < topRow.MinHeight) { newTop = topRow.MinHeight; newBottom = total - topRow.MinHeight; }
             if (newBottom < bottomRow.MinHeight) { newBottom = bottomRow.MinHeight; newTop = total - bottomRow.MinHeight; }
 
@@ -93,10 +97,13 @@ namespace Spritely
 
         private void TaskFeaturesSplitter_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            double newTask = TaskListRow.ActualHeight + e.VerticalChange;
-            double newFeatures = FeaturesPanelRow.ActualHeight - e.VerticalChange;
+            double currentTask = TaskListRow.Height.Value;
+            double currentFeatures = FeaturesPanelRow.Height.Value;
 
-            double total = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
+            double newTask = currentTask + e.VerticalChange;
+            double newFeatures = currentFeatures - e.VerticalChange;
+
+            double total = currentTask + currentFeatures;
             const double minHeight = 60;
             if (newTask < minHeight) { newTask = minHeight; newFeatures = total - minHeight; }
             if (newFeatures < minHeight) { newFeatures = minHeight; newTask = total - minHeight; }

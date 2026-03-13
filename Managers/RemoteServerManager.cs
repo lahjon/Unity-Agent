@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -22,16 +24,7 @@ public sealed class RemoteServerManager : IDisposable
     private Task? _listenLoop;
     private bool _disposed;
 
-    // External dependencies injected from MainWindow
-    private readonly Func<ObservableCollection<AgentTask>> _getActiveTasks;
-    private readonly Func<ObservableCollection<AgentTask>> _getHistoryTasks;
-    private readonly Func<System.Collections.Generic.List<ProjectEntry>> _getProjects;
-    private readonly Func<int> _getMaxConcurrent;
-    private readonly Func<string, AgentTask?> _findTask;
-    private readonly Action<CreateTaskRequest> _createTask;
-    private readonly Action<AgentTask> _cancelTask;
-    private readonly Action<AgentTask> _pauseTask;
-    private readonly Action<AgentTask> _resumeTask;
+    private readonly IRemoteServerCallbacks _callbacks;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -39,33 +32,54 @@ public sealed class RemoteServerManager : IDisposable
         WriteIndented = false
     };
 
+    private static readonly string ApiKeyFilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Spritely", "remote_api_key.txt");
+
+    private static readonly string AuditLogPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Spritely", "logs", "remote_audit.log");
+
+    private int _auditCount;
+
     public bool IsRunning => _listener?.IsListening == true;
     public int Port { get; private set; }
     public string? ListenUrl { get; private set; }
+    public string ApiKey { get; private set; } = "";
+    public int AuditCount => _auditCount;
 
     public event Action<string>? Log;
     public event Action<bool>? StatusChanged;
+    public event Action<int>? AuditCountChanged;
 
-    public RemoteServerManager(
-        Func<ObservableCollection<AgentTask>> getActiveTasks,
-        Func<ObservableCollection<AgentTask>> getHistoryTasks,
-        Func<System.Collections.Generic.List<ProjectEntry>> getProjects,
-        Func<int> getMaxConcurrent,
-        Func<string, AgentTask?> findTask,
-        Action<CreateTaskRequest> createTask,
-        Action<AgentTask> cancelTask,
-        Action<AgentTask> pauseTask,
-        Action<AgentTask> resumeTask)
+    public RemoteServerManager(IRemoteServerCallbacks callbacks)
     {
-        _getActiveTasks = getActiveTasks;
-        _getHistoryTasks = getHistoryTasks;
-        _getProjects = getProjects;
-        _getMaxConcurrent = getMaxConcurrent;
-        _findTask = findTask;
-        _createTask = createTask;
-        _cancelTask = cancelTask;
-        _pauseTask = pauseTask;
-        _resumeTask = resumeTask;
+        _callbacks = callbacks;
+        ApiKey = LoadOrGenerateApiKey();
+    }
+
+    private static string LoadOrGenerateApiKey()
+    {
+        try
+        {
+            if (File.Exists(ApiKeyFilePath))
+            {
+                var existing = File.ReadAllText(ApiKeyFilePath).Trim();
+                if (existing.Length > 0) return existing;
+            }
+
+            var dir = Path.GetDirectoryName(ApiKeyFilePath)!;
+            Directory.CreateDirectory(dir);
+
+            var key = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+            File.WriteAllText(ApiKeyFilePath, key);
+            return key;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("RemoteServer", $"Failed to load/generate API key: {ex.Message}");
+            return "";
+        }
     }
 
     public void Start(int port)
@@ -129,13 +143,24 @@ public sealed class RemoteServerManager : IDisposable
         // CORS for local dev
         resp.Headers.Add("Access-Control-Allow-Origin", "*");
         resp.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        resp.Headers.Add("Access-Control-Allow-Headers", "Content-Type");
+        resp.Headers.Add("Access-Control-Allow-Headers", "Content-Type, X-Api-Key");
 
         if (req.HttpMethod == "OPTIONS")
         {
             resp.StatusCode = 204;
             resp.Close();
             return;
+        }
+
+        // Validate API key
+        if (!string.IsNullOrEmpty(ApiKey))
+        {
+            var providedKey = req.Headers["X-Api-Key"];
+            if (string.IsNullOrEmpty(providedKey) || !string.Equals(providedKey, ApiKey, StringComparison.Ordinal))
+            {
+                await WriteJsonAsync(resp, 401, new ApiResponse<object> { Success = false, Error = "Unauthorized: invalid or missing API key" });
+                return;
+            }
         }
 
         try
@@ -150,9 +175,9 @@ public sealed class RemoteServerManager : IDisposable
                 ("GET", "/api/tasks") => HandleGetTasks(req),
                 ("GET", var p) when p.StartsWith("/api/tasks/") => HandleGetTask(p),
                 ("POST", "/api/tasks") => await HandleCreateTaskAsync(req),
-                ("POST", var p) when p.StartsWith("/api/tasks/") && p.EndsWith("/cancel") => HandleTaskAction(p, "cancel"),
-                ("POST", var p) when p.StartsWith("/api/tasks/") && p.EndsWith("/pause") => HandleTaskAction(p, "pause"),
-                ("POST", var p) when p.StartsWith("/api/tasks/") && p.EndsWith("/resume") => HandleTaskAction(p, "resume"),
+                ("POST", var p) when p.StartsWith("/api/tasks/") && p.EndsWith("/cancel") => HandleTaskAction(p, "cancel", req),
+                ("POST", var p) when p.StartsWith("/api/tasks/") && p.EndsWith("/pause") => HandleTaskAction(p, "pause", req),
+                ("POST", var p) when p.StartsWith("/api/tasks/") && p.EndsWith("/resume") => HandleTaskAction(p, "resume", req),
                 _ => null
             };
 
@@ -162,7 +187,13 @@ public sealed class RemoteServerManager : IDisposable
                 return;
             }
 
-            await WriteJsonAsync(resp, 200, result);
+            var statusCode = result switch
+            {
+                ApiResponse<TaskDto> { Success: false } => 400,
+                ApiResponse<TaskDto> { Location: not null, Success: true } => 201,
+                _ => 200
+            };
+            await WriteJsonAsync(resp, statusCode, result);
         }
         catch (Exception ex)
         {
@@ -175,20 +206,20 @@ public sealed class RemoteServerManager : IDisposable
 
     private ApiResponse<ServerStatusDto> HandleStatus()
     {
-        var active = _getActiveTasks();
+        var active = _callbacks.GetActiveTasks();
         return new ApiResponse<ServerStatusDto>
         {
             Data = new ServerStatusDto
             {
                 ActiveTasks = active.Count(t => !t.IsFinished),
-                MaxConcurrentTasks = _getMaxConcurrent()
+                MaxConcurrentTasks = _callbacks.GetMaxConcurrentTasks()
             }
         };
     }
 
     private ApiResponse<System.Collections.Generic.List<ProjectDto>> HandleGetProjects()
     {
-        var projects = _getProjects()
+        var projects = _callbacks.GetProjects()
             .Select(p => new ProjectDto
             {
                 Name = p.Name,
@@ -201,20 +232,48 @@ public sealed class RemoteServerManager : IDisposable
         return new ApiResponse<System.Collections.Generic.List<ProjectDto>> { Data = projects };
     }
 
-    private ApiResponse<System.Collections.Generic.List<TaskDto>> HandleGetTasks(HttpListenerRequest req)
+    private ApiResponse<PaginatedResponse<TaskDto>> HandleGetTasks(HttpListenerRequest req)
     {
         var filter = req.QueryString["filter"] ?? "active";
-        var tasks = filter == "history" ? _getHistoryTasks() : _getActiveTasks();
+        var tasks = filter == "history" ? _callbacks.GetHistoryTasks() : _callbacks.GetActiveTasks();
 
-        var dtos = tasks.Select(MapTaskDto).ToList();
-        return new ApiResponse<System.Collections.Generic.List<TaskDto>> { Data = dtos };
+        IEnumerable<AgentTask> filtered = tasks;
+
+        var statusFilter = req.QueryString["status"];
+        if (!string.IsNullOrWhiteSpace(statusFilter))
+        {
+            var statuses = statusFilter.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            filtered = filtered.Where(t => statuses.Any(s => string.Equals(s, t.Status.ToString(), StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var projectPath = req.QueryString["projectPath"];
+        if (!string.IsNullOrWhiteSpace(projectPath))
+            filtered = filtered.Where(t => string.Equals(t.ProjectPath, projectPath, StringComparison.OrdinalIgnoreCase));
+
+        var allDtos = filtered.Select(t => MapTaskDto(t)).ToList();
+        var totalCount = allDtos.Count;
+
+        var page = Math.Max(1, int.TryParse(req.QueryString["page"], out var p) ? p : 1);
+        var limit = int.TryParse(req.QueryString["limit"], out var l) ? Math.Clamp(l, 1, 100) : 20;
+        var paged = allDtos.Skip((page - 1) * limit).Take(limit).ToList();
+
+        return new ApiResponse<PaginatedResponse<TaskDto>>
+        {
+            Data = new PaginatedResponse<TaskDto>
+            {
+                Items = paged,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = limit
+            }
+        };
     }
 
     private ApiResponse<TaskDto>? HandleGetTask(string path)
     {
         // /api/tasks/{id}
         var id = path.Replace("/api/tasks/", "").Trim('/');
-        var task = _findTask(id);
+        var task = _callbacks.FindTask(id);
         if (task == null) return null;
 
         var dto = MapTaskDto(task, includeOutput: true);
@@ -223,32 +282,88 @@ public sealed class RemoteServerManager : IDisposable
 
     private async Task<ApiResponse<TaskDto>> HandleCreateTaskAsync(HttpListenerRequest req)
     {
+        var clientIp = req.RemoteEndPoint?.ToString() ?? "unknown";
         using var reader = new StreamReader(req.InputStream, req.ContentEncoding);
         var body = await reader.ReadToEndAsync();
         var request = JsonSerializer.Deserialize<CreateTaskRequest>(body, JsonOpts);
 
         if (request == null || string.IsNullOrWhiteSpace(request.Description))
+        {
+            WriteAuditLog("create", "n/a", clientIp, false, "Description is required");
             return new ApiResponse<TaskDto> { Success = false, Error = "Description is required" };
+        }
 
-        _createTask(request);
-        return new ApiResponse<TaskDto> { Data = new TaskDto { Description = request.Description, Status = "Queued" } };
+        if (request.Description.Length > 2000)
+        {
+            WriteAuditLog("create", "n/a", clientIp, false, "Description too long");
+            return new ApiResponse<TaskDto> { Success = false, Error = "Description must be 2000 characters or fewer" };
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Model) && !Enum.TryParse<ModelType>(request.Model, ignoreCase: true, out _))
+        {
+            WriteAuditLog("create", "n/a", clientIp, false, $"Invalid model '{request.Model}'");
+            return new ApiResponse<TaskDto> { Success = false, Error = $"Invalid model '{request.Model}'. Allowed: {string.Join(", ", Enum.GetNames<ModelType>())}" };
+        }
+
+        if (!Enum.TryParse<TaskPriority>(request.Priority, ignoreCase: true, out _))
+        {
+            WriteAuditLog("create", "n/a", clientIp, false, $"Invalid priority '{request.Priority}'");
+            return new ApiResponse<TaskDto> { Success = false, Error = $"Invalid priority '{request.Priority}'. Allowed: {string.Join(", ", Enum.GetNames<TaskPriority>())}" };
+        }
+
+        var knownPaths = _callbacks.GetProjects().Select(p => p.Path).ToList();
+        if (string.IsNullOrWhiteSpace(request.ProjectPath) || !knownPaths.Contains(request.ProjectPath, StringComparer.OrdinalIgnoreCase))
+        {
+            WriteAuditLog("create", "n/a", clientIp, false, "Invalid projectPath");
+            return new ApiResponse<TaskDto> { Success = false, Error = $"Invalid projectPath. Must be one of the registered projects: {string.Join(", ", knownPaths)}" };
+        }
+
+        var created = _callbacks.CreateTask(request);
+        if (created == null)
+        {
+            WriteAuditLog("create", "n/a", clientIp, false, "Failed to create task");
+            return new ApiResponse<TaskDto> { Success = false, Error = "Failed to create task" };
+        }
+
+        var dto = MapTaskDto(created);
+        WriteAuditLog("create", dto.Id, clientIp, true);
+        return new ApiResponse<TaskDto>
+        {
+            Data = dto,
+            Location = $"/api/tasks/{dto.Id}"
+        };
     }
 
-    private ApiResponse<object>? HandleTaskAction(string path, string action)
+    private ApiResponse<object>? HandleTaskAction(string path, string action, HttpListenerRequest req)
     {
+        var clientIp = req.RemoteEndPoint?.ToString() ?? "unknown";
+
         // /api/tasks/{id}/{action}
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length < 3) return null;
 
         var id = segments[2];
-        var task = _findTask(id);
-        if (task == null) return null;
-
-        switch (action)
+        var task = _callbacks.FindTask(id);
+        if (task == null)
         {
-            case "cancel": _cancelTask(task); break;
-            case "pause": _pauseTask(task); break;
-            case "resume": _resumeTask(task); break;
+            WriteAuditLog(action, id, clientIp, false, "Task not found");
+            return null;
+        }
+
+        try
+        {
+            switch (action)
+            {
+                case "cancel": _callbacks.CancelTask(task); break;
+                case "pause": _callbacks.PauseTask(task); break;
+                case "resume": _callbacks.ResumeTask(task); break;
+            }
+            WriteAuditLog(action, id, clientIp, true);
+        }
+        catch (Exception ex)
+        {
+            WriteAuditLog(action, id, clientIp, false, ex.Message);
+            throw;
         }
 
         return new ApiResponse<object> { Data = new { action, taskId = id } };
@@ -291,6 +406,19 @@ public sealed class RemoteServerManager : IDisposable
         resp.ContentLength64 = bytes.Length;
         await resp.OutputStream.WriteAsync(bytes);
         resp.Close();
+    }
+
+    private void WriteAuditLog(string action, string taskId, string clientIp, bool success, string? error = null)
+    {
+        var timestamp = DateTime.UtcNow.ToString("o");
+        var status = success ? "SUCCESS" : "FAILURE";
+        var errorPart = error != null ? $" error=\"{error}\"" : "";
+        var line = $"[{timestamp}] {status} action={action} taskId={taskId} client={clientIp}{errorPart}{Environment.NewLine}";
+
+        SafeFileWriter.WriteInBackground(AuditLogPath, line, "RemoteAudit", appendLine: true);
+
+        var count = Interlocked.Increment(ref _auditCount);
+        AuditCountChanged?.Invoke(count);
     }
 
     public void Dispose()

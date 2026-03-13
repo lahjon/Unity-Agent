@@ -25,6 +25,7 @@ namespace Spritely.Managers
         private readonly Dispatcher _dispatcher;
         private bool _isDirty = true;
         private bool _isDisposed;
+        private bool _isRefreshing;
 
         // Currently selected task for detail view
         private AgentTask? _selectedTask;
@@ -77,6 +78,9 @@ namespace Spritely.Managers
 
         public async Task RefreshAsync(ScrollViewer container)
         {
+            if (_isRefreshing) return;
+            _isRefreshing = true;
+
             try
             {
                 // Collect tasks with changed files
@@ -101,6 +105,10 @@ namespace Spritely.Managers
                 {
                     container.Content = BuildErrorContent(ex.Message);
                 });
+            }
+            finally
+            {
+                _isRefreshing = false;
             }
         }
 
@@ -133,16 +141,17 @@ namespace Spritely.Managers
         private List<AgentTask> GetTasksWithChanges()
         {
             var result = new List<AgentTask>();
+            var seen = new HashSet<string>();
 
             foreach (var task in _getActiveTasks())
             {
-                if (task.ChangedFiles.Count > 0 || task.IsRunning || task.IsCommitting)
+                if ((task.ChangedFiles.Count > 0 || task.IsRunning || task.IsCommitting) && seen.Add(task.Id))
                     result.Add(task);
             }
 
             foreach (var task in _getHistoryTasks())
             {
-                if (task.ChangedFiles.Count > 0)
+                if (task.ChangedFiles.Count > 0 && seen.Add(task.Id))
                     result.Add(task);
             }
 
@@ -165,8 +174,12 @@ namespace Spritely.Managers
             if (string.IsNullOrEmpty(projectPath) || task.ChangedFiles.Count == 0)
                 return;
 
+            var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var relativePath in task.ChangedFiles)
             {
+                if (!seenFiles.Add(relativePath))
+                    continue;
+
                 var fullPath = Path.Combine(projectPath, relativePath);
                 var entry = new IdeFileEntry
                 {

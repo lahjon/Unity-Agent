@@ -115,7 +115,7 @@ namespace Spritely
 
 
         // IProjectPanelView — expose named XAML controls to ProjectManager
-        TextBlock IProjectPanelView.PromptProjectLabel => PromptProjectLabel;
+        ComboBox IProjectPanelView.PromptProjectLabel => PromptProjectLabel;
         StackPanel IProjectPanelView.ProjectListPanel => ProjectListPanel;
         ToggleButton IProjectPanelView.UseMcpToggle => UseMcpToggle;
         TextBox IProjectPanelView.ShortDescBox => ShortDescBox;
@@ -1883,7 +1883,7 @@ namespace Spritely
 
             if (!hasProjects)
             {
-                PromptProjectLabel.Text = "";
+                PromptProjectLabel.Items.Clear();
                 PromptProjectLabel.ToolTip = null;
             }
 
