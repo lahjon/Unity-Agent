@@ -169,6 +169,7 @@ namespace Spritely.Managers
             string outputTail, string taskDescription, string? completionSummary,
             CancellationToken ct = default, string? modelOverride = null)
         {
+            Process? process = null;
             try
             {
                 var contextTail = outputTail.Length > 2000 ? outputTail[^2000..] : outputTail;
@@ -195,15 +196,21 @@ namespace Spritely.Managers
                 psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
                 psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
 
-                using var process = new Process { StartInfo = psi };
+                process = new Process { StartInfo = psi };
                 process.Start();
                 JobObjectManager.Instance.AssignProcess(process);
 
-                await process.StandardInput.WriteAsync(prompt.AsMemory(), ct);
+                await process.StandardInput.WriteAsync(prompt.AsMemory(), ct).ConfigureAwait(false);
                 process.StandardInput.Close();
 
-                var output = await process.StandardOutput.ReadToEndAsync(ct);
-                await process.WaitForExitAsync(ct);
+                // Use a timeout to prevent hanging indefinitely if the CLI process stalls.
+                // The caller's CancellationToken may be CancellationToken.None after task completion.
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, ct);
+                var linkedToken = linkedCts.Token;
+
+                var output = await process.StandardOutput.ReadToEndAsync(linkedToken).ConfigureAwait(false);
+                await process.WaitForExitAsync(linkedToken).ConfigureAwait(false);
 
                 var processedText = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
 
@@ -295,11 +302,22 @@ namespace Spritely.Managers
                 AppLogger.Debug("CompletionAnalyzer", $"Could not parse result verification response: {processedText}");
                 return null;
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
             catch (Exception ex)
             {
                 AppLogger.Debug("CompletionAnalyzer", "Result verification failed", ex);
                 return null;
+            }
+            finally
+            {
+                if (process != null)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { /* best effort */ }
+                    process.Dispose();
+                }
             }
         }
 

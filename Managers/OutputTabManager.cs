@@ -419,8 +419,11 @@ namespace Spritely.Managers
 
         public void UpdateTabHeader(AgentTask task)
         {
-            // Stop typewriter and pulsing dots when task reaches a terminal state
-            if (task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled or AgentTaskStatus.Recommendation)
+            // Stop typewriter and pulsing dots when task reaches a terminal or post-completion state.
+            // Verifying is included because the process has exited — no more streaming output.
+            // Leaving the animation running during verify would compete with summary/verification output.
+            if (task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled
+                or AgentTaskStatus.Recommendation or AgentTaskStatus.Verifying)
                 StopTypewriterAnimation(task.Id);
 
             if (_sendButtons.TryGetValue(task.Id, out var sendBtn))
@@ -713,23 +716,27 @@ namespace Spritely.Managers
             List<(string fileName, int added, int removed, string diffContent)> fileDiffs,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
         {
-            // Stream summary to disk
+            // Build summary text (safe on any thread — no collection access)
             var summaryText = "\n═══ Code Changes ═══════════════════════════\n";
             foreach (var (fileName, added, removed, _) in fileDiffs)
                 summaryText += $"  {fileName}  (+{added}/-{removed})\n";
             summaryText += "═══════════════════════════════════════════\n";
             _outputWriter.WriteChunk(taskId, summaryText);
 
-            var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
-                    ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
-            if (task != null)
-            {
-                task.OutputBuilder.Append(summaryText);
-                TrimOutputIfNeeded(task);
-            }
+            // Capture for closure
+            var capturedSummary = summaryText;
 
             void BuildUi()
             {
+                // Update OutputBuilder on the UI thread (ObservableCollection access is not thread-safe)
+                var task = activeTasks.FirstOrDefault(t => t.Id == taskId)
+                        ?? historyTasks.FirstOrDefault(t => t.Id == taskId);
+                if (task != null)
+                {
+                    task.OutputBuilder.Append(capturedSummary);
+                    TrimOutputIfNeeded(task);
+                }
+
                 if (!_outputBoxes.TryGetValue(taskId, out var box)) return;
 
                 // Stop typewriter so we can append directly
