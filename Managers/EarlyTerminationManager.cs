@@ -281,7 +281,8 @@ namespace Spritely.Managers
         }
 
         private double EstimateCost(AgentTask task) =>
-            (double)FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens);
+            (double)FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens,
+                task.CacheReadTokens, task.CacheCreationTokens, task.Runtime.LastCliModel);
 
         /// <summary>
         /// Clears termination state for a task.
