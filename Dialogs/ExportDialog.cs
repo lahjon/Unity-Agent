@@ -328,7 +328,8 @@ namespace Spritely.Dialogs
                     var cost = task.HasTokenData
                         ? FormatHelpers.FormatCost(FormatHelpers.EstimateCost(
                             task.InputTokens, task.OutputTokens,
-                            task.CacheReadTokens, task.CacheCreationTokens))
+                            task.CacheReadTokens, task.CacheCreationTokens,
+                            task.Data.LastUsedCliModel ?? task.Runtime.LastCliModel))
                         : "N/A";
 
                     var description = task.ShortDescription.Replace("|", "\\|");
@@ -399,7 +400,8 @@ namespace Spritely.Dialogs
                     sb.AppendLine("#### Token Usage");
                     sb.AppendLine();
                     var cost = FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens,
-                        task.CacheReadTokens, task.CacheCreationTokens);
+                        task.CacheReadTokens, task.CacheCreationTokens,
+                        task.Data.LastUsedCliModel ?? task.Runtime.LastCliModel);
                     sb.AppendLine($"| Metric | Count |");
                     sb.AppendLine($"|--------|-------|");
                     sb.AppendLine($"| Input Tokens | {task.InputTokens:N0} |");
@@ -545,7 +547,8 @@ namespace Spritely.Dialogs
             {
                 var cost = task.HasTokenData
                     ? FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens,
-                        task.CacheReadTokens, task.CacheCreationTokens)
+                        task.CacheReadTokens, task.CacheCreationTokens,
+                        task.Data.LastUsedCliModel ?? task.Runtime.LastCliModel)
                     : 0m;
 
                 var entry = new Dictionary<string, object?>
@@ -658,7 +661,8 @@ namespace Spritely.Dialogs
                         sb.AppendLine($"  Cache Creation: {task.CacheCreationTokens:N0}");
                     sb.AppendLine($"  Total:          {task.TotalAllTokens:N0}");
                     var cost = FormatHelpers.EstimateCost(task.InputTokens, task.OutputTokens,
-                        task.CacheReadTokens, task.CacheCreationTokens);
+                        task.CacheReadTokens, task.CacheCreationTokens,
+                        task.Data.LastUsedCliModel ?? task.Runtime.LastCliModel);
                     sb.AppendLine($"  Est. Cost:      {FormatHelpers.FormatCost(cost)}");
                 }
 
