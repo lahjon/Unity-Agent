@@ -9,6 +9,7 @@ namespace Spritely.Models;
 /// </summary>
 public interface IRemoteServerCallbacks
 {
+    AppSettingsDto GetSettings();
     ObservableCollection<AgentTask> GetActiveTasks();
     ObservableCollection<AgentTask> GetHistoryTasks();
     List<ProjectEntry> GetProjects();

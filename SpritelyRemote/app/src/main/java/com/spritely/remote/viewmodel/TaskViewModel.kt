@@ -17,7 +17,8 @@ data class TaskListState(
     val error: String? = null,
     val selectedTask: TaskDto? = null,
     val selectedProject: ProjectDto? = null,
-    val showCreateDialog: Boolean = false
+    val showCreateDialog: Boolean = false,
+    val autoQueueEnabled: Boolean = true
 )
 
 class TaskViewModel : ViewModel() {
@@ -29,10 +30,16 @@ class TaskViewModel : ViewModel() {
     private var detailPollJob: Job? = null
     private var host: String = ""
     private var port: Int = 7923
+    private var apiKey: String = ""
 
-    fun setConnection(host: String, port: Int) {
+    fun setConnection(host: String, port: Int, apiKey: String = "") {
         this.host = host
         this.port = port
+        this.apiKey = apiKey
+    }
+
+    fun setAutoQueue(enabled: Boolean) {
+        _state.update { it.copy(autoQueueEnabled = enabled) }
     }
 
     fun startPolling() {
@@ -63,7 +70,7 @@ class TaskViewModel : ViewModel() {
         val selected = _state.value.selectedTask ?: return
         if (!selected.isRunning) return
         try {
-            val api = ApiClient.getApi(host, port)
+            val api = ApiClient.getApi(host, port, apiKey)
             val resp = api.getTask(selected.id)
             if (resp.isSuccessful) {
                 _state.update { it.copy(selectedTask = resp.body()?.data) }
@@ -74,7 +81,7 @@ class TaskViewModel : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             try {
-                val api = ApiClient.getApi(host, port)
+                val api = ApiClient.getApi(host, port, apiKey)
 
                 val activeResp = api.getTasks("active")
                 val historyResp = api.getTasks("history")
@@ -98,7 +105,7 @@ class TaskViewModel : ViewModel() {
     fun loadTaskDetail(taskId: String) {
         viewModelScope.launch {
             try {
-                val api = ApiClient.getApi(host, port)
+                val api = ApiClient.getApi(host, port, apiKey)
                 val resp = api.getTask(taskId)
                 if (resp.isSuccessful) {
                     _state.update { it.copy(selectedTask = resp.body()?.data) }
@@ -117,14 +124,16 @@ class TaskViewModel : ViewModel() {
         val projectPath = request.projectPath.ifEmpty {
             _state.value.selectedProject?.path ?: ""
         }
+        val autoQueue = if (_state.value.autoQueueEnabled) true else null
         val normalizedRequest = request.copy(
             projectPath = projectPath,
             isFeatureMode = true,
-            model = null
+            model = null,
+            autoQueue = autoQueue
         )
         viewModelScope.launch {
             try {
-                val api = ApiClient.getApi(host, port)
+                val api = ApiClient.getApi(host, port, apiKey)
                 api.createTask(normalizedRequest)
                 _state.update { it.copy(showCreateDialog = false) }
                 refresh()
@@ -137,7 +146,7 @@ class TaskViewModel : ViewModel() {
     fun cancelTask(taskId: String) {
         viewModelScope.launch {
             try {
-                ApiClient.getApi(host, port).cancelTask(taskId)
+                ApiClient.getApi(host, port, apiKey).cancelTask(taskId)
                 delay(500)
                 refresh()
             } catch (_: Exception) {}
@@ -147,7 +156,7 @@ class TaskViewModel : ViewModel() {
     fun pauseTask(taskId: String) {
         viewModelScope.launch {
             try {
-                ApiClient.getApi(host, port).pauseTask(taskId)
+                ApiClient.getApi(host, port, apiKey).pauseTask(taskId)
                 delay(500)
                 refresh()
             } catch (_: Exception) {}
@@ -157,7 +166,7 @@ class TaskViewModel : ViewModel() {
     fun resumeTask(taskId: String) {
         viewModelScope.launch {
             try {
-                ApiClient.getApi(host, port).resumeTask(taskId)
+                ApiClient.getApi(host, port, apiKey).resumeTask(taskId)
                 delay(500)
                 refresh()
             } catch (_: Exception) {}

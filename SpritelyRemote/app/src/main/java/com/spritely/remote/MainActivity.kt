@@ -42,7 +42,10 @@ fun SpritelyApp(
     LaunchedEffect(connState.isConnected) {
         if (connState.isConnected) {
             val port = connState.port.toIntOrNull() ?: 7923
-            taskVM.setConnection(connState.host, port)
+            taskVM.setConnection(connState.host, port, connState.apiKey)
+            // Sync auto-queue from desktop settings if available, default to true
+            val desktopAutoQueue = connState.appSettings?.autoQueue ?: true
+            taskVM.setAutoQueue(desktopAutoQueue)
             taskVM.startPolling()
         } else {
             taskVM.stopPolling()
@@ -51,10 +54,14 @@ fun SpritelyApp(
 
     // Track whether user has passed through project selection
     var hasSelectedProject by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
     // Reset project selection when disconnected
     LaunchedEffect(connState.isConnected) {
-        if (!connState.isConnected) hasSelectedProject = false
+        if (!connState.isConnected) {
+            hasSelectedProject = false
+            showSettings = false
+        }
     }
 
     // Navigation state
@@ -64,6 +71,7 @@ fun SpritelyApp(
             state = connState,
             onHostChange = connectionVM::updateHost,
             onPortChange = connectionVM::updatePort,
+            onApiKeyChange = connectionVM::updateApiKey,
             onConnect = connectionVM::connect
         )
     } else if (!hasSelectedProject) {
@@ -79,6 +87,15 @@ fun SpritelyApp(
                 taskVM.selectProject(null)
                 hasSelectedProject = true
             }
+        )
+    } else if (showSettings) {
+        // Settings screen
+        SettingsScreen(
+            appSettings = connState.appSettings,
+            autoQueueEnabled = taskState.autoQueueEnabled,
+            onAutoQueueChange = { taskVM.setAutoQueue(it) },
+            onRefresh = { connectionVM.refreshSettings() },
+            onBack = { showSettings = false }
         )
     } else if (taskState.selectedTask != null) {
         // Task detail screen
@@ -101,13 +118,15 @@ fun SpritelyApp(
             onPauseTask = taskVM::pauseTask,
             onResumeTask = taskVM::resumeTask,
             onDisconnect = { connectionVM.disconnect() },
-            onRefresh = { taskVM.refresh() }
+            onRefresh = { taskVM.refresh() },
+            onSettings = { showSettings = true }
         )
 
         // Create task dialog
         if (taskState.showCreateDialog) {
             CreateTaskDialog(
                 projects = taskState.projects,
+                selectedProject = taskState.selectedProject,
                 onDismiss = { taskVM.hideCreateDialog() },
                 onCreate = { taskVM.createTask(it) }
             )

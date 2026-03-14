@@ -65,6 +65,16 @@ public sealed class TaskDto
     [JsonPropertyName("output")] public string? Output { get; init; }
 }
 
+public sealed class AppSettingsDto
+{
+    [JsonPropertyName("autoCommit")] public bool AutoCommit { get; init; }
+    [JsonPropertyName("autoQueue")] public bool AutoQueue { get; init; }
+    [JsonPropertyName("autoVerify")] public bool AutoVerify { get; init; }
+    [JsonPropertyName("maxConcurrentTasks")] public int MaxConcurrentTasks { get; init; }
+    [JsonPropertyName("taskTimeoutMinutes")] public int TaskTimeoutMinutes { get; init; }
+    [JsonPropertyName("opusEffortLevel")] public string OpusEffortLevel { get; init; } = "high";
+}
+
 public sealed class CreateTaskRequest
 {
     [JsonPropertyName("description")] public string Description { get; init; } = "";
@@ -75,4 +85,5 @@ public sealed class CreateTaskRequest
     [JsonPropertyName("useMcp")] public bool UseMcp { get; init; }
     [JsonPropertyName("autoDecompose")] public bool AutoDecompose { get; init; }
     [JsonPropertyName("extendedPlanning")] public bool ExtendedPlanning { get; init; }
+    [JsonPropertyName("autoQueue")] public bool? AutoQueue { get; init; }
 }

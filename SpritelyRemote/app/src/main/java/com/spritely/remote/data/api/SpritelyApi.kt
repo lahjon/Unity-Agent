@@ -9,6 +9,9 @@ interface SpritelyApi {
     @GET("/api/status")
     suspend fun getStatus(): Response<ApiResponse<ServerStatus>>
 
+    @GET("/api/settings")
+    suspend fun getSettings(): Response<ApiResponse<AppSettings>>
+
     @GET("/api/projects")
     suspend fun getProjects(): Response<ApiResponse<List<ProjectDto>>>
 
