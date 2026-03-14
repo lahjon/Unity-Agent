@@ -55,14 +55,6 @@ namespace Spritely.Managers
             autoCommitToggle.Unchecked += (_, _) => _settingsManager.AutoCommit = false;
             _cachedRoot.Children.Add(autoCommitToggle);
 
-            // Auto-Queue toggle
-            var autoQueueToggle = MakeToggleSwitch(_settingsManager.AutoQueue, "Auto-Queue");
-            autoQueueToggle.Margin = new Thickness(0, 0, 0, 6);
-            autoQueueToggle.ToolTip = "New tasks depend on the previously created task, forming a linear queue";
-            autoQueueToggle.Checked += (_, _) => _settingsManager.AutoQueue = true;
-            autoQueueToggle.Unchecked += (_, _) => _settingsManager.AutoQueue = false;
-            _cachedRoot.Children.Add(autoQueueToggle);
-
             // Status message container - create placeholder
             _cachedStatusBorder = new Border();
             _cachedRoot.Children.Add(_cachedStatusBorder);

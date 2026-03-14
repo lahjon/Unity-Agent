@@ -249,6 +249,15 @@
                                             <TextBlock Text="Decompose" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </ToggleButton>
+                                    <ToggleButton x:Name="AutoQueueToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="New tasks depend on the previously created task, forming a linear queue"
+                                                  Checked="AutoQueueToggle_Changed" Unchecked="AutoQueueToggle_Changed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8CB;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                       Foreground="{StaticResource TextLight}"/>
+                                            <TextBlock Text="Auto-Queue" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ToggleButton>
                                 </WrapPanel>
                             </ScrollViewer>
                         </DockPanel>

@@ -142,7 +142,8 @@ namespace Spritely.Tests
         [Fact]
         public void TokenBudgetManager_TracksUsage()
         {
-            _tokenBudgetManager.UpdateTaskUsage("task1", 100_000);
+            _tokenBudgetManager.UpdateTaskUsage("task1", 100_000,
+                inputTokens: 80_000, outputTokens: 20_000, model: "claude-sonnet-4-20250514");
             var usage = _tokenBudgetManager.GetTaskUsage("task1");
 
             Assert.Equal(100_000, usage.TotalTokens);

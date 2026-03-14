@@ -28,8 +28,7 @@ namespace Spritely.Models
         public long TotalCacheReadTokens { get; set; }
         public long TotalCacheCreationTokens { get; set; }
         public long TotalTokens => TotalInputTokens + TotalOutputTokens + TotalCacheReadTokens + TotalCacheCreationTokens;
-        public decimal EstimatedCost => Helpers.FormatHelpers.EstimateCost(
-            TotalInputTokens, TotalOutputTokens, TotalCacheReadTokens, TotalCacheCreationTokens);
+        public decimal EstimatedCost { get; set; }
         public DateTime? MostRecentTaskTime { get; set; }
 
         public List<SparklinePoint> RecentActivity { get; set; } = new();

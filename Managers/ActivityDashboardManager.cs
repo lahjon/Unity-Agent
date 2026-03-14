@@ -178,6 +178,9 @@ namespace Spritely.Managers
                 TotalOutputTokens = tasks.Sum(t => t.OutputTokens),
                 TotalCacheReadTokens = tasks.Sum(t => t.CacheReadTokens),
                 TotalCacheCreationTokens = tasks.Sum(t => t.CacheCreationTokens),
+                EstimatedCost = tasks.Sum(t => Helpers.FormatHelpers.EstimateCost(
+                    t.InputTokens, t.OutputTokens, t.CacheReadTokens, t.CacheCreationTokens,
+                    t.Data.LastUsedCliModel ?? t.Runtime.LastCliModel)),
                 MostRecentTaskTime = mostRecentEnd != default ? mostRecentEnd : null,
                 RecentActivity = recentCompleted
             };

@@ -513,6 +513,7 @@ namespace Spritely
             TokenLimitRetryBox.Text = _settingsManager.TokenLimitRetryMinutes.ToString();
             TaskTimeoutBox.Text = _settingsManager.TaskTimeoutMinutes.ToString();
             AutoVerifyToggle.IsChecked = _settingsManager.AutoVerify;
+            AutoQueueToggle.IsChecked = _settingsManager.AutoQueue;
             ShowCodeChangesToggle.IsChecked = _settingsManager.ShowCodeChanges;
             DefaultMcpServerNameBox.Text = _settingsManager.DefaultMcpServerName;
             DefaultMcpAddressBox.Text = _settingsManager.DefaultMcpAddress;

@@ -26,6 +26,11 @@ namespace Spritely
             _settingsManager.AutoVerify = AutoVerifyToggle.IsChecked == true;
         }
 
+        private void AutoQueueToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            _settingsManager.AutoQueue = AutoQueueToggle.IsChecked == true;
+        }
+
         private void ShowCodeChangesToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_settingsManager == null || _projectManager == null) return;

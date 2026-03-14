@@ -57,7 +57,9 @@ namespace Spritely.Managers
                 // Update budget tracking
                 if (budgetConfig != null)
                 {
-                    _tokenBudgetManager.UpdateTaskUsage(task.Id, task.TotalAllTokens);
+                    _tokenBudgetManager.UpdateTaskUsage(task.Id, task.TotalAllTokens,
+                        task.InputTokens, task.OutputTokens,
+                        task.CacheReadTokens, task.CacheCreationTokens, task.Runtime.LastCliModel);
                 }
 
                 // Perform various checks
@@ -390,7 +392,9 @@ namespace Spritely.Managers
         private readonly Dictionary<string, TokenUsage> _taskUsage = new();
         private readonly object _lock = new();
 
-        public void UpdateTaskUsage(string taskId, long totalTokens)
+        public void UpdateTaskUsage(string taskId, long totalTokens,
+            long inputTokens = 0, long outputTokens = 0,
+            long cacheReadTokens = 0, long cacheCreationTokens = 0, string? model = null)
         {
             lock (_lock)
             {
@@ -402,7 +406,8 @@ namespace Spritely.Managers
 
                 usage.TotalTokens = totalTokens;
                 usage.LastUpdated = DateTime.Now;
-                usage.EstimatedCost = EstimateTokenCost(totalTokens);
+                usage.EstimatedCost = (double)FormatHelpers.EstimateCost(
+                    inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, model);
             }
         }
 
@@ -450,8 +455,7 @@ namespace Spritely.Managers
             }
         }
 
-        private double EstimateTokenCost(long tokens) =>
-            (double)FormatHelpers.EstimateCost(tokens, 0);
+        // Removed EstimateTokenCost — cost is now calculated per-token-type in UpdateTaskUsage
     }
 
     public class TokenUsage
