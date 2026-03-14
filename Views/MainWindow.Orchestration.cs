@@ -726,6 +726,13 @@ namespace Spritely
             AddActiveTask(task);
             _outputTabManager.CreateTab(task);
 
+            // Auto-Queue: chain onto previous task if enabled and no explicit deps
+            if (_settingsManager.AutoQueue && (dependencies == null || dependencies.Count == 0) && _lastLaunchedTask is { IsFinished: false })
+            {
+                dependencies = new List<AgentTask> { _lastLaunchedTask };
+            }
+            _lastLaunchedTask = task;
+
             var activeDeps = dependencies?.Where(d => !d.IsFinished).ToList();
 
             if (activeDeps is { Count: > 0 })

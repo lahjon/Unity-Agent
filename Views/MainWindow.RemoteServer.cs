@@ -50,6 +50,16 @@ namespace Spritely
 
         // ── IRemoteServerCallbacks ───────────────────────────────────────
 
+        AppSettingsDto IRemoteServerCallbacks.GetSettings() => new()
+        {
+            AutoCommit = _settingsManager.AutoCommit,
+            AutoQueue = _settingsManager.AutoQueue,
+            AutoVerify = _settingsManager.AutoVerify,
+            MaxConcurrentTasks = _settingsManager.MaxConcurrentTasks,
+            TaskTimeoutMinutes = _settingsManager.TaskTimeoutMinutes,
+            OpusEffortLevel = _settingsManager.OpusEffortLevel
+        };
+
         ObservableCollection<AgentTask> IRemoteServerCallbacks.GetActiveTasks()
         {
             lock (_activeTasksLock) return new ObservableCollection<AgentTask>(_activeTasks);
@@ -143,12 +153,19 @@ namespace Spritely
 
                 task.Data.PriorityLevel = priority;
                 task.Data.TaskNumber = _nextTaskNumber++;
+                task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
+                task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
+                task.TimeoutMinutes = _settingsManager.TaskTimeoutMinutes;
 
-                lock (_activeTasksLock)
-                    _activeTasks.Add(task);
+                // If remote client sends autoQueue flag, temporarily override the setting
+                var savedAutoQueue = _settingsManager.AutoQueue;
+                if (request.AutoQueue.HasValue)
+                    _settingsManager.AutoQueue = request.AutoQueue.Value;
 
-                _outputTabManager.CreateTab(task);
-                _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
+                LaunchTask(task);
+
+                if (request.AutoQueue.HasValue)
+                    _settingsManager.AutoQueue = savedAutoQueue;
 
                 return task;
             });

@@ -40,7 +40,8 @@ fun DashboardScreen(
     onPauseTask: (String) -> Unit,
     onResumeTask: (String) -> Unit,
     onDisconnect: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onSettings: () -> Unit = {}
 ) {
     var showHistory by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -91,6 +92,9 @@ fun DashboardScreen(
                 actions = {
                     IconButton(onClick = onRefresh) {
                         Icon(Icons.Default.Refresh, "Refresh", tint = SpriteTextMuted)
+                    }
+                    IconButton(onClick = onSettings) {
+                        Icon(Icons.Default.Settings, "Settings", tint = SpriteTextMuted)
                     }
                     IconButton(onClick = onDisconnect) {
                         Icon(Icons.Default.LinkOff, "Disconnect", tint = SpriteTextMuted)

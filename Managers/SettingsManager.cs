@@ -26,6 +26,7 @@ namespace Spritely.Managers
         private string _defaultMcpStartCommand = @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
         private string _opusEffortLevel = "high";
         private bool _showCodeChanges;
+        private bool _autoQueue;
         private bool _remoteServerEnabled;
         private int _remoteServerPort = 7923;
 
@@ -115,6 +116,12 @@ namespace Spritely.Managers
             set => _showCodeChanges = value;
         }
 
+        public bool AutoQueue
+        {
+            get => _autoQueue;
+            set => _autoQueue = value;
+        }
+
         public bool RemoteServerEnabled
         {
             get => _remoteServerEnabled;
@@ -170,6 +177,8 @@ namespace Spritely.Managers
                     OpusEffortLevel = oel.GetString() ?? "high";
                 if (dict.TryGetValue("showCodeChanges", out var scc))
                     _showCodeChanges = scc.GetBoolean();
+                if (dict.TryGetValue("autoQueue", out var aq))
+                    _autoQueue = aq.GetBoolean();
                 if (dict.TryGetValue("remoteServerEnabled", out var rse))
                     _remoteServerEnabled = rse.GetBoolean();
                 if (dict.TryGetValue("remoteServerPort", out var rsp))
@@ -198,6 +207,7 @@ namespace Spritely.Managers
                     ["defaultMcpStartCommand"] = _defaultMcpStartCommand,
                     ["opusEffortLevel"] = _opusEffortLevel,
                     ["showCodeChanges"] = _showCodeChanges,
+                    ["autoQueue"] = _autoQueue,
                     ["remoteServerEnabled"] = _remoteServerEnabled,
                     ["remoteServerPort"] = _remoteServerPort
                 };

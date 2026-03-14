@@ -15,6 +15,15 @@ data class ServerStatus(
     @SerializedName("maxConcurrentTasks") val maxConcurrentTasks: Int = 0
 )
 
+data class AppSettings(
+    @SerializedName("autoCommit") val autoCommit: Boolean = false,
+    @SerializedName("autoQueue") val autoQueue: Boolean = false,
+    @SerializedName("autoVerify") val autoVerify: Boolean = false,
+    @SerializedName("maxConcurrentTasks") val maxConcurrentTasks: Int = 10,
+    @SerializedName("taskTimeoutMinutes") val taskTimeoutMinutes: Int = 120,
+    @SerializedName("opusEffortLevel") val opusEffortLevel: String = "high"
+)
+
 data class ProjectDto(
     @SerializedName("name") val name: String = "",
     @SerializedName("path") val path: String = "",
@@ -57,5 +66,6 @@ data class CreateTaskRequest(
     @SerializedName("isFeatureMode") val isFeatureMode: Boolean = true,
     @SerializedName("useMcp") val useMcp: Boolean = false,
     @SerializedName("autoDecompose") val autoDecompose: Boolean = false,
-    @SerializedName("extendedPlanning") val extendedPlanning: Boolean = false
+    @SerializedName("extendedPlanning") val extendedPlanning: Boolean = false,
+    @SerializedName("autoQueue") val autoQueue: Boolean? = null
 )

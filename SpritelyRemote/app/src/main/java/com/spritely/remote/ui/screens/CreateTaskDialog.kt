@@ -17,11 +17,12 @@ import com.spritely.remote.ui.theme.*
 @Composable
 fun CreateTaskDialog(
     projects: List<ProjectDto>,
+    selectedProject: ProjectDto? = null,
     onDismiss: () -> Unit,
     onCreate: (CreateTaskRequest) -> Unit
 ) {
     var description by remember { mutableStateOf("") }
-    var selectedProject by remember { mutableStateOf(projects.firstOrNull()) }
+    var chosenProject by remember { mutableStateOf(selectedProject ?: projects.firstOrNull()) }
     var projectMenuExpanded by remember { mutableStateOf(false) }
     val isValid = description.trim().length >= 10
 
@@ -60,7 +61,7 @@ fun CreateTaskDialog(
                     onExpandedChange = { projectMenuExpanded = it }
                 ) {
                     OutlinedTextField(
-                        value = selectedProject?.name ?: "Select project",
+                        value = chosenProject?.name ?: "Select project",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Project") },
@@ -93,7 +94,7 @@ fun CreateTaskDialog(
                                     }
                                 },
                                 onClick = {
-                                    selectedProject = project
+                                    chosenProject = project
                                     projectMenuExpanded = false
                                 }
                             )
@@ -109,13 +110,7 @@ fun CreateTaskDialog(
                         onCreate(
                             CreateTaskRequest(
                                 description = description.trim(),
-                                projectPath = selectedProject?.path ?: "",
-                                model = null,
-                                priority = "Normal",
-                                isFeatureMode = true,
-                                useMcp = false,
-                                autoDecompose = false,
-                                extendedPlanning = false
+                                projectPath = chosenProject?.path ?: ""
                             )
                         )
                     }

@@ -86,6 +86,8 @@ namespace Spritely
 
         // Task numbering (1–9999, resets on app restart)
         private int _nextTaskNumber = 1;
+        // Last task launched for auto-queue chaining
+        private AgentTask? _lastLaunchedTask;
 
         // Disposal guard
         private bool _disposed;

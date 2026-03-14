@@ -171,6 +171,7 @@ public sealed class RemoteServerManager : IDisposable
             object? result = (method, path) switch
             {
                 ("GET", "/api/status") => HandleStatus(),
+                ("GET", "/api/settings") => HandleGetSettings(),
                 ("GET", "/api/projects") => HandleGetProjects(),
                 ("GET", "/api/tasks") => HandleGetTasks(req),
                 ("GET", var p) when p.StartsWith("/api/tasks/") => HandleGetTask(p),
@@ -215,6 +216,11 @@ public sealed class RemoteServerManager : IDisposable
                 MaxConcurrentTasks = _callbacks.GetMaxConcurrentTasks()
             }
         };
+    }
+
+    private ApiResponse<AppSettingsDto> HandleGetSettings()
+    {
+        return new ApiResponse<AppSettingsDto> { Data = _callbacks.GetSettings() };
     }
 
     private ApiResponse<System.Collections.Generic.List<ProjectDto>> HandleGetProjects()
