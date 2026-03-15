@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Spritely.Managers
 {
@@ -81,30 +82,29 @@ namespace Spritely.Managers
         /// <param name="pageSize">Lines per page</param>
         /// <param name="totalLines">Total line count in the file</param>
         /// <returns>Lines for the requested page, or empty if file doesn't exist.</returns>
-        public IReadOnlyList<string> ReadPage(string taskId, int pageNumber, int pageSize, out int totalLines)
+        public async Task<(IReadOnlyList<string> Lines, int TotalLines)> ReadPageAsync(string taskId, int pageNumber, int pageSize)
         {
-            totalLines = 0;
             var filePath = GetLogPath(taskId);
             if (!File.Exists(filePath))
-                return Array.Empty<string>();
+                return (Array.Empty<string>(), 0);
 
             var sem = _locks.GetOrAdd(taskId, _ => new SemaphoreSlim(1, 1));
-            sem.Wait();
+            await sem.WaitAsync();
             try
             {
-                var allLines = File.ReadAllLines(filePath);
-                totalLines = allLines.Length;
+                var allLines = await File.ReadAllLinesAsync(filePath);
+                int totalLines = allLines.Length;
 
                 int skip = pageNumber * pageSize;
                 if (skip >= totalLines)
-                    return Array.Empty<string>();
+                    return (Array.Empty<string>(), totalLines);
 
-                return allLines.Skip(skip).Take(pageSize).ToList();
+                return (allLines.Skip(skip).Take(pageSize).ToList(), totalLines);
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("StreamingOutputWriter", $"Failed to read page for task {taskId}: {ex.Message}");
-                return Array.Empty<string>();
+                return (Array.Empty<string>(), 0);
             }
             finally
             {
@@ -115,17 +115,17 @@ namespace Spritely.Managers
         /// <summary>
         /// Reads the full output from the task's log file.
         /// </summary>
-        public string ReadAll(string taskId)
+        public async Task<string> ReadAllAsync(string taskId)
         {
             var filePath = GetLogPath(taskId);
             if (!File.Exists(filePath))
                 return string.Empty;
 
             var sem = _locks.GetOrAdd(taskId, _ => new SemaphoreSlim(1, 1));
-            sem.Wait();
+            await sem.WaitAsync();
             try
             {
-                return File.ReadAllText(filePath);
+                return await File.ReadAllTextAsync(filePath);
             }
             catch (Exception ex)
             {

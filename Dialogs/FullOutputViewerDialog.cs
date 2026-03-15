@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -17,7 +18,7 @@ namespace Spritely.Dialogs
     {
         private const int LinesPerPage = 500;
 
-        public static void Show(string taskId, string description, StreamingOutputWriter outputWriter)
+        public static async Task ShowAsync(string taskId, string description, StreamingOutputWriter outputWriter)
         {
             if (!outputWriter.HasLogFile(taskId))
             {
@@ -91,9 +92,10 @@ namespace Spritely.Dialogs
                 HorizontalAlignment = HorizontalAlignment.Right
             };
 
-            void LoadPage(int page)
+            async Task LoadPageAsync(int page)
             {
-                var lines = outputWriter.ReadPage(taskId, page, LinesPerPage, out totalLines);
+                var (lines, total) = await outputWriter.ReadPageAsync(taskId, page, LinesPerPage);
+                totalLines = total;
                 int totalPages = Math.Max(1, (totalLines + LinesPerPage - 1) / LinesPerPage);
                 currentPage = Math.Clamp(page, 0, totalPages - 1);
 
@@ -114,14 +116,13 @@ namespace Spritely.Dialogs
                 sizeInfo.Text = bytes > 0 ? $"{bytes / 1024.0:F1} KB on disk" : "";
             }
 
-            prevBtn.Click += (_, _) => LoadPage(currentPage - 1);
-            nextBtn.Click += (_, _) => LoadPage(currentPage + 1);
-            jumpToEndBtn.Click += (_, _) =>
+            prevBtn.Click += async (_, _) => await LoadPageAsync(currentPage - 1);
+            nextBtn.Click += async (_, _) => await LoadPageAsync(currentPage + 1);
+            jumpToEndBtn.Click += async (_, _) =>
             {
-                // Read to get total, then jump to last page
-                outputWriter.ReadPage(taskId, 0, LinesPerPage, out int total);
+                var (_, total) = await outputWriter.ReadPageAsync(taskId, 0, LinesPerPage);
                 int lastPage = Math.Max(0, (total + LinesPerPage - 1) / LinesPerPage - 1);
-                LoadPage(lastPage);
+                await LoadPageAsync(lastPage);
             };
 
             var navPanel = new DockPanel { Margin = new Thickness(12, 8, 12, 8) };
@@ -142,22 +143,22 @@ namespace Spritely.Dialogs
             dlg.DataContext = layout;
 
             // Keyboard navigation
-            dlg.KeyDown += (_, ke) =>
+            dlg.KeyDown += async (_, ke) =>
             {
-                if (ke.Key == Key.Left && prevBtn.IsEnabled) LoadPage(currentPage - 1);
-                else if (ke.Key == Key.Right && nextBtn.IsEnabled) LoadPage(currentPage + 1);
-                else if (ke.Key == Key.Home) LoadPage(0);
+                if (ke.Key == Key.Left && prevBtn.IsEnabled) await LoadPageAsync(currentPage - 1);
+                else if (ke.Key == Key.Right && nextBtn.IsEnabled) await LoadPageAsync(currentPage + 1);
+                else if (ke.Key == Key.Home) await LoadPageAsync(0);
                 else if (ke.Key == Key.End)
                 {
-                    outputWriter.ReadPage(taskId, 0, LinesPerPage, out int total);
-                    LoadPage(Math.Max(0, (total + LinesPerPage - 1) / LinesPerPage - 1));
+                    var (_, total) = await outputWriter.ReadPageAsync(taskId, 0, LinesPerPage);
+                    await LoadPageAsync(Math.Max(0, (total + LinesPerPage - 1) / LinesPerPage - 1));
                 }
             };
 
             // Load last page by default (most relevant)
-            outputWriter.ReadPage(taskId, 0, LinesPerPage, out int initTotal);
+            var (_, initTotal) = await outputWriter.ReadPageAsync(taskId, 0, LinesPerPage);
             int initLastPage = Math.Max(0, (initTotal + LinesPerPage - 1) / LinesPerPage - 1);
-            LoadPage(initLastPage);
+            await LoadPageAsync(initLastPage);
 
             dlg.ShowDialog();
         }

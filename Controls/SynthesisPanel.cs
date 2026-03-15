@@ -210,7 +210,7 @@ namespace Spritely.Controls
             _synthesisStatus.Foreground = (Brush)Application.Current.FindResource("Success");
         }
 
-        private void PollOutputs(object? sender, EventArgs e)
+        private async void PollOutputs(object? sender, EventArgs e)
         {
             for (int i = 0; i < 3; i++)
             {
@@ -220,7 +220,7 @@ namespace Spritely.Controls
                 if (currentBytes <= _lastReadBytes[i]) continue;
 
                 // Read full output and get the new portion
-                var fullOutput = _outputWriter.ReadAll(_taskIds[i]!);
+                var fullOutput = await _outputWriter.ReadAllAsync(_taskIds[i]!);
                 if (string.IsNullOrEmpty(fullOutput)) continue;
 
                 // Approximate: convert byte position to character position

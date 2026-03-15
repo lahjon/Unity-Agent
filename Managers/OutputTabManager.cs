@@ -160,9 +160,9 @@ namespace Spritely.Managers
                 Margin = new Thickness(4, 0, 0, 0),
                 ToolTip = "View full output from disk"
             };
-            fullOutputBtn.Click += (_, _) =>
+            fullOutputBtn.Click += async (_, _) =>
             {
-                Dialogs.FullOutputViewerDialog.Show(task.Id, task.Description, _outputWriter);
+                await Dialogs.FullOutputViewerDialog.ShowAsync(task.Id, task.Description, _outputWriter);
             };
 
             var inputPanel = new DockPanel { Margin = new Thickness(0, 4, 0, 0) };
