@@ -139,7 +139,7 @@ namespace Spritely.Managers
         public void StartManagedProcess(AgentTask task, Process process)
         {
             // Save current token counts as baseline so the result event can accumulate
-            // across multiple Claude invocations (feature mode phases, retries, follow-ups)
+            // across multiple Claude invocations (teams mode phases, retries, follow-ups)
             _preProcessTokenBaseline[task.Id] = (task.InputTokens, task.OutputTokens, task.CacheReadTokens, task.CacheCreationTokens);
 
             process.Start();
@@ -336,8 +336,8 @@ namespace Spritely.Managers
             task.Status = AgentTaskStatus.SoftStop;
 
             // Stop timers so no retries/iterations fire during shutdown
-            task.FeatureModeIterationTimer?.Stop();
-            task.FeatureModeRetryTimer?.Stop();
+            task.TeamsModeIterationTimer?.Stop();
+            task.TeamsModeRetryTimer?.Stop();
             task.TokenLimitRetryTimer?.Stop();
 
             // Send Ctrl+C (ETX) to stdin — Claude CLI treats this as a graceful abort
@@ -362,9 +362,9 @@ namespace Spritely.Managers
             SuspendProcessTree(task.Process);
             task.Status = AgentTaskStatus.Paused;
 
-            // Pause feature mode timers if active
-            task.FeatureModeIterationTimer?.Stop();
-            task.FeatureModeRetryTimer?.Stop();
+            // Pause teams mode timers if active
+            task.TeamsModeIterationTimer?.Stop();
+            task.TeamsModeRetryTimer?.Stop();
 
             _outputTabManager.UpdateTabHeader(task);
             ProcessPaused?.Invoke(task.Id);
@@ -416,11 +416,11 @@ namespace Spritely.Managers
 
             task.Status = task.IsPlanningBeforeQueue ? AgentTaskStatus.Planning : AgentTaskStatus.Running;
 
-            // Restart feature mode timers if applicable
-            if (task.IsFeatureMode)
+            // Restart teams mode timers if applicable
+            if (task.IsTeamsMode)
             {
-                task.FeatureModeIterationTimer?.Start();
-                task.FeatureModeRetryTimer?.Start();
+                task.TeamsModeIterationTimer?.Start();
+                task.TeamsModeRetryTimer?.Start();
             }
 
             _outputTabManager.UpdateTabHeader(task);
@@ -726,7 +726,7 @@ namespace Spritely.Managers
                                 var cacheCreate = resultUsage.TryGetProperty("cache_creation_input_tokens", out var rcct) ? rcct.GetInt64() : 0;
                                 // Result event has cumulative totals for THIS invocation.
                                 // Add to the pre-process baseline to accumulate across multiple
-                                // invocations (feature mode phases, token limit retries, follow-ups).
+                                // invocations (teams mode phases, token limit retries, follow-ups).
                                 if (_preProcessTokenBaseline.TryRemove(taskId, out var baseline))
                                 {
                                     task.InputTokens = baseline.Input + inTok;

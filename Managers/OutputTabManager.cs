@@ -617,7 +617,7 @@ namespace Spritely.Managers
         internal static void TrimOutputIfNeeded(AgentTask task)
         {
             // Feature mode tasks are not trimmed by general cap (they have their own iteration-based trimming)
-            if (task.IsFeatureMode)
+            if (task.IsTeamsMode)
                 return;
 
             if (task.OutputBuilder.Length <= OutputCapChars)

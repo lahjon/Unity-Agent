@@ -26,9 +26,9 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void GetCliModelForTask_FeatureModePhaseNone_ReturnsSonnet()
+        public void GetCliModelForTask_TeamsModePhaseNone_ReturnsSonnet()
         {
-            var task = new AgentTask { IsFeatureMode = true, FeatureModePhase = FeatureModePhase.None };
+            var task = new AgentTask { IsTeamsMode = true, TeamsModePhase = TeamsModePhase.None };
             Assert.Equal(AppConstants.ClaudeSonnet, PromptBuilder.GetCliModelForTask(task));
         }
 
@@ -58,10 +58,10 @@ namespace Spritely.Tests
         }
 
         [Theory]
-        [InlineData(FeatureModePhase.None, "claude-sonnet-4-6")]
-        [InlineData(FeatureModePhase.PlanConsolidation, "claude-opus-4-6")]
-        [InlineData(FeatureModePhase.Evaluation, "claude-opus-4-6")]
-        public void GetCliModelForPhase_ReturnsExpectedModel(FeatureModePhase phase, string expectedModel)
+        [InlineData(TeamsModePhase.None, "claude-sonnet-4-6")]
+        [InlineData(TeamsModePhase.PlanConsolidation, "claude-opus-4-6")]
+        [InlineData(TeamsModePhase.Evaluation, "claude-opus-4-6")]
+        public void GetCliModelForPhase_ReturnsExpectedModel(TeamsModePhase phase, string expectedModel)
         {
             Assert.Equal(expectedModel, PromptBuilder.GetCliModelForPhase(phase));
         }
@@ -109,14 +109,14 @@ namespace Spritely.Tests
         [Fact]
         public void BuildBasePrompt_UseMcp_IncludesMcpBlock()
         {
-            var result = _builder.BuildBasePrompt("system", "task desc", useMcp: true, isFeatureMode: false);
+            var result = _builder.BuildBasePrompt("system", "task desc", useMcp: true, isTeamsMode: false);
             Assert.Contains(PromptBuilder.McpPromptBlock, result);
         }
 
         [Fact]
         public void BuildBasePrompt_NoMcp_ExcludesMcpBlock()
         {
-            var result = _builder.BuildBasePrompt("system", "task desc", useMcp: false, isFeatureMode: false);
+            var result = _builder.BuildBasePrompt("system", "task desc", useMcp: false, isTeamsMode: false);
             Assert.DoesNotContain(PromptBuilder.McpPromptBlock, result);
         }
 
@@ -182,8 +182,8 @@ namespace Spritely.Tests
         [Fact]
         public void BuildBasePrompt_FeatureMode_UsesFeatureTemplate()
         {
-            var result = _builder.BuildBasePrompt("system", "task desc", false, isFeatureMode: true);
-            Assert.Contains(PromptBuilder.FeatureModeInitialTemplate, result);
+            var result = _builder.BuildBasePrompt("system", "task desc", false, isTeamsMode: true);
+            Assert.Contains(PromptBuilder.TeamsModeInitialTemplate, result);
             Assert.Contains("task desc", result);
         }
 
@@ -383,18 +383,18 @@ namespace Spritely.Tests
             Assert.True(psi.CreateNoWindow);
         }
 
-        // ── GetFeatureModeLogFilename ────────────────────────────────
+        // ── GetTeamsModeLogFilename ────────────────────────────────
 
         [Fact]
-        public void GetFeatureModeLogFilename_NoTaskId_ReturnsDefault()
+        public void GetTeamsModeLogFilename_NoTaskId_ReturnsDefault()
         {
-            Assert.Equal(".feature_log.md", PromptBuilder.GetFeatureModeLogFilename());
+            Assert.Equal(".teams_log.md", PromptBuilder.GetTeamsModeLogFilename());
         }
 
         [Fact]
-        public void GetFeatureModeLogFilename_WithTaskId_IncludesId()
+        public void GetTeamsModeLogFilename_WithTaskId_IncludesId()
         {
-            Assert.Equal(".feature_log_abc123.md", PromptBuilder.GetFeatureModeLogFilename("abc123"));
+            Assert.Equal(".teams_log_abc123.md", PromptBuilder.GetTeamsModeLogFilename("abc123"));
         }
     }
 }

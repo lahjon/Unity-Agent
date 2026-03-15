@@ -1,23 +1,27 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using Spritely.Models;
 
 namespace Spritely.Managers
 {
     public interface IPromptBuilder
     {
         string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
-            bool isFeatureMode, bool extendedPlanning = false,
+            bool isTeamsMode, bool extendedPlanning = false,
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
             bool isGameProject = false, string taskId = "",
             bool applyFix = true, bool suppressOutputEfficiency = false,
-            string skillsBlock = "", string featureContextBlock = "");
+            string skillsBlock = "", string featureContextBlock = "",
+            string crossProjectHintsBlock = "");
 
         string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
             bool isGameProject = false, string skillsBlock = "",
-            string featureContextBlock = "", string pendingChangesBlock = "");
+            string featureContextBlock = "", string pendingChangesBlock = "",
+            PromptVariant? evolutionVariant = null,
+            string crossProjectHintsBlock = "");
 
         string BuildPromptWithImages(string basePrompt, List<string> imagePaths);
 
@@ -34,12 +38,12 @@ namespace Spritely.Managers
 
         ProcessStartInfo BuildProcessStartInfo(string ps1FilePath, bool headless);
 
-        string BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = "");
+        string BuildTeamsModeContinuationPrompt(int iteration, int maxIterations, string taskId = "");
 
-        string BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations,
+        string BuildTeamsModePlanConsolidationPrompt(int iteration, int maxIterations,
             string teamResults, string featureDescription);
 
-        string BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations,
+        string BuildTeamsModeEvaluationPrompt(int iteration, int maxIterations,
             string featureDescription, string implementationResults);
 
         string BuildDependencyContext(List<string> depIds,

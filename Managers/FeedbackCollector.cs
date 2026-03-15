@@ -16,12 +16,15 @@ namespace Spritely.Managers
         private readonly FeedbackStore _store;
         private readonly FeedbackAnalyzer _analyzer;
         private readonly FeedbackApplicator _applicator;
+        private readonly CrossProjectInsightsManager? _crossProjectInsights;
 
-        public FeedbackCollector(FeedbackStore store, FeedbackAnalyzer analyzer, FeedbackApplicator applicator)
+        public FeedbackCollector(FeedbackStore store, FeedbackAnalyzer analyzer, FeedbackApplicator applicator,
+            CrossProjectInsightsManager? crossProjectInsights = null)
         {
             _store = store;
             _analyzer = analyzer;
             _applicator = applicator;
+            _crossProjectInsights = crossProjectInsights;
         }
 
         /// <summary>
@@ -50,6 +53,9 @@ namespace Spritely.Managers
 
                     // Apply low-risk improvements automatically
                     _applicator.ApplyInsight(insight);
+
+                    // Contribute anonymized patterns to cross-project shared store
+                    _crossProjectInsights?.ContributeInsights(insight);
 
                     AppLogger.Info("FeedbackCollector",
                         $"Feedback analysis completed for {task.ProjectDisplayName}: " +
@@ -88,12 +94,21 @@ namespace Spritely.Managers
                 CacheCreationTokens = task.CacheCreationTokens,
                 ChangedFileCount = task.ChangedFiles?.Count ?? 0,
                 IterationCount = task.CurrentIteration,
-                WasFeatureMode = task.IsFeatureMode,
+                WasTeamsMode = task.IsTeamsMode,
                 UsedMcp = task.UseMcp,
                 UsedExtendedPlanning = task.ExtendedPlanning,
                 UsedAutoDecompose = task.AutoDecompose,
                 Model = task.Model.ToString()
             };
+
+            // Populate feature context tracking from runtime context
+            if (task.Runtime != null)
+            {
+                if (task.Runtime.InjectedFeatureIds?.Count > 0)
+                    entry.InjectedFeatureIds = new List<string>(task.Runtime.InjectedFeatureIds);
+                entry.TaskCategory = task.Runtime.TaskCategory;
+                entry.ContextTokensUsed = task.Runtime.ContextTokensUsed;
+            }
 
             // Quick local analysis of success/failure factors
             AnalyzeFactors(entry, task);
@@ -114,8 +129,8 @@ namespace Spritely.Managers
                     entry.SuccessFactors.Add("focused_changes");
                 if (entry.VerificationPassed)
                     entry.SuccessFactors.Add("verification_passed");
-                if (entry.WasFeatureMode && entry.IterationCount <= 2)
-                    entry.SuccessFactors.Add("efficient_feature_mode");
+                if (entry.WasTeamsMode && entry.IterationCount <= 2)
+                    entry.SuccessFactors.Add("efficient_teams_mode");
                 if (entry.UsedExtendedPlanning)
                     entry.SuccessFactors.Add("extended_planning_helped");
             }

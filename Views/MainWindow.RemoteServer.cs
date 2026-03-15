@@ -149,7 +149,7 @@ namespace Spritely
                     projectPath: projectPath,
                     skipPermissions: true,
                     headless: false,
-                    isFeatureMode: request.IsFeatureMode,
+                    isTeamsMode: request.IsTeamsMode,
                     ignoreFileLocks: false,
                     useMcp: request.UseMcp,
                     extendedPlanning: request.ExtendedPlanning,

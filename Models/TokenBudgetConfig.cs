@@ -15,12 +15,12 @@ namespace Spritely.Models
         /// <summary>
         /// Token budgets allocated to specific phases.
         /// </summary>
-        public Dictionary<FeatureModePhase, long> PhaseBudgets { get; set; } = new()
+        public Dictionary<TeamsModePhase, long> PhaseBudgets { get; set; } = new()
         {
-            [FeatureModePhase.TeamPlanning] = 100_000,
-            [FeatureModePhase.PlanConsolidation] = 50_000,
-            [FeatureModePhase.Execution] = 250_000,
-            [FeatureModePhase.Evaluation] = 100_000
+            [TeamsModePhase.TeamPlanning] = 100_000,
+            [TeamsModePhase.PlanConsolidation] = 50_000,
+            [TeamsModePhase.Execution] = 250_000,
+            [TeamsModePhase.Evaluation] = 100_000
         };
 
         /// <summary>
@@ -85,7 +85,7 @@ namespace Spritely.Models
         public bool EnableIterationMemory { get; set; } = true;
 
         /// <summary>
-        /// Maximum tokens per child result in feature mode.
+        /// Maximum tokens per child result in teams mode.
         /// </summary>
         public int MaxTokensPerChildResult { get; set; } = 2000;
 
@@ -107,7 +107,7 @@ namespace Spritely.Models
         /// <summary>
         /// Gets the phase budget for a specific phase.
         /// </summary>
-        public long GetPhaseBudget(FeatureModePhase phase)
+        public long GetPhaseBudget(TeamsModePhase phase)
         {
             return PhaseBudgets.TryGetValue(phase, out var budget)
                 ? budget
@@ -130,12 +130,12 @@ namespace Spritely.Models
             return new TokenBudgetConfig
             {
                 TotalTokenBudget = 100_000,
-                PhaseBudgets = new Dictionary<FeatureModePhase, long>
+                PhaseBudgets = new Dictionary<TeamsModePhase, long>
                 {
-                    [FeatureModePhase.TeamPlanning] = 20_000,
-                    [FeatureModePhase.PlanConsolidation] = 10_000,
-                    [FeatureModePhase.Execution] = 50_000,
-                    [FeatureModePhase.Evaluation] = 20_000
+                    [TeamsModePhase.TeamPlanning] = 20_000,
+                    [TeamsModePhase.PlanConsolidation] = 10_000,
+                    [TeamsModePhase.Execution] = 50_000,
+                    [TeamsModePhase.Evaluation] = 20_000
                 },
                 Level = OptimizationLevel.Aggressive
             };
@@ -149,12 +149,12 @@ namespace Spritely.Models
             return new TokenBudgetConfig
             {
                 TotalTokenBudget = 1_000_000,
-                PhaseBudgets = new Dictionary<FeatureModePhase, long>
+                PhaseBudgets = new Dictionary<TeamsModePhase, long>
                 {
-                    [FeatureModePhase.TeamPlanning] = 200_000,
-                    [FeatureModePhase.PlanConsolidation] = 100_000,
-                    [FeatureModePhase.Execution] = 500_000,
-                    [FeatureModePhase.Evaluation] = 200_000
+                    [TeamsModePhase.TeamPlanning] = 200_000,
+                    [TeamsModePhase.PlanConsolidation] = 100_000,
+                    [TeamsModePhase.Execution] = 500_000,
+                    [TeamsModePhase.Evaluation] = 200_000
                 },
                 Level = OptimizationLevel.Conservative
             };

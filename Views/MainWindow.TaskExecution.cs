@@ -20,15 +20,15 @@ namespace Spritely
         private void ResetPerTaskToggles()
         {
             SpawnTeamToggle.IsChecked = false;
-            FeatureModeToggle.IsChecked = false;
+            TeamsModeToggle.IsChecked = false;
             ExtendedPlanningToggle.IsChecked = false;
             PlanOnlyToggle.IsChecked = false;
             AutoDecomposeToggle.IsChecked = false;
             ApplyFixToggle.IsChecked = true;
-            if (FeatureModeIterationsPanel != null)
-                FeatureModeIterationsPanel.Visibility = Visibility.Collapsed;
-            if (FeatureModeIterationsBox != null)
-                FeatureModeIterationsBox.Text = "2";
+            if (TeamsModeIterationsPanel != null)
+                TeamsModeIterationsPanel.Visibility = Visibility.Collapsed;
+            if (TeamsModeIterationsBox != null)
+                TeamsModeIterationsBox.Text = "2";
 
             // Clear skill selections
             _skillManager.ClearEnabledSkills();
@@ -39,15 +39,15 @@ namespace Spritely
         private void ReadUiFlagsInto(TaskConfigBase target)
         {
             target.SpawnTeam = SpawnTeamToggle.IsChecked == true;
-            target.IsFeatureMode = FeatureModeToggle.IsChecked == true;
+            target.IsTeamsMode = TeamsModeToggle.IsChecked == true;
             target.ExtendedPlanning = ExtendedPlanningToggle.IsChecked == true;
             target.PlanOnly = PlanOnlyToggle.IsChecked == true;
             target.IgnoreFileLocks = IgnoreFileLocksToggle.IsChecked == true;
             target.UseMcp = UseMcpToggle.IsChecked == true;
             target.AutoDecompose = AutoDecomposeToggle.IsChecked == true;
             target.ApplyFix = ApplyFixToggle.IsChecked == true;
-            if (int.TryParse(FeatureModeIterationsBox?.Text, out var iter) && iter > 0)
-                target.FeatureModeIterations = iter;
+            if (int.TryParse(TeamsModeIterationsBox?.Text, out var iter) && iter > 0)
+                target.TeamsModeIterations = iter;
         }
 
         /// <summary>Applies flags from a <see cref="TaskConfigBase"/> to the main-window toggle controls.</summary>
@@ -55,17 +55,17 @@ namespace Spritely
         {
             if (SpawnTeamToggle == null) return; // Not yet loaded during InitializeComponent
             SpawnTeamToggle.IsChecked = source.SpawnTeam;
-            FeatureModeToggle.IsChecked = source.IsFeatureMode;
+            TeamsModeToggle.IsChecked = source.IsTeamsMode;
             ExtendedPlanningToggle.IsChecked = source.ExtendedPlanning;
             PlanOnlyToggle.IsChecked = source.PlanOnly;
             IgnoreFileLocksToggle.IsChecked = source.IgnoreFileLocks;
             UseMcpToggle.IsChecked = source.UseMcp;
             AutoDecomposeToggle.IsChecked = source.AutoDecompose;
             ApplyFixToggle.IsChecked = source.ApplyFix;
-            if (FeatureModeIterationsPanel != null)
-                FeatureModeIterationsPanel.Visibility = source.IsFeatureMode ? Visibility.Visible : Visibility.Collapsed;
-            if (FeatureModeIterationsBox != null)
-                FeatureModeIterationsBox.Text = source.FeatureModeIterations.ToString();
+            if (TeamsModeIterationsPanel != null)
+                TeamsModeIterationsPanel.Visibility = source.IsTeamsMode ? Visibility.Visible : Visibility.Collapsed;
+            if (TeamsModeIterationsBox != null)
+                TeamsModeIterationsBox.Text = source.TeamsModeIterations.ToString();
         }
 
         // ── Execute ────────────────────────────────────────────────
@@ -88,16 +88,17 @@ namespace Spritely
             bool planOnly = false,
             List<AgentTask>? dependencies = null,
             string? additionalInstructions = null,
-            string? header = null)
+            string? header = null,
+            bool? forceMcp = null)
         {
             var task = _taskFactory.CreateTask(
                 description,
                 _projectManager.ProjectPath,
                 skipPermissions: true,
                 headless: false,
-                isFeatureMode: FeatureModeToggle.IsChecked == true,
+                isTeamsMode: TeamsModeToggle.IsChecked == true,
                 ignoreFileLocks: IgnoreFileLocksToggle.IsChecked == true,
-                useMcp: UseMcpToggle.IsChecked == true,
+                useMcp: forceMcp ?? (UseMcpToggle.IsChecked == true),
                 spawnTeam: SpawnTeamToggle.IsChecked == true,
                 extendedPlanning: ExtendedPlanningToggle.IsChecked == true,
                 planOnly: planOnly,
@@ -106,7 +107,7 @@ namespace Spritely
                 autoDecompose: AutoDecomposeToggle.IsChecked == true,
                 applyFix: ApplyFixToggle.IsChecked == true,
                 useAutoMode: AutoModeToggle.IsChecked == true,
-                allowFeatureModeInference: AutoFeatureModeToggle.IsChecked == true);
+                allowFeatureModeInference: AutoTeamsModeToggle.IsChecked == true);
 
             task.ProjectColor = _projectManager.GetProjectColor(task.ProjectPath);
             task.ProjectDisplayName = _projectManager.GetProjectDisplayName(task.ProjectPath);
@@ -115,7 +116,7 @@ namespace Spritely
                 task.Header = header;
             task.AdditionalInstructions = additionalInstructions ?? "";
 
-            if (task.IsFeatureMode && int.TryParse(FeatureModeIterationsBox?.Text, out var iterations) && iterations > 0)
+            if (task.IsTeamsMode && int.TryParse(TeamsModeIterationsBox?.Text, out var iterations) && iterations > 0)
                 task.MaxIterations = iterations;
 
             task.TimeoutMinutes = _settingsManager.TaskTimeoutMinutes;
@@ -208,7 +209,7 @@ namespace Spritely
                     _projectManager.ProjectPath,
                     skipPermissions: true,
                     headless: false,
-                    isFeatureMode: false,
+                    isTeamsMode: false,
                     ignoreFileLocks: IgnoreFileLocksToggle.IsChecked == true,
                     useMcp: UseMcpToggle.IsChecked == true);
 
@@ -288,8 +289,8 @@ namespace Spritely
             // If the task is still active, cancel it first
             if (task.IsRunning || task.IsPlanning || task.IsPaused || task.IsQueued)
             {
-                task.FeatureModeRetryTimer?.Stop();
-                task.FeatureModeIterationTimer?.Stop();
+                task.TeamsModeRetryTimer?.Stop();
+                task.TeamsModeIterationTimer?.Stop();
                 try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
                 task.Status = AgentTaskStatus.Cancelled;
                 task.EndTime = DateTime.Now;
@@ -618,7 +619,7 @@ namespace Spritely
                 sourceTask.ProjectPath,
                 sourceTask.SkipPermissions,
                 sourceTask.Headless,
-                sourceTask.IsFeatureMode,
+                sourceTask.IsTeamsMode,
                 sourceTask.IgnoreFileLocks,
                 sourceTask.UseMcp,
                 sourceTask.SpawnTeam,
@@ -809,15 +810,15 @@ namespace Spritely
                 }
             }
 
-            if (task.FeatureModeRetryTimer != null)
+            if (task.TeamsModeRetryTimer != null)
             {
-                task.FeatureModeRetryTimer.Stop();
-                task.FeatureModeRetryTimer = null;
+                task.TeamsModeRetryTimer.Stop();
+                task.TeamsModeRetryTimer = null;
             }
-            if (task.FeatureModeIterationTimer != null)
+            if (task.TeamsModeIterationTimer != null)
             {
-                task.FeatureModeIterationTimer.Stop();
-                task.FeatureModeIterationTimer = null;
+                task.TeamsModeIterationTimer.Stop();
+                task.TeamsModeIterationTimer = null;
             }
             if (task.TokenLimitRetryTimer != null)
             {

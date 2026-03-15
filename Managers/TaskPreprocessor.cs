@@ -16,7 +16,7 @@ namespace Spritely.Managers
         public string EnhancedPrompt { get; set; } = "";
         public bool ApplyFix { get; set; } = true;
         public bool ExtendedPlanning { get; set; }
-        public bool IsFeatureMode { get; set; }
+        public bool IsTeamsMode { get; set; }
         public bool AutoDecompose { get; set; }
         public bool SpawnTeam { get; set; }
         public bool UseMcp { get; set; }
@@ -35,7 +35,7 @@ namespace Spritely.Managers
     public class TaskPreprocessor
     {
         private const string PreprocessJsonSchema =
-            """{"type":"object","properties":{"header":{"type":"string"},"enhanced_prompt":{"type":"string"},"apply_fix":{"type":"boolean"},"extended_planning":{"type":"boolean"},"feature_mode":{"type":"boolean"},"auto_decompose":{"type":"boolean"},"spawn_team":{"type":"boolean"},"use_mcp":{"type":"boolean"},"iterations":{"type":"integer"}},"required":["header","enhanced_prompt","apply_fix","extended_planning","feature_mode","auto_decompose","spawn_team","use_mcp","iterations"]}""";
+            """{"type":"object","properties":{"header":{"type":"string"},"enhanced_prompt":{"type":"string"},"apply_fix":{"type":"boolean"},"extended_planning":{"type":"boolean"},"teams_mode":{"type":"boolean"},"auto_decompose":{"type":"boolean"},"spawn_team":{"type":"boolean"},"use_mcp":{"type":"boolean"},"iterations":{"type":"integer"}},"required":["header","enhanced_prompt","apply_fix","extended_planning","teams_mode","auto_decompose","spawn_team","use_mcp","iterations"]}""";
 
         private static readonly string PreprocessPrompt = PromptLoader.Load("TaskPreprocessorPrompt.md");
 
@@ -101,7 +101,7 @@ namespace Spritely.Managers
                     EnhancedPrompt = data.TryGetProperty("enhanced_prompt", out var ep) ? ep.GetString() ?? taskDescription : taskDescription,
                     ApplyFix = !data.TryGetProperty("apply_fix", out var af) || af.GetBoolean(),
                     ExtendedPlanning = data.TryGetProperty("extended_planning", out var xp) && xp.GetBoolean(),
-                    IsFeatureMode = data.TryGetProperty("feature_mode", out var fm) && fm.GetBoolean(),
+                    IsTeamsMode = data.TryGetProperty("teams_mode", out var fm) && fm.GetBoolean(),
                     AutoDecompose = data.TryGetProperty("auto_decompose", out var ad) && ad.GetBoolean(),
                     SpawnTeam = data.TryGetProperty("spawn_team", out var st) && st.GetBoolean(),
                     UseMcp = data.TryGetProperty("use_mcp", out var um) && um.GetBoolean(),
@@ -133,8 +133,8 @@ namespace Spritely.Managers
                 task.ApplyFix = result.ApplyFix;
             if (!task.ExtendedPlanning)          // still at default (false)
                 task.ExtendedPlanning = result.ExtendedPlanning;
-            if (!task.IsFeatureMode && task.AllowFeatureModeInference)
-                task.IsFeatureMode = result.IsFeatureMode;
+            if (!task.IsTeamsMode && task.AllowTeamsModeInference)
+                task.IsTeamsMode = result.IsTeamsMode;
             if (!task.AutoDecompose)             // still at default (false)
                 task.AutoDecompose = result.AutoDecompose;
             if (!task.SpawnTeam)                 // still at default (false)
@@ -142,7 +142,7 @@ namespace Spritely.Managers
             if (!task.UseMcp)                    // still at default (false)
                 task.UseMcp = result.UseMcp;
 
-            if (result.IsFeatureMode && task.IsFeatureMode)
+            if (result.IsTeamsMode && task.IsTeamsMode)
                 task.MaxIterations = Math.Max(2, result.Iterations);
         }
 
@@ -155,7 +155,7 @@ namespace Spritely.Managers
             sb.AppendLine("── Active Toggles ──────────────────────────");
             sb.AppendLine($"  Apply Fix:         {(task.ApplyFix ? "ON" : "OFF")}");
             sb.AppendLine($"  Extended Planning: {(task.ExtendedPlanning ? "ON" : "OFF")}");
-            sb.AppendLine($"  Feature Mode:      {(task.IsFeatureMode ? $"ON (max {task.MaxIterations} iterations)" : "OFF")}");
+            sb.AppendLine($"  Teams Mode:      {(task.IsTeamsMode ? $"ON (max {task.MaxIterations} iterations)" : "OFF")}");
             sb.AppendLine($"  Auto Decompose:    {(task.AutoDecompose ? "ON" : "OFF")}");
             sb.AppendLine($"  Spawn Team:        {(task.SpawnTeam ? "ON" : "OFF")}");
             sb.AppendLine($"  Use MCP:           {(task.UseMcp ? "ON" : "OFF")}");

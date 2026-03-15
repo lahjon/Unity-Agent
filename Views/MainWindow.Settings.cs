@@ -55,7 +55,7 @@ namespace Spritely
             }
         }
 
-        private void AutoFeatureModeToggle_Changed(object sender, RoutedEventArgs e)
+        private void AutoTeamsModeToggle_Changed(object sender, RoutedEventArgs e)
         {
             // Purely a flag read at task launch time — no immediate UI side-effects needed.
         }
@@ -94,8 +94,8 @@ namespace Spritely
             if (PlanOnlyToggle == null || ExecuteButton == null) return;
             if (PlanOnlyToggle.IsChecked == true)
                 ExecuteButton.ToolTip = "Plan Task";
-            else if (FeatureModeToggle.IsChecked == true)
-                ExecuteButton.ToolTip = "Start Feature Mode";
+            else if (TeamsModeToggle.IsChecked == true)
+                ExecuteButton.ToolTip = "Start Teams Mode";
             else
                 ExecuteButton.ToolTip = "Execute Task";
         }

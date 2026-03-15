@@ -56,8 +56,8 @@
       "shortSignature": "TaskNumber: int"
     },
     "description": {
-      "featureId": "self-improvement-engine",
-      "filePath": "Models/FeedbackEntry.cs",
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
       "kind": "Property",
       "shortSignature": "Description: string"
     },
@@ -309,9 +309,9 @@
     },
     "mainwindow": {
       "featureId": "main-window-ui",
-      "filePath": "Views/MainWindow.RemoteServer.cs",
+      "filePath": "Views/MainWindow.Synthesis.cs",
       "kind": "Class",
-      "shortSignature": "class MainWindow : IRemoteServerCallbacks"
+      "shortSignature": "class MainWindow"
     },
     "releasetasklocksaftercommit": {
       "featureId": "task-execution",
@@ -1329,7 +1329,7 @@
     },
     "dependson": {
       "featureId": "feature-mode",
-      "filePath": "Managers/TaskExecutionManager.cs",
+      "filePath": "Managers/TeamsModeHandler.cs",
       "kind": "Property",
       "shortSignature": "DependsOn: List\u003Cint\u003E?"
     },
@@ -2486,10 +2486,10 @@
       "shortSignature": "Features: List\u003CFeatureIndexEntry\u003E"
     },
     "id": {
-      "featureId": "self-improvement-engine",
-      "filePath": "Models/FeedbackEntry.cs",
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
       "kind": "Property",
-      "shortSignature": "Id: string"
+      "shortSignature": "Id: long"
     },
     "category": {
       "featureId": "self-improvement-engine",
@@ -2618,8 +2618,8 @@
       "shortSignature": "FeatureModeOutputCapChars: int = 100_000"
     },
     "planningteammembertimeoutminutes": {
-      "featureId": "feature-mode-execution",
-      "filePath": "Managers/FeatureModeHandler.cs",
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
       "kind": "Const",
       "shortSignature": "PlanningTeamMemberTimeoutMinutes: int = 30"
     },
@@ -2636,14 +2636,14 @@
       "shortSignature": "OnFeatureModePhaseComplete(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
     },
     "maxperchildchars": {
-      "featureId": "feature-mode-execution",
-      "filePath": "Managers/FeatureModeHandler.cs",
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
       "kind": "Const",
       "shortSignature": "MaxPerChildChars: int = 2_000"
     },
     "maxtotalresultschars": {
-      "featureId": "feature-mode-execution",
-      "filePath": "Managers/FeatureModeHandler.cs",
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
       "kind": "Const",
       "shortSignature": "MaxTotalResultsChars: int = 12_000"
     },
@@ -4586,8 +4586,8 @@
       "shortSignature": "InvalidateCache(string projectPath) -\u003E void"
     },
     "clearcache": {
-      "featureId": "prompt-building",
-      "filePath": "Managers/RulesManager.cs",
+      "featureId": "feature-mode",
+      "filePath": "Managers/ContextPrefetchPipeline.cs",
       "kind": "Method",
       "shortSignature": "ClearCache() -\u003E void"
     },
@@ -4862,8 +4862,8 @@
       "shortSignature": "IsGlobal: bool"
     },
     "createdat": {
-      "featureId": "self-improvement-engine",
-      "filePath": "Managers/ImprovementTaskGenerator.cs",
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
       "kind": "Property",
       "shortSignature": "CreatedAt: DateTime"
     },
@@ -5552,8 +5552,8 @@
       "shortSignature": "CurrentIteration: int"
     },
     "projectpath": {
-      "featureId": "self-improvement-engine",
-      "filePath": "Models/FeedbackEntry.cs",
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
       "kind": "Property",
       "shortSignature": "ProjectPath: string"
     },
@@ -6788,8 +6788,8 @@
       "shortSignature": "Render() -\u003E string"
     },
     "clear": {
-      "featureId": "terminal",
-      "filePath": "Models/VtScreenBuffer.cs",
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
       "kind": "Method",
       "shortSignature": "Clear() -\u003E void"
     },
@@ -8564,10 +8564,10 @@
       "shortSignature": "SuccessPatterns: List\u003CPatternEntry\u003E"
     },
     "failurepatterns": {
-      "featureId": "self-improvement-engine",
-      "filePath": "Models/FeedbackEntry.cs",
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
       "kind": "Property",
-      "shortSignature": "FailurePatterns: List\u003CPatternEntry\u003E"
+      "shortSignature": "FailurePatterns: string"
     },
     "suggestedruleadditions": {
       "featureId": "self-improvement-engine",
@@ -8802,6 +8802,360 @@
       "filePath": "Managers/IdePanelManager.cs",
       "kind": "Property",
       "shortSignature": "Exists: bool"
+    },
+    "teamsmodehandler": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
+      "kind": "Class",
+      "shortSignature": "class TeamsModeHandler"
+    },
+    "teamsmodemaxruntimehours": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
+      "kind": "Const",
+      "shortSignature": "TeamsModeMaxRuntimeHours: int = 12"
+    },
+    "teamsmodeiterationtimeoutminutes": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
+      "kind": "Const",
+      "shortSignature": "TeamsModeIterationTimeoutMinutes: int = 60"
+    },
+    "teamsmodemaxconsecutivefailures": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
+      "kind": "Const",
+      "shortSignature": "TeamsModeMaxConsecutiveFailures: int = 3"
+    },
+    "teamsmodeoutputcapchars": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
+      "kind": "Const",
+      "shortSignature": "TeamsModeOutputCapChars: int = 100_000"
+    },
+    "handleteamsmodeiteration": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
+      "kind": "Method",
+      "shortSignature": "HandleTeamsModeIteration(AgentTask task, int exitCode, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
+    },
+    "onteamsmodephasecomplete": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
+      "kind": "Method",
+      "shortSignature": "OnTeamsModePhaseComplete(AgentTask task, ObservableCollection\u003CAgentTask\u003E activeTasks, ObservableCollection\u003CAgentTask\u003E historyTasks, Action\u003CAgentTask\u003E moveToHistory) -\u003E void"
+    },
+    "teamsmodeaction": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/TeamsModeHandler.cs",
+      "kind": "Enum",
+      "shortSignature": "enum TeamsModeAction"
+    },
+    "contextprefetchpipeline": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/ContextPrefetchPipeline.cs",
+      "kind": "Class",
+      "shortSignature": "class ContextPrefetchPipeline"
+    },
+    "debouncedelay": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/ContextPrefetchPipeline.cs",
+      "kind": "Const",
+      "shortSignature": "DebounceDelay: TimeSpan = TimeSpan.FromMilliseconds(800)"
+    },
+    "cachefreshnesslimit": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/ContextPrefetchPipeline.cs",
+      "kind": "Const",
+      "shortSignature": "CacheFreshnessLimit: TimeSpan = TimeSpan.FromSeconds(30)"
+    },
+    "ondescriptionchanged": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/ContextPrefetchPipeline.cs",
+      "kind": "Method",
+      "shortSignature": "OnDescriptionChanged(string description) -\u003E void"
+    },
+    "trygetcached": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/ContextPrefetchPipeline.cs",
+      "kind": "Method",
+      "shortSignature": "TryGetCached(string description) -\u003E FeatureContextResult?"
+    },
+    "promptevolutionmanager": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PromptEvolutionManager.cs",
+      "kind": "Class",
+      "shortSignature": "class PromptEvolutionManager"
+    },
+    "getactivevariant": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PromptEvolutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "GetActiveVariant(string projectPath, string taskId) -\u003E PromptVariant?"
+    },
+    "recordoutcome": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PromptEvolutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "RecordOutcome(string taskId, string projectPath, bool success) -\u003E void"
+    },
+    "applyvariant": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PromptEvolutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "ApplyVariant(string systemPrompt, PromptVariant? variant) -\u003E string"
+    },
+    "getvarianthistory": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PromptEvolutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "GetVariantHistory(string projectPath, int limit = 20) -\u003E List\u003CPromptVariant\u003E"
+    },
+    "cleanupoldvariants": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PromptEvolutionManager.cs",
+      "kind": "Method",
+      "shortSignature": "CleanupOldVariants(string projectPath, int keepCount = 20) -\u003E void"
+    },
+    "crossprojectinsightsmanager": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Class",
+      "shortSignature": "class CrossProjectInsightsManager"
+    },
+    "maxglobalrules": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Const",
+      "shortSignature": "MaxGlobalRules: int = 50"
+    },
+    "minconfidence": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Const",
+      "shortSignature": "MinConfidence: double = 0.4"
+    },
+    "maxhints": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Const",
+      "shortSignature": "MaxHints: int = 3"
+    },
+    "contributeinsights": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Method",
+      "shortSignature": "ContributeInsights(FeedbackInsight insight) -\u003E void"
+    },
+    "getcrossprojecthints": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Method",
+      "shortSignature": "GetCrossProjectHints() -\u003E string"
+    },
+    "crossprojectinsightsstore": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Class",
+      "shortSignature": "class CrossProjectInsightsStore"
+    },
+    "contributioncount": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "ContributionCount: int"
+    },
+    "lastcontribution": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "LastContribution: DateTime"
+    },
+    "aggregatesuccessrate": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "AggregateSuccessRate: double"
+    },
+    "globalrules": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "GlobalRules: List\u003CCrossProjectRule\u003E"
+    },
+    "crossprojectrule": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Class",
+      "shortSignature": "class CrossProjectRule"
+    },
+    "rule": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "Rule: string"
+    },
+    "source": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "Source: string"
+    },
+    "projectcount": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "ProjectCount: int"
+    },
+    "totaloccurrences": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "TotalOccurrences: int"
+    },
+    "averageconfidence": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "AverageConfidence: double"
+    },
+    "lastseen": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/CrossProjectInsightsManager.cs",
+      "kind": "Property",
+      "shortSignature": "LastSeen: DateTime"
+    },
+    "promptvariant": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Class",
+      "shortSignature": "class PromptVariant"
+    },
+    "varianthash": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "VariantHash: string"
+    },
+    "blockname": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "BlockName: string"
+    },
+    "originaltext": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "OriginalText: string"
+    },
+    "mutatedtext": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "MutatedText: string"
+    },
+    "isactive": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "IsActive: bool"
+    },
+    "trialcount": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "TrialCount: int"
+    },
+    "successcount": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "SuccessCount: int"
+    },
+    "controltrialcount": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "ControlTrialCount: int"
+    },
+    "controlsuccesscount": {
+      "featureId": "feature-mode",
+      "filePath": "Models/PromptVariant.cs",
+      "kind": "Property",
+      "shortSignature": "ControlSuccessCount: int"
+    },
+    "setsynthesiscomplete": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Method",
+      "shortSignature": "SetSynthesisComplete() -\u003E void"
+    },
+    "markcomplete": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Method",
+      "shortSignature": "MarkComplete(int index) -\u003E void"
+    },
+    "stoppolling": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Method",
+      "shortSignature": "StopPolling() -\u003E void"
+    },
+    "startpolling": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Method",
+      "shortSignature": "StartPolling() -\u003E void"
+    },
+    "setperspectiveagent": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Method",
+      "shortSignature": "SetPerspectiveAgent(int index, string taskId) -\u003E void"
+    },
+    "synthesisresult": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Property",
+      "shortSignature": "SynthesisResult: string?"
+    },
+    "perspectivecolors": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Const",
+      "shortSignature": "PerspectiveColors: string[] = { \u0022#64B5F6\u0022, \u0022#81C784\u0022, \u0022#FFB74D\u0022 }"
+    },
+    "perspectivenames": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Const",
+      "shortSignature": "PerspectiveNames: string[] = { \u0022Architecture\u0022, \u0022Testing\u0022, \u0022Edge Ca..."
+    },
+    "synthesispanel": {
+      "featureId": "task-ui",
+      "filePath": "Controls/SynthesisPanel.cs",
+      "kind": "Class",
+      "shortSignature": "class SynthesisPanel : Border"
+    },
+    "plansynthesizer": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PlanSynthesizer.cs",
+      "kind": "Class",
+      "shortSignature": "class PlanSynthesizer"
+    },
+    "synthesistemplate": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PlanSynthesizer.cs",
+      "kind": "Const",
+      "shortSignature": "SynthesisTemplate: string = PromptLoader.Load(\u0022PlanSynthesisTempl..."
+    },
+    "synthesizeasync": {
+      "featureId": "feature-mode",
+      "filePath": "Managers/PlanSynthesizer.cs",
+      "kind": "Method",
+      "shortSignature": "SynthesizeAsync(string architectureFindings, string testingFindings, string edgeCaseFindings, string featureDescription, CancellationToken ct = default) -\u003E Task\u003Cstring?\u003E"
     }
   }
 }

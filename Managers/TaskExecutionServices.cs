@@ -47,5 +47,8 @@ namespace Spritely.Managers
         public HybridSearchManager? HybridSearchManager { get; init; }
         public FeedbackCollector? FeedbackCollector { get; init; }
         public SkillDiscoveryAgent? SkillDiscoveryAgent { get; init; }
+        public ContextPrefetchPipeline? ContextPrefetchPipeline { get; init; }
+        public PromptEvolutionManager? PromptEvolutionManager { get; init; }
+        public CrossProjectInsightsManager? CrossProjectInsightsManager { get; init; }
     }
 }

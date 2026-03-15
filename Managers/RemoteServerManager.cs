@@ -402,7 +402,7 @@ public sealed class RemoteServerManager : IDisposable
             ProjectName = Path.GetFileName(d.ProjectPath),
             Model = d.Model.ToString(),
             Priority = d.PriorityLevel.ToString(),
-            IsFeatureMode = d.IsFeatureMode,
+            IsTeamsMode = d.IsTeamsMode,
             StartTime = d.StartTime,
             EndTime = d.EndTime,
             CurrentIteration = d.CurrentIteration,

@@ -79,7 +79,7 @@ namespace Spritely.Managers
         {
             // Fall back to existing resolver if hybrid search isn't available
             if (!IsAvailable)
-                return await _featureContextResolver.ResolveAsync(projectPath, request.Query, ct);
+                return await _featureContextResolver.ResolveAsync(projectPath, request.Query, ct: ct);
 
             try
             {
@@ -90,7 +90,7 @@ namespace Spritely.Managers
                 // Embed the query using query input_type (optimized for search retrieval)
                 var queryEmbedding = await _embeddingService.EmbedQueryAsync(request.Query, EmbeddingConstants.VoyageCodeModel, ct);
                 if (queryEmbedding == null)
-                    return await _featureContextResolver.ResolveAsync(projectPath, request.Query, ct);
+                    return await _featureContextResolver.ResolveAsync(projectPath, request.Query, ct: ct);
 
                 // Vector search — feature vectors + optionally file chunks
                 var searchCategories = new List<string>
@@ -254,13 +254,13 @@ namespace Spritely.Managers
                 // Low confidence: fall back to Haiku for disambiguation + new feature detection
                 AppLogger.Info("HybridSearch",
                     $"Low confidence ({topScore:F3}) — falling back to Haiku resolver");
-                return await _featureContextResolver.ResolveAsync(projectPath, request.Query, ct);
+                return await _featureContextResolver.ResolveAsync(projectPath, request.Query, ct: ct);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
                 AppLogger.Warn("HybridSearch", $"Hybrid search failed, falling back: {ex.Message}");
-                return await _featureContextResolver.ResolveAsync(projectPath, request.Query, ct);
+                return await _featureContextResolver.ResolveAsync(projectPath, request.Query, ct: ct);
             }
         }
 

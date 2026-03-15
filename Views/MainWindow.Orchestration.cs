@@ -42,7 +42,7 @@ namespace Spritely
                     {
                         parentIndex = i;
                         // SpawnSubtask already increments SubTaskCounter and adds to ChildTaskIds;
-                        // only do it here for children created outside SpawnSubtask (e.g. feature mode execution tasks).
+                        // only do it here for children created outside SpawnSubtask (e.g. teams mode execution tasks).
                         if (!_activeTasks[i].ChildTaskIds.Contains(task.Id))
                         {
                             _activeTasks[i].SubTaskCounter++;
@@ -63,7 +63,7 @@ namespace Spritely
                     _activeTasks.Insert(insertAfter, task);
                     RefreshActivityDashboard();
                     RestoreStarRows();
-                    if (task.IsFeatureMode || task.DependencyTaskIdCount > 0)
+                    if (task.IsTeamsMode || task.DependencyTaskIdCount > 0)
                         CheckAutoExpandGraph();
                     return;
                 }
@@ -77,8 +77,8 @@ namespace Spritely
             RefreshActivityDashboard();
             RestoreStarRows();
 
-            // Auto-expand graph when feature mode or dependency tasks are active
-            if (task.IsFeatureMode || task.DependencyTaskIdCount > 0)
+            // Auto-expand graph when teams mode or dependency tasks are active
+            if (task.IsTeamsMode || task.DependencyTaskIdCount > 0)
                 CheckAutoExpandGraph();
         }
 
@@ -307,16 +307,16 @@ namespace Spritely
             _fileLockManager.CheckQueuedTasks(_activeTasks);
             _taskOrchestrator.OnTaskCompleted(task.Id);
 
-            // If this was a feature mode child that just finished (e.g. after auto-commit),
+            // If this was a teams mode child that just finished (e.g. after auto-commit),
             // re-check whether all siblings are done so the parent can advance to the next phase.
-            // Without this, a child entering Committing status causes CheckFeatureModePhaseCompletion
+            // Without this, a child entering Committing status causes CheckTeamsModePhaseCompletion
             // to return early (Committing is not IsFinished), and no subsequent call re-triggers it.
             if (!string.IsNullOrEmpty(task.ParentTaskId))
             {
                 var parent = _activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
-                if (parent is { IsFeatureMode: true })
+                if (parent is { IsTeamsMode: true })
                 {
-                    _taskExecutionManager.CheckFeatureModePhaseCompletion(
+                    _taskExecutionManager.CheckTeamsModePhaseCompletion(
                         parent, _activeTasks, _historyTasks, MoveToHistory);
                 }
             }
@@ -688,7 +688,7 @@ namespace Spritely
                 historicTask.ProjectPath,
                 historicTask.SkipPermissions,
                 historicTask.Headless,
-                historicTask.IsFeatureMode,
+                historicTask.IsTeamsMode,
                 historicTask.IgnoreFileLocks,
                 historicTask.UseMcp,
                 historicTask.SpawnTeam,

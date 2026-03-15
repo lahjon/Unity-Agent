@@ -10,7 +10,7 @@ namespace Spritely.Models
     {
         bool Headless { get; set; }
         bool SpawnTeam { get; set; }
-        bool IsFeatureMode { get; set; }
+        bool IsTeamsMode { get; set; }
         bool ExtendedPlanning { get; set; }
         bool PlanOnly { get; set; }
         bool IgnoreFileLocks { get; set; }
@@ -27,7 +27,7 @@ namespace Spritely.Models
         {
             target.Headless = source.Headless;
             target.SpawnTeam = source.SpawnTeam;
-            target.IsFeatureMode = source.IsFeatureMode;
+            target.IsTeamsMode = source.IsTeamsMode;
             target.ExtendedPlanning = source.ExtendedPlanning;
             target.PlanOnly = source.PlanOnly;
             target.IgnoreFileLocks = source.IgnoreFileLocks;

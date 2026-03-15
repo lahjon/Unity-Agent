@@ -219,7 +219,7 @@ namespace Spritely.Tests
                 Description = "Test task",
                 ProjectPath = @"C:\TestProject",
                 MaxIterations = 10,
-                IsFeatureMode = true
+                IsTeamsMode = true
             };
             task.CurrentIteration = iteration;
             return task;

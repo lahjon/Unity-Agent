@@ -22,7 +22,7 @@ namespace Spritely.Managers
     /// <summary>
     /// Thin coordinator that delegates to focused single-responsibility classes:
     /// <see cref="TaskProcessLauncher"/> for subprocess creation and process lifecycle,
-    /// <see cref="FeatureModeHandler"/> for feature mode retry timers and iteration tracking,
+    /// <see cref="TeamsModeHandler"/> for teams mode retry timers and iteration tracking,
     /// <see cref="OutputProcessor"/> for output trimming, completion summaries, and recommendation parsing,
     /// <see cref="TokenLimitHandler"/> for token limit detection and retry scheduling.
     /// </summary>
@@ -50,7 +50,7 @@ namespace Spritely.Managers
         // ── Focused sub-handlers ─────────────────────────────────────
         private readonly OutputProcessor _outputProcessor;
         private readonly TaskProcessLauncher _processLauncher;
-        private readonly FeatureModeHandler _featureModeHandler;
+        private readonly TeamsModeHandler _featureModeHandler;
         private readonly TokenLimitHandler _tokenLimitHandler;
         private readonly EarlyTerminationManager _earlyTerminationManager;
         private readonly TaskPreprocessor _taskPreprocessor;
@@ -60,15 +60,25 @@ namespace Spritely.Managers
         private readonly FeatureContextResolver _featureContextResolver;
         private readonly FeatureUpdateAgent _featureUpdateAgent;
         private readonly HybridSearchManager? _hybridSearchManager;
+        private readonly ContextPrefetchPipeline? _contextPrefetchPipeline;
 
         // ── Feedback System ──────────────────────────────────────────────
         private readonly FeedbackCollector? _feedbackCollector;
+
+        // ── Prompt Evolution ──────────────────────────────────────────────
+        private readonly PromptEvolutionManager? _promptEvolutionManager;
+
+        // ── Cross-Project Insights ──────────────────────────────────────────
+        private readonly CrossProjectInsightsManager? _crossProjectInsightsManager;
 
         /// <summary>Exposes the streaming tool state dictionary for external consumers.</summary>
         public ConcurrentDictionary<string, StreamingToolState> StreamingToolState => _processLauncher.StreamingToolState;
 
         /// <summary>Exposes the early termination manager for monitoring/dashboard access.</summary>
         public EarlyTerminationManager EarlyTerminationManager => _earlyTerminationManager;
+
+        /// <summary>Exposes the output tab manager for synthesis board access.</summary>
+        public OutputTabManager OutputTabManager => _outputTabManager;
 
         /// <summary>Fires when a task's process exits (with the task ID). Used to resume dependency-queued tasks.</summary>
         public event Action<string>? TaskCompleted;
@@ -78,6 +88,15 @@ namespace Spritely.Managers
 
         /// <summary>Fires when a task transitions to Queued with unresolved dependencies after planning, so the orchestrator can track it.</summary>
         public event Action<AgentTask, List<string>>? TaskNeedsOrchestratorRegistration;
+
+        /// <summary>Fires when 3 perspective agents are spawned for synthesis (parentTaskId, perspectiveTaskIds[3]).</summary>
+        public event Action<string, string[]>? SynthesisPerspectivesSpawned;
+
+        /// <summary>Fires when a perspective agent completes (parentTaskId, perspectiveIndex 0-2).</summary>
+        public event Action<string, int>? SynthesisPerspectiveCompleted;
+
+        /// <summary>Fires when plan synthesis completes (parentTaskId, synthesisResult).</summary>
+        public event Action<string, string>? SynthesisComplete;
 
         public TaskExecutionManager(TaskExecutionServices services)
         {
@@ -111,8 +130,13 @@ namespace Spritely.Managers
             _featureContextResolver = services.FeatureContextResolver ?? new FeatureContextResolver(_featureRegistryManager, claudeService: services.ClaudeService);
             _featureUpdateAgent = services.FeatureUpdateAgent ?? new FeatureUpdateAgent(_featureRegistryManager, claudeService: services.ClaudeService);
             _hybridSearchManager = services.HybridSearchManager;
+            _contextPrefetchPipeline = services.ContextPrefetchPipeline;
             _feedbackCollector = services.FeedbackCollector;
-            _featureModeHandler = new FeatureModeHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, services.PromptBuilder, services.TaskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
+            _promptEvolutionManager = services.PromptEvolutionManager;
+            _crossProjectInsightsManager = services.CrossProjectInsightsManager;
+            _featureModeHandler = new TeamsModeHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, services.PromptBuilder, services.TaskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
+            if (services.ClaudeService != null)
+                _featureModeHandler.SetPlanSynthesizer(new PlanSynthesizer(services.ClaudeService));
             _tokenLimitHandler = new TokenLimitHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.FileLockManager, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, retryMinutesFunc);
 
             // Set callback to process queued messages when task becomes ready
@@ -122,9 +146,12 @@ namespace Spritely.Managers
             // Forward token-limit handler's TaskCompleted to the coordinator's event
             _tokenLimitHandler.TaskCompleted += id => TaskCompleted?.Invoke(id);
 
-            // Wire up feature mode handler events for team/step extraction and child spawning
+            // Wire up teams mode handler events for team/step extraction and child spawning
             _featureModeHandler.ExtractTeamRequested += (parent, output) => ExtractAndSpawnTeamForFeatureMode(parent, output);
-            _featureModeHandler.FeatureModeChildSpawned += (parent, child) => SubTaskSpawned?.Invoke(parent, child);
+            _featureModeHandler.TeamsModeChildSpawned += (parent, child) => SubTaskSpawned?.Invoke(parent, child);
+            _featureModeHandler.SynthesisPerspectivesSpawned += (parentId, ids) => SynthesisPerspectivesSpawned?.Invoke(parentId, ids);
+            _featureModeHandler.SynthesisPerspectiveCompleted += (parentId, idx) => SynthesisPerspectiveCompleted?.Invoke(parentId, idx);
+            _featureModeHandler.SynthesisComplete += (parentId, result) => SynthesisComplete?.Invoke(parentId, result);
         }
 
         // ── Prompt preparation ────────────────────────────────────────
@@ -136,6 +163,14 @@ namespace Spritely.Managers
         /// </summary>
         private string BuildAndWritePromptFile(AgentTask task, ObservableCollection<AgentTask>? activeTasks = null, string featureContextBlock = "", string pendingChangesBlock = "")
         {
+            // Check for active prompt evolution variant (A/B test assignment)
+            PromptVariant? evolutionVariant = null;
+            if (_promptEvolutionManager != null && !task.IsSubTask)
+                evolutionVariant = _promptEvolutionManager.GetActiveVariant(task.ProjectPath, task.Id);
+
+            // Inject cross-project insights (globally-successful patterns from other projects)
+            var crossProjectHints = _crossProjectInsightsManager?.GetCrossProjectHints() ?? "";
+
             var fullPrompt = _promptBuilder.BuildFullPrompt(
                 _getSystemPrompt(), task,
                 _getProjectDescription(task),
@@ -143,7 +178,9 @@ namespace Spritely.Managers
                 _isGameProject(task.ProjectPath),
                 _getSkillsBlock(),
                 featureContextBlock,
-                pendingChangesBlock);
+                pendingChangesBlock,
+                evolutionVariant,
+                crossProjectHints);
 
             if (activeTasks != null)
             {
@@ -184,7 +221,7 @@ namespace Spritely.Managers
             var originalDescription = task.Description;
             var needsPreprocess = task.UseAutoMode && !task.HasHeader && !task.IsSubTask && !IsKnownTaskType(task.Summary);
             var needsFeatures = !task.IsSubTask && !IsKnownTaskType(task.Summary)
-                && (task.IsFeatureMode || task.AllowFeatureModeInference)
+                && (task.IsTeamsMode || task.AllowTeamsModeInference)
                 && _featureRegistryManager.RegistryExists(task.ProjectPath);
 
             if (needsPreprocess || needsFeatures)
@@ -198,14 +235,23 @@ namespace Spritely.Managers
                 ? _taskPreprocessor.PreprocessAsync(task.Description, task.Cts.Token)
                 : System.Threading.Tasks.Task.FromResult<PreprocessResult?>(null);
 
+            // Check prefetch cache first to skip the feature resolution round-trip
             System.Threading.Tasks.Task<FeatureContextResult?> featureTask;
-            if (needsFeatures && _hybridSearchManager != null)
+            var prefetchedResult = needsFeatures ? _contextPrefetchPipeline?.TryGetCached(originalDescription) : null;
+            if (prefetchedResult != null)
+            {
+                featureTask = System.Threading.Tasks.Task.FromResult<FeatureContextResult?>(prefetchedResult);
+                _outputProcessor.AppendColoredOutput(task.Id,
+                    "[Features] Using pre-fetched context (cache hit)\n",
+                    Brushes.DarkGray, activeTasks, historyTasks);
+            }
+            else if (needsFeatures && _hybridSearchManager != null)
             {
                 featureTask = ResolveWithHybridSearchAsync(task.ProjectPath, originalDescription, task.Cts.Token);
             }
             else if (needsFeatures)
             {
-                featureTask = _featureContextResolver.ResolveAsync(task.ProjectPath, originalDescription, task.Cts.Token);
+                featureTask = _featureContextResolver.ResolveAsync(task.ProjectPath, originalDescription, ct: task.Cts.Token);
             }
             else
             {
@@ -236,8 +282,8 @@ namespace Spritely.Managers
                         task.Runtime.PreprocessorPrompt = preprocessResult.SentPrompt;
                         TaskPreprocessor.ApplyToTask(task, preprocessResult);
                         _outputTabManager.UpdateTabHeader(task);
-                        if (string.IsNullOrEmpty(task.OriginalFeatureDescription))
-                            task.OriginalFeatureDescription = originalDescription;
+                        if (string.IsNullOrEmpty(task.OriginalTeamsDescription))
+                            task.OriginalTeamsDescription = originalDescription;
                         _outputProcessor.AppendColoredOutput(task.Id,
                             $"[Preprocessor] OK — \"{preprocessResult.Header}\"\n",
                             Brushes.MediumPurple, activeTasks, historyTasks);
@@ -272,7 +318,7 @@ namespace Spritely.Managers
                 }
             }
 
-            if (task.IsFeatureMode)
+            if (task.IsTeamsMode)
                 _taskFactory.PrepareTaskForFeatureModeStart(task);
 
             // Apply feature resolver result
@@ -354,7 +400,7 @@ namespace Spritely.Managers
             if (task.ExtendedPlanning) flags.Add("Planning");
             if (task.AutoDecompose) flags.Add("Auto-decompose");
             if (task.SpawnTeam) flags.Add("Team");
-            if (task.IsFeatureMode) flags.Add($"Feature(max {task.MaxIterations})");
+            if (task.IsTeamsMode) flags.Add($"Feature(max {task.MaxIterations})");
             var flagsSuffix = flags.Count > 0 ? $" | {string.Join(" | ", flags)}" : "";
             _outputProcessor.AppendOutput(task.Id,
                 $"Task #{task.TaskNumber}: {promptPreview}\nModel: {friendlyModel}{flagsSuffix}\n\n",
@@ -433,9 +479,9 @@ namespace Spritely.Managers
                 }
 
                 // Feature mode: multi-phase orchestration — always handle before SpawnTeam
-                if (task.IsFeatureMode && task.Status == AgentTaskStatus.Running)
+                if (task.IsTeamsMode && task.Status == AgentTaskStatus.Running)
                 {
-                    _featureModeHandler.HandleFeatureModeIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
+                    _featureModeHandler.HandleTeamsModeIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
                     _fileLockManager.CheckQueuedTasks(activeTasks);
                     TaskCompleted?.Invoke(task.Id);
                     return;
@@ -485,19 +531,19 @@ namespace Spritely.Managers
                 }
                 else
                 {
-                    // Check if this is a feature mode child task (e.g., architect, team member)
-                    var isFeatureModeChild = false;
+                    // Check if this is a teams mode child task (e.g., architect, team member)
+                    var isTeamsModeChild = false;
                     if (!string.IsNullOrEmpty(task.ParentTaskId))
                     {
                         var parent = activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId)
                                     ?? historyTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
-                        if (parent != null && parent.IsFeatureMode)
+                        if (parent != null && parent.IsTeamsMode)
                         {
-                            isFeatureModeChild = true;
+                            isTeamsModeChild = true;
                         }
                     }
 
-                    if (isFeatureModeChild)
+                    if (isTeamsModeChild)
                     {
                         // Feature mode child tasks complete directly without verification step
                         var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
@@ -539,7 +585,7 @@ namespace Spritely.Managers
                         }
                         catch (Exception ex)
                         {
-                            AppLogger.Error("TaskExecution", $"Failed to extract summary for feature mode child task {task.Id}", ex);
+                            AppLogger.Error("TaskExecution", $"Failed to extract summary for teams mode child task {task.Id}", ex);
                             task.CompletionSummary = $"Task completed with status: {expectedStatus}";
                         }
 
@@ -560,20 +606,21 @@ namespace Spritely.Managers
                         }
                         catch (Exception ex)
                         {
-                            AppLogger.Error("TaskExecution", $"Failed to append completion output for feature mode child task {task.Id}", ex);
+                            AppLogger.Error("TaskExecution", $"Failed to append completion output for teams mode child task {task.Id}", ex);
                         }
 
                         _outputTabManager.UpdateTabHeader(task);
                         _fileLockManager.CheckQueuedTasks(activeTasks);
                         TaskCompleted?.Invoke(task.Id);
 
-                        // Check if all feature mode children are complete to trigger next phase
+                        // Check if all teams mode children are complete to trigger next phase
                         if (!string.IsNullOrEmpty(task.ParentTaskId))
                         {
                             var parent = activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
                             if (parent != null)
                             {
-                                CheckFeatureModePhaseCompletion(parent, activeTasks, historyTasks, moveToHistory);
+                                _featureModeHandler.NotifyChildCompleted(parent.Id, task.Id);
+                                CheckTeamsModePhaseCompletion(parent, activeTasks, historyTasks, moveToHistory);
                             }
                         }
                         return;
@@ -593,20 +640,20 @@ namespace Spritely.Managers
             {
                 _processLauncher.StartManagedProcess(task, process);
 
-                if (task.IsFeatureMode)
+                if (task.IsTeamsMode)
                 {
                     var iterationTimer = new DispatcherTimer
                     {
-                        Interval = TimeSpan.FromMinutes(FeatureModeHandler.FeatureModeIterationTimeoutMinutes)
+                        Interval = TimeSpan.FromMinutes(TeamsModeHandler.TeamsModeIterationTimeoutMinutes)
                     };
-                    task.FeatureModeIterationTimer = iterationTimer;
+                    task.TeamsModeIterationTimer = iterationTimer;
                     iterationTimer.Tick += (_, _) =>
                     {
                         iterationTimer.Stop();
-                        task.FeatureModeIterationTimer = null;
+                        task.TeamsModeIterationTimer = null;
                         if (task.Process is { HasExited: false })
                         {
-                            _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Iteration timeout ({FeatureModeHandler.FeatureModeIterationTimeoutMinutes}min). Killing stuck process.\n", activeTasks, historyTasks);
+                            _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] Iteration timeout ({TeamsModeHandler.TeamsModeIterationTimeoutMinutes}min). Killing stuck process.\n", activeTasks, historyTasks);
                             try { task.Process.Kill(true); } catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill stuck process for task {task.Id}", ex); }
                         }
                     };
@@ -655,6 +702,14 @@ namespace Spritely.Managers
             catch (Exception ex)
             {
                 AppLogger.Error("TaskExecution", $"CompleteWithVerificationAsync failed for task {task.Id}", ex);
+            }
+
+            // Prompt Evolution: record task outcome for A/B testing
+            if (_promptEvolutionManager != null && !task.IsSubTask)
+            {
+                var success = exitCode == 0 &&
+                    (expectedStatus == AgentTaskStatus.Completed || task.Status == AgentTaskStatus.Completed);
+                _promptEvolutionManager.RecordOutcome(task.Id, task.ProjectPath, success);
             }
 
             // Feature System: update registry with task results (fire-and-forget, never blocks teardown)
@@ -732,7 +787,7 @@ namespace Spritely.Managers
 
         /// <summary>
         /// Runs the completion summary after a follow-up completes, then sets the final status.
-        /// Fires TaskCompleted so feature mode parents and the orchestrator are notified.
+        /// Fires TaskCompleted so teams mode parents and the orchestrator are notified.
         /// </summary>
         private async System.Threading.Tasks.Task CompleteFollowUpWithVerificationAsync(AgentTask task, int exitCode,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
@@ -861,7 +916,7 @@ namespace Spritely.Managers
         {
             if (string.IsNullOrEmpty(text)) return;
 
-            AppLogger.Info("FollowUp", $"[{task.Id}] SendFollowUp called. Status={task.Status}, IsFeatureMode={task.IsFeatureMode}, Phase={task.FeatureModePhase}, ProcessAlive={task.Process is { HasExited: false }}, ConversationId={task.ConversationId ?? "(null)"}");
+            AppLogger.Info("FollowUp", $"[{task.Id}] SendFollowUp called. Status={task.Status}, IsTeamsMode={task.IsTeamsMode}, Phase={task.TeamsModePhase}, ProcessAlive={task.Process is { HasExited: false }}, ConversationId={task.ConversationId ?? "(null)"}");
             AppLogger.Info("FollowUp", $"[{task.Id}] Task details: ActiveTasksCount={activeTasks.Count}, HistoryTasksCount={historyTasks.Count}");
 
             // Ensure task is in active tasks (not history)
@@ -869,12 +924,12 @@ namespace Spritely.Managers
             var isInHistory = historyTasks.Contains(task);
             AppLogger.Info("FollowUp", $"[{task.Id}] Task location: InActive={isInActive}, InHistory={isInHistory}");
 
-            // Block follow-up when the task is a feature mode coordinator waiting for subtasks.
+            // Block follow-up when the task is a teams mode coordinator waiting for subtasks.
             // Without this, it would start a new Claude process that has no context about the
             // coordination and asks "what do you want me to do?"
-            if (task.IsFeatureMode && task.FeatureModePhase is FeatureModePhase.TeamPlanning or FeatureModePhase.Execution)
+            if (task.IsTeamsMode && task.TeamsModePhase is TeamsModePhase.TeamPlanning or TeamsModePhase.Execution)
             {
-                AppLogger.Warn("FollowUp", $"[{task.Id}] Blocked: feature mode coordinator in phase {task.FeatureModePhase}");
+                AppLogger.Warn("FollowUp", $"[{task.Id}] Blocked: teams mode coordinator in phase {task.TeamsModePhase}");
                 _outputProcessor.AppendOutput(task.Id,
                     "\nThis task is coordinating subtasks and waiting for them to complete. Follow-up input is not available during this phase.\n",
                     activeTasks, historyTasks);
@@ -1083,15 +1138,15 @@ namespace Spritely.Managers
             // Cancel cooperative async operations before killing the process
             try { task.Cts?.Cancel(); } catch (ObjectDisposedException) { }
 
-            if (task.FeatureModeRetryTimer != null)
+            if (task.TeamsModeRetryTimer != null)
             {
-                task.FeatureModeRetryTimer.Stop();
-                task.FeatureModeRetryTimer = null;
+                task.TeamsModeRetryTimer.Stop();
+                task.TeamsModeRetryTimer = null;
             }
-            if (task.FeatureModeIterationTimer != null)
+            if (task.TeamsModeIterationTimer != null)
             {
-                task.FeatureModeIterationTimer.Stop();
-                task.FeatureModeIterationTimer = null;
+                task.TeamsModeIterationTimer.Stop();
+                task.TeamsModeIterationTimer = null;
             }
             if (task.TokenLimitRetryTimer != null)
             {
@@ -1107,7 +1162,7 @@ namespace Spritely.Managers
             task.Cts?.Dispose();
             task.Cts = null;
 
-            // Fire TaskCompleted so the orchestrator and feature mode parent get notified.
+            // Fire TaskCompleted so the orchestrator and teams mode parent get notified.
             // Without this, cancelling a subtask leaves the parent stuck waiting forever.
             TaskCompleted?.Invoke(task.Id);
         }
@@ -1206,7 +1261,7 @@ namespace Spritely.Managers
                     parent.ProjectPath,
                     parent.SkipPermissions,
                     parent.Headless,
-                    parent.IsFeatureMode,
+                    parent.IsTeamsMode,
                     parent.IgnoreFileLocks,
                     parent.UseMcp,
                     parent.SpawnTeam,
@@ -1219,7 +1274,7 @@ namespace Spritely.Managers
                     parent.ProjectPath,
                     skipPermissions: false,
                     headless: false,
-                    isFeatureMode: false,
+                    isTeamsMode: false,
                     ignoreFileLocks: false,
                     useMcp: false);
 
@@ -1417,10 +1472,10 @@ namespace Spritely.Managers
         // ── Backward-compatible forwarding for EvaluateFeatureModeIteration ─
 
         /// <summary>
-        /// Pure decision function for feature mode iteration logic.
-        /// Delegates to <see cref="FeatureModeHandler.EvaluateFeatureModeIteration"/>.
+        /// Pure decision function for teams mode iteration logic.
+        /// Delegates to <see cref="TeamsModeHandler.EvaluateFeatureModeIteration"/>.
         /// </summary>
-        internal static FeatureModeHandler.FeatureModeDecision EvaluateFeatureModeIteration(
+        internal static TeamsModeHandler.FeatureModeDecision EvaluateFeatureModeIteration(
             ICompletionAnalyzer completionAnalyzer,
             AgentTaskStatus currentStatus,
             TimeSpan totalRuntime,
@@ -1430,7 +1485,7 @@ namespace Spritely.Managers
             int exitCode,
             int consecutiveFailures,
             int outputLength)
-            => FeatureModeHandler.EvaluateFeatureModeIteration(
+            => TeamsModeHandler.EvaluateFeatureModeIteration(
                 completionAnalyzer, currentStatus, totalRuntime, iterationOutput,
                 currentIteration, maxIterations, exitCode,
                 consecutiveFailures, outputLength);
@@ -1608,10 +1663,10 @@ namespace Spritely.Managers
             public List<int>? DependsOn { get; set; }
         }
 
-        // ── Feature mode team extraction (used by FeatureModeHandler) ──
+        // ── Feature mode team extraction (used by TeamsModeHandler) ──
 
         /// <summary>
-        /// Extracts team members from the feature mode planning output.
+        /// Extracts team members from the teams mode planning output.
         /// Similar to ExtractAndSpawnTeam but returns children without marking the parent as Completed.
         /// </summary>
         private List<AgentTask>? ExtractAndSpawnTeamForFeatureMode(AgentTask parent, string output)
@@ -1619,7 +1674,7 @@ namespace Spritely.Managers
             var json = Helpers.FormatHelpers.ExtractCodeBlockContent(output, "TEAM");
             if (json == null)
             {
-                AppLogger.Warn("FeatureMode", $"No ```TEAM``` block found in feature mode planning output for task {parent.Id}");
+                AppLogger.Warn("TeamsMode", $"No ```TEAM``` block found in teams mode planning output for task {parent.Id}");
                 return null;
             }
 
@@ -1633,7 +1688,7 @@ namespace Spritely.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("FeatureMode", $"Failed to deserialize TEAM JSON for feature mode task {parent.Id}", ex);
+                AppLogger.Warn("TeamsMode", $"Failed to deserialize TEAM JSON for teams mode task {parent.Id}", ex);
                 return null;
             }
 
@@ -1680,19 +1735,19 @@ namespace Spritely.Managers
         // ── Feature mode phase completion check ─────────────────────────
 
         /// <summary>
-        /// Checks whether all children of a feature mode phase are complete.
-        /// If so, triggers the next phase via FeatureModeHandler.
+        /// Checks whether all children of a teams mode phase are complete.
+        /// If so, triggers the next phase via TeamsModeHandler.
         /// Called from FinalizeTask when a child task completes.
         /// </summary>
-        public void CheckFeatureModePhaseCompletion(AgentTask featureParent,
+        public void CheckTeamsModePhaseCompletion(AgentTask featureParent,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            if (!featureParent.IsFeatureMode) return;
-            if (featureParent.FeatureModePhase is not (FeatureModePhase.TeamPlanning or FeatureModePhase.Execution)) return;
-            if (featureParent.FeaturePhaseChildIdCount == 0) return;
+            if (!featureParent.IsTeamsMode) return;
+            if (featureParent.TeamsModePhase is not (TeamsModePhase.TeamPlanning or TeamsModePhase.Execution)) return;
+            if (featureParent.TeamsPhaseChildIdCount == 0) return;
 
-            var children = featureParent.FeaturePhaseChildIds
+            var children = featureParent.TeamsPhaseChildIds
                 .Select(id => activeTasks.FirstOrDefault(t => t.Id == id)
                            ?? historyTasks.FirstOrDefault(t => t.Id == id))
                 .Where(c => c != null)
@@ -1704,13 +1759,13 @@ namespace Spritely.Managers
             var allComplete = children.Count > 0 && children.All(c => c != null && c.IsFinished);
             if (!allComplete) return;
 
-            // If ALL children were cancelled, abort the feature mode task gracefully
+            // If ALL children were cancelled, abort the teams mode task gracefully
             // instead of advancing to the next phase with empty results
             var allCancelled = children.All(c => c?.Status == AgentTaskStatus.Cancelled);
             if (allCancelled)
             {
                 _outputProcessor.AppendOutput(featureParent.Id,
-                    "\n[Feature Mode] All subtasks were cancelled. Aborting feature mode.\n",
+                    "\n[Teams Mode] All subtasks were cancelled. Aborting teams mode.\n",
                     activeTasks, historyTasks);
                 featureParent.Status = AgentTaskStatus.Cancelled;
                 featureParent.EndTime = DateTime.Now;
@@ -1727,7 +1782,7 @@ namespace Spritely.Managers
             {
                 // Log warnings about cancelled children
                 _outputProcessor.AppendOutput(featureParent.Id,
-                    $"\n[Feature Mode] Warning: {cancelledChildren.Count} out of {children.Count} subtasks were cancelled:\n",
+                    $"\n[Teams Mode] Warning: {cancelledChildren.Count} out of {children.Count} subtasks were cancelled:\n",
                     activeTasks, historyTasks);
 
                 foreach (var cancelled in cancelledChildren)
@@ -1744,7 +1799,7 @@ namespace Spritely.Managers
                 if (cancelledChildren.Count > children.Count / 2)
                 {
                     _outputProcessor.AppendOutput(featureParent.Id,
-                        $"\n[Feature Mode] Majority of subtasks ({cancelledChildren.Count}/{children.Count}) were cancelled. Aborting feature mode.\n",
+                        $"\n[Teams Mode] Majority of subtasks ({cancelledChildren.Count}/{children.Count}) were cancelled. Aborting teams mode.\n",
                         activeTasks, historyTasks);
                     featureParent.Status = AgentTaskStatus.Failed;
                     featureParent.EndTime = DateTime.Now;
@@ -1754,23 +1809,23 @@ namespace Spritely.Managers
                     return;
                 }
 
-                // Filter out cancelled children from FeaturePhaseChildIds before proceeding
+                // Filter out cancelled children from TeamsPhaseChildIds before proceeding
                 var cancelledIds = cancelledChildren.Where(c => c != null).Select(c => c!.Id).ToHashSet();
-                var validChildIds = featureParent.FeaturePhaseChildIds
+                var validChildIds = featureParent.TeamsPhaseChildIds
                     .Where(id => !cancelledIds.Contains(id))
                     .ToList();
-                featureParent.ClearFeaturePhaseChildIds();
+                featureParent.ClearTeamsPhaseChildIds();
                 foreach (var id in validChildIds)
                 {
-                    featureParent.AddFeaturePhaseChildId(id);
+                    featureParent.AddTeamsPhaseChildId(id);
                 }
 
                 _outputProcessor.AppendOutput(featureParent.Id,
-                    $"\n[Feature Mode] Proceeding with {completedChildren.Count} completed subtasks, ignoring {cancelledChildren.Count} cancelled ones.\n",
+                    $"\n[Teams Mode] Proceeding with {completedChildren.Count} completed subtasks, ignoring {cancelledChildren.Count} cancelled ones.\n",
                     activeTasks, historyTasks);
             }
 
-            _featureModeHandler.OnFeatureModePhaseComplete(featureParent, activeTasks, historyTasks, moveToHistory);
+            _featureModeHandler.OnTeamsModePhaseComplete(featureParent, activeTasks, historyTasks, moveToHistory);
         }
 
         private static bool HasNeedsMoreWorkStatus(string outputText)
@@ -1833,7 +1888,7 @@ namespace Spritely.Managers
             {
                 AppLogger.Debug("TaskExecutionManager",
                     $"Hybrid search failed, falling back to feature resolver: {ex.Message}");
-                return await _featureContextResolver.ResolveAsync(projectPath, taskDescription, ct);
+                return await _featureContextResolver.ResolveAsync(projectPath, taskDescription, ct: ct);
             }
         }
     }

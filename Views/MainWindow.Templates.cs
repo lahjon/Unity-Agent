@@ -68,7 +68,7 @@ namespace Spritely
             var flags = new List<string>();
             if (t.Headless) flags.Add("Headless");
             if (t.SpawnTeam) flags.Add("Team");
-            if (t.IsFeatureMode) flags.Add("FeatureMode");
+            if (t.IsTeamsMode) flags.Add("TeamsMode");
             if (t.ExtendedPlanning) flags.Add("ExtPlanning");
             if (t.PlanOnly) flags.Add("PlanOnly");
             if (t.AutoDecompose) flags.Add("AutoDecompose");
@@ -339,7 +339,7 @@ namespace Spritely
             var togglePanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
             var headlessChk = MakeTemplateCheckBox("Headless", t.Headless);
             var teamChk = MakeTemplateCheckBox("Team", t.SpawnTeam);
-            var featureModeChk = MakeTemplateCheckBox("Feature Mode", t.IsFeatureMode);
+            var featureModeChk = MakeTemplateCheckBox("Teams Mode", t.IsTeamsMode);
             var extPlanChk = MakeTemplateCheckBox("ExtPlanning", t.ExtendedPlanning);
             var planOnlyChk = MakeTemplateCheckBox("PlanOnly", t.PlanOnly);
             var ignoreLockChk = MakeTemplateCheckBox("IgnoreLocks", t.IgnoreFileLocks);
@@ -428,7 +428,7 @@ namespace Spritely
                 t.Description = descBox.Text?.Trim() ?? "";
                 t.Headless = headlessChk.IsChecked == true;
                 t.SpawnTeam = teamChk.IsChecked == true;
-                t.IsFeatureMode = featureModeChk.IsChecked == true;
+                t.IsTeamsMode = featureModeChk.IsChecked == true;
                 t.ExtendedPlanning = extPlanChk.IsChecked == true;
                 t.PlanOnly = planOnlyChk.IsChecked == true;
                 t.IgnoreFileLocks = ignoreLockChk.IsChecked == true;

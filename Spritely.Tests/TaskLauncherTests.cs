@@ -54,7 +54,7 @@ namespace Spritely.Tests
                 @"C:\Projects\Test",
                 skipPermissions: true,
                 headless: false,
-                isFeatureMode: true,
+                isTeamsMode: true,
                 ignoreFileLocks: true,
                 useMcp: true,
                 spawnTeam: true);
@@ -63,7 +63,7 @@ namespace Spritely.Tests
             Assert.Equal(@"C:\Projects\Test", task.ProjectPath);
             Assert.True(task.SkipPermissions);
             Assert.False(task.Headless);
-            Assert.True(task.IsFeatureMode);
+            Assert.True(task.IsTeamsMode);
             Assert.True(task.IgnoreFileLocks);
             Assert.True(task.UseMcp);
             Assert.True(task.SpawnTeam);
@@ -100,7 +100,7 @@ namespace Spritely.Tests
         [Fact]
         public void BuildBasePrompt_NormalMode_CombinesSystemAndDescription()
         {
-            var result = _prompt.BuildBasePrompt("SYSTEM:", "do things", useMcp: false, isFeatureMode: false);
+            var result = _prompt.BuildBasePrompt("SYSTEM:", "do things", useMcp: false, isTeamsMode: false);
             Assert.StartsWith("SYSTEM:", result);
             Assert.EndsWith("do things", result);
             Assert.Contains("# USER PROMPT / TASK", result);
@@ -109,7 +109,7 @@ namespace Spritely.Tests
         [Fact]
         public void BuildBasePrompt_WithMcp_IncludesMcpBlock()
         {
-            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: false);
+            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: true, isTeamsMode: false);
             Assert.Contains("# MCP", result);
             Assert.Contains("UnityMCP", result);
             Assert.StartsWith("SYS:", result);
@@ -119,7 +119,7 @@ namespace Spritely.Tests
         [Fact]
         public void BuildBasePrompt_FeatureMode_UsesFeatureModeTemplate()
         {
-            var result = _prompt.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isFeatureMode: true);
+            var result = _prompt.BuildBasePrompt("SYSTEM:", "fix bugs", useMcp: false, isTeamsMode: true);
             Assert.Contains("# FEATURE MODE", result);
             Assert.EndsWith("fix bugs", result);
             Assert.DoesNotContain("SYSTEM:", result);
@@ -128,7 +128,7 @@ namespace Spritely.Tests
         [Fact]
         public void BuildBasePrompt_AlwaysIncludesNoGitWriteBlock()
         {
-            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isFeatureMode: false);
+            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: false, isTeamsMode: false);
             Assert.Contains("NO GIT WRITES", result);
             Assert.Contains("Never commit", result);
             Assert.StartsWith("SYS:", result);
@@ -138,7 +138,7 @@ namespace Spritely.Tests
         [Fact]
         public void BuildBasePrompt_FeatureMode_IgnoresMcp()
         {
-            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: true, isFeatureMode: true);
+            var result = _prompt.BuildBasePrompt("SYS:", "task", useMcp: true, isTeamsMode: true);
             Assert.DoesNotContain("# MCP\n", result);
             Assert.Contains("# FEATURE MODE", result);
         }
@@ -169,7 +169,7 @@ namespace Spritely.Tests
             {
                 Description = "do work",
                 UseMcp = false,
-                IsFeatureMode = false
+                IsTeamsMode = false
             };
             var result = _prompt.BuildFullPrompt("SYS:", task);
             Assert.StartsWith("SYS:", result);
@@ -184,7 +184,7 @@ namespace Spritely.Tests
             {
                 Description = "do work",
                 UseMcp = false,
-                IsFeatureMode = false
+                IsTeamsMode = false
             };
             task.ImagePaths.Add("img.png");
             var result = _prompt.BuildFullPrompt("SYS:", task);
@@ -257,8 +257,8 @@ namespace Spritely.Tests
         [Fact]
         public void GetCliModelForTask_FeatureModeInitial_ReturnsSonnet()
         {
-            var task = new AgentTask { IsFeatureMode = true };
-            task.Data.FeatureModePhase = FeatureModePhase.None;
+            var task = new AgentTask { IsTeamsMode = true };
+            task.Data.TeamsModePhase = TeamsModePhase.None;
             Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForTask(task));
         }
 
@@ -286,19 +286,19 @@ namespace Spritely.Tests
         [Fact]
         public void GetCliModelForPhase_Consolidation_ReturnsOpus()
         {
-            Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForPhase(FeatureModePhase.PlanConsolidation));
+            Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForPhase(TeamsModePhase.PlanConsolidation));
         }
 
         [Fact]
         public void GetCliModelForPhase_Evaluation_ReturnsOpus()
         {
-            Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForPhase(FeatureModePhase.Evaluation));
+            Assert.Equal(PromptBuilder.CliOpusModel, PromptBuilder.GetCliModelForPhase(TeamsModePhase.Evaluation));
         }
 
         [Fact]
         public void GetCliModelForPhase_None_ReturnsSonnet()
         {
-            Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForPhase(FeatureModePhase.None));
+            Assert.Equal(PromptBuilder.CliSonnetModel, PromptBuilder.GetCliModelForPhase(TeamsModePhase.None));
         }
 
         // ── PowerShell Script Building ──────────────────────────────
@@ -466,7 +466,7 @@ namespace Spritely.Tests
             Assert.Contains("-ExecutionPolicy Bypass", psi.Arguments);
         }
 
-        // ── Feature Mode Helpers ────────────────────────────────────
+        // ── Teams Mode Helpers ────────────────────────────────────
 
         [Fact]
         public void PrepareTaskForFeatureModeStart_ForcesSkipPermissions()
@@ -501,70 +501,70 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void BuildFeatureModeContinuationPrompt_InterpolatesValues()
+        public void BuildTeamsModeContinuationPrompt_InterpolatesValues()
         {
-            var prompt = _prompt.BuildFeatureModeContinuationPrompt(3, 50);
+            var prompt = _prompt.BuildTeamsModeContinuationPrompt(3, 50);
             Assert.Contains("iteration 3/50", prompt);
         }
 
         [Fact]
-        public void BuildFeatureModeContinuationPrompt_ContainsRestrictions()
+        public void BuildTeamsModeContinuationPrompt_ContainsRestrictions()
         {
-            var prompt = _prompt.BuildFeatureModeContinuationPrompt(1, 10);
+            var prompt = _prompt.BuildTeamsModeContinuationPrompt(1, 10);
             Assert.Contains("No git", prompt);
             Assert.Contains("no OS modifications", prompt);
             Assert.Contains("project root", prompt);
         }
 
         [Fact]
-        public void CheckFeatureModeComplete_Complete_ReturnsTrue()
+        public void CheckTeamsModeComplete_Complete_ReturnsTrue()
         {
-            Assert.True(_completion.CheckFeatureModeComplete("some output\nSTATUS: COMPLETE\n"));
+            Assert.True(_completion.CheckTeamsModeComplete("some output\nSTATUS: COMPLETE\n"));
         }
 
         [Fact]
-        public void CheckFeatureModeComplete_NeedsMoreWork_ReturnsFalse()
+        public void CheckTeamsModeComplete_NeedsMoreWork_ReturnsFalse()
         {
-            Assert.False(_completion.CheckFeatureModeComplete("some output\nSTATUS: NEEDS_MORE_WORK\n"));
+            Assert.False(_completion.CheckTeamsModeComplete("some output\nSTATUS: NEEDS_MORE_WORK\n"));
         }
 
         [Fact]
-        public void CheckFeatureModeComplete_NoMarker_ReturnsFalse()
+        public void CheckTeamsModeComplete_NoMarker_ReturnsFalse()
         {
-            Assert.False(_completion.CheckFeatureModeComplete("just some output\nno markers here\n"));
+            Assert.False(_completion.CheckTeamsModeComplete("just some output\nno markers here\n"));
         }
 
         [Fact]
-        public void CheckFeatureModeComplete_CompleteWithWhitespace_ReturnsTrue()
+        public void CheckTeamsModeComplete_CompleteWithWhitespace_ReturnsTrue()
         {
-            Assert.True(_completion.CheckFeatureModeComplete("output\n  STATUS: COMPLETE  \n"));
+            Assert.True(_completion.CheckTeamsModeComplete("output\n  STATUS: COMPLETE  \n"));
         }
 
         [Fact]
-        public void CheckFeatureModeComplete_NeedsMoreWorkThenComplete_ReturnsTrue()
+        public void CheckTeamsModeComplete_NeedsMoreWorkThenComplete_ReturnsTrue()
         {
             // Last marker wins when scanning from the end
             var output = "STATUS: NEEDS_MORE_WORK\nmore work\nSTATUS: COMPLETE\n";
-            Assert.True(_completion.CheckFeatureModeComplete(output));
+            Assert.True(_completion.CheckTeamsModeComplete(output));
         }
 
         [Fact]
-        public void CheckFeatureModeComplete_CompleteThenNeedsMoreWork_ReturnsFalse()
+        public void CheckTeamsModeComplete_CompleteThenNeedsMoreWork_ReturnsFalse()
         {
             var output = "STATUS: COMPLETE\nmore work\nSTATUS: NEEDS_MORE_WORK\n";
-            Assert.False(_completion.CheckFeatureModeComplete(output));
+            Assert.False(_completion.CheckTeamsModeComplete(output));
         }
 
         [Fact]
-        public void CheckFeatureModeComplete_CompleteWithRecommendations_ReturnsTrue()
+        public void CheckTeamsModeComplete_CompleteWithRecommendations_ReturnsTrue()
         {
-            Assert.True(_completion.CheckFeatureModeComplete("some output\nSTATUS: COMPLETE WITH RECOMMENDATIONS\n"));
+            Assert.True(_completion.CheckTeamsModeComplete("some output\nSTATUS: COMPLETE WITH RECOMMENDATIONS\n"));
         }
 
         [Fact]
-        public void CheckFeatureModeComplete_CompleteWithRecommendations_Whitespace_ReturnsTrue()
+        public void CheckTeamsModeComplete_CompleteWithRecommendations_Whitespace_ReturnsTrue()
         {
-            Assert.True(_completion.CheckFeatureModeComplete("output\n  STATUS: COMPLETE WITH RECOMMENDATIONS  \n"));
+            Assert.True(_completion.CheckTeamsModeComplete("output\n  STATUS: COMPLETE WITH RECOMMENDATIONS  \n"));
         }
 
         [Fact]
@@ -773,18 +773,18 @@ namespace Spritely.Tests
         }
 
         [Fact]
-        public void FeatureModeInitialTemplate_ContainsRestrictions()
+        public void TeamsModeInitialTemplate_ContainsRestrictions()
         {
-            Assert.Contains("No git commands", PromptBuilder.FeatureModeInitialTemplate);
-            Assert.Contains("No file modifications", PromptBuilder.FeatureModeInitialTemplate);
-            Assert.Contains("TEAM", PromptBuilder.FeatureModeInitialTemplate);
+            Assert.Contains("No git commands", PromptBuilder.TeamsModeInitialTemplate);
+            Assert.Contains("No file modifications", PromptBuilder.TeamsModeInitialTemplate);
+            Assert.Contains("TEAM", PromptBuilder.TeamsModeInitialTemplate);
         }
 
         [Fact]
-        public void FeatureModeContinuationTemplate_ContainsPlaceholders()
+        public void TeamsModeContinuationTemplate_ContainsPlaceholders()
         {
-            Assert.Contains("{0}", PromptBuilder.FeatureModeContinuationTemplate);
-            Assert.Contains("{1}", PromptBuilder.FeatureModeContinuationTemplate);
+            Assert.Contains("{0}", PromptBuilder.TeamsModeContinuationTemplate);
+            Assert.Contains("{1}", PromptBuilder.TeamsModeContinuationTemplate);
         }
 
         // ── Completion Summary ─────────────────────────────────────────

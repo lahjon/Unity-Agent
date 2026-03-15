@@ -273,12 +273,12 @@ namespace Spritely
         {
         }
 
-        private void FeatureModeToggle_Changed(object sender, RoutedEventArgs e)
+        private void TeamsModeToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (ExecuteButton == null) return;
             UpdateExecuteButtonText();
-            if (FeatureModeIterationsPanel != null)
-                FeatureModeIterationsPanel.Visibility = FeatureModeToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            if (TeamsModeIterationsPanel != null)
+                TeamsModeIterationsPanel.Visibility = TeamsModeToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ── Project Events ─────────────────────────────────────────
@@ -303,7 +303,7 @@ namespace Spritely
             var tag = item.Tag?.ToString();
             var isGemini = tag == "Gemini" || tag == "GeminiGameArt";
             var isGameArt = tag == "GeminiGameArt";
-            if (FeatureModeToggle != null) FeatureModeToggle.IsEnabled = !isGemini;
+            if (TeamsModeToggle != null) TeamsModeToggle.IsEnabled = !isGemini;
             if (SpawnTeamToggle != null) SpawnTeamToggle.IsEnabled = !isGemini;
             if (ExtendedPlanningToggle != null) ExtendedPlanningToggle.IsEnabled = !isGemini;
             if (AutoDecomposeToggle != null) AutoDecomposeToggle.IsEnabled = !isGemini;

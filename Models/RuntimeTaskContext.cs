@@ -21,8 +21,8 @@ namespace Spritely
         public StringBuilder OutputBuilder { get; } = new();
 
         // Feature mode
-        public System.Windows.Threading.DispatcherTimer? FeatureModeRetryTimer { get; set; }
-        public System.Windows.Threading.DispatcherTimer? FeatureModeIterationTimer { get; set; }
+        public System.Windows.Threading.DispatcherTimer? TeamsModeRetryTimer { get; set; }
+        public System.Windows.Threading.DispatcherTimer? TeamsModeIterationTimer { get; set; }
         public int ConsecutiveFailures { get; set; }
         public int ConsecutiveTokenLimitRetries { get; set; }
         public int LastIterationOutputStart { get; set; }
@@ -37,6 +37,15 @@ namespace Spritely
 
         // Feature system: resolver suggestion for deferred new-feature creation
         public Spritely.Models.FeatureContextResult? ResolverSuggestion { get; set; }
+
+        /// <summary>All feature IDs that were injected into the task prompt (for feedback tracking).</summary>
+        public List<string> InjectedFeatureIds { get; set; } = new();
+
+        /// <summary>Task category detected by preprocessor, used for token budget profile selection.</summary>
+        public string TaskCategory { get; set; } = "default";
+
+        /// <summary>Approximate token count of the feature context block injected into the prompt.</summary>
+        public int ContextTokensUsed { get; set; }
 
         // Prompt pipeline diagnostics: captured for display in full output view
         public string? PreprocessorPrompt { get; set; }
@@ -224,10 +233,10 @@ namespace Spritely
 
         public void Dispose()
         {
-            FeatureModeRetryTimer?.Stop();
-            FeatureModeRetryTimer = null;
-            FeatureModeIterationTimer?.Stop();
-            FeatureModeIterationTimer = null;
+            TeamsModeRetryTimer?.Stop();
+            TeamsModeRetryTimer = null;
+            TeamsModeIterationTimer?.Stop();
+            TeamsModeIterationTimer = null;
             TokenLimitRetryTimer?.Stop();
             TokenLimitRetryTimer = null;
 

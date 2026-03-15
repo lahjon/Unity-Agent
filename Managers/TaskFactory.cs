@@ -27,7 +27,7 @@ namespace Spritely.Managers
             string projectPath,
             bool skipPermissions,
             bool headless,
-            bool isFeatureMode,
+            bool isTeamsMode,
             bool ignoreFileLocks,
             bool useMcp,
             bool spawnTeam = false,
@@ -47,7 +47,7 @@ namespace Spritely.Managers
                 Description = description,
                 SkipPermissions = skipPermissions,
                 Headless = headless,
-                IsFeatureMode = isFeatureMode,
+                IsTeamsMode = isTeamsMode,
                 IgnoreFileLocks = ignoreFileLocks,
                 UseMcp = useMcp,
                 SpawnTeam = spawnTeam,
@@ -57,7 +57,7 @@ namespace Spritely.Managers
                 AutoDecompose = autoDecompose,
                 ApplyFix = applyFix,
                 UseAutoMode = useAutoMode,
-                AllowFeatureModeInference = allowFeatureModeInference,
+                AllowTeamsModeInference = allowFeatureModeInference,
                 Model = model,
                 MaxIterations = 2,
                 ProjectPath = projectPath,
@@ -68,7 +68,7 @@ namespace Spritely.Managers
             return task;
         }
 
-        // ── Feature Mode Preparation ────────────────────────────────────
+        // ── Teams Mode Preparation ────────────────────────────────────
 
         public void PrepareTaskForFeatureModeStart(AgentTask task)
         {
@@ -76,10 +76,10 @@ namespace Spritely.Managers
             task.CurrentIteration = 1;
             task.ConsecutiveFailures = 0;
             task.LastIterationOutputStart = 0;
-            task.FeatureModePhase = FeatureModePhase.None;
-            task.FeaturePhaseChildIds.Clear();
-            if (string.IsNullOrEmpty(task.OriginalFeatureDescription))
-                task.OriginalFeatureDescription = task.Description;
+            task.TeamsModePhase = TeamsModePhase.None;
+            task.TeamsPhaseChildIds.Clear();
+            if (string.IsNullOrEmpty(task.OriginalTeamsDescription))
+                task.OriginalTeamsDescription = task.Description;
         }
 
         // ── Summary Generation ──────────────────────────────────────

@@ -29,14 +29,14 @@ namespace Spritely.Tests
         [Fact]
         public void StatusText_Running_NonFeatureMode()
         {
-            var task = new AgentTask { IsFeatureMode = false };
+            var task = new AgentTask { IsTeamsMode = false };
             Assert.Equal("Running", task.StatusText);
         }
 
         [Fact]
         public void StatusText_Running_FeatureMode_ShowsIteration()
         {
-            var task = new AgentTask { IsFeatureMode = true, MaxIterations = 2 };
+            var task = new AgentTask { IsTeamsMode = true, MaxIterations = 2 };
             task.CurrentIteration = 1;
             Assert.Equal("Running (1/2)", task.StatusText);
         }

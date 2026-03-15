@@ -585,7 +585,7 @@ namespace Spritely.Tests
                 "system prompt",
                 "task description",
                 useMcp: false,
-                isFeatureMode: false,
+                isTeamsMode: false,
                 featureContextBlock: featureBlock);
 
             Assert.Contains("# FEATURE CONTEXT", result);
@@ -602,7 +602,7 @@ namespace Spritely.Tests
                 "system prompt",
                 "task description",
                 useMcp: false,
-                isFeatureMode: false,
+                isTeamsMode: false,
                 featureContextBlock: "");
 
             Assert.DoesNotContain("# FEATURE CONTEXT", result);
@@ -618,7 +618,7 @@ namespace Spritely.Tests
                 "system prompt",
                 "implement feature",
                 useMcp: false,
-                isFeatureMode: true,
+                isTeamsMode: true,
                 featureContextBlock: featureBlock);
 
             Assert.Contains("# FEATURE CONTEXT", result);
@@ -680,7 +680,7 @@ namespace Spritely.Tests
             var promptBuilder = new PromptBuilder();
             var prompt = promptBuilder.BuildBasePrompt(
                 "system", "Fix the test manager",
-                useMcp: false, isFeatureMode: false,
+                useMcp: false, isTeamsMode: false,
                 featureContextBlock: contextBlock);
 
             Assert.Contains("# FEATURE CONTEXT", prompt);

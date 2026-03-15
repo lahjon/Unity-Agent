@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Spritely.Constants;
+using Spritely.Models;
 
 namespace Spritely.Managers
 {
@@ -29,7 +30,7 @@ namespace Spritely.Managers
                 return CliSonnetModel;
 
             // Feature mode initial planning = exploration (designs planning team)
-            if (task.IsFeatureMode && task.FeatureModePhase == FeatureModePhase.None)
+            if (task.IsTeamsMode && task.TeamsModePhase == TeamsModePhase.None)
                 return CliSonnetModel;
 
             // Planning team members: explore codebase, post findings (subtask + no ExtendedPlanning)
@@ -52,15 +53,15 @@ namespace Spritely.Managers
         }
 
         /// <summary>
-        /// Determines the CLI model for a feature mode phase process.
+        /// Determines the CLI model for a teams mode phase process.
         /// </summary>
-        public static string GetCliModelForPhase(FeatureModePhase phase)
+        public static string GetCliModelForPhase(TeamsModePhase phase)
         {
             return phase switch
             {
-                FeatureModePhase.None => CliSonnetModel,               // Team design = exploration
-                FeatureModePhase.PlanConsolidation => CliOpusModel,     // Consolidation = planning
-                FeatureModePhase.Evaluation => CliOpusModel,            // Evaluation = planning
+                TeamsModePhase.None => CliSonnetModel,               // Team design = exploration
+                TeamsModePhase.PlanConsolidation => CliOpusModel,     // Consolidation = planning
+                TeamsModePhase.Evaluation => CliOpusModel,            // Evaluation = planning
                 _ => CliOpusModel
             };
         }
@@ -84,10 +85,10 @@ namespace Spritely.Managers
         public static readonly string AutonomousExecutionBlock = PromptLoader.Load("AutonomousExecutionBlock.md");
         public static readonly string OutputEfficiencyBlock = PromptLoader.Load("OutputEfficiencyBlock.md");
         public static readonly string PlanningTeamMemberBlock = PromptLoader.Load("PlanningTeamMemberBlock.md");
-        public static readonly string FeatureModeInitialTemplate = PromptLoader.Load("FeatureModeInitialTemplate.md");
-        public static readonly string FeatureModePlanConsolidationTemplate = PromptLoader.Load("FeatureModePlanConsolidationTemplate.md");
-        public static readonly string FeatureModeEvaluationTemplate = PromptLoader.Load("FeatureModeEvaluationTemplate.md");
-        public static readonly string FeatureModeContinuationTemplate = PromptLoader.Load("FeatureModeContinuationTemplate.md");
+        public static readonly string TeamsModeInitialTemplate = PromptLoader.Load("TeamsModeInitialTemplate.md");
+        public static readonly string TeamsModePlanConsolidationTemplate = PromptLoader.Load("TeamsModePlanConsolidationTemplate.md");
+        public static readonly string TeamsModeEvaluationTemplate = PromptLoader.Load("TeamsModeEvaluationTemplate.md");
+        public static readonly string TeamsModeContinuationTemplate = PromptLoader.Load("TeamsModeContinuationTemplate.md");
 
         // ── Prompts formerly in other files (centralized) ────────────
 
@@ -105,45 +106,62 @@ namespace Spritely.Managers
         public static readonly string ResultVerificationPromptTemplate = PromptLoader.Load("ResultVerificationPromptTemplate.md");
 
         public static readonly string TokenLimitRetryContinuationPrompt = PromptLoader.Load("TokenLimitRetryContinuationPrompt.md");
-        public static readonly string FeatureModeIterationPlanningTemplate = PromptLoader.Load("FeatureModeIterationPlanningTemplate.md");
+        public static readonly string TeamsModeIterationPlanningTemplate = PromptLoader.Load("TeamsModeIterationPlanningTemplate.md");
+
+        // Synthesis perspective prompts
+        public static readonly string SynthesisArchitecturePerspective = PromptLoader.Load("SynthesisArchitecturePerspective.md");
+        public static readonly string SynthesisTestingPerspective = PromptLoader.Load("SynthesisTestingPerspective.md");
+        public static readonly string SynthesisEdgeCasesPerspective = PromptLoader.Load("SynthesisEdgeCasesPerspective.md");
+
+        /// <summary>Perspective prompt blocks indexed by perspective (0=Architecture, 1=Testing, 2=EdgeCases).</summary>
+        public static readonly string[] SynthesisPerspectives =
+        {
+            SynthesisArchitecturePerspective,
+            SynthesisTestingPerspective,
+            SynthesisEdgeCasesPerspective
+        };
+
+        public static readonly string[] SynthesisPerspectiveNames = { "Architecture", "Testing", "Edge Cases" };
 
         // ── Helpers ──────────────────────────────────────────────────
 
         /// <summary>
-        /// Returns the task-specific feature mode log filename.
-        /// When taskId is provided, produces ".feature_log_{taskId}.md" so
-        /// multiple feature mode tasks on the same project don't collide.
+        /// Returns the task-specific teams mode log filename.
+        /// When taskId is provided, produces ".teams_log_{taskId}.md" so
+        /// multiple teams mode tasks on the same project don't collide.
         /// </summary>
-        public static string GetFeatureModeLogFilename(string? taskId = null)
-            => string.IsNullOrEmpty(taskId) ? ".feature_log.md" : $".feature_log_{taskId}.md";
+        public static string GetTeamsModeLogFilename(string? taskId = null)
+            => string.IsNullOrEmpty(taskId) ? ".teams_log.md" : $".teams_log_{taskId}.md";
 
         private static string InjectFeatureModeLogFilename(string prompt, string? taskId)
         {
             if (string.IsNullOrEmpty(taskId)) return prompt;
-            return prompt.Replace(".feature_log.md", GetFeatureModeLogFilename(taskId));
+            return prompt.Replace(".teams_log.md", GetTeamsModeLogFilename(taskId));
         }
 
         // ── Prompt Assembly ─────────────────────────────────────────
 
         public string BuildBasePrompt(string systemPrompt, string description, bool useMcp,
-            bool isFeatureMode, bool extendedPlanning = false,
+            bool isTeamsMode, bool extendedPlanning = false,
             bool planOnly = false, string projectDescription = "",
             string projectRulesBlock = "",
             bool autoDecompose = false, bool spawnTeam = false,
             bool isGameProject = false, string taskId = "",
             bool applyFix = true, bool suppressOutputEfficiency = false,
-            string skillsBlock = "", string featureContextBlock = "")
+            string skillsBlock = "", string featureContextBlock = "",
+            string crossProjectHintsBlock = "")
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
                 descBlock = $"# PROJECT CONTEXT\n{projectDescription}\n\n";
 
             var featureBlock = !string.IsNullOrWhiteSpace(featureContextBlock) ? featureContextBlock + "\n" : "";
+            var crossBlock = !string.IsNullOrWhiteSpace(crossProjectHintsBlock) ? crossProjectHintsBlock + "\n" : "";
             var gameBlock = isGameProject ? GameRulesBlock : "";
             var efficiencyBlock = suppressOutputEfficiency ? "" : OutputEfficiencyBlock;
 
-            if (isFeatureMode)
-                return descBlock + projectRulesBlock + featureBlock + skillsBlock + gameBlock + efficiencyBlock + FeatureModeInitialTemplate + description;
+            if (isTeamsMode)
+                return descBlock + projectRulesBlock + featureBlock + crossBlock + skillsBlock + gameBlock + efficiencyBlock + TeamsModeInitialTemplate + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -154,15 +172,24 @@ namespace Spritely.Managers
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;
-            return descBlock + systemPrompt + gitBlock + projectRulesBlock + featureBlock + skillsBlock + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
+            return descBlock + systemPrompt + gitBlock + projectRulesBlock + featureBlock + crossBlock + skillsBlock + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
                 "# USER PROMPT / TASK\n" + description;
         }
 
         public string BuildFullPrompt(string systemPrompt, AgentTask task,
             string projectDescription = "", string projectRulesBlock = "",
             bool isGameProject = false, string skillsBlock = "",
-            string featureContextBlock = "", string pendingChangesBlock = "")
+            string featureContextBlock = "", string pendingChangesBlock = "",
+            PromptVariant? evolutionVariant = null,
+            string crossProjectHintsBlock = "")
         {
+            // Apply prompt evolution variant if one is active for this task
+            if (evolutionVariant != null && !string.IsNullOrWhiteSpace(evolutionVariant.MutatedText))
+            {
+                if (systemPrompt.Contains(evolutionVariant.OriginalText))
+                    systemPrompt = systemPrompt.Replace(evolutionVariant.OriginalText, evolutionVariant.MutatedText);
+            }
+
             var description = !string.IsNullOrEmpty(task.StoredPrompt) ? task.StoredPrompt : task.Description;
             if (!string.IsNullOrWhiteSpace(task.AdditionalInstructions))
                 description += "\n\n# Additional Instructions\n" + task.AdditionalInstructions;
@@ -172,7 +199,7 @@ namespace Spritely.Managers
             var isPlanningMember = task.ParentTaskId != null && !task.ExtendedPlanning && !task.PlanOnly;
             var suppressEfficiency = isPlanningMember || task.PlanOnly;
 
-            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsFeatureMode, task.ExtendedPlanning, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency, skillsBlock, featureContextBlock);
+            var basePrompt = BuildBasePrompt(systemPrompt, description, task.UseMcp, task.IsTeamsMode, task.ExtendedPlanning, task.PlanOnly, projectDescription, projectRulesBlock, task.AutoDecompose, task.SpawnTeam, isGameProject, task.Id, task.ApplyFix, suppressEfficiency, skillsBlock, featureContextBlock, crossProjectHintsBlock);
 
             // Inject pending changes block before the task description so the AI
             // is aware of in-progress uncommitted work in the repository.
@@ -282,20 +309,20 @@ namespace Spritely.Managers
             };
         }
 
-        public string BuildFeatureModeContinuationPrompt(int iteration, int maxIterations, string taskId = "")
+        public string BuildTeamsModeContinuationPrompt(int iteration, int maxIterations, string taskId = "")
         {
-            var prompt = string.Format(FeatureModeContinuationTemplate, iteration, maxIterations);
+            var prompt = string.Format(TeamsModeContinuationTemplate, iteration, maxIterations);
             return OutputEfficiencyBlock + InjectFeatureModeLogFilename(prompt, taskId);
         }
 
-        public string BuildFeatureModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription)
+        public string BuildTeamsModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription)
         {
-            return OutputEfficiencyBlock + string.Format(FeatureModePlanConsolidationTemplate, iteration, maxIterations, teamResults, featureDescription);
+            return OutputEfficiencyBlock + string.Format(TeamsModePlanConsolidationTemplate, iteration, maxIterations, teamResults, featureDescription);
         }
 
-        public string BuildFeatureModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults)
+        public string BuildTeamsModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults)
         {
-            return OutputEfficiencyBlock + string.Format(FeatureModeEvaluationTemplate, iteration, maxIterations, featureDescription, implementationResults);
+            return OutputEfficiencyBlock + string.Format(TeamsModeEvaluationTemplate, iteration, maxIterations, featureDescription, implementationResults);
         }
 
         public string BuildDependencyContext(List<string> depIds,

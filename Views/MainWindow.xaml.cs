@@ -63,6 +63,7 @@ namespace Spritely
         private readonly OutputTabManager _outputTabManager;
         private ProjectManager _projectManager = null!;
         private TaskExecutionManager _taskExecutionManager = null!;
+        private ContextPrefetchPipeline _contextPrefetchPipeline = null!;
         private readonly MessageBusManager _messageBusManager;
         private McpHealthMonitor? _mcpHealthMonitor;
         private TerminalTabManager? _terminalManager;
@@ -222,6 +223,10 @@ namespace Spritely
             var hybridSearchManager = new HybridSearchManager(
                 embeddingService, vectorStore, featureRegistryManager,
                 featureContextResolver, codebaseIndexManager);
+            _contextPrefetchPipeline = new ContextPrefetchPipeline(
+                featureContextResolver, featureRegistryManager, hybridSearchManager,
+                () => _projectManager.ProjectPath);
+
             var featureUpdateAgent = new FeatureUpdateAgent(
                 featureRegistryManager, codebaseIndexManager, moduleRegistryManager, _claudeService);
 
@@ -243,8 +248,10 @@ namespace Spritely
                 saveProjects: () => _projectManager.SaveProjects(),
                 rulesManager: _projectManager.Rules,
                 taskGenerator: improvementTaskGenerator);
-            var feedbackCollector = new FeedbackCollector(feedbackStore, feedbackAnalyzer, feedbackApplicator);
+            var crossProjectInsightsManager = new CrossProjectInsightsManager(appDataDir);
+            var feedbackCollector = new FeedbackCollector(feedbackStore, feedbackAnalyzer, feedbackApplicator, crossProjectInsightsManager);
             _improvementTaskGenerator = improvementTaskGenerator;
+            var promptEvolutionManager = new PromptEvolutionManager(feedbackStore);
 
             _gitOperationGuard = new GitOperationGuard(_fileLockManager);
 
@@ -276,9 +283,13 @@ namespace Spritely
                 ClaudeService = _claudeService,
                 FeedbackCollector = feedbackCollector,
                 SkillDiscoveryAgent = new SkillDiscoveryAgent(_claudeService, _skillManager, Dispatcher),
+                ContextPrefetchPipeline = _contextPrefetchPipeline,
+                PromptEvolutionManager = promptEvolutionManager,
+                CrossProjectInsightsManager = crossProjectInsightsManager,
             });
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
             _taskExecutionManager.SubTaskSpawned += OnSubTaskSpawned;
+            InitializeSynthesisBoard();
 
             _taskOrchestrator = new TaskOrchestrator();
             _taskOrchestrator.TaskReady += OnOrchestratorTaskReady;
@@ -1018,12 +1029,12 @@ namespace Spritely
         }
 
         /// <summary>
-        /// Auto-expands the graph panel when feature mode tasks are present,
+        /// Auto-expands the graph panel when teams mode tasks are present,
         /// and collapses it when no tasks remain.
         /// </summary>
         private void CheckAutoExpandGraph()
         {
-            bool hasFeatureModeTasks = _activeTasks.Any(t => t.IsFeatureMode && !t.IsFinished);
+            bool hasFeatureModeTasks = _activeTasks.Any(t => t.IsTeamsMode && !t.IsFinished);
             bool hasDependencyTasks = _activeTasks.Any(t => t.DependencyTaskIdCount > 0 || t.BlockedByTaskId != null);
 
             if ((hasFeatureModeTasks || hasDependencyTasks) && _graphCollapsed)
@@ -1129,6 +1140,8 @@ namespace Spritely
                         _currentLoadedPrompt = null;
                 }
             }
+
+            _contextPrefetchPipeline?.OnDescriptionChanged(TaskInput.Text ?? "");
         }
 
         private void ClearImages_Click(object sender, RoutedEventArgs e)
@@ -1534,7 +1547,7 @@ namespace Spritely
                 task.ProjectPath,
                 true,
                 false,
-                FeatureModeToggle.IsChecked == true,
+                TeamsModeToggle.IsChecked == true,
                 IgnoreFileLocksToggle.IsChecked == true,
                 UseMcpToggle.IsChecked == true,
                 SpawnTeamToggle.IsChecked == true,

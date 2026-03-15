@@ -207,18 +207,18 @@
                                             <TextBlock Text="Team" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </ToggleButton>
-                                    <ToggleButton x:Name="FeatureModeToggle" IsChecked="False"
-                                                  Style="{StaticResource ToggleChip}" ToolTip="Enable feature mode with iterations"
-                                                  Checked="FeatureModeToggle_Changed" Unchecked="FeatureModeToggle_Changed">
+                                    <ToggleButton x:Name="TeamsModeToggle" IsChecked="False"
+                                                  Style="{StaticResource ToggleChip}" ToolTip="Enable teams mode with iterations"
+                                                  Checked="TeamsModeToggle_Changed" Unchecked="TeamsModeToggle_Changed">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
                                                        Foreground="{StaticResource TextLight}"/>
                                             <TextBlock Text="Feature" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </ToggleButton>
-                                    <StackPanel x:Name="FeatureModeIterationsPanel" Orientation="Horizontal" Margin="0,0,4,4" Visibility="Collapsed">
+                                    <StackPanel x:Name="TeamsModeIterationsPanel" Orientation="Horizontal" Margin="0,0,4,4" Visibility="Collapsed">
                                         <TextBlock Text="×" Foreground="{StaticResource TextMuted}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center" Margin="0,0,2,0"/>
-                                        <TextBox x:Name="FeatureModeIterationsBox" Text="2" Width="36" FontSize="10" FontFamily="Segoe UI"
+                                        <TextBox x:Name="TeamsModeIterationsBox" Text="2" Width="36" FontSize="10" FontFamily="Segoe UI"
                                                  Background="{StaticResource BgDeep}" Foreground="{StaticResource TextPrimary}"
                                                  CaretBrush="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderSubtle}"
                                                  BorderThickness="1" Padding="4,2" VerticalContentAlignment="Center"
@@ -313,10 +313,10 @@
                                     <TextBlock Text="Auto-Mode" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton x:Name="AutoFeatureModeToggle" IsChecked="True"
+                            <ToggleButton x:Name="AutoTeamsModeToggle" IsChecked="True"
                                           Style="{StaticResource ToggleChip}" VerticalAlignment="Center" Margin="4,0,0,0"
-                                          ToolTip="Allow preprocessor to infer feature mode"
-                                          Checked="AutoFeatureModeToggle_Changed" Unchecked="AutoFeatureModeToggle_Changed">
+                                          ToolTip="Allow preprocessor to infer teams mode"
+                                          Checked="AutoTeamsModeToggle_Changed" Unchecked="AutoTeamsModeToggle_Changed">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
                                                Foreground="{StaticResource TextLight}"/>
@@ -1588,8 +1588,11 @@
                                                         </DockPanel>
                                                         <TextBlock Text="{Binding Description}" Foreground="{StaticResource TextSecondary}"
                                                                    FontSize="11" FontFamily="Segoe UI"
-                                                                   TextWrapping="Wrap"
-                                                                   ToolTip="{Binding Description}"/>
+                                                                   TextWrapping="Wrap">
+                                                            <TextBlock.ToolTip>
+                                                                <TextBlock Text="{Binding Description}" MaxWidth="400" TextWrapping="Wrap"/>
+                                                            </TextBlock.ToolTip>
+                                                        </TextBlock>
                                                     </StackPanel>
                                                 </DockPanel>
                                             </Border>

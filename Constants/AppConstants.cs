@@ -94,10 +94,10 @@ namespace Spritely.Constants
         /// <summary>Context reduction factors for each retry attempt (0.8 = 80% of original).</summary>
         public static readonly double[] TokenRetryReductionFactors = { 0.8, 0.6, 0.4, 0.3 };
 
-        /// <summary>Maximum tokens for child result truncation in feature mode.</summary>
+        /// <summary>Maximum tokens for child result truncation in teams mode.</summary>
         public const int MaxChildResultTokens = 2000;
 
-        /// <summary>Threshold for using Sonnet vs Opus in feature mode consolidation (0-1 scale).</summary>
+        /// <summary>Threshold for using Sonnet vs Opus in teams mode consolidation (0-1 scale).</summary>
         public const double ModelComplexityThreshold = 0.5;
 
         // ── Token Cost Rates (USD per million tokens) ──────────────────
@@ -133,5 +133,19 @@ namespace Spritely.Constants
 
         /// <summary>Minimum entries required before invoking the LLM for deep analysis.</summary>
         public const int FeedbackLlmAnalysisThreshold = 15;
+
+        // ── Prompt Evolution ──────────────────────────────────────────────
+
+        /// <summary>Minimum feedback entries before attempting prompt mutation.</summary>
+        public const int PromptEvolutionThreshold = 20;
+
+        /// <summary>Number of recent entries to analyze for failure patterns.</summary>
+        public const int PromptEvolutionAnalysisWindow = 30;
+
+        /// <summary>Total A/B test tasks (variant + control) before making a decision.</summary>
+        public const int PromptEvolutionAbTestSize = 5;
+
+        /// <summary>Maximum prompt variants to retain per project.</summary>
+        public const int PromptEvolutionMaxVariants = 20;
     }
 }

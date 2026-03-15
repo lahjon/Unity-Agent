@@ -17,7 +17,7 @@ namespace Spritely
         public DateTime StartTime { get; set; } = DateTime.Now;
         public bool SkipPermissions { get; set; }
         public bool Headless { get; set; }
-        public bool IsFeatureMode { get; set; }
+        public bool IsTeamsMode { get; set; }
         public bool IgnoreFileLocks { get; set; }
         public bool UseMcp { get; set; }
         public bool SpawnTeam { get; set; }
@@ -27,7 +27,7 @@ namespace Spritely
         public bool AutoDecompose { get; set; }
         public bool ApplyFix { get; set; } = true;
         public bool UseAutoMode { get; set; } = true;
-        public bool AllowFeatureModeInference { get; set; } = true;
+        public bool AllowTeamsModeInference { get; set; } = true;
         public string AdditionalInstructions { get; set; } = "";
         public string? StoredPrompt { get; set; }
         public string? ConversationId { get; set; }
@@ -101,7 +101,7 @@ namespace Spritely
         public string? LastUsedCliModel { get; set; }
 
         // Feature mode multi-phase tracking
-        public FeatureModePhase FeatureModePhase { get; set; }
+        public TeamsModePhase TeamsModePhase { get; set; }
 
         // Thread-safe feature phase child IDs
         private readonly object _featurePhaseChildIdsLock = new();
@@ -111,17 +111,17 @@ namespace Spritely
         /// Gets a snapshot (copy) of the feature phase child IDs for safe iteration,
         /// or replaces the entire list under lock.
         /// </summary>
-        public List<string> FeaturePhaseChildIds
+        public List<string> TeamsPhaseChildIds
         {
             get { lock (_featurePhaseChildIdsLock) return _featurePhaseChildIds.ToList(); }
             set { lock (_featurePhaseChildIdsLock) _featurePhaseChildIds = value ?? new List<string>(); }
         }
 
-        public void AddFeaturePhaseChildId(string id) { lock (_featurePhaseChildIdsLock) _featurePhaseChildIds.Add(id); }
-        public void ClearFeaturePhaseChildIds() { lock (_featurePhaseChildIdsLock) _featurePhaseChildIds.Clear(); }
-        public bool ContainsFeaturePhaseChildId(string id) { lock (_featurePhaseChildIdsLock) return _featurePhaseChildIds.Contains(id); }
-        public int FeaturePhaseChildIdCount { get { lock (_featurePhaseChildIdsLock) return _featurePhaseChildIds.Count; } }
+        public void AddTeamsPhaseChildId(string id) { lock (_featurePhaseChildIdsLock) _featurePhaseChildIds.Add(id); }
+        public void ClearTeamsPhaseChildIds() { lock (_featurePhaseChildIdsLock) _featurePhaseChildIds.Clear(); }
+        public bool ContainsTeamsPhaseChildId(string id) { lock (_featurePhaseChildIdsLock) return _featurePhaseChildIds.Contains(id); }
+        public int TeamsPhaseChildIdCount { get { lock (_featurePhaseChildIdsLock) return _featurePhaseChildIds.Count; } }
 
-        public string OriginalFeatureDescription { get; set; } = "";
+        public string OriginalTeamsDescription { get; set; } = "";
     }
 }

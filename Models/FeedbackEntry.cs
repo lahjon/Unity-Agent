@@ -32,11 +32,16 @@ namespace Spritely.Models
         public int IterationCount { get; set; }
 
         // Task configuration that led to this outcome
-        public bool WasFeatureMode { get; set; }
+        public bool WasTeamsMode { get; set; }
         public bool UsedMcp { get; set; }
         public bool UsedExtendedPlanning { get; set; }
         public bool UsedAutoDecompose { get; set; }
         public string Model { get; set; } = "";
+
+        // Feature context tracking (populated from RuntimeTaskContext)
+        public List<string> InjectedFeatureIds { get; set; } = new();
+        public string TaskCategory { get; set; } = "default";
+        public int ContextTokensUsed { get; set; }
 
         // Derived analysis (populated by FeedbackAnalyzer)
         public List<string> SuccessFactors { get; set; } = new();

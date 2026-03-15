@@ -13,7 +13,7 @@ namespace Spritely.Managers
             string projectPath,
             bool skipPermissions,
             bool headless,
-            bool isFeatureMode,
+            bool isTeamsMode,
             bool ignoreFileLocks,
             bool useMcp,
             bool spawnTeam = false,

@@ -114,6 +114,9 @@ namespace Spritely
             _taskExecutionManager.TaskCompleted -= OnTaskProcessCompleted;
             _taskExecutionManager.TaskCompleted -= _gitPanelManager.OnTaskCompleted;
             _taskExecutionManager.SubTaskSpawned -= OnSubTaskSpawned;
+            _taskExecutionManager.SynthesisPerspectivesSpawned -= OnSynthesisPerspectivesSpawned;
+            _taskExecutionManager.SynthesisPerspectiveCompleted -= OnSynthesisPerspectiveCompleted;
+            _taskExecutionManager.SynthesisComplete -= OnSynthesisComplete;
 
             _taskOrchestrator.TaskReady -= OnOrchestratorTaskReady;
 

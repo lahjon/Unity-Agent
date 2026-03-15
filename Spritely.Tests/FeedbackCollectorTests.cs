@@ -169,7 +169,7 @@ namespace Spritely.Tests
         public void CollectAndAnalyze_CapturesTaskConfiguration()
         {
             var task = CreateTask(AgentTaskStatus.Completed);
-            task.IsFeatureMode = true;
+            task.IsTeamsMode = true;
             task.UseMcp = true;
             task.ExtendedPlanning = true;
             task.AutoDecompose = true;
@@ -179,7 +179,7 @@ namespace Spritely.Tests
             SafeFileWriter.FlushAll();
 
             var entries = _store.LoadEntries(task.ProjectPath);
-            Assert.True(entries[0].WasFeatureMode);
+            Assert.True(entries[0].WasTeamsMode);
             Assert.True(entries[0].UsedMcp);
             Assert.True(entries[0].UsedExtendedPlanning);
             Assert.True(entries[0].UsedAutoDecompose);

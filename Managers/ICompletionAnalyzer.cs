@@ -26,7 +26,7 @@ namespace Spritely.Managers
             string outputTail, string taskDescription, string? completionSummary,
             CancellationToken ct = default, string? modelOverride = null);
 
-        bool CheckFeatureModeComplete(string output);
+        bool CheckTeamsModeComplete(string output);
 
         bool IsTokenLimitError(string output);
     }

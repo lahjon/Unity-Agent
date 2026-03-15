@@ -41,7 +41,7 @@ namespace Spritely
         GeminiGameArt
     }
 
-    public enum FeatureModePhase
+    public enum TeamsModePhase
     {
         None = 0,
         TeamPlanning = 1,
@@ -104,7 +104,7 @@ namespace Spritely
         public DateTime StartTime { get => Data.StartTime; set => Data.StartTime = value; }
         public bool SkipPermissions { get => Data.SkipPermissions; set => Data.SkipPermissions = value; }
         public bool Headless { get => Data.Headless; set => Data.Headless = value; }
-        public bool IsFeatureMode { get => Data.IsFeatureMode; set => Data.IsFeatureMode = value; }
+        public bool IsTeamsMode { get => Data.IsTeamsMode; set => Data.IsTeamsMode = value; }
         public bool UseMcp { get => Data.UseMcp; set => Data.UseMcp = value; }
         public bool SpawnTeam { get => Data.SpawnTeam; set => Data.SpawnTeam = value; }
         public bool ExtendedPlanning { get => Data.ExtendedPlanning; set => Data.ExtendedPlanning = value; }
@@ -113,7 +113,7 @@ namespace Spritely
         public bool AutoDecompose { get => Data.AutoDecompose; set => Data.AutoDecompose = value; }
         public bool ApplyFix { get => Data.ApplyFix; set => Data.ApplyFix = value; }
         public bool UseAutoMode { get => Data.UseAutoMode; set => Data.UseAutoMode = value; }
-        public bool AllowFeatureModeInference { get => Data.AllowFeatureModeInference; set => Data.AllowFeatureModeInference = value; }
+        public bool AllowTeamsModeInference { get => Data.AllowTeamsModeInference; set => Data.AllowTeamsModeInference = value; }
         public string? GroupId { get => Data.GroupId; set => Data.GroupId = value; }
         public string? GroupName { get => Data.GroupName; set => Data.GroupName = value; }
         public string AdditionalInstructions { get => Data.AdditionalInstructions; set => Data.AdditionalInstructions = value; }
@@ -130,12 +130,12 @@ namespace Spritely
         public string? DependencyContext { get => Data.DependencyContext; set => Data.DependencyContext = value; }
         public string? ParentTaskId { get => Data.ParentTaskId; set => Data.ParentTaskId = value; }
         public List<string> ChildTaskIds { get => Data.ChildTaskIds; set => Data.ChildTaskIds = value; }
-        public List<string> FeaturePhaseChildIds { get => Data.FeaturePhaseChildIds; set => Data.FeaturePhaseChildIds = value; }
-        public void AddFeaturePhaseChildId(string id) => Data.AddFeaturePhaseChildId(id);
-        public void ClearFeaturePhaseChildIds() => Data.ClearFeaturePhaseChildIds();
-        public bool ContainsFeaturePhaseChildId(string id) => Data.ContainsFeaturePhaseChildId(id);
-        public int FeaturePhaseChildIdCount => Data.FeaturePhaseChildIdCount;
-        public string OriginalFeatureDescription { get => Data.OriginalFeatureDescription; set => Data.OriginalFeatureDescription = value; }
+        public List<string> TeamsPhaseChildIds { get => Data.TeamsPhaseChildIds; set => Data.TeamsPhaseChildIds = value; }
+        public void AddTeamsPhaseChildId(string id) => Data.AddTeamsPhaseChildId(id);
+        public void ClearTeamsPhaseChildIds() => Data.ClearTeamsPhaseChildIds();
+        public bool ContainsTeamsPhaseChildId(string id) => Data.ContainsTeamsPhaseChildId(id);
+        public int TeamsPhaseChildIdCount => Data.TeamsPhaseChildIdCount;
+        public string OriginalTeamsDescription { get => Data.OriginalTeamsDescription; set => Data.OriginalTeamsDescription = value; }
         public int? TimeoutMinutes { get => Data.TimeoutMinutes; set => Data.TimeoutMinutes = value; }
         public bool HasTimeoutWarning { get => Data.HasTimeoutWarning; set => Data.HasTimeoutWarning = value; }
 
@@ -261,10 +261,10 @@ namespace Spritely
             set { if (Data.EndTime == value) return; Data.EndTime = value; OnPropertyChanged(); NotifyAlso(nameof(TimeInfo)); }
         }
 
-        public FeatureModePhase FeatureModePhase
+        public TeamsModePhase TeamsModePhase
         {
-            get => Data.FeatureModePhase;
-            set { if (Data.FeatureModePhase == value) return; Data.FeatureModePhase = value; OnPropertyChanged(); NotifyAlso(nameof(StatusText), nameof(QueueStatusText)); }
+            get => Data.TeamsModePhase;
+            set { if (Data.TeamsModePhase == value) return; Data.TeamsModePhase = value; OnPropertyChanged(); NotifyAlso(nameof(StatusText), nameof(QueueStatusText)); }
         }
 
         // ── Token tracking ─────────────────────────────────────────────
@@ -340,8 +340,8 @@ namespace Spritely
         // ── Runtime state delegation ──────────────────────────────────
 
         public StringBuilder OutputBuilder => Runtime.OutputBuilder;
-        public System.Windows.Threading.DispatcherTimer? FeatureModeRetryTimer { get => Runtime.FeatureModeRetryTimer; set => Runtime.FeatureModeRetryTimer = value; }
-        public System.Windows.Threading.DispatcherTimer? FeatureModeIterationTimer { get => Runtime.FeatureModeIterationTimer; set => Runtime.FeatureModeIterationTimer = value; }
+        public System.Windows.Threading.DispatcherTimer? TeamsModeRetryTimer { get => Runtime.TeamsModeRetryTimer; set => Runtime.TeamsModeRetryTimer = value; }
+        public System.Windows.Threading.DispatcherTimer? TeamsModeIterationTimer { get => Runtime.TeamsModeIterationTimer; set => Runtime.TeamsModeIterationTimer = value; }
         public System.Windows.Threading.DispatcherTimer? TokenLimitRetryTimer { get => Runtime.TokenLimitRetryTimer; set => Runtime.TokenLimitRetryTimer = value; }
         public int ConsecutiveFailures { get => Runtime.ConsecutiveFailures; set => Runtime.ConsecutiveFailures = value; }
         public int ConsecutiveTokenLimitRetries { get => Runtime.ConsecutiveTokenLimitRetries; set => Runtime.ConsecutiveTokenLimitRetries = value; }
@@ -382,7 +382,7 @@ namespace Spritely
         public bool IsSubTask => ParentTaskId != null;
         public bool HasChildren => ChildTaskIds.Count > 0;
         public int NestingDepth => IsSubTask ? 1 : 0;
-        public bool IsWaitingForRetry => TokenLimitRetryTimer != null || FeatureModeRetryTimer != null;
+        public bool IsWaitingForRetry => TokenLimitRetryTimer != null || TeamsModeRetryTimer != null;
         public bool IsRunning => Status is AgentTaskStatus.Running or AgentTaskStatus.Stored;
         public bool IsPlanning => Status == AgentTaskStatus.Planning;
         public bool IsQueued => Status == AgentTaskStatus.Queued;
@@ -427,11 +427,11 @@ namespace Spritely
         public string StatusText => Status switch
         {
             AgentTaskStatus.Running when IsWaitingForRetry => "Retrying soon",
-            AgentTaskStatus.Running when IsFeatureMode && FeatureModePhase == FeatureModePhase.TeamPlanning =>
+            AgentTaskStatus.Running when IsTeamsMode && TeamsModePhase == TeamsModePhase.TeamPlanning =>
                 $"Coordinating ({CurrentIteration}/{MaxIterations}) — Team Planning",
-            AgentTaskStatus.Running when IsFeatureMode && FeatureModePhase == FeatureModePhase.Execution =>
+            AgentTaskStatus.Running when IsTeamsMode && TeamsModePhase == TeamsModePhase.Execution =>
                 $"Coordinating ({CurrentIteration}/{MaxIterations}) — Execution",
-            AgentTaskStatus.Running => IsFeatureMode ? $"Running ({CurrentIteration}/{MaxIterations})" : "Running",
+            AgentTaskStatus.Running => IsTeamsMode ? $"Running ({CurrentIteration}/{MaxIterations})" : "Running",
             AgentTaskStatus.Completed => "Finished",
             AgentTaskStatus.Cancelled => "Cancelled",
             AgentTaskStatus.Failed => "Failed",
@@ -497,7 +497,7 @@ namespace Spritely
             get
             {
                 var tags = new List<string>(4);
-                if (IsFeatureMode) tags.Add("FEAT");
+                if (IsTeamsMode) tags.Add("TEAMS");
                 if (ExtendedPlanning) tags.Add("EXT");
                 if (Headless) tags.Add("HDL");
                 if (SpawnTeam) tags.Add("TEAM");
@@ -512,7 +512,7 @@ namespace Spritely
             get
             {
                 var lines = new List<string>(4);
-                if (IsFeatureMode) lines.Add("FEAT = Feature Mode");
+                if (IsTeamsMode) lines.Add("TEAMS = Teams Mode");
                 if (ExtendedPlanning) lines.Add("EXT = Extended Planning");
                 if (Headless) lines.Add("HDL = Headless");
                 if (SpawnTeam) lines.Add("TEAM = Spawn Team");

@@ -31,7 +31,7 @@ namespace Spritely.Tests
 
         private static AgentTask MakeFeatureModeTask(string projectPath)
         {
-            var t = _factory.CreateTask("feature mode task", projectPath, true, false, true, true, false, false);
+            var t = _factory.CreateTask("teams mode task", projectPath, true, false, true, true, false, false);
             _factory.PrepareTaskForFeatureModeStart(t);
             return t;
         }
@@ -190,7 +190,7 @@ namespace Spritely.Tests
             featureMode.CurrentIteration = 5;
 
             Assert.Equal(@"C:\Projects\Alpha", featureMode.ProjectPath);
-            Assert.True(featureMode.IsFeatureMode);
+            Assert.True(featureMode.IsTeamsMode);
             Assert.True(featureMode.SkipPermissions);
             Assert.Equal(5, featureMode.CurrentIteration);
             Assert.True(featureMode.IsRunning);
@@ -199,7 +199,7 @@ namespace Spritely.Tests
         [Fact]
         public void FeatureModeTask_ContinuationPrompt_UsesCorrectIteration()
         {
-            var prompt = _prompt.BuildFeatureModeContinuationPrompt(7, 50);
+            var prompt = _prompt.BuildTeamsModeContinuationPrompt(7, 50);
             Assert.Contains("iteration 7/50", prompt);
         }
 
@@ -211,7 +211,7 @@ namespace Spritely.Tests
                 Description = "Feature mode fix",
                 ProjectPath = @"C:\Projects\Alpha",
                 SkipPermissions = false,
-                IsFeatureMode = true
+                IsTeamsMode = true
             };
             _factory.PrepareTaskForFeatureModeStart(task);
 
@@ -355,7 +355,7 @@ namespace Spritely.Tests
             {
                 Description = "fix bug",
                 UseMcp = false,
-                IsFeatureMode = false
+                IsTeamsMode = false
             };
 
             var result = _prompt.BuildFullPrompt("SYS:", task, "A Unity game project");
@@ -372,7 +372,7 @@ namespace Spritely.Tests
             {
                 Description = "do work",
                 UseMcp = false,
-                IsFeatureMode = false
+                IsTeamsMode = false
             };
 
             var result = _prompt.BuildFullPrompt("SYS:", task, "");
@@ -386,7 +386,7 @@ namespace Spritely.Tests
             {
                 Description = "do work",
                 UseMcp = false,
-                IsFeatureMode = false
+                IsTeamsMode = false
             };
 
             // null description should not crash

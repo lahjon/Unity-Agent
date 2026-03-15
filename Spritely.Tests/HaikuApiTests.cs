@@ -96,7 +96,7 @@ namespace Spritely.Tests
             _output.WriteLine($"Enhanced prompt: {result.EnhancedPrompt}");
             _output.WriteLine($"ApplyFix: {result.ApplyFix}");
             _output.WriteLine($"ExtendedPlanning: {result.ExtendedPlanning}");
-            _output.WriteLine($"FeatureMode: {result.IsFeatureMode}");
+            _output.WriteLine($"TeamsMode: {result.IsTeamsMode}");
             _output.WriteLine($"AutoDecompose: {result.AutoDecompose}");
             _output.WriteLine($"SpawnTeam: {result.SpawnTeam}");
             _output.WriteLine($"UseMcp: {result.UseMcp}");
@@ -111,7 +111,7 @@ namespace Spritely.Tests
 
             // A simple bug fix should have sensible defaults
             Assert.True(result.ApplyFix, "A bug fix task should have ApplyFix=true");
-            Assert.False(result.IsFeatureMode, "A simple fix should not trigger feature mode");
+            Assert.False(result.IsTeamsMode, "A simple fix should not trigger teams mode");
             Assert.False(result.AutoDecompose, "A simple fix should not auto-decompose");
             Assert.False(result.SpawnTeam, "A simple fix should not spawn a team");
             Assert.False(result.UseMcp, "A non-Unity task should not use MCP");

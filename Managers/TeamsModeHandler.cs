@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -6,19 +7,21 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Threading;
 using Spritely.Constants;
 
 namespace Spritely.Managers
 {
     /// <summary>
-    /// Manages feature mode multi-phase orchestration:
+    /// Manages teams mode multi-phase orchestration:
     /// Phase 1 (TeamPlanning): Spawn a planning team that explores the codebase
-    /// Phase 2 (PlanConsolidation): Consolidate team findings into step-by-step FEATURE_STEPS
+    /// Phase 2 (PlanConsolidation): Consolidate team findings into step-by-step TEAM_STEPS
     /// Phase 3 (Execution): Create tasks for each step with dependency tracking
     /// Phase 4 (Evaluation): Evaluate all results, decide whether to iterate
     /// </summary>
-    public class FeatureModeHandler
+    public class TeamsModeHandler
     {
         private readonly string _scriptDir;
         private readonly TaskProcessLauncher _processLauncher;
@@ -33,26 +36,39 @@ namespace Spritely.Managers
         private readonly ModelComplexityAnalyzer _modelComplexityAnalyzer;
         private readonly EarlyTerminationManager _earlyTerminationManager;
         private readonly IterationMemoryManager _iterationMemoryManager;
+        private PlanSynthesizer? _planSynthesizer;
 
-        internal const int FeatureModeMaxRuntimeHours = 12;
-        internal const int FeatureModeIterationTimeoutMinutes = 60;
-        internal const int FeatureModeMaxConsecutiveFailures = 3;
-        internal const int FeatureModeOutputCapChars = 100_000;
+        /// <summary>Maps parent task ID → list of 3 perspective agent IDs (Architecture, Testing, EdgeCases).</summary>
+        private readonly ConcurrentDictionary<string, string[]> _perspectiveAgents = new();
+
+        /// <summary>Fires when perspective agents are spawned for the synthesis board (parentTaskId, perspectiveTaskIds[3]).</summary>
+        public event Action<string, string[]>? SynthesisPerspectivesSpawned;
+
+        /// <summary>Fires when a perspective agent completes (parentTaskId, perspectiveIndex 0-2).</summary>
+        public event Action<string, int>? SynthesisPerspectiveCompleted;
+
+        /// <summary>Fires when plan synthesis is complete (parentTaskId, synthesisResult).</summary>
+        public event Action<string, string>? SynthesisComplete;
+
+        internal const int TeamsModeMaxRuntimeHours = 12;
+        internal const int TeamsModeIterationTimeoutMinutes = 60;
+        internal const int TeamsModeMaxConsecutiveFailures = 3;
+        internal const int TeamsModeOutputCapChars = 100_000;
         internal const int PlanningTeamMemberTimeoutMinutes = 30;
 
-        /// <summary>Fires when a new feature mode iteration starts (taskId, iteration).</summary>
+        /// <summary>Fires when a new teams mode iteration starts (taskId, iteration).</summary>
         public event Action<string, int>? IterationStarted;
 
-        /// <summary>Fires when the feature mode finishes for a task (taskId, finalStatus).</summary>
-        public event Action<string, AgentTaskStatus>? FeatureModeFinished;
+        /// <summary>Fires when the teams mode finishes for a task (taskId, finalStatus).</summary>
+        public event Action<string, AgentTaskStatus>? TeamsModeFinished;
 
         /// <summary>Fires when a team member or step task needs to be spawned (parent, child).</summary>
-        public event Action<AgentTask, AgentTask>? FeatureModeChildSpawned;
+        public event Action<AgentTask, AgentTask>? TeamsModeChildSpawned;
 
         /// <summary>Fires to request team extraction from output (parent, output) → list of children.</summary>
         public event Func<AgentTask, string, List<AgentTask>?>? ExtractTeamRequested;
 
-        public FeatureModeHandler(
+        public TeamsModeHandler(
             string scriptDir,
             TaskProcessLauncher processLauncher,
             OutputProcessor outputProcessor,
@@ -82,16 +98,19 @@ namespace Spritely.Managers
             _iterationMemoryManager = iterationMemoryManager ?? new IterationMemoryManager();
         }
 
-        // ── Main entry point: called when a feature mode task's process exits ──
+        /// <summary>Sets the plan synthesizer for merging perspective agent outputs.</summary>
+        public void SetPlanSynthesizer(PlanSynthesizer synthesizer) => _planSynthesizer = synthesizer;
 
-        public void HandleFeatureModeIteration(AgentTask task, int exitCode,
+        // ── Main entry point: called when a teams mode task's process exits ──
+
+        public void HandleTeamsModeIteration(AgentTask task, int exitCode,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            if (task.FeatureModeIterationTimer != null)
+            if (task.TeamsModeIterationTimer != null)
             {
-                task.FeatureModeIterationTimer.Stop();
-                task.FeatureModeIterationTimer = null;
+                task.TeamsModeIterationTimer.Stop();
+                task.TeamsModeIterationTimer = null;
             }
 
             if (task.Status != AgentTaskStatus.Running) return;
@@ -101,11 +120,11 @@ namespace Spritely.Managers
                 ? fullOutput[task.LastIterationOutputStart..]
                 : fullOutput;
 
-            // Trim OutputBuilder if it exceeds the feature mode cap
-            if (task.OutputBuilder.Length > FeatureModeOutputCapChars)
+            // Trim OutputBuilder if it exceeds the teams mode cap
+            if (task.OutputBuilder.Length > TeamsModeOutputCapChars)
             {
                 var trimmed = task.OutputBuilder.ToString(
-                    task.OutputBuilder.Length - FeatureModeOutputCapChars, FeatureModeOutputCapChars);
+                    task.OutputBuilder.Length - TeamsModeOutputCapChars, TeamsModeOutputCapChars);
                 task.OutputBuilder.Clear();
                 task.OutputBuilder.Append(trimmed);
                 task.LastIterationOutputStart = Math.Min(task.LastIterationOutputStart, task.OutputBuilder.Length);
@@ -113,10 +132,10 @@ namespace Spritely.Managers
 
             // Check runtime cap
             var totalRuntime = DateTime.Now - task.StartTime;
-            if (totalRuntime.TotalHours >= FeatureModeMaxRuntimeHours)
+            if (totalRuntime.TotalHours >= TeamsModeMaxRuntimeHours)
             {
-                _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Total runtime cap ({FeatureModeMaxRuntimeHours}h) reached. Stopping.\n", activeTasks, historyTasks);
-                FinishFeatureModeTask(task, AgentTaskStatus.Completed, activeTasks, historyTasks, moveToHistory);
+                _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] Total runtime cap ({TeamsModeMaxRuntimeHours}h) reached. Stopping.\n", activeTasks, historyTasks);
+                FinishTeamsModeTask(task, AgentTaskStatus.Completed, activeTasks, historyTasks, moveToHistory);
                 return;
             }
 
@@ -128,8 +147,8 @@ namespace Spritely.Managers
 
                 if (task.ConsecutiveTokenLimitRetries >= maxTokenLimitRetries)
                 {
-                    _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Max token limit retries ({maxTokenLimitRetries}) reached. Stopping.\n", activeTasks, historyTasks);
-                    FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
+                    _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] Max token limit retries ({maxTokenLimitRetries}) reached. Stopping.\n", activeTasks, historyTasks);
+                    FinishTeamsModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
                     return;
                 }
 
@@ -146,11 +165,11 @@ namespace Spritely.Managers
             if (exitCode != 0)
             {
                 task.ConsecutiveFailures++;
-                _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Phase process exited with code {exitCode} (failure {task.ConsecutiveFailures}/{FeatureModeMaxConsecutiveFailures})\n", activeTasks, historyTasks);
-                if (task.ConsecutiveFailures >= FeatureModeMaxConsecutiveFailures)
+                _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] Phase process exited with code {exitCode} (failure {task.ConsecutiveFailures}/{TeamsModeMaxConsecutiveFailures})\n", activeTasks, historyTasks);
+                if (task.ConsecutiveFailures >= TeamsModeMaxConsecutiveFailures)
                 {
-                    _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] {FeatureModeMaxConsecutiveFailures} consecutive failures. Stopping.\n", activeTasks, historyTasks);
-                    FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
+                    _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] {TeamsModeMaxConsecutiveFailures} consecutive failures. Stopping.\n", activeTasks, historyTasks);
+                    FinishTeamsModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
                     return;
                 }
             }
@@ -164,7 +183,7 @@ namespace Spritely.Managers
             // Only evaluate during Evaluation phase (end of a full logical iteration).
             // Planning/consolidation phases are read-only by design and produce no file
             // changes, which would falsely trigger stall detection.
-            var shouldEvaluateTermination = task.FeatureModePhase == FeatureModePhase.Evaluation;
+            var shouldEvaluateTermination = task.TeamsModePhase == TeamsModePhase.Evaluation;
             var terminationDecision = shouldEvaluateTermination
                 ? _earlyTerminationManager.EvaluateTermination(task, iterationOutput)
                 : new TerminationDecision { ShouldTerminate = false, Reason = TerminationReason.None };
@@ -178,8 +197,8 @@ namespace Spritely.Managers
                     _ => "early termination triggered"
                 };
                 _outputProcessor.AppendOutput(task.Id,
-                    $"\n[Feature Mode] Early termination: {reason} (confidence: {terminationDecision.Confidence:P0})\n" +
-                    $"[Feature Mode] Detail: {terminationDecision.Explanation}\n",
+                    $"\n[Teams Mode] Early termination: {reason} (confidence: {terminationDecision.Confidence:P0})\n" +
+                    $"[Teams Mode] Detail: {terminationDecision.Explanation}\n",
                     activeTasks, historyTasks);
 
                 // Log evidence from each check
@@ -188,12 +207,12 @@ namespace Spritely.Managers
                     if (check.Severity >= CheckSeverity.Warning)
                     {
                         _outputProcessor.AppendOutput(task.Id,
-                            $"[Feature Mode]   • {check.Type}: {check.Description}\n",
+                            $"[Teams Mode]   • {check.Type}: {check.Description}\n",
                             activeTasks, historyTasks);
                     }
                 }
 
-                FinishFeatureModeTask(task,
+                FinishTeamsModeTask(task,
                     terminationDecision.Reason == TerminationReason.CriticalFailure
                         ? AgentTaskStatus.Failed
                         : AgentTaskStatus.Completed,
@@ -203,31 +222,31 @@ namespace Spritely.Managers
             else if (!string.IsNullOrEmpty(terminationDecision.RecommendedAction))
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    $"[Feature Mode] Progress monitor: {terminationDecision.Explanation} — {terminationDecision.RecommendedAction}\n",
+                    $"[Teams Mode] Progress monitor: {terminationDecision.Explanation} — {terminationDecision.RecommendedAction}\n",
                     activeTasks, historyTasks);
             }
 
             // Route based on current phase
-            switch (task.FeatureModePhase)
+            switch (task.TeamsModePhase)
             {
-                case FeatureModePhase.None:
+                case TeamsModePhase.None:
                     // Initial planning process completed — extract team
                     HandlePlanningProcessComplete(task, iterationOutput, activeTasks, historyTasks, moveToHistory);
                     break;
 
-                case FeatureModePhase.PlanConsolidation:
+                case TeamsModePhase.PlanConsolidation:
                     // Consolidation process completed — extract steps
                     HandleConsolidationComplete(task, iterationOutput, activeTasks, historyTasks, moveToHistory);
                     break;
 
-                case FeatureModePhase.Evaluation:
+                case TeamsModePhase.Evaluation:
                     // Evaluation process completed — check if done or iterate
                     HandleEvaluationComplete(task, iterationOutput, activeTasks, historyTasks, moveToHistory);
                     break;
 
                 default:
                     // TeamPlanning or Execution phases don't have their own process — they wait for children
-                    _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Unexpected process exit in phase {task.FeatureModePhase}.\n", activeTasks, historyTasks);
+                    _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] Unexpected process exit in phase {task.TeamsModePhase}.\n", activeTasks, historyTasks);
                     break;
             }
         }
@@ -247,26 +266,26 @@ namespace Spritely.Managers
             if (children == null || children.Count == 0)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Feature Mode] No team produced — falling back to direct plan consolidation.\n",
+                    "\n[Teams Mode] No team produced — falling back to direct plan consolidation.\n",
                     activeTasks, historyTasks);
 
                 // Skip team phase, go directly to plan consolidation
-                task.FeatureModePhase = FeatureModePhase.PlanConsolidation;
+                task.TeamsModePhase = TeamsModePhase.PlanConsolidation;
                 StartPlanConsolidationProcess(task, "", activeTasks, historyTasks, moveToHistory);
                 return;
             }
 
             // Mark the parent as the Main coordinator so the UI clearly identifies it
             if (string.IsNullOrWhiteSpace(task.Summary) || !task.Summary.StartsWith("[Main]"))
-                task.Summary = $"[Main] {(task.Summary ?? _taskFactory.GenerateLocalSummary(task.OriginalFeatureDescription))}";
+                task.Summary = $"[Main] {(task.Summary ?? _taskFactory.GenerateLocalSummary(task.OriginalTeamsDescription))}";
 
             // First pass: Configure team members for planning only (no file modifications)
-            task.ClearFeaturePhaseChildIds();
+            task.ClearTeamsPhaseChildIds();
             foreach (var child in children)
             {
                 child.SpawnTeam = false;
                 child.AutoDecompose = false;
-                child.IsFeatureMode = false;
+                child.IsTeamsMode = false;
                 child.UseMessageBus = true;
                 child.SkipPermissions = true;
                 // Propagate parent's feature context so planning members know which files to explore
@@ -285,16 +304,16 @@ namespace Spritely.Managers
             {
                 try
                 {
-                    task.AddFeaturePhaseChildId(child.Id);
-                    FeatureModeChildSpawned?.Invoke(task, child);
+                    task.AddTeamsPhaseChildId(child.Id);
+                    TeamsModeChildSpawned?.Invoke(task, child);
                     spawnedCount++;
                 }
                 catch (Exception ex)
                 {
                     anySpawnFailed = true;
-                    AppLogger.Warn("FeatureMode", $"Failed to spawn team member '{child.Summary}' for task {task.Id}", ex);
+                    AppLogger.Warn("TeamsMode", $"Failed to spawn team member '{child.Summary}' for task {task.Id}", ex);
                     _outputProcessor.AppendOutput(task.Id,
-                        $"\n[Feature Mode] WARNING: Failed to spawn team member: {ex.Message}\n",
+                        $"\n[Teams Mode] WARNING: Failed to spawn team member: {ex.Message}\n",
                         activeTasks, historyTasks);
                     break; // Stop spawning more children on first failure
                 }
@@ -310,9 +329,9 @@ namespace Spritely.Managers
                 }
 
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Feature Mode] Team member spawn failures — falling back to direct plan consolidation.\n",
+                    "\n[Teams Mode] Team member spawn failures — falling back to direct plan consolidation.\n",
                     activeTasks, historyTasks);
-                task.FeatureModePhase = FeatureModePhase.PlanConsolidation;
+                task.TeamsModePhase = TeamsModePhase.PlanConsolidation;
                 StartPlanConsolidationProcess(task, "", activeTasks, historyTasks, moveToHistory);
                 return;
             }
@@ -320,9 +339,12 @@ namespace Spritely.Managers
             // Refresh dependency display info now that TaskNumbers are assigned
             TaskExecutionManager.RefreshDependencyDisplayInfo(children, "team member");
 
-            task.FeatureModePhase = FeatureModePhase.TeamPlanning;
+            // Spawn 3 parallel perspective agents for synthesis board
+            SpawnSynthesisPerspectiveAgents(task, activeTasks, historyTasks);
+
+            task.TeamsModePhase = TeamsModePhase.TeamPlanning;
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Feature Mode] Planning team spawned with {spawnedCount} member(s). Waiting for team to complete...\n",
+                $"\n[Teams Mode] Planning team spawned with {spawnedCount} member(s) + 3 perspective agents. Waiting for team to complete...\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
@@ -330,11 +352,96 @@ namespace Spritely.Managers
             StartPhaseTimeout(task, PlanningTeamMemberTimeoutMinutes, activeTasks, historyTasks, moveToHistory);
         }
 
+        // ── Synthesis perspective agents ────────────────────────────────
+
+        /// <summary>
+        /// Spawns 3 parallel Sonnet agents with distinct perspectives (Architecture, Testing, Edge Cases)
+        /// as additional team members for the synthesis board.
+        /// </summary>
+        private void SpawnSynthesisPerspectiveAgents(AgentTask task,
+            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
+        {
+            var perspectiveIds = new string[3];
+
+            for (int i = 0; i < 3; i++)
+            {
+                var perspectiveName = PromptBuilder.SynthesisPerspectiveNames[i];
+                var perspectivePrompt = PromptBuilder.SynthesisPerspectives[i];
+
+                var description = $"[Synth:{perspectiveName}] Analyze from {perspectiveName} perspective: {task.OriginalTeamsDescription}";
+                var child = _taskFactory.CreateTask(
+                    description,
+                    task.ProjectPath,
+                    skipPermissions: true,
+                    headless: false,
+                    isTeamsMode: false,
+                    ignoreFileLocks: false,
+                    useMcp: task.UseMcp,
+                    spawnTeam: false,
+                    extendedPlanning: false,
+                    planOnly: false,
+                    useMessageBus: true,
+                    model: task.Model,
+                    parentTaskId: task.Id);
+
+                child.ProjectColor = task.ProjectColor;
+                child.ProjectDisplayName = task.ProjectDisplayName;
+                child.Summary = $"[Synth:{perspectiveName}]";
+                child.AutoDecompose = false;
+
+                if (!string.IsNullOrWhiteSpace(task.Runtime.FeatureContextBlock))
+                    child.Runtime.FeatureContextBlock = task.Runtime.FeatureContextBlock;
+
+                child.AdditionalInstructions = perspectivePrompt +
+                    PromptBuilder.PlanningTeamMemberBlock +
+                    (child.AdditionalInstructions ?? "");
+
+                perspectiveIds[i] = child.Id;
+
+                try
+                {
+                    task.AddTeamsPhaseChildId(child.Id);
+                    TeamsModeChildSpawned?.Invoke(task, child);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("TeamsMode", $"Failed to spawn synthesis perspective '{perspectiveName}' for task {task.Id}", ex);
+                    _outputProcessor.AppendOutput(task.Id,
+                        $"\n[Synthesis] WARNING: Failed to spawn {perspectiveName} perspective: {ex.Message}\n",
+                        activeTasks, historyTasks);
+                }
+            }
+
+            _perspectiveAgents[task.Id] = perspectiveIds;
+            _outputProcessor.AppendOutput(task.Id,
+                "\n[Synthesis] 3 perspective agents spawned (Architecture, Testing, Edge Cases).\n",
+                activeTasks, historyTasks);
+
+            SynthesisPerspectivesSpawned?.Invoke(task.Id, perspectiveIds);
+        }
+
+        /// <summary>
+        /// Checks if a completed child task is a perspective agent and fires the appropriate event.
+        /// Call this from the task completion handler.
+        /// </summary>
+        public void NotifyChildCompleted(string parentTaskId, string childTaskId)
+        {
+            if (!_perspectiveAgents.TryGetValue(parentTaskId, out var ids)) return;
+            for (int i = 0; i < ids.Length; i++)
+            {
+                if (ids[i] == childTaskId)
+                {
+                    SynthesisPerspectiveCompleted?.Invoke(parentTaskId, i);
+                    return;
+                }
+            }
+        }
+
         /// <summary>
         /// Called when all children of the current phase have completed.
-        /// Routes to the next phase based on current FeatureModePhase.
+        /// Routes to the next phase based on current TeamsModePhase.
         /// </summary>
-        public void OnFeatureModePhaseComplete(AgentTask task,
+        public void OnTeamsModePhaseComplete(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
@@ -343,53 +450,136 @@ namespace Spritely.Managers
             // Cancel phase timeout since all children completed
             CancelPhaseTimeout(task);
 
-            switch (task.FeatureModePhase)
+            switch (task.TeamsModePhase)
             {
-                case FeatureModePhase.TeamPlanning:
+                case TeamsModePhase.TeamPlanning:
                     OnTeamPlanningComplete(task, activeTasks, historyTasks, moveToHistory);
                     break;
 
-                case FeatureModePhase.Execution:
+                case TeamsModePhase.Execution:
                     OnExecutionComplete(task, activeTasks, historyTasks, moveToHistory);
                     break;
             }
         }
 
         /// <summary>
-        /// Phase 1 → Phase 2: All planning team members finished. Consolidate into FEATURE_STEPS.
+        /// Phase 1 → Phase 2: All planning team members finished. Run synthesis on perspective agents,
+        /// then consolidate into TEAM_STEPS.
         /// </summary>
         private void OnTeamPlanningComplete(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
             _outputProcessor.AppendOutput(task.Id,
-                "\n[Feature Mode] Planning team complete. Consolidating into step-by-step plan...\n",
+                "\n[Teams Mode] Planning team complete. Running synthesis...\n",
                 activeTasks, historyTasks);
 
             // Collect team member results
             var teamResults = CollectChildResults(task, activeTasks, historyTasks);
 
-            task.FeatureModePhase = FeatureModePhase.PlanConsolidation;
-            task.ClearFeaturePhaseChildIds();
-
-            StartPlanConsolidationProcess(task, teamResults, activeTasks, historyTasks, moveToHistory);
+            // Run perspective synthesis if perspective agents were spawned
+            if (_planSynthesizer != null && _perspectiveAgents.TryGetValue(task.Id, out var perspectiveIds))
+            {
+                _ = RunSynthesisAndConsolidateAsync(task, teamResults, perspectiveIds,
+                    activeTasks, historyTasks, moveToHistory);
+            }
+            else
+            {
+                // No synthesizer or no perspective agents — proceed directly
+                task.TeamsModePhase = TeamsModePhase.PlanConsolidation;
+                task.ClearTeamsPhaseChildIds();
+                StartPlanConsolidationProcess(task, teamResults, activeTasks, historyTasks, moveToHistory);
+            }
         }
 
         /// <summary>
-        /// Phase 2 process: Run consolidation agent that reads team results and outputs FEATURE_STEPS.
+        /// Runs Haiku synthesis on perspective outputs, then proceeds to plan consolidation.
+        /// </summary>
+        private async System.Threading.Tasks.Task RunSynthesisAndConsolidateAsync(AgentTask task, string teamResults,
+            string[] perspectiveIds, ObservableCollection<AgentTask> activeTasks,
+            ObservableCollection<AgentTask> historyTasks, Action<AgentTask> moveToHistory)
+        {
+            // Collect perspective outputs
+            var perspectiveOutputs = new string[3];
+            for (int i = 0; i < 3; i++)
+            {
+                var child = activeTasks.FirstOrDefault(t => t.Id == perspectiveIds[i])
+                         ?? historyTasks.FirstOrDefault(t => t.Id == perspectiveIds[i]);
+                if (child != null)
+                {
+                    var output = child.CompletionSummary;
+                    if (string.IsNullOrWhiteSpace(output))
+                        output = child.OutputBuilder.ToString();
+                    perspectiveOutputs[i] = output ?? "";
+                }
+                else
+                {
+                    perspectiveOutputs[i] = "";
+                }
+            }
+
+            _outputProcessor.AppendOutput(task.Id,
+                "[Synthesis] Running Haiku plan synthesis across 3 perspectives...\n",
+                activeTasks, historyTasks);
+
+            string? synthesis = null;
+            try
+            {
+                synthesis = await _planSynthesizer!.SynthesizeAsync(
+                    perspectiveOutputs[0], perspectiveOutputs[1], perspectiveOutputs[2],
+                    task.OriginalTeamsDescription);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("TeamsMode", $"Plan synthesis failed for task {task.Id}", ex);
+                _outputProcessor.AppendOutput(task.Id,
+                    $"[Synthesis] WARNING: Synthesis failed ({ex.Message}), proceeding with raw team results.\n",
+                    activeTasks, historyTasks);
+            }
+
+            // Clean up perspective agent tracking
+            _perspectiveAgents.TryRemove(task.Id, out _);
+
+            // Continue on dispatcher thread
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                if (task.Status != AgentTaskStatus.Running) return;
+
+                string consolidationInput;
+                if (!string.IsNullOrEmpty(synthesis))
+                {
+                    _outputProcessor.AppendOutput(task.Id,
+                        "[Synthesis] Plan synthesis complete. Including in consolidation.\n",
+                        activeTasks, historyTasks);
+                    SynthesisComplete?.Invoke(task.Id, synthesis);
+                    consolidationInput = teamResults + "\n\n" + synthesis;
+                }
+                else
+                {
+                    consolidationInput = teamResults;
+                }
+
+                task.TeamsModePhase = TeamsModePhase.PlanConsolidation;
+                task.ClearTeamsPhaseChildIds();
+                StartPlanConsolidationProcess(task, consolidationInput, activeTasks, historyTasks, moveToHistory);
+            });
+        }
+
+        /// <summary>
+        /// Phase 2 process: Run consolidation agent that reads team results and outputs TEAM_STEPS.
         /// </summary>
         private void StartPlanConsolidationProcess(AgentTask task, string teamResults,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            var prompt = _promptBuilder.BuildFeatureModePlanConsolidationPrompt(
-                task.CurrentIteration, task.MaxIterations, teamResults, task.OriginalFeatureDescription);
+            var prompt = _promptBuilder.BuildTeamsModePlanConsolidationPrompt(
+                task.CurrentIteration, task.MaxIterations, teamResults, task.OriginalTeamsDescription);
 
-            StartFeatureModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
+            StartTeamsModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
         }
 
         /// <summary>
-        /// Phase 2 complete: Parse FEATURE_STEPS and create execution tasks.
+        /// Phase 2 complete: Parse TEAM_STEPS and create execution tasks.
         /// </summary>
         private void HandleConsolidationComplete(AgentTask task, string output,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
@@ -400,14 +590,14 @@ namespace Spritely.Managers
             if (steps == null || steps.Count == 0)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Feature Mode] No FEATURE_STEPS found in consolidation output. Finishing.\n",
+                    "\n[Teams Mode] No TEAM_STEPS found in consolidation output. Finishing.\n",
                     activeTasks, historyTasks);
-                FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
+                FinishTeamsModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
                 return;
             }
 
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Feature Mode] Plan consolidated: {steps.Count} step(s). Creating execution tasks...\n",
+                $"\n[Teams Mode] Plan consolidated: {steps.Count} step(s). Creating execution tasks...\n",
                 activeTasks, historyTasks);
 
             // Spawn execution tasks with dependencies
@@ -418,16 +608,16 @@ namespace Spritely.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("FeatureMode", $"Failed to spawn execution tasks for task {task.Id}", ex);
+                AppLogger.Warn("TeamsMode", $"Failed to spawn execution tasks for task {task.Id}", ex);
                 _outputProcessor.AppendOutput(task.Id,
-                    $"\n[Feature Mode] ERROR spawning execution tasks: {ex.Message}. Finishing.\n",
+                    $"\n[Teams Mode] ERROR spawning execution tasks: {ex.Message}. Finishing.\n",
                     activeTasks, historyTasks);
-                FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
+                FinishTeamsModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
                 return;
             }
 
-            task.FeatureModePhase = FeatureModePhase.Execution;
-            task.ClearFeaturePhaseChildIds();
+            task.TeamsModePhase = TeamsModePhase.Execution;
+            task.ClearTeamsPhaseChildIds();
 
             // Spawn all children, tracking successes
             var spawnedCount = 0;
@@ -436,16 +626,16 @@ namespace Spritely.Managers
             {
                 try
                 {
-                    task.AddFeaturePhaseChildId(child.Id);
-                    FeatureModeChildSpawned?.Invoke(task, child);
+                    task.AddTeamsPhaseChildId(child.Id);
+                    TeamsModeChildSpawned?.Invoke(task, child);
                     spawnedCount++;
                 }
                 catch (Exception ex)
                 {
                     anySpawnFailed = true;
-                    AppLogger.Warn("FeatureMode", $"Failed to spawn execution task '{child.Summary}' for task {task.Id}", ex);
+                    AppLogger.Warn("TeamsMode", $"Failed to spawn execution task '{child.Summary}' for task {task.Id}", ex);
                     _outputProcessor.AppendOutput(task.Id,
-                        $"\n[Feature Mode] WARNING: Failed to spawn execution step: {ex.Message}\n",
+                        $"\n[Teams Mode] WARNING: Failed to spawn execution step: {ex.Message}\n",
                         activeTasks, historyTasks);
                     break; // Stop spawning more children on first failure
                 }
@@ -461,9 +651,9 @@ namespace Spritely.Managers
                 }
 
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Feature Mode] Execution task spawn failures. Finishing.\n",
+                    "\n[Teams Mode] Execution task spawn failures. Finishing.\n",
                     activeTasks, historyTasks);
-                FinishFeatureModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
+                FinishTeamsModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
                 return;
             }
 
@@ -471,12 +661,12 @@ namespace Spritely.Managers
             TaskExecutionManager.RefreshDependencyDisplayInfo(children, "step");
 
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Feature Mode] {spawnedCount} execution task(s) spawned. Waiting for completion...\n",
+                $"\n[Teams Mode] {spawnedCount} execution task(s) spawned. Waiting for completion...\n",
                 activeTasks, historyTasks);
             _outputTabManager.UpdateTabHeader(task);
 
             // Safety timeout: kill stuck execution tasks after the iteration timeout
-            StartPhaseTimeout(task, FeatureModeIterationTimeoutMinutes, activeTasks, historyTasks, moveToHistory);
+            StartPhaseTimeout(task, TeamsModeIterationTimeoutMinutes, activeTasks, historyTasks, moveToHistory);
         }
 
         /// <summary>
@@ -487,7 +677,7 @@ namespace Spritely.Managers
             Action<AgentTask> moveToHistory)
         {
             _outputProcessor.AppendOutput(task.Id,
-                "\n[Feature Mode] All execution tasks complete. Starting evaluation...\n",
+                "\n[Teams Mode] All execution tasks complete. Starting evaluation...\n",
                 activeTasks, historyTasks);
 
             // Collect execution results
@@ -502,16 +692,16 @@ namespace Spritely.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("FeatureMode", $"[{task.Id}] Failed to record execution memory", ex);
+                AppLogger.Warn("TeamsMode", $"[{task.Id}] Failed to record execution memory", ex);
             }
 
-            task.FeatureModePhase = FeatureModePhase.Evaluation;
-            task.ClearFeaturePhaseChildIds();
+            task.TeamsModePhase = TeamsModePhase.Evaluation;
+            task.ClearTeamsPhaseChildIds();
 
-            var prompt = _promptBuilder.BuildFeatureModeEvaluationPrompt(
-                task.CurrentIteration, task.MaxIterations, task.OriginalFeatureDescription, executionResults);
+            var prompt = _promptBuilder.BuildTeamsModeEvaluationPrompt(
+                task.CurrentIteration, task.MaxIterations, task.OriginalTeamsDescription, executionResults);
 
-            StartFeatureModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
+            StartTeamsModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
         }
 
         /// <summary>
@@ -521,28 +711,28 @@ namespace Spritely.Managers
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            if (_completionAnalyzer.CheckFeatureModeComplete(output))
+            if (_completionAnalyzer.CheckTeamsModeComplete(output))
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    $"\n[Feature Mode] STATUS: COMPLETE detected at iteration {task.CurrentIteration}. Feature finished.\n",
+                    $"\n[Teams Mode] STATUS: COMPLETE detected at iteration {task.CurrentIteration}. Feature finished.\n",
                     activeTasks, historyTasks);
-                FinishFeatureModeTask(task, AgentTaskStatus.Completed, activeTasks, historyTasks, moveToHistory);
+                FinishTeamsModeTask(task, AgentTaskStatus.Completed, activeTasks, historyTasks, moveToHistory);
                 return;
             }
 
             if (task.CurrentIteration >= task.MaxIterations)
             {
                 _outputProcessor.AppendOutput(task.Id,
-                    $"\n[Feature Mode] Max iterations ({task.MaxIterations}) reached. Stopping.\n",
+                    $"\n[Teams Mode] Max iterations ({task.MaxIterations}) reached. Stopping.\n",
                     activeTasks, historyTasks);
-                FinishFeatureModeTask(task, AgentTaskStatus.Completed, activeTasks, historyTasks, moveToHistory);
+                FinishTeamsModeTask(task, AgentTaskStatus.Completed, activeTasks, historyTasks, moveToHistory);
                 return;
             }
 
             // Start next iteration
             task.CurrentIteration++;
-            task.FeatureModePhase = FeatureModePhase.None;
-            task.ClearFeaturePhaseChildIds();
+            task.TeamsModePhase = TeamsModePhase.None;
+            task.ClearTeamsPhaseChildIds();
             task.LastIterationOutputStart = task.OutputBuilder.Length;
 
             // Record structured memory from this iteration for cross-iteration context caching.
@@ -552,12 +742,12 @@ namespace Spritely.Managers
             {
                 var memory = _iterationMemoryManager.ExtractMemoryFromOutput(output, task.CurrentIteration - 1);
                 _iterationMemoryManager.RecordIteration(task.Id, task.CurrentIteration - 1, memory);
-                AppLogger.Debug("FeatureMode", $"[{task.Id}] Recorded iteration {task.CurrentIteration - 1} memory: " +
+                AppLogger.Debug("TeamsMode", $"[{task.Id}] Recorded iteration {task.CurrentIteration - 1} memory: " +
                     $"{memory.KeyDiscoveries.Count} discoveries, {memory.FailedApproaches.Count} failures, {memory.ImportantFiles.Count} files");
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("FeatureMode", $"[{task.Id}] Failed to record iteration memory", ex);
+                AppLogger.Warn("TeamsMode", $"[{task.Id}] Failed to record iteration memory", ex);
             }
 
             var iterRuntime = DateTime.Now - task.StartTime;
@@ -565,7 +755,7 @@ namespace Spritely.Managers
                 ? $" | Tokens: {Helpers.FormatHelpers.FormatTokenCount(task.InputTokens + task.OutputTokens)}"
                 : "";
             _outputProcessor.AppendOutput(task.Id,
-                $"\n[Feature Mode] NEEDS_MORE_WORK — Starting iteration {task.CurrentIteration}/{task.MaxIterations} | Runtime: {(int)iterRuntime.TotalMinutes}m{iterTokenInfo}\n\n",
+                $"\n[Teams Mode] NEEDS_MORE_WORK — Starting iteration {task.CurrentIteration}/{task.MaxIterations} | Runtime: {(int)iterRuntime.TotalMinutes}m{iterTokenInfo}\n\n",
                 activeTasks, historyTasks);
             IterationStarted?.Invoke(task.Id, task.CurrentIteration);
             _outputTabManager.UpdateTabHeader(task);
@@ -592,12 +782,12 @@ namespace Spritely.Managers
                 iterationContext = _iterationMemoryManager.BuildIterationContext(task.Id, task.CurrentIteration);
                 if (!string.IsNullOrEmpty(iterationContext))
                 {
-                    AppLogger.Debug("FeatureMode", $"[{task.Id}] Injecting iteration memory context ({iterationContext.Length} chars) into iteration {task.CurrentIteration}");
+                    AppLogger.Debug("TeamsMode", $"[{task.Id}] Injecting iteration memory context ({iterationContext.Length} chars) into iteration {task.CurrentIteration}");
                 }
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("FeatureMode", $"[{task.Id}] Failed to build iteration context", ex);
+                AppLogger.Warn("TeamsMode", $"[{task.Id}] Failed to build iteration context", ex);
             }
 
             // Include feature context so iteration planning knows which files/features are relevant
@@ -606,23 +796,23 @@ namespace Spritely.Managers
                 : "";
 
             // Format iteration template with current iteration number
-            var iterationTemplate = string.Format(PromptBuilder.FeatureModeIterationPlanningTemplate,
+            var iterationTemplate = string.Format(PromptBuilder.TeamsModeIterationPlanningTemplate,
                 task.CurrentIteration);
 
             var prompt = featureCtx +
-                PromptBuilder.FeatureModeInitialTemplate +
-                task.OriginalFeatureDescription +
+                PromptBuilder.TeamsModeInitialTemplate +
+                task.OriginalTeamsDescription +
                 iterationContext +
                 "\n\n" + iterationTemplate +
                 previousEvaluation;
 
-            StartFeatureModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
+            StartTeamsModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
         }
 
         /// <summary>
-        /// Launches a new Claude process for the feature mode task with the given prompt.
+        /// Launches a new Claude process for the teams mode task with the given prompt.
         /// </summary>
-        private void StartFeatureModeProcess(AgentTask task, string prompt,
+        private void StartTeamsModeProcess(AgentTask task, string prompt,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
@@ -630,7 +820,7 @@ namespace Spritely.Managers
 
             task.LastIterationOutputStart = task.OutputBuilder.Length;
 
-            var promptFile = Path.Combine(_scriptDir, $"feature_{task.Id}_{task.CurrentIteration}_{(int)task.FeatureModePhase}.txt");
+            var promptFile = Path.Combine(_scriptDir, $"feature_{task.Id}_{task.CurrentIteration}_{(int)task.TeamsModePhase}.txt");
             File.WriteAllText(promptFile, prompt, Encoding.UTF8);
 
             // Dynamic model selection based on complexity
@@ -644,7 +834,7 @@ namespace Spritely.Managers
             }
             task.Runtime.LastCliModel = phaseModel;
             _outputProcessor.AppendOutput(task.Id,
-                $"\nPhase: {task.FeatureModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
+                $"\nPhase: {task.TeamsModePhase} | Model: {PromptBuilder.GetFriendlyModelName(phaseModel)} ({phaseModel})\n",
                 activeTasks, historyTasks);
             var claudeCmd = _promptBuilder.BuildClaudeCommand(task.SkipPermissions, phaseModel);
 
@@ -656,7 +846,7 @@ namespace Spritely.Managers
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
                 _processLauncher.CleanupScripts(task.Id);
-                HandleFeatureModeIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
+                HandleTeamsModeIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
             });
 
             try
@@ -665,24 +855,24 @@ namespace Spritely.Managers
 
                 var iterationTimer = new DispatcherTimer
                 {
-                    Interval = TimeSpan.FromMinutes(FeatureModeIterationTimeoutMinutes)
+                    Interval = TimeSpan.FromMinutes(TeamsModeIterationTimeoutMinutes)
                 };
-                task.FeatureModeIterationTimer = iterationTimer;
+                task.TeamsModeIterationTimer = iterationTimer;
                 iterationTimer.Tick += (_, _) =>
                 {
                     iterationTimer.Stop();
-                    task.FeatureModeIterationTimer = null;
+                    task.TeamsModeIterationTimer = null;
                     if (task.Process is { HasExited: false })
                     {
-                        _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Process timeout ({FeatureModeIterationTimeoutMinutes}min). Killing stuck process.\n", activeTasks, historyTasks);
-                        try { task.Process.Kill(true); } catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill stuck feature mode process for task {task.Id}", ex); }
+                        _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] Process timeout ({TeamsModeIterationTimeoutMinutes}min). Killing stuck process.\n", activeTasks, historyTasks);
+                        try { task.Process.Kill(true); } catch (Exception ex) { AppLogger.Warn("TaskExecution", $"Failed to kill stuck teams mode process for task {task.Id}", ex); }
                     }
                 };
                 iterationTimer.Start();
             }
             catch (Exception ex)
             {
-                _outputProcessor.AppendOutput(task.Id, $"[Feature Mode] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, $"[Teams Mode] ERROR starting process: {ex.Message}\n", activeTasks, historyTasks);
                 task.Status = AgentTaskStatus.Failed;
                 task.EndTime = DateTime.Now;
                 _outputTabManager.UpdateTabHeader(task);
@@ -702,14 +892,14 @@ namespace Spritely.Managers
         }
 
         /// <summary>
-        /// Extracts FEATURE_STEPS JSON block from consolidation output.
+        /// Extracts TEAM_STEPS JSON block from consolidation output.
         /// </summary>
         private static List<FeatureStepEntry>? ExtractFeatureSteps(string output)
         {
-            var json = Helpers.FormatHelpers.ExtractCodeBlockContent(output, "FEATURE_STEPS");
+            var json = Helpers.FormatHelpers.ExtractCodeBlockContent(output, "TEAM_STEPS");
             if (json == null)
             {
-                AppLogger.Warn("FeatureMode", "No ```FEATURE_STEPS``` block found in output");
+                AppLogger.Warn("TeamsMode", "No ```TEAM_STEPS``` block found in output");
                 return null;
             }
 
@@ -723,13 +913,13 @@ namespace Spritely.Managers
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("FeatureMode", "Failed to deserialize FEATURE_STEPS JSON", ex);
+                AppLogger.Warn("TeamsMode", "Failed to deserialize TEAM_STEPS JSON", ex);
                 return null;
             }
         }
 
         /// <summary>
-        /// Creates execution child tasks from FEATURE_STEPS with inter-task dependencies.
+        /// Creates execution child tasks from TEAM_STEPS with inter-task dependencies.
         /// </summary>
         private List<AgentTask> SpawnExecutionTasks(AgentTask parent, List<FeatureStepEntry> steps,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
@@ -744,7 +934,7 @@ namespace Spritely.Managers
                     parent.ProjectPath,
                     skipPermissions: true,
                     headless: false,
-                    isFeatureMode: false,
+                    isTeamsMode: false,
                     ignoreFileLocks: false,
                     useMcp: parent.UseMcp,
                     spawnTeam: false,
@@ -815,7 +1005,7 @@ namespace Spritely.Managers
             var childMetadata = new Dictionary<string, (string title, AgentTaskStatus status)>();
 
             // Collect raw results from children
-            foreach (var childId in parent.FeaturePhaseChildIds)
+            foreach (var childId in parent.TeamsPhaseChildIds)
             {
                 var child = activeTasks.FirstOrDefault(t => t.Id == childId)
                          ?? historyTasks.FirstOrDefault(t => t.Id == childId);
@@ -877,7 +1067,7 @@ namespace Spritely.Managers
                 var avgImportance = truncatedResults.Average(r => r.ImportanceScore);
 
                 _outputProcessor.AppendOutput(parent.Id,
-                    $"\n[Feature Mode] Smart truncation: {totalOriginal:N0} → {totalTruncated:N0} chars " +
+                    $"\n[Teams Mode] Smart truncation: {totalOriginal:N0} → {totalTruncated:N0} chars " +
                     $"({(1.0 - (double)totalTruncated / totalOriginal) * 100:F1}% reduction, " +
                     $"importance score: {avgImportance:F2}, {idx} children)\n",
                     activeTasks, historyTasks);
@@ -890,7 +1080,7 @@ namespace Spritely.Managers
 
         /// <summary>
         /// Starts a timer that kills any still-running children after the specified timeout.
-        /// Uses the task's FeatureModeIterationTimer slot (which is free during child-wait phases).
+        /// Uses the task's TeamsModeIterationTimer slot (which is free during child-wait phases).
         /// </summary>
         private void StartPhaseTimeout(AgentTask task, int timeoutMinutes,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
@@ -902,28 +1092,28 @@ namespace Spritely.Managers
             {
                 Interval = TimeSpan.FromMinutes(timeoutMinutes)
             };
-            task.FeatureModeIterationTimer = timer;
+            task.TeamsModeIterationTimer = timer;
             timer.Tick += (_, _) =>
             {
                 timer.Stop();
-                task.FeatureModeIterationTimer = null;
+                task.TeamsModeIterationTimer = null;
                 if (task.Status != AgentTaskStatus.Running) return;
 
                 _outputProcessor.AppendOutput(task.Id,
-                    $"\n[Feature Mode] Phase timeout ({timeoutMinutes}min). Killing stuck child tasks...\n",
+                    $"\n[Teams Mode] Phase timeout ({timeoutMinutes}min). Killing stuck child tasks...\n",
                     activeTasks, historyTasks);
 
                 // Kill any still-running children
-                foreach (var childId in task.FeaturePhaseChildIds)
+                foreach (var childId in task.TeamsPhaseChildIds)
                 {
                     var child = activeTasks.FirstOrDefault(t => t.Id == childId);
                     if (child is { IsFinished: false, Process: { HasExited: false } })
                     {
                         _outputProcessor.AppendOutput(task.Id,
-                            $"[Feature Mode] Killing stuck child #{child.TaskNumber}: {child.Summary}\n",
+                            $"[Teams Mode] Killing stuck child #{child.TaskNumber}: {child.Summary}\n",
                             activeTasks, historyTasks);
                         try { child.Process.Kill(true); }
-                        catch (Exception ex) { AppLogger.Warn("FeatureMode", $"Failed to kill stuck child {child.Id}", ex); }
+                        catch (Exception ex) { AppLogger.Warn("TeamsMode", $"Failed to kill stuck child {child.Id}", ex); }
                     }
                 }
             };
@@ -932,10 +1122,10 @@ namespace Spritely.Managers
 
         private static void CancelPhaseTimeout(AgentTask task)
         {
-            if (task.FeatureModeIterationTimer != null)
+            if (task.TeamsModeIterationTimer != null)
             {
-                task.FeatureModeIterationTimer.Stop();
-                task.FeatureModeIterationTimer = null;
+                task.TeamsModeIterationTimer.Stop();
+                task.TeamsModeIterationTimer = null;
             }
         }
 
@@ -946,37 +1136,37 @@ namespace Spritely.Managers
             Action<AgentTask> moveToHistory)
         {
             var retryMinutes = _getTokenLimitRetryMinutes();
-            _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Token limit hit. Retrying in {retryMinutes} minutes...\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] Token limit hit. Retrying in {retryMinutes} minutes...\n", activeTasks, historyTasks);
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(retryMinutes) };
-            task.FeatureModeRetryTimer = timer;
+            task.TeamsModeRetryTimer = timer;
             timer.Tick += (_, _) =>
             {
                 timer.Stop();
-                task.FeatureModeRetryTimer = null;
+                task.TeamsModeRetryTimer = null;
                 if (task.Status != AgentTaskStatus.Running) return;
-                if ((DateTime.Now - task.StartTime).TotalHours >= FeatureModeMaxRuntimeHours)
+                if ((DateTime.Now - task.StartTime).TotalHours >= TeamsModeMaxRuntimeHours)
                 {
-                    _outputProcessor.AppendOutput(task.Id, $"\n[Feature Mode] Runtime cap reached during retry wait. Stopping.\n", activeTasks, historyTasks);
-                    FinishFeatureModeTask(task, AgentTaskStatus.Completed, activeTasks, historyTasks, moveToHistory);
+                    _outputProcessor.AppendOutput(task.Id, $"\n[Teams Mode] Runtime cap reached during retry wait. Stopping.\n", activeTasks, historyTasks);
+                    FinishTeamsModeTask(task, AgentTaskStatus.Completed, activeTasks, historyTasks, moveToHistory);
                     return;
                 }
-                _outputProcessor.AppendOutput(task.Id, "[Feature Mode] Retrying...\n", activeTasks, historyTasks);
+                _outputProcessor.AppendOutput(task.Id, "[Teams Mode] Retrying...\n", activeTasks, historyTasks);
 
                 // Restart the appropriate phase process
-                switch (task.FeatureModePhase)
+                switch (task.TeamsModePhase)
                 {
-                    case FeatureModePhase.None:
+                    case TeamsModePhase.None:
                         StartIterationPlanningProcess(task, "", activeTasks, historyTasks, moveToHistory);
                         break;
-                    case FeatureModePhase.PlanConsolidation:
+                    case TeamsModePhase.PlanConsolidation:
                         var teamResults = CollectChildResults(task, activeTasks, historyTasks);
                         StartPlanConsolidationProcess(task, teamResults, activeTasks, historyTasks, moveToHistory);
                         break;
-                    case FeatureModePhase.Evaluation:
+                    case TeamsModePhase.Evaluation:
                         var execResults = CollectChildResults(task, activeTasks, historyTasks);
-                        var evalPrompt = _promptBuilder.BuildFeatureModeEvaluationPrompt(
-                            task.CurrentIteration, task.MaxIterations, task.OriginalFeatureDescription, execResults);
-                        StartFeatureModeProcess(task, evalPrompt, activeTasks, historyTasks, moveToHistory);
+                        var evalPrompt = _promptBuilder.BuildTeamsModeEvaluationPrompt(
+                            task.CurrentIteration, task.MaxIterations, task.OriginalTeamsDescription, execResults);
+                        StartTeamsModeProcess(task, evalPrompt, activeTasks, historyTasks, moveToHistory);
                         break;
                 }
             };
@@ -1055,17 +1245,17 @@ namespace Spritely.Managers
             ObservableCollection<AgentTask> historyTasks)
         {
             // For phases that don't involve consolidation/evaluation, use default selection
-            if (task.FeatureModePhase != FeatureModePhase.PlanConsolidation &&
-                task.FeatureModePhase != FeatureModePhase.Evaluation)
+            if (task.TeamsModePhase != TeamsModePhase.PlanConsolidation &&
+                task.TeamsModePhase != TeamsModePhase.Evaluation)
             {
-                return PromptBuilder.GetCliModelForPhase(task.FeatureModePhase);
+                return PromptBuilder.GetCliModelForPhase(task.TeamsModePhase);
             }
 
             // Collect child results for complexity analysis
             var childResults = new Dictionary<string, string>();
             bool hasErrors = false;
 
-            foreach (var childId in task.FeaturePhaseChildIds)
+            foreach (var childId in task.TeamsPhaseChildIds)
             {
                 var child = activeTasks.FirstOrDefault(t => t.Id == childId)
                          ?? historyTasks.FirstOrDefault(t => t.Id == childId);
@@ -1091,9 +1281,9 @@ namespace Spritely.Managers
 
             // Analyze complexity
             var analysis = _modelComplexityAnalyzer.AnalyzeComplexity(
-                task.FeaturePhaseChildIds.Count,
+                task.TeamsPhaseChildIds.Count,
                 childResults,
-                task.FeatureModePhase,
+                task.TeamsModePhase,
                 hasErrors);
 
             // Log the decision
@@ -1116,13 +1306,13 @@ namespace Spritely.Managers
         private void CleanupSpawnedChildren(AgentTask parent, ObservableCollection<AgentTask> activeTasks,
             ObservableCollection<AgentTask> historyTasks)
         {
-            if (parent.FeaturePhaseChildIds.Count == 0) return;
+            if (parent.TeamsPhaseChildIds.Count == 0) return;
 
             _outputProcessor.AppendOutput(parent.Id,
-                $"\n[Feature Mode] Cleaning up {parent.FeaturePhaseChildIds.Count} spawned children...\n",
+                $"\n[Teams Mode] Cleaning up {parent.TeamsPhaseChildIds.Count} spawned children...\n",
                 activeTasks, historyTasks);
 
-            foreach (var childId in parent.FeaturePhaseChildIds.ToList())
+            foreach (var childId in parent.TeamsPhaseChildIds.ToList())
             {
                 var child = activeTasks.FirstOrDefault(t => t.Id == childId);
                 if (child != null)
@@ -1138,12 +1328,12 @@ namespace Spritely.Managers
                         {
                             child.Process.Kill(true);
                             _outputProcessor.AppendOutput(parent.Id,
-                                $"[Feature Mode] Killed child process #{child.TaskNumber}: {child.Summary}\n",
+                                $"[Teams Mode] Killed child process #{child.TaskNumber}: {child.Summary}\n",
                                 activeTasks, historyTasks);
                         }
                         catch (Exception ex)
                         {
-                            AppLogger.Warn("FeatureMode", $"Failed to kill child process {child.Id}", ex);
+                            AppLogger.Warn("TeamsMode", $"Failed to kill child process {child.Id}", ex);
                         }
                     }
 
@@ -1160,24 +1350,24 @@ namespace Spritely.Managers
             }
 
             // Clear the child IDs list
-            parent.ClearFeaturePhaseChildIds();
+            parent.ClearTeamsPhaseChildIds();
         }
 
         // ── Finish ──────────────────────────────────────────────────────
 
-        private void FinishFeatureModeTask(AgentTask task, AgentTaskStatus status,
+        private void FinishTeamsModeTask(AgentTask task, AgentTaskStatus status,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
-            if (task.FeatureModeRetryTimer != null)
+            if (task.TeamsModeRetryTimer != null)
             {
-                task.FeatureModeRetryTimer.Stop();
-                task.FeatureModeRetryTimer = null;
+                task.TeamsModeRetryTimer.Stop();
+                task.TeamsModeRetryTimer = null;
             }
-            if (task.FeatureModeIterationTimer != null)
+            if (task.TeamsModeIterationTimer != null)
             {
-                task.FeatureModeIterationTimer.Stop();
-                task.FeatureModeIterationTimer = null;
+                task.TeamsModeIterationTimer.Stop();
+                task.TeamsModeIterationTimer = null;
             }
 
             // Directly set final status without verifying step
@@ -1189,7 +1379,7 @@ namespace Spritely.Managers
 
             // Clean up iteration memory files for this task (data already consumed)
             try { _iterationMemoryManager.CleanupOldMemories(TimeSpan.FromDays(7)); }
-            catch (Exception ex) { AppLogger.Debug("FeatureMode", $"Iteration memory cleanup: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Debug("TeamsMode", $"Iteration memory cleanup: {ex.Message}"); }
 
             if (task.UseMessageBus)
                 _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
@@ -1198,28 +1388,28 @@ namespace Spritely.Managers
             var finishTokenInfo = task.HasTokenData
                 ? $" | Tokens: {Helpers.FormatHelpers.FormatTokenCount(task.InputTokens + task.OutputTokens)} ({Helpers.FormatHelpers.FormatTokenCount(task.InputTokens)} in / {Helpers.FormatHelpers.FormatTokenCount(task.OutputTokens)} out)"
                 : "";
-            _outputProcessor.AppendOutput(task.Id, $"[Feature Mode] Total runtime: {(int)duration.TotalHours}h {duration.Minutes}m across {task.CurrentIteration} iteration(s).{finishTokenInfo}\n", activeTasks, historyTasks);
+            _outputProcessor.AppendOutput(task.Id, $"[Teams Mode] Total runtime: {(int)duration.TotalHours}h {duration.Minutes}m across {task.CurrentIteration} iteration(s).{finishTokenInfo}\n", activeTasks, historyTasks);
 
             _outputTabManager.UpdateTabHeader(task);
             moveToHistory(task);
-            FeatureModeFinished?.Invoke(task.Id, status);
+            TeamsModeFinished?.Invoke(task.Id, status);
         }
 
 
         // ── Feature mode iteration decision logic (extracted for testability) ──
 
-        internal enum FeatureModeAction { Skip, Finish, RetryAfterDelay, Continue }
+        internal enum TeamsModeAction { Skip, Finish, RetryAfterDelay, Continue }
 
         internal struct FeatureModeDecision
         {
-            public FeatureModeAction Action;
+            public TeamsModeAction Action;
             public AgentTaskStatus FinishStatus;
             public int ConsecutiveFailures;
             public bool TrimOutput;
         }
 
         /// <summary>
-        /// Pure decision function that evaluates what the feature mode loop should do next.
+        /// Pure decision function that evaluates what the teams mode loop should do next.
         /// </summary>
         internal static FeatureModeDecision EvaluateFeatureModeIteration(
             ICompletionAnalyzer completionAnalyzer,
@@ -1233,23 +1423,23 @@ namespace Spritely.Managers
             int outputLength)
         {
             if (currentStatus != AgentTaskStatus.Running)
-                return new FeatureModeDecision { Action = FeatureModeAction.Skip };
+                return new FeatureModeDecision { Action = TeamsModeAction.Skip };
 
-            if (totalRuntime.TotalHours >= FeatureModeMaxRuntimeHours)
-                return new FeatureModeDecision { Action = FeatureModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
+            if (totalRuntime.TotalHours >= TeamsModeMaxRuntimeHours)
+                return new FeatureModeDecision { Action = TeamsModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
 
-            if (completionAnalyzer.CheckFeatureModeComplete(iterationOutput))
-                return new FeatureModeDecision { Action = FeatureModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
+            if (completionAnalyzer.CheckTeamsModeComplete(iterationOutput))
+                return new FeatureModeDecision { Action = TeamsModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
 
             if (currentIteration >= maxIterations)
-                return new FeatureModeDecision { Action = FeatureModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
+                return new FeatureModeDecision { Action = TeamsModeAction.Finish, FinishStatus = AgentTaskStatus.Completed };
 
             var newFailures = consecutiveFailures;
             if (exitCode != 0 && !completionAnalyzer.IsTokenLimitError(iterationOutput))
             {
                 newFailures++;
-                if (newFailures >= FeatureModeMaxConsecutiveFailures)
-                    return new FeatureModeDecision { Action = FeatureModeAction.Finish, FinishStatus = AgentTaskStatus.Failed, ConsecutiveFailures = newFailures };
+                if (newFailures >= TeamsModeMaxConsecutiveFailures)
+                    return new FeatureModeDecision { Action = TeamsModeAction.Finish, FinishStatus = AgentTaskStatus.Failed, ConsecutiveFailures = newFailures };
             }
             else
             {
@@ -1257,13 +1447,13 @@ namespace Spritely.Managers
             }
 
             if (exitCode != 0 && completionAnalyzer.IsTokenLimitError(iterationOutput))
-                return new FeatureModeDecision { Action = FeatureModeAction.RetryAfterDelay, ConsecutiveFailures = newFailures };
+                return new FeatureModeDecision { Action = TeamsModeAction.RetryAfterDelay, ConsecutiveFailures = newFailures };
 
             return new FeatureModeDecision
             {
-                Action = FeatureModeAction.Continue,
+                Action = TeamsModeAction.Continue,
                 ConsecutiveFailures = newFailures,
-                TrimOutput = outputLength > FeatureModeOutputCapChars
+                TrimOutput = outputLength > TeamsModeOutputCapChars
             };
         }
     }

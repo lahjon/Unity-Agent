@@ -47,7 +47,29 @@ namespace Spritely
             var projectPath = _projectManager.ProjectPath;
             if (string.IsNullOrEmpty(projectPath)) return;
 
-            var desc = "Build this project and fix all build errors until it compiles successfully.\n\n" +
+            var isGame = _projectManager.IsGameProject(projectPath);
+
+            string desc;
+            bool forceMcp = false;
+
+            if (isGame)
+            {
+                forceMcp = true;
+                desc = "Fix all compilation errors in this Unity project until the console is clean.\n\n" +
+                       "## Instructions\n\n" +
+                       "1. Use the MCP `get_console_logs` tool to read the Unity Editor console and retrieve all current errors and warnings.\n" +
+                       "2. If there are no errors, report success.\n" +
+                       "3. If there are errors:\n" +
+                       "   a. Analyze each error to determine the root cause (read the referenced scripts as needed).\n" +
+                       "   b. Implement fixes for each error in the source files.\n" +
+                       "   c. After fixing, wait a few seconds for Unity to recompile, then call `get_console_logs` again to verify.\n" +
+                       "   d. Repeat until the console shows zero errors.\n" +
+                       "4. Warnings are lower priority — fix them only if trivial, but always report them.\n\n" +
+                       "Provide a clear summary of what errors were found and how they were fixed.";
+            }
+            else
+            {
+                desc = "Build this project and fix all build errors until it compiles successfully.\n\n" +
                        "## Instructions\n\n" +
                        "1. Determine the build system used by this project (e.g. `dotnet build`, Unity, CMake, npm, etc.).\n" +
                        "2. Run a full build of the project.\n" +
@@ -58,13 +80,15 @@ namespace Spritely
                        "   c. Re-run the build to verify the fixes.\n" +
                        "   d. Repeat until the build succeeds with no errors.\n\n" +
                        "Provide a clear summary of what errors were found and how they were fixed.";
+            }
 
             LaunchTaskFromDescription(
                 desc,
                 "Build Test",
                 imagePaths: _imageManager.DetachImages(),
                 planOnly: false,
-                header: "Build Test");
+                header: "Build Test",
+                forceMcp: forceMcp ? true : null);
 
             ResetPerTaskToggles();
         }

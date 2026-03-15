@@ -12,8 +12,8 @@ using Spritely.Managers;
 using Spritely.Services;
 using Xunit;
 
-using FeatureModeAction = Spritely.Managers.FeatureModeHandler.FeatureModeAction;
-using FeatureModeDecision = Spritely.Managers.FeatureModeHandler.FeatureModeDecision;
+using TeamsModeAction = Spritely.Managers.TeamsModeHandler.TeamsModeAction;
+using FeatureModeDecision = Spritely.Managers.TeamsModeHandler.FeatureModeDecision;
 
 namespace Spritely.Tests
 {
@@ -43,7 +43,7 @@ namespace Spritely.Tests
 
         private static AgentTask MakeFeatureModeTask(string projectPath = @"C:\Projects\Test")
         {
-            var t = _factory.CreateTask("feature mode task", projectPath, true, false, true, true, false, false);
+            var t = _factory.CreateTask("teams mode task", projectPath, true, false, true, true, false, false);
             _factory.PrepareTaskForFeatureModeStart(t);
             return t;
         }
@@ -116,7 +116,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Paused,
                 TimeSpan.FromHours(1), "", 1, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Skip, decision.Action);
+            Assert.Equal(TeamsModeAction.Skip, decision.Action);
         }
 
         [Theory]
@@ -129,7 +129,7 @@ namespace Spritely.Tests
             var decision = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, status, TimeSpan.FromHours(1), "", 1, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Skip, decision.Action);
+            Assert.Equal(TeamsModeAction.Skip, decision.Action);
         }
 
         [Fact]
@@ -139,7 +139,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(12), "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
@@ -150,7 +150,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(13), "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
@@ -163,7 +163,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), output, 5, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
@@ -176,7 +176,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), output, 5, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
         }
 
         [Fact]
@@ -186,7 +186,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 50, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
@@ -197,7 +197,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromHours(1), "", 49, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
         }
 
         [Fact]
@@ -208,7 +208,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Failed, decision.FinishStatus);
             Assert.Equal(3, decision.ConsecutiveFailures);
         }
@@ -221,7 +221,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 0, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
             Assert.Equal(1, decision.ConsecutiveFailures);
         }
 
@@ -233,7 +233,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 1, consecutiveFailures: 1, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
             Assert.Equal(2, decision.ConsecutiveFailures);
         }
 
@@ -245,7 +245,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "some output", 5, 50,
                 exitCode: 0, consecutiveFailures: 2, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
             Assert.Equal(0, decision.ConsecutiveFailures);
         }
 
@@ -263,7 +263,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), errorText, 5, 50,
                 exitCode: 1, consecutiveFailures: 0, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.RetryAfterDelay, decision.Action);
+            Assert.Equal(TeamsModeAction.RetryAfterDelay, decision.Action);
         }
 
         [Fact]
@@ -274,7 +274,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "rate limit exceeded", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.RetryAfterDelay, decision.Action);
+            Assert.Equal(TeamsModeAction.RetryAfterDelay, decision.Action);
             Assert.Equal(0, decision.ConsecutiveFailures);
         }
 
@@ -287,7 +287,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "rate limit exceeded", 5, 50,
                 exitCode: 1, consecutiveFailures: 1, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.RetryAfterDelay, decision.Action);
+            Assert.Equal(TeamsModeAction.RetryAfterDelay, decision.Action);
             Assert.Equal(0, decision.ConsecutiveFailures);
         }
 
@@ -299,7 +299,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 200_000);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
             Assert.True(decision.TrimOutput);
         }
 
@@ -311,7 +311,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 50_000);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
             Assert.False(decision.TrimOutput);
         }
 
@@ -335,7 +335,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(12), "STATUS: COMPLETE\n", 5, 50, 0, 0, 0);
 
             // Runtime cap is checked first
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
@@ -348,7 +348,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "STATUS: COMPLETE\n", 50, 50, 0, 0, 0);
 
             // Both lead to Completed, just verifying it finishes
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 
@@ -361,7 +361,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(1), "normal output", 5, 50,
                 exitCode: 1, consecutiveFailures: 2, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Failed, decision.FinishStatus);
         }
 
@@ -373,7 +373,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(12).Add(TimeSpan.FromSeconds(1)),
                 "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
         }
 
         [Fact]
@@ -384,7 +384,7 @@ namespace Spritely.Tests
                 TimeSpan.FromHours(11).Add(TimeSpan.FromMinutes(59)),
                 "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -1181,15 +1181,15 @@ namespace Spritely.Tests
                 {
                     var task = MakeFeatureModeTask();
                     task.Cts = new CancellationTokenSource();
-                    task.FeatureModeRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-                    task.FeatureModeIterationTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-                    task.FeatureModeRetryTimer.Start();
-                    task.FeatureModeIterationTimer.Start();
+                    task.TeamsModeRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
+                    task.TeamsModeIterationTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
+                    task.TeamsModeRetryTimer.Start();
+                    task.TeamsModeIterationTimer.Start();
 
                     mgr.CancelTaskImmediate(task);
 
-                    Assert.Null(task.FeatureModeRetryTimer);
-                    Assert.Null(task.FeatureModeIterationTimer);
+                    Assert.Null(task.TeamsModeRetryTimer);
+                    Assert.Null(task.TeamsModeIterationTimer);
                     Assert.Equal(AgentTaskStatus.Cancelled, task.Status);
                 }
                 finally { try { Directory.Delete(tempDir, true); } catch { } }
@@ -1270,7 +1270,7 @@ namespace Spritely.Tests
         [Fact]
         public void FeatureModeLifecycle_PrepareForStart_InitializesCorrectly()
         {
-            var task = _factory.CreateTask("feature mode", @"C:\Test", true, false, false, true, false, false);
+            var task = _factory.CreateTask("teams mode", @"C:\Test", true, false, false, true, false, false);
             _factory.PrepareTaskForFeatureModeStart(task);
 
             Assert.True(task.SkipPermissions);
@@ -1282,7 +1282,7 @@ namespace Spritely.Tests
         [Fact]
         public void FeatureModeLifecycle_IterationContinuesThenFinishesOnComplete()
         {
-            // Simulate a multi-iteration feature mode run
+            // Simulate a multi-iteration teams mode run
             var task = MakeFeatureModeTask();
             var failures = 0;
 
@@ -1290,21 +1290,21 @@ namespace Spritely.Tests
             var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(5),
                 "Working...\nSTATUS: NEEDS_MORE_WORK\n", 1, 50, 0, failures, 1000);
-            Assert.Equal(FeatureModeAction.Continue, d1.Action);
+            Assert.Equal(TeamsModeAction.Continue, d1.Action);
             failures = d1.ConsecutiveFailures;
 
             // Iteration 2: success
             var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(15),
                 "More work...\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
-            Assert.Equal(FeatureModeAction.Continue, d2.Action);
+            Assert.Equal(TeamsModeAction.Continue, d2.Action);
             failures = d2.ConsecutiveFailures;
 
             // Iteration 3: complete!
             var d3 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(25),
                 "Done!\nSTATUS: COMPLETE\n", 3, 50, 0, failures, 3000);
-            Assert.Equal(FeatureModeAction.Finish, d3.Action);
+            Assert.Equal(TeamsModeAction.Finish, d3.Action);
             Assert.Equal(AgentTaskStatus.Completed, d3.FinishStatus);
         }
 
@@ -1317,7 +1317,7 @@ namespace Spritely.Tests
             var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(5),
                 "error output", 1, 50, 1, failures, 1000);
-            Assert.Equal(FeatureModeAction.Continue, d1.Action);
+            Assert.Equal(TeamsModeAction.Continue, d1.Action);
             Assert.Equal(1, d1.ConsecutiveFailures);
             failures = d1.ConsecutiveFailures;
 
@@ -1325,7 +1325,7 @@ namespace Spritely.Tests
             var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(10),
                 "back to work\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
-            Assert.Equal(FeatureModeAction.Continue, d2.Action);
+            Assert.Equal(TeamsModeAction.Continue, d2.Action);
             Assert.Equal(0, d2.ConsecutiveFailures);
             failures = d2.ConsecutiveFailures;
 
@@ -1333,19 +1333,19 @@ namespace Spritely.Tests
             var d3 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(15),
                 "error", 3, 50, 1, failures, 3000);
-            Assert.Equal(FeatureModeAction.Continue, d3.Action);
+            Assert.Equal(TeamsModeAction.Continue, d3.Action);
             failures = d3.ConsecutiveFailures;
 
             var d4 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(20),
                 "error", 4, 50, 1, failures, 4000);
-            Assert.Equal(FeatureModeAction.Continue, d4.Action);
+            Assert.Equal(TeamsModeAction.Continue, d4.Action);
             failures = d4.ConsecutiveFailures;
 
             var d5 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(25),
                 "error", 5, 50, 1, failures, 5000);
-            Assert.Equal(FeatureModeAction.Finish, d5.Action);
+            Assert.Equal(TeamsModeAction.Finish, d5.Action);
             Assert.Equal(AgentTaskStatus.Failed, d5.FinishStatus);
             Assert.Equal(3, d5.ConsecutiveFailures);
         }
@@ -1359,7 +1359,7 @@ namespace Spritely.Tests
             var d1 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromMinutes(30),
                 "error: rate limit exceeded", 1, 50, 1, failures, 1000);
-            Assert.Equal(FeatureModeAction.RetryAfterDelay, d1.Action);
+            Assert.Equal(TeamsModeAction.RetryAfterDelay, d1.Action);
             Assert.Equal(0, d1.ConsecutiveFailures); // Token limit resets failures
             failures = d1.ConsecutiveFailures;
 
@@ -1367,7 +1367,7 @@ namespace Spritely.Tests
             var d2 = TaskExecutionManager.EvaluateFeatureModeIteration(
                 _completion, AgentTaskStatus.Running, TimeSpan.FromHours(1),
                 "continuing work\nSTATUS: NEEDS_MORE_WORK\n", 2, 50, 0, failures, 2000);
-            Assert.Equal(FeatureModeAction.Continue, d2.Action);
+            Assert.Equal(TeamsModeAction.Continue, d2.Action);
             Assert.Equal(0, d2.ConsecutiveFailures);
         }
 
@@ -1558,7 +1558,7 @@ namespace Spritely.Tests
         [Fact]
         public void FeatureModeContinuationPrompt_IncludesIterationNumbers()
         {
-            var prompt = _prompt.BuildFeatureModeContinuationPrompt(1, 2);
+            var prompt = _prompt.BuildTeamsModeContinuationPrompt(1, 2);
 
             Assert.Contains("1", prompt);
             Assert.Contains("2", prompt);
@@ -1568,7 +1568,7 @@ namespace Spritely.Tests
         [Fact]
         public void FeatureModeContinuationPrompt_IncludesRestrictions()
         {
-            var prompt = _prompt.BuildFeatureModeContinuationPrompt(1, 50);
+            var prompt = _prompt.BuildTeamsModeContinuationPrompt(1, 50);
 
             Assert.Contains("No git", prompt);
             Assert.Contains("STATUS: COMPLETE", prompt);
@@ -1585,7 +1585,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), "", 5, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
         }
 
         [Fact]
@@ -1599,7 +1599,7 @@ namespace Spritely.Tests
                 TimeSpan.FromMinutes(30), output, 5, 50, 0, 0, 0);
 
             // Should NOT detect completion (marker buried beyond last 50 lines)
-            Assert.Equal(FeatureModeAction.Continue, decision.Action);
+            Assert.Equal(TeamsModeAction.Continue, decision.Action);
         }
 
         [Fact]
@@ -1611,7 +1611,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(30), output, 5, 50, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
         }
 
         [Fact]
@@ -1623,7 +1623,7 @@ namespace Spritely.Tests
                 TimeSpan.FromMinutes(30), "too many requests", 5, 50,
                 exitCode: 0, consecutiveFailures: 0, outputLength: 0);
 
-            Assert.Equal(FeatureModeAction.RetryAfterDelay, decision.Action);
+            Assert.Equal(TeamsModeAction.RetryAfterDelay, decision.Action);
         }
 
         [Fact]
@@ -1633,7 +1633,7 @@ namespace Spritely.Tests
                 _completion, AgentTaskStatus.Running,
                 TimeSpan.FromMinutes(5), "", 0, 0, 0, 0, 0);
 
-            Assert.Equal(FeatureModeAction.Finish, decision.Action);
+            Assert.Equal(TeamsModeAction.Finish, decision.Action);
             Assert.Equal(AgentTaskStatus.Completed, decision.FinishStatus);
         }
 

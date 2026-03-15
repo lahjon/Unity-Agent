@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 namespace Spritely.Managers
 {
     /// <summary>
-    /// Manages structured memory across feature mode iterations to prevent repeated failures
+    /// Manages structured memory across teams mode iterations to prevent repeated failures
     /// and provide context about previous discoveries.
     /// </summary>
     public class IterationMemoryManager
@@ -26,7 +26,7 @@ namespace Spritely.Managers
         }
 
         /// <summary>
-        /// Records the results of a feature mode iteration.
+        /// Records the results of a teams mode iteration.
         /// </summary>
         public void RecordIteration(string taskId, int iteration, IterationMemory memory)
         {
@@ -197,7 +197,7 @@ namespace Spritely.Managers
         }
 
         /// <summary>
-        /// Extracts memory from feature mode output.
+        /// Extracts memory from teams mode output.
         /// </summary>
         public IterationMemory ExtractMemoryFromOutput(string output, int iteration)
         {

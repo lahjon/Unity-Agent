@@ -394,9 +394,9 @@ namespace Spritely.Managers
             }
         }
 
-        // ── Feature Mode & Token Limit ─────────────────────────────────
+        // ── Teams Mode & Token Limit ─────────────────────────────────
 
-        public bool CheckFeatureModeComplete(string output)
+        public bool CheckTeamsModeComplete(string output)
         {
             var lines = output.Split('\n');
             var start = Math.Max(0, lines.Length - Constants.AppConstants.MaxOutputTailLines);

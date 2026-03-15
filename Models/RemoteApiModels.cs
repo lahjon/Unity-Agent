@@ -54,7 +54,7 @@ public sealed class TaskDto
     [JsonPropertyName("projectName")] public string ProjectName { get; init; } = "";
     [JsonPropertyName("model")] public string Model { get; init; } = "";
     [JsonPropertyName("priority")] public string Priority { get; init; } = "";
-    [JsonPropertyName("isFeatureMode")] public bool IsFeatureMode { get; init; }
+    [JsonPropertyName("isTeamsMode")] public bool IsTeamsMode { get; init; }
     [JsonPropertyName("startTime")] public DateTime StartTime { get; init; }
     [JsonPropertyName("endTime")] public DateTime? EndTime { get; init; }
     [JsonPropertyName("currentIteration")] public int CurrentIteration { get; init; }
@@ -81,7 +81,7 @@ public sealed class CreateTaskRequest
     [JsonPropertyName("projectPath")] public string ProjectPath { get; init; } = "";
     [JsonPropertyName("model")] public string? Model { get; init; }
     [JsonPropertyName("priority")] public string Priority { get; init; } = "Normal";
-    [JsonPropertyName("isFeatureMode")] public bool IsFeatureMode { get; init; }
+    [JsonPropertyName("isTeamsMode")] public bool IsTeamsMode { get; init; }
     [JsonPropertyName("useMcp")] public bool UseMcp { get; init; }
     [JsonPropertyName("autoDecompose")] public bool AutoDecompose { get; init; }
     [JsonPropertyName("extendedPlanning")] public bool ExtendedPlanning { get; init; }

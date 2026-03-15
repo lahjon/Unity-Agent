@@ -8,7 +8,7 @@ namespace Spritely.Managers
 {
     /// <summary>
     /// Analyzes task complexity to determine optimal model selection (Sonnet vs Opus)
-    /// for feature mode consolidation and evaluation phases.
+    /// for teams mode consolidation and evaluation phases.
     /// </summary>
     public class ModelComplexityAnalyzer
     {
@@ -87,12 +87,12 @@ namespace Spritely.Managers
         };
 
         /// <summary>
-        /// Analyzes the complexity of a feature mode task to determine the appropriate model.
+        /// Analyzes the complexity of a teams mode task to determine the appropriate model.
         /// </summary>
         public ModelSelectionResult AnalyzeComplexity(
             int teamSize,
             Dictionary<string, string> childResults,
-            FeatureModePhase phase,
+            TeamsModePhase phase,
             bool hasErrors = false)
         {
             var result = new ModelSelectionResult
@@ -141,8 +141,8 @@ namespace Spritely.Managers
             // Phase-specific adjustments
             var phaseMultiplier = phase switch
             {
-                FeatureModePhase.PlanConsolidation => 0.9, // Planning usually needs less complexity
-                FeatureModePhase.Evaluation => 1.1, // Evaluation benefits from deeper analysis
+                TeamsModePhase.PlanConsolidation => 0.9, // Planning usually needs less complexity
+                TeamsModePhase.Evaluation => 1.1, // Evaluation benefits from deeper analysis
                 _ => 1.0
             };
 
@@ -318,7 +318,7 @@ namespace Spritely.Managers
             public string RecommendedModel { get; set; } = "sonnet";
             public Dictionary<string, double> Factors { get; set; } = new();
             public string Reasoning { get; set; } = "";
-            public FeatureModePhase Phase { get; set; }
+            public TeamsModePhase Phase { get; set; }
             public int TeamSize { get; set; }
         }
     }

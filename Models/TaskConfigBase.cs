@@ -9,7 +9,7 @@ namespace Spritely.Models
         public string Model { get; set; } = "ClaudeCode";
         public bool Headless { get; set; }
         public bool SpawnTeam { get; set; }
-        public bool IsFeatureMode { get; set; }
+        public bool IsTeamsMode { get; set; }
         public bool ExtendedPlanning { get; set; }
         public bool PlanOnly { get; set; }
         public bool IgnoreFileLocks { get; set; }
@@ -17,18 +17,18 @@ namespace Spritely.Models
         public bool UseMessageBus { get; set; }
         public bool AutoDecompose { get; set; }
         public bool ApplyFix { get; set; } = true;
-        public int FeatureModeIterations { get; set; } = 2;
+        public int TeamsModeIterations { get; set; } = 2;
         public string AdditionalInstructions { get; set; } = "";
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         /// <summary>Skill IDs that were active when this config was saved.</summary>
         public List<string> ActiveSkillIds { get; set; } = new();
 
-        // ITaskFlags.Iterations maps to FeatureModeIterations
+        // ITaskFlags.Iterations maps to TeamsModeIterations
         int ITaskFlags.Iterations
         {
-            get => FeatureModeIterations;
-            set => FeatureModeIterations = value;
+            get => TeamsModeIterations;
+            set => TeamsModeIterations = value;
         }
 
         /// <summary>
