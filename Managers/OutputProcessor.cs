@@ -85,6 +85,9 @@ namespace Spritely.Managers
                         AppendOutput(task.Id, summary, activeTasks, historyTasks);
                 }
 
+                // Generate semantic commit message (fire-and-forget, doesn't block output)
+                _ = GenerateSemanticCommitMessageAsync(task);
+
                 // Display colored code diff if "See Code Changes" is enabled
                 if (_getShowCodeChanges())
                     await AppendCodeChangeDiffAsync(task, activeTasks, historyTasks);
@@ -141,6 +144,30 @@ namespace Spritely.Managers
             catch (Exception ex)
             {
                 AppLogger.Error("OutputProcessor", $"AppendCompletionSummary failed for task {task.Id}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Generates a semantic commit message via Haiku and stores it on the task.
+        /// Runs as fire-and-forget; failures are silently logged.
+        /// </summary>
+        private async System.Threading.Tasks.Task GenerateSemanticCommitMessageAsync(AgentTask task)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(task.GitStartHash)) return;
+
+                var ct = task.Cts?.Token ?? System.Threading.CancellationToken.None;
+                var description = !string.IsNullOrWhiteSpace(task.Summary) ? task.Summary : task.Description;
+                var message = await _completionAnalyzer.GenerateSemanticCommitMessageAsync(
+                    task.ProjectPath, task.GitStartHash, description, ct).ConfigureAwait(false);
+
+                if (!string.IsNullOrWhiteSpace(message))
+                    task.SemanticCommitMessage = message;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("OutputProcessor", $"Semantic commit message generation failed for task {task.Id}", ex);
             }
         }
 

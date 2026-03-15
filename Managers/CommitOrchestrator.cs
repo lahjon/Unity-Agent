@@ -143,8 +143,8 @@ namespace Spritely.Managers
 
         private string ResolveCommitMessage(AgentTask task)
         {
-            if (!string.IsNullOrWhiteSpace(task.CompletionSummary))
-                return task.CompletionSummary;
+            if (!string.IsNullOrWhiteSpace(task.SemanticCommitMessage))
+                return task.SemanticCommitMessage;
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 return task.Summary;
             return task.Description;

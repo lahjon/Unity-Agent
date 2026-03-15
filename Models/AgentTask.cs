@@ -225,6 +225,12 @@ namespace Spritely
             set { if (Data.CommitDiff == value) return; Data.CommitDiff = value; OnPropertyChanged(); }
         }
 
+        public string? SemanticCommitMessage
+        {
+            get => Data.SemanticCommitMessage;
+            set { if (Data.SemanticCommitMessage == value) return; Data.SemanticCommitMessage = value; OnPropertyChanged(); }
+        }
+
         public string Summary
         {
             get => Data.Summary;

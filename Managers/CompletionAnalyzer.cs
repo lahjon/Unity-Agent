@@ -394,6 +394,105 @@ namespace Spritely.Managers
             }
         }
 
+        // ── Semantic Commit Message ───────────────────────────────────
+
+        public async Task<string?> GenerateSemanticCommitMessageAsync(
+            string projectPath, string? gitStartHash,
+            string taskDescription, CancellationToken cancellationToken = default)
+        {
+            Process? process = null;
+            try
+            {
+                // Get numstat for file-level summary
+                var numstatResult = await _gitHelper.RunGitCommandAsync(
+                    projectPath, $"diff {gitStartHash ?? "HEAD"} --numstat", cancellationToken).ConfigureAwait(false);
+                var numstat = numstatResult.IsSuccess ? numstatResult.Output?.Trim() ?? "" : "";
+
+                if (string.IsNullOrWhiteSpace(numstat))
+                    return null;
+
+                // Get patch diff (truncated to avoid token overflow)
+                var patchResult = await _gitHelper.RunGitCommandAsync(
+                    projectPath, $"diff {gitStartHash ?? "HEAD"} -U3", TimeSpan.FromSeconds(15), cancellationToken).ConfigureAwait(false);
+                var patch = patchResult.IsSuccess ? patchResult.Output?.Trim() ?? "" : "";
+                if (patch.Length > 8000)
+                    patch = patch[..8000] + "\n... (truncated)";
+
+                var prompt = string.Format(PromptBuilder.SemanticCommitMessagePromptTemplate,
+                    taskDescription, numstat, patch);
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "claude",
+                    Arguments = $"-p --output-format json --model {AppConstants.ClaudeHaiku} --max-turns 1",
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8
+                };
+                psi.Environment.Remove("CLAUDECODE");
+                psi.Environment.Remove("CLAUDE_CODE_SSE_PORT");
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
+
+                process = new Process { StartInfo = psi };
+                process.Start();
+                JobObjectManager.Instance.AssignProcess(process);
+
+                await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken).ConfigureAwait(false);
+                process.StandardInput.Close();
+
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, cancellationToken);
+                var linkedToken = linkedCts.Token;
+
+                var output = await process.StandardOutput.ReadToEndAsync(linkedToken).ConfigureAwait(false);
+                await process.WaitForExitAsync(linkedToken).ConfigureAwait(false);
+
+                var processedText = Helpers.FormatHelpers.StripAnsiCodes(output).Trim();
+
+                // Extract the result text from JSON wrapper
+                try
+                {
+                    using var doc = JsonDocument.Parse(processedText);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("result", out var resultElement) &&
+                        resultElement.ValueKind == JsonValueKind.String)
+                    {
+                        var result = resultElement.GetString()?.Trim();
+                        if (!string.IsNullOrWhiteSpace(result))
+                            return result;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // If not JSON, use raw output
+                    if (!string.IsNullOrWhiteSpace(processedText))
+                        return processedText;
+                }
+
+                return null;
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("CompletionAnalyzer", "Semantic commit message generation failed", ex);
+                return null;
+            }
+            finally
+            {
+                if (process != null)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { /* best effort */ }
+                    process.Dispose();
+                }
+            }
+        }
+
         // ── Teams Mode & Token Limit ─────────────────────────────────
 
         public bool CheckTeamsModeComplete(string output)

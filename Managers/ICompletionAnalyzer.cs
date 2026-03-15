@@ -26,6 +26,9 @@ namespace Spritely.Managers
             string outputTail, string taskDescription, string? completionSummary,
             CancellationToken ct = default, string? modelOverride = null);
 
+        Task<string?> GenerateSemanticCommitMessageAsync(string projectPath, string? gitStartHash,
+            string taskDescription, CancellationToken cancellationToken = default);
+
         bool CheckTeamsModeComplete(string output);
 
         bool IsTokenLimitError(string output);

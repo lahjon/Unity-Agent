@@ -109,6 +109,9 @@ namespace Spritely.Managers
         /// <summary>Template for result verification. Use string.Format with {0}=taskDescription, {1}=contextTail, {2}=summaryBlock.</summary>
         public static readonly string ResultVerificationPromptTemplate = PromptLoader.Load("Tasks/ResultVerificationPromptTemplate.md");
 
+        /// <summary>Template for semantic commit messages. Use string.Format with {0}=taskDescription, {1}=numstat, {2}=patch.</summary>
+        public static readonly string SemanticCommitMessagePromptTemplate = PromptLoader.Load("Tasks/SemanticCommitMessagePrompt.md");
+
         public static readonly string TokenLimitRetryContinuationPrompt = PromptLoader.Load("Core/TokenLimitRetryContinuationPrompt.md");
         public static readonly string TeamsModeIterationPlanningTemplate = PromptLoader.Load("Teams/TeamsModeIterationPlanningTemplate.md");
 
