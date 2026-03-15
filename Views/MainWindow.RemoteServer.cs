@@ -26,6 +26,11 @@ namespace Spritely
             {
                 UpdateRemoteServerUi(running);
             });
+            _remoteServer.ErrorOccurred += error => Dispatcher.Invoke(() =>
+            {
+                RemoteServerStatus.Text = error;
+                RemoteServerDot.Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0x55, 0x55));
+            });
             _remoteServer.AuditCountChanged += count => Dispatcher.Invoke(() =>
             {
                 AuditLogCount.Text = count.ToString();
@@ -177,14 +182,25 @@ namespace Spritely
         {
             if (_remoteServer == null || _remoteServer.IsRunning) return;
 
+            RemoteServerStatus.Text = $"Starting server on port {_settingsManager.RemoteServerPort}...";
+            RemoteServerDot.Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0xB8, 0x6C)); // orange while starting
+            RemoteServerStartBtn.IsEnabled = false;
+
             _remoteServer.Start(_settingsManager.RemoteServerPort);
-            _settingsManager.RemoteServerEnabled = true;
-            _settingsManager.SaveSettings(_projectManager.ProjectPath);
+
+            if (_remoteServer.IsRunning)
+            {
+                _settingsManager.RemoteServerEnabled = true;
+                _settingsManager.SaveSettings(_projectManager.ProjectPath);
+            }
         }
 
         private void RemoteServerStop_Click(object sender, RoutedEventArgs e)
         {
             if (_remoteServer == null || !_remoteServer.IsRunning) return;
+
+            RemoteServerStatus.Text = "Stopping server...";
+            RemoteServerStopBtn.IsEnabled = false;
 
             _remoteServer.Stop();
             _settingsManager.RemoteServerEnabled = false;
@@ -250,13 +266,13 @@ namespace Spritely
 
         private async Task BuildApkAsync(string gradleTask, string variant)
         {
-            var projectRoot = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-            var repoRoot = FindRepoRoot(projectRoot);
-            var remoteDir = repoRoot != null ? Path.Combine(repoRoot, "SpritelyRemote") : null;
+            var remoteDir = FindSpritelyRemoteDir();
 
-            if (remoteDir == null || !Directory.Exists(remoteDir))
+            if (remoteDir == null)
             {
-                BuildApkStatus.Text = "SpritelyRemote folder not found.";
+                BuildApkStatus.Foreground = (Brush)FindResource("TextLight");
+                BuildApkStatus.Text = "SpritelyRemote folder not found. Searched from app base directory and working directory.\n" +
+                    "Ensure the SpritelyRemote folder exists in the repository root.";
                 return;
             }
 
@@ -325,14 +341,31 @@ namespace Spritely
             }
         }
 
-        private static string? FindRepoRoot(string? dir)
+        private static string? FindSpritelyRemoteDir()
         {
-            while (dir != null)
+            // Try multiple candidate roots: app base dir, working dir, assembly location
+            var candidates = new[]
             {
-                if (Directory.Exists(Path.Combine(dir, ".git")))
-                    return dir;
-                dir = Directory.GetParent(dir)?.FullName;
+                AppDomain.CurrentDomain.BaseDirectory,
+                Directory.GetCurrentDirectory(),
+                Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+            };
+
+            foreach (var candidate in candidates)
+            {
+                if (string.IsNullOrEmpty(candidate)) continue;
+
+                // Walk up from each candidate looking for the SpritelyRemote folder
+                var dir = candidate;
+                while (dir != null)
+                {
+                    var remotePath = Path.Combine(dir, "SpritelyRemote");
+                    if (Directory.Exists(remotePath))
+                        return remotePath;
+                    dir = Directory.GetParent(dir)?.FullName;
+                }
             }
+
             return null;
         }
     }

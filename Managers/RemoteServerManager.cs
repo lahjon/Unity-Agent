@@ -51,6 +51,7 @@ public sealed class RemoteServerManager : IDisposable
     public event Action<string>? Log;
     public event Action<bool>? StatusChanged;
     public event Action<int>? AuditCountChanged;
+    public event Action<string>? ErrorOccurred;
 
     public RemoteServerManager(IRemoteServerCallbacks callbacks)
     {
@@ -87,7 +88,7 @@ public sealed class RemoteServerManager : IDisposable
         if (IsRunning) return;
 
         Port = port;
-        ListenUrl = $"http://+:{port}/";
+        ListenUrl = $"http://localhost:{port}/";
 
         _cts = new CancellationTokenSource();
         _listener = new HttpListener();
@@ -102,7 +103,17 @@ public sealed class RemoteServerManager : IDisposable
         }
         catch (HttpListenerException ex)
         {
-            Log?.Invoke($"Failed to start server: {ex.Message}");
+            var msg = $"Failed to start server on port {port}: {ex.Message}";
+            Log?.Invoke(msg);
+            ErrorOccurred?.Invoke(msg);
+            _listener = null;
+            StatusChanged?.Invoke(false);
+        }
+        catch (Exception ex)
+        {
+            var msg = $"Failed to start server: {ex.Message}";
+            Log?.Invoke(msg);
+            ErrorOccurred?.Invoke(msg);
             _listener = null;
             StatusChanged?.Invoke(false);
         }

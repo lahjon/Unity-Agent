@@ -1806,7 +1806,8 @@ namespace Spritely.Managers
             "Test Verification",
             "Crash Log Investigation",
             "Build Test",
-            "Generate Suggestions"
+            "Generate Suggestions",
+            "Re-assign"
         };
 
         private static bool IsKnownTaskType(string? summary) =>

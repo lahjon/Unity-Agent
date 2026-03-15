@@ -308,10 +308,10 @@
       "shortSignature": "Dispose() -\u003E void"
     },
     "mainwindow": {
-      "featureId": "task-orchestration",
-      "filePath": "Views/MainWindow.Orchestration.cs",
+      "featureId": "main-window-ui",
+      "filePath": "Views/MainWindow.RemoteServer.cs",
       "kind": "Class",
-      "shortSignature": "class MainWindow"
+      "shortSignature": "class MainWindow : IRemoteServerCallbacks"
     },
     "releasetasklocksaftercommit": {
       "featureId": "task-execution",
