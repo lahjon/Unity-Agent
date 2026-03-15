@@ -26,13 +26,14 @@ namespace Spritely.Managers
     {
         public string Title { get; set; } = "";
         public string Description { get; set; } = "";
+        public List<string> Files { get; set; } = new();
         public SuggestionCategory Category { get; set; } = SuggestionCategory.General;
     }
 
     public class HelperManager : IDisposable
     {
         private const string SuggestionJsonSchema =
-            """{"type":"object","properties":{"suggestions":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"description":{"type":"string"}},"required":["title","description"]}}},"required":["suggestions"]}""";
+            """{"type":"object","properties":{"suggestions":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"description":{"type":"string"},"files":{"type":"array","items":{"type":"string"}}},"required":["title","description"]}}},"required":["suggestions"]}""";
 
         private readonly string _appDataDir;
         private string _currentProjectPath;
@@ -205,7 +206,8 @@ namespace Spritely.Managers
                     Suggestions.Add(new Suggestion
                     {
                         Title = title,
-                        Description = item.Description ?? "",
+                        Description = FormatDescriptionWithFiles(item.Description ?? "", item.Files),
+                        Files = item.Files ?? new List<string>(),
                         Category = category
                     });
                 }
@@ -322,6 +324,7 @@ namespace Spritely.Managers
                 {
                     Title = s.Title,
                     Description = s.Description,
+                    Files = s.Files.Count > 0 ? s.Files : null,
                     Category = s.Category.ToString()
                 }).ToList();
 
@@ -349,6 +352,7 @@ namespace Spritely.Managers
                     {
                         Title = entry.Title ?? "",
                         Description = entry.Description ?? "",
+                        Files = entry.Files ?? new List<string>(),
                         Category = cat
                     });
                 }
@@ -376,6 +380,7 @@ namespace Spritely.Managers
                     {
                         Title = entry.Title ?? "",
                         Description = entry.Description ?? "",
+                        Files = entry.Files ?? new List<string>(),
                         Category = cat
                     });
                 }
@@ -420,6 +425,12 @@ namespace Spritely.Managers
                     _ignoredTitles.Add(t);
             }
             catch (Exception ex) { AppLogger.Warn("HelperManager", "Failed to load ignored titles async", ex); }
+        }
+
+        private static string FormatDescriptionWithFiles(string description, List<string>? files)
+        {
+            if (files == null || files.Count == 0) return description;
+            return description.TrimEnd() + "\n\nFiles: " + string.Join(", ", files);
         }
 
         private static string StripAnsi(string text) => Helpers.FormatHelpers.StripAnsiCodes(text);
@@ -594,6 +605,7 @@ namespace Spritely.Managers
         {
             public string Title { get; set; } = "";
             public string Description { get; set; } = "";
+            public List<string>? Files { get; set; }
             public string? Category { get; set; }
         }
     }

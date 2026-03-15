@@ -26,15 +26,9 @@ namespace Spritely
             topRow.Height = new GridLength(topRow.ActualHeight);
             bottomRow.Height = new GridLength(bottomRow.ActualHeight);
 
-            // Also pin inner task/features rows to prevent their star sizing
-            // from causing the outer grid to re-proportion during drag
-            if (_featuresPanelExpanded)
-            {
-                if (TaskListRow.ActualHeight > 0)
-                    TaskListRow.Height = new GridLength(TaskListRow.ActualHeight);
-                if (FeaturesPanelRow.ActualHeight > 0)
-                    FeaturesPanelRow.Height = new GridLength(FeaturesPanelRow.ActualHeight);
-            }
+            // Pin inner task list row to prevent star sizing from causing re-proportion during drag
+            if (TaskListRow.ActualHeight > 0)
+                TaskListRow.Height = new GridLength(TaskListRow.ActualHeight);
         }
 
         private void TopMiddleSplitter_DragDelta(object sender, DragDeltaEventArgs e)
@@ -74,53 +68,8 @@ namespace Spritely
             topRow.Height = new GridLength(topProportion, GridUnitType.Star);
             bottomRow.Height = new GridLength(bottomProportion, GridUnitType.Star);
 
-            // Restore inner task/features rows to star sizing
-            if (_featuresPanelExpanded)
-            {
-                double innerTotal = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
-                if (innerTotal > 0)
-                {
-                    TaskListRow.Height = new GridLength(TaskListRow.ActualHeight / innerTotal, GridUnitType.Star);
-                    FeaturesPanelRow.Height = new GridLength(FeaturesPanelRow.ActualHeight / innerTotal, GridUnitType.Star);
-                }
-            }
-        }
-
-        // ── Task List ↔ Features splitter drag ──
-
-        private void TaskFeaturesSplitter_DragStarted(object sender, DragStartedEventArgs e)
-        {
-            _isSplitterDragging = true;
-            TaskListRow.Height = new GridLength(TaskListRow.ActualHeight);
-            FeaturesPanelRow.Height = new GridLength(FeaturesPanelRow.ActualHeight);
-        }
-
-        private void TaskFeaturesSplitter_DragDelta(object sender, DragDeltaEventArgs e)
-        {
-            double currentTask = TaskListRow.Height.Value;
-            double currentFeatures = FeaturesPanelRow.Height.Value;
-
-            double newTask = currentTask + e.VerticalChange;
-            double newFeatures = currentFeatures - e.VerticalChange;
-
-            double total = currentTask + currentFeatures;
-            const double minHeight = 60;
-            if (newTask < minHeight) { newTask = minHeight; newFeatures = total - minHeight; }
-            if (newFeatures < minHeight) { newFeatures = minHeight; newTask = total - minHeight; }
-
-            TaskListRow.Height = new GridLength(newTask);
-            FeaturesPanelRow.Height = new GridLength(newFeatures);
-        }
-
-        private void TaskFeaturesSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
-        {
-            _isSplitterDragging = false;
-            double totalHeight = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
-            if (totalHeight <= 0) return;
-            double taskProportion = TaskListRow.ActualHeight / totalHeight;
-            double featuresProportion = FeaturesPanelRow.ActualHeight / totalHeight;
-            TaskListRow.Height = new GridLength(taskProportion, GridUnitType.Star);
-            FeaturesPanelRow.Height = new GridLength(featuresProportion, GridUnitType.Star);
+            // Restore inner task list row to star sizing
+            TaskListRow.Height = new GridLength(1, GridUnitType.Star);
         }
 
         // ── Right splitter drag ──

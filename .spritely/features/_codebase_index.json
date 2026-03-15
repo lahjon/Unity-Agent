@@ -302,22 +302,22 @@
       "shortSignature": "ClearOutput() -\u003E void"
     },
     "dispose": {
-      "featureId": "ide-panel-management",
-      "filePath": "Managers/IdePanelManager.cs",
+      "featureId": "task-templates-storage",
+      "filePath": "Views/MainWindow.ProjectLifecycle.cs",
       "kind": "Method",
       "shortSignature": "Dispose() -\u003E void"
     },
     "mainwindow": {
-      "featureId": "main-window-ui",
-      "filePath": "Views/MainWindow.Automation.cs",
+      "featureId": "task-templates-storage",
+      "filePath": "Views/MainWindow.ProjectLifecycle.cs",
       "kind": "Class",
       "shortSignature": "class MainWindow"
     },
     "releasetasklocksaftercommit": {
       "featureId": "task-execution",
-      "filePath": "Views/MainWindow.AutoCommit.cs",
+      "filePath": "Managers/CommitOrchestrator.cs",
       "kind": "Method",
-      "shortSignature": "ReleaseTaskLocksAfterCommit(AgentTask task) -\u003E void"
+      "shortSignature": "ReleaseTaskLocksAfterCommit(AgentTask task, Action? onRefreshDashboard = null) -\u003E void"
     },
     "total": {
       "featureId": "task-ui",
@@ -9156,6 +9156,24 @@
       "filePath": "Managers/PlanSynthesizer.cs",
       "kind": "Method",
       "shortSignature": "SynthesizeAsync(string architectureFindings, string testingFindings, string edgeCaseFindings, string featureDescription, CancellationToken ct = default) -\u003E Task\u003Cstring?\u003E"
+    },
+    "commitorchestrator": {
+      "featureId": "task-execution",
+      "filePath": "Managers/CommitOrchestrator.cs",
+      "kind": "Class",
+      "shortSignature": "class CommitOrchestrator"
+    },
+    "persistchangedfiles": {
+      "featureId": "task-execution",
+      "filePath": "Managers/CommitOrchestrator.cs",
+      "kind": "Method",
+      "shortSignature": "PersistChangedFiles(AgentTask task, HashSet\u003Cstring\u003E lockedFiles) -\u003E void"
+    },
+    "persistchangedfilesfromgitasync": {
+      "featureId": "task-execution",
+      "filePath": "Managers/CommitOrchestrator.cs",
+      "kind": "Method",
+      "shortSignature": "PersistChangedFilesFromGitAsync(AgentTask task) -\u003E Task"
     }
   }
 }

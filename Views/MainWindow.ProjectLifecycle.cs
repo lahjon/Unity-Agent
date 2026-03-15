@@ -32,6 +32,7 @@ namespace Spritely
             UpdateNoProjectState();
 
             _ = ReloadTemplatesForProjectAsync();
+            _ = LoadSavedPromptsAsync();
             _ = LoadSkillsAsync();
             _ = LoadFeaturesAsync();
         }

@@ -185,7 +185,7 @@ public class FeatureInitializer
                 if (chunkIdx == 0)
                     ReportProgress("Analyzing project structure...");
 
-                var template = PromptLoader.Load("FeatureInitializationPrompt.md");
+                var template = PromptLoader.Load("Features/FeatureInitializationPrompt.md");
                 var prompt = string.Format(template, projectType, directoryTree, signaturesText);
 
                 ct.ThrowIfCancellationRequested();
@@ -758,7 +758,7 @@ public class FeatureInitializer
                 featureSummary.AppendLine($"- **{f.Id}**: {f.Name} [{f.Category}] — {f.Description}");
             }
 
-            var template = PromptLoader.Load("FeatureModuleGroupingPrompt.md");
+            var template = PromptLoader.Load("Features/FeatureModuleGroupingPrompt.md");
             var prompt = string.Format(template, featureSummary.ToString());
 
             ct.ThrowIfCancellationRequested();

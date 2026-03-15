@@ -15,6 +15,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Spritely.Helpers;
 using Spritely.Dialogs;
+using Spritely.Managers.DataStore;
 using Spritely.Models;
 
 namespace Spritely.Managers
@@ -24,6 +25,7 @@ namespace Spritely.Managers
         private List<ProjectEntry> _savedProjects = new();
         private string _projectPath;
         private readonly string _projectsFile;
+        private readonly IDataStore<List<ProjectEntry>> _projectStore;
         private string _addProjectSelectedPath = "";
         private bool _isSwapping;
         private ObservableCollection<AgentTask>? _activeTasks;
@@ -73,6 +75,13 @@ namespace Spritely.Managers
             IProjectPanelView view)
         {
             _projectsFile = Path.Combine(appDataDir, "projects.json");
+            _projectStore = new JsonDataStore<List<ProjectEntry>>(_projectsFile, new DataStoreOptions
+            {
+                SchemaVersion = 1,
+                BackgroundWrite = true,
+                CallerName = "ProjectManager",
+                JsonOptions = _projectJsonOptions
+            });
             _projectPath = initialProjectPath;
             _view = view;
 
@@ -186,19 +195,22 @@ namespace Spritely.Managers
         {
             try
             {
-                if (File.Exists(_projectsFile))
+                var loaded = await _projectStore.LoadAsync().ConfigureAwait(false);
+                if (loaded != null)
                 {
-                    var json = await File.ReadAllTextAsync(_projectsFile).ConfigureAwait(false);
+                    _savedProjects = loaded;
+                }
+                else if (File.Exists(_projectsFile))
+                {
+                    // Legacy fallback: raw string list without versioned envelope
                     try
                     {
-                        _savedProjects = JsonSerializer.Deserialize<List<ProjectEntry>>(json, _projectJsonOptions) ?? new();
-                    }
-                    catch
-                    {
+                        var json = await File.ReadAllTextAsync(_projectsFile).ConfigureAwait(false);
                         var oldList = JsonSerializer.Deserialize<List<string>>(json) ?? new();
                         _savedProjects = oldList.Select(p => new ProjectEntry { Path = p }).ToList();
                         SaveProjects();
                     }
+                    catch { _savedProjects = new(); }
                 }
             }
             catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed to load projects", ex); _savedProjects = new(); }
@@ -220,8 +232,8 @@ namespace Spritely.Managers
         {
             try
             {
-                var json = JsonSerializer.Serialize(_savedProjects, _projectJsonOptions);
-                SafeFileWriter.WriteInBackground(_projectsFile, json, "ProjectManager");
+                // Fire-and-forget: BackgroundWrite is enabled in DataStoreOptions
+                _ = _projectStore.SaveAsync(_savedProjects);
             }
             catch (Exception ex) { AppLogger.Warn("ProjectManager", "Failed to save projects", ex); }
         }

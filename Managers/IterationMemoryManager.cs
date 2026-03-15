@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spritely.Managers.DataStore;
 
 namespace Spritely.Managers
 {
@@ -16,6 +18,14 @@ namespace Spritely.Managers
     {
         private readonly string _memoryBasePath;
         private readonly object _lock = new();
+        private readonly ConcurrentDictionary<string, IPartitionedDataStore<IterationMemory>> _stores = new();
+
+        private static readonly DataStoreOptions _storeOptions = new()
+        {
+            SchemaVersion = 1,
+            AtomicWrite = true,
+            CallerName = "IterationMemory"
+        };
 
         public IterationMemoryManager()
         {
@@ -25,6 +35,15 @@ namespace Spritely.Managers
             Directory.CreateDirectory(_memoryBasePath);
         }
 
+        private IPartitionedDataStore<IterationMemory> GetStore(string taskId)
+        {
+            return _stores.GetOrAdd(taskId, id =>
+                new PartitionedDataStore<IterationMemory>(
+                    Path.Combine(_memoryBasePath, id),
+                    _storeOptions,
+                    filePrefix: "iteration_"));
+        }
+
         /// <summary>
         /// Records the results of a teams mode iteration.
         /// </summary>
@@ -32,16 +51,8 @@ namespace Spritely.Managers
         {
             lock (_lock)
             {
-                var taskDir = GetTaskDirectory(taskId);
-                var filePath = Path.Combine(taskDir, $"iteration_{iteration}.json");
-
-                var json = JsonSerializer.Serialize(memory, new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                });
-
-                File.WriteAllText(filePath, json);
+                var store = GetStore(taskId);
+                store.SaveAsync(iteration.ToString(), memory).GetAwaiter().GetResult();
                 AppLogger.Debug("IterationMemory", $"Recorded iteration {iteration} for task {taskId}");
             }
         }
@@ -53,28 +64,8 @@ namespace Spritely.Managers
         {
             lock (_lock)
             {
-                var taskDir = GetTaskDirectory(taskId);
-                if (!Directory.Exists(taskDir))
-                    return new List<IterationMemory>();
-
-                var memories = new List<IterationMemory>();
-
-                foreach (var file in Directory.GetFiles(taskDir, "iteration_*.json").OrderBy(f => f))
-                {
-                    try
-                    {
-                        var json = File.ReadAllText(file);
-                        var memory = JsonSerializer.Deserialize<IterationMemory>(json);
-                        if (memory != null)
-                            memories.Add(memory);
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Warn("IterationMemory", $"Failed to load iteration memory from {file}", ex);
-                    }
-                }
-
-                return memories;
+                var store = GetStore(taskId);
+                return store.LoadAllAsync().GetAwaiter().GetResult();
             }
         }
 

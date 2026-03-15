@@ -81,7 +81,7 @@ namespace Spritely.Managers
         /// </summary>
         public void PersistChangedFiles(AgentTask task, HashSet<string> lockedFiles)
         {
-            var projectRoot = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
+            var projectRoot = task.ProjectPath.TrimEnd('\\', '/') + "\\";
             var relativePaths = new List<string>();
             foreach (var absPath in lockedFiles)
             {
@@ -89,7 +89,10 @@ namespace Spritely.Managers
                     ? absPath.Substring(projectRoot.Length)
                     : absPath;
                 if (!rel.Contains("..") && !Path.IsPathRooted(rel))
-                    relativePaths.Add(rel.Replace('\\', '/'));
+                {
+                    var actualCased = ResolveActualCasing(task.ProjectPath, rel);
+                    relativePaths.Add(actualCased.Replace('\\', '/'));
+                }
             }
             task.ChangedFiles = relativePaths;
         }
@@ -150,11 +153,50 @@ namespace Spritely.Managers
         private async Task<List<string>> ResolveFilePaths(AgentTask task)
         {
             var lockedFiles = ResolveLockedFiles(task);
-            var projectRoot = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
             var relativePaths = new List<string>();
 
+            // Prefer git diff paths — they have correct casing unlike normalized file lock paths
+            if (!string.IsNullOrEmpty(task.GitStartHash))
+            {
+                var gitChangedFiles = await _gitHelper.GetChangedFileNamesAsync(
+                    task.ProjectPath, task.GitStartHash);
+                if (gitChangedFiles != null && gitChangedFiles.Count > 0)
+                {
+                    if (lockedFiles != null && lockedFiles.Count > 0)
+                    {
+                        // Intersect: only commit git-changed files that the task actually locked
+                        var lockedLower = new HashSet<string>(
+                            lockedFiles.Select(f => f.Replace('/', '\\').ToLowerInvariant()));
+                        var projectRootLower = task.ProjectPath.TrimEnd('\\', '/').ToLowerInvariant() + "\\";
+
+                        foreach (var gitFile in gitChangedFiles)
+                        {
+                            if (gitFile.Contains("..") || Path.IsPathRooted(gitFile)) continue;
+                            var absLower = (projectRootLower + gitFile.Replace('/', '\\')).ToLowerInvariant();
+                            if (lockedLower.Contains(absLower))
+                                relativePaths.Add(gitFile.Replace('\\', '/'));
+                        }
+
+                        // If intersection is empty, the task may have used Bash edits not captured by locks;
+                        // fall through to using all git-changed files
+                        if (relativePaths.Count > 0)
+                            return relativePaths;
+                    }
+
+                    // No lock-based filtering — use all git-changed files
+                    foreach (var f in gitChangedFiles)
+                    {
+                        if (!f.Contains("..") && !Path.IsPathRooted(f))
+                            relativePaths.Add(f.Replace('\\', '/'));
+                    }
+                    return relativePaths;
+                }
+            }
+
+            // Fallback: resolve file-lock paths with correct filesystem casing
             if (lockedFiles != null && lockedFiles.Count > 0)
             {
+                var projectRoot = task.ProjectPath.TrimEnd('\\', '/') + "\\";
                 foreach (var absPath in lockedFiles)
                 {
                     var rel = absPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
@@ -167,26 +209,50 @@ namespace Spritely.Managers
                         continue;
                     }
 
-                    relativePaths.Add(rel.Replace('\\', '/'));
-                }
-            }
-
-            // Fall back to git diff against GitStartHash when file locks didn't capture changes
-            if (relativePaths.Count == 0 && !string.IsNullOrEmpty(task.GitStartHash))
-            {
-                var gitChangedFiles = await _gitHelper.GetChangedFileNamesAsync(
-                    task.ProjectPath, task.GitStartHash);
-                if (gitChangedFiles != null)
-                {
-                    foreach (var f in gitChangedFiles)
-                    {
-                        if (!f.Contains("..") && !Path.IsPathRooted(f))
-                            relativePaths.Add(f.Replace('\\', '/'));
-                    }
+                    // Resolve actual filesystem casing since file lock paths are lowercased
+                    var actualCased = ResolveActualCasing(task.ProjectPath, rel);
+                    relativePaths.Add(actualCased.Replace('\\', '/'));
                 }
             }
 
             return relativePaths;
+        }
+
+        /// <summary>
+        /// Resolves the actual filesystem casing for a relative path by walking each segment.
+        /// File lock paths are normalized to lowercase which breaks case-sensitive git pathspecs.
+        /// </summary>
+        private static string ResolveActualCasing(string projectRoot, string relativePath)
+        {
+            try
+            {
+                var fullPath = Path.Combine(projectRoot, relativePath);
+                if (!File.Exists(fullPath) && !Directory.Exists(fullPath))
+                    return relativePath;
+
+                var result = projectRoot.TrimEnd('\\', '/');
+                var segments = relativePath.Replace('/', '\\').Split('\\');
+
+                foreach (var segment in segments)
+                {
+                    var parent = result;
+                    var entries = Directory.GetFileSystemEntries(parent, segment);
+                    if (entries.Length > 0)
+                        result = entries[0];
+                    else
+                        result = Path.Combine(parent, segment);
+                }
+
+                // Return the portion after the project root
+                if (result.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+                    return result.Substring(projectRoot.TrimEnd('\\', '/').Length + 1);
+
+                return relativePath;
+            }
+            catch
+            {
+                return relativePath;
+            }
         }
 
         private HashSet<string>? ResolveLockedFiles(AgentTask task)

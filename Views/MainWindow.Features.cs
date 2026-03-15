@@ -315,48 +315,7 @@ namespace Spritely
             }
         }
 
-        private bool _featuresPanelExpanded = true;
         private bool _featureOperationRunning;
-        private double _savedTaskListProportion = 1;
-        private double _savedFeaturesProportion = 1;
-
-        private void ToggleFeaturesPanel_Click(object sender, RoutedEventArgs e)
-        {
-            // Pin RootGrid rows to prevent layout jitter from the left panel's inner grid changes
-            PinRowHeights();
-
-            _featuresPanelExpanded = !_featuresPanelExpanded;
-            FeaturesPanelContent.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
-            FeaturesListBox.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
-            FeatureDetailPanel.Visibility = _featuresPanelExpanded && _selectedFeature != null ? Visibility.Visible : Visibility.Collapsed;
-            TaskFeaturesSplitter.Visibility = _featuresPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
-
-            if (_featuresPanelExpanded)
-            {
-                TaskListRow.Height = new GridLength(_savedTaskListProportion, GridUnitType.Star);
-                FeaturesPanelRow.Height = new GridLength(_savedFeaturesProportion, GridUnitType.Star);
-            }
-            else
-            {
-                // Save proportions before collapsing
-                double total = TaskListRow.ActualHeight + FeaturesPanelRow.ActualHeight;
-                if (total > 0)
-                {
-                    _savedTaskListProportion = TaskListRow.ActualHeight / total;
-                    _savedFeaturesProportion = FeaturesPanelRow.ActualHeight / total;
-                }
-                FeaturesPanelRow.Height = GridLength.Auto;
-            }
-
-            FeaturesPanelToggleBtn.Content = _featuresPanelExpanded ? "\uE70D" : "\uE70E";
-
-            RestoreStarRows();
-        }
-
-        private void ToggleFeaturesPanel_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            ToggleFeaturesPanel_Click(sender, (RoutedEventArgs)e);
-        }
 
         private void CloseFeatureDetail_Click(object sender, RoutedEventArgs e)
         {

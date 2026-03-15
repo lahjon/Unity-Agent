@@ -37,7 +37,7 @@ namespace Spritely.Managers
         private const string PreprocessJsonSchema =
             """{"type":"object","properties":{"header":{"type":"string"},"enhanced_prompt":{"type":"string"},"apply_fix":{"type":"boolean"},"extended_planning":{"type":"boolean"},"teams_mode":{"type":"boolean"},"auto_decompose":{"type":"boolean"},"spawn_team":{"type":"boolean"},"use_mcp":{"type":"boolean"},"iterations":{"type":"integer"}},"required":["header","enhanced_prompt","apply_fix","extended_planning","teams_mode","auto_decompose","spawn_team","use_mcp","iterations"]}""";
 
-        private static readonly string PreprocessPrompt = PromptLoader.Load("TaskPreprocessorPrompt.md");
+        private static readonly string PreprocessPrompt = PromptLoader.Load("Tasks/TaskPreprocessorPrompt.md");
 
         private readonly ClaudeService? _claudeService;
 

@@ -209,7 +209,7 @@ namespace Spritely.Managers
                     new JsonSerializerOptions { WriteIndented = false });
 
                 // Load prompt template and format
-                var template = PromptLoader.Load("FeatureUpdatePrompt.md");
+                var template = PromptLoader.Load("Features/FeatureUpdatePrompt.md");
                 var prompt = string.Format(template,
                     taskDescription,
                     completionSummary ?? "No summary",
@@ -771,7 +771,7 @@ namespace Spritely.Managers
                     var indexJson = JsonSerializer.Serialize(featureSummaries,
                         new JsonSerializerOptions { WriteIndented = false });
 
-                    var template = PromptLoader.Load("FeatureUpdatePrompt.md");
+                    var template = PromptLoader.Load("Features/FeatureUpdatePrompt.md");
                     var prompt = string.Format(template,
                         pending.TaskDescription,
                         pending.CompletionSummary ?? "No summary",

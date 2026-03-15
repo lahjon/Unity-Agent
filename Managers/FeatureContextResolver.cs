@@ -347,7 +347,7 @@ namespace Spritely.Managers
                     new JsonSerializerOptions { WriteIndented = false });
 
                 // Load prompt template and format
-                var template = PromptLoader.Load("FeatureContextResolverPrompt.md");
+                var template = PromptLoader.Load("Features/FeatureContextResolverPrompt.md");
                 var prompt = string.Format(template, taskDescription, candidatesJson);
 
                 // Prefer direct API; fall back to CLI

@@ -16,14 +16,15 @@ namespace Spritely.Managers
         private const string Prefix = "Spritely.Prompts.";
 
         /// <summary>
-        /// Returns the contents of an embedded .md resource by filename (without path prefix).
+        /// Returns the contents of an embedded .md resource by path relative to Prompts/.
+        /// Accepts both flat names ("Foo.md") and subdirectory paths ("Core/Foo.md").
         /// The result is cached on first read — subsequent calls return the cached string.
         /// </summary>
         public static string Load(string filename)
         {
             return _cache.GetOrAdd(filename, static (key, asm) =>
             {
-                var resourceName = Prefix + key;
+                var resourceName = Prefix + key.Replace('/', '.').Replace('\\', '.');
                 using var stream = asm.GetManifestResourceStream(resourceName);
                 if (stream == null)
                     throw new InvalidOperationException(

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Spritely.Constants;
+using Spritely.Managers.DataStore;
 using Spritely.Models;
 
 namespace Spritely.Managers
@@ -42,8 +44,7 @@ namespace Spritely.Managers
         /// </summary>
         public static async Task<List<FeatureEntry>> LoadFeaturesAsync(string projectPath)
         {
-            var filePath = GetFeaturesPath(projectPath);
-            return await LoadJsonlAsync<FeatureEntry>(filePath);
+            return await GetFeatureStore(projectPath).LoadAsync();
         }
 
         /// <summary>
@@ -51,9 +52,8 @@ namespace Spritely.Managers
         /// </summary>
         public static async Task SaveFeaturesAsync(string projectPath, List<FeatureEntry> features)
         {
-            var filePath = GetFeaturesPath(projectPath);
             var sorted = features.OrderBy(f => f.Id, StringComparer.Ordinal).ToList();
-            await SaveJsonlAsync(filePath, sorted);
+            await GetFeatureStore(projectPath).SaveAsync(sorted);
         }
 
         /// <summary>
@@ -122,16 +122,14 @@ namespace Spritely.Managers
         /// <summary>Reads all modules from the JSONL database file.</summary>
         public static async Task<List<ModuleEntry>> LoadModulesAsync(string projectPath)
         {
-            var filePath = GetModulesPath(projectPath);
-            return await LoadJsonlAsync<ModuleEntry>(filePath);
+            return await GetModuleStore(projectPath).LoadAsync();
         }
 
         /// <summary>Writes all modules to the JSONL database file, sorted by ID.</summary>
         public static async Task SaveModulesAsync(string projectPath, List<ModuleEntry> modules)
         {
-            var filePath = GetModulesPath(projectPath);
             var sorted = modules.OrderBy(m => m.Id, StringComparer.Ordinal).ToList();
-            await SaveJsonlAsync(filePath, sorted);
+            await GetModuleStore(projectPath).SaveAsync(sorted);
         }
 
         /// <summary>Loads a single module by ID.</summary>
@@ -190,14 +188,10 @@ namespace Spritely.Managers
         /// <summary>Loads the metadata file. Returns defaults if missing.</summary>
         public static async Task<FeatureMetadata> LoadMetadataAsync(string projectPath)
         {
-            var filePath = GetMetadataPath(projectPath);
             try
             {
-                if (!File.Exists(filePath))
-                    return new FeatureMetadata();
-
-                var json = await File.ReadAllTextAsync(filePath);
-                return JsonSerializer.Deserialize<FeatureMetadata>(json, PrettyOptions) ?? new FeatureMetadata();
+                var store = GetMetadataStore(projectPath);
+                return await store.LoadAsync().ConfigureAwait(false) ?? new FeatureMetadata();
             }
             catch
             {
@@ -208,11 +202,9 @@ namespace Spritely.Managers
         /// <summary>Saves the metadata file.</summary>
         public static async Task SaveMetadataAsync(string projectPath, FeatureMetadata metadata)
         {
-            var filePath = GetMetadataPath(projectPath);
-            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+            var store = GetMetadataStore(projectPath);
             metadata.LastUpdatedAt = DateTime.UtcNow;
-            var json = JsonSerializer.Serialize(metadata, PrettyOptions).Replace("\r\n", "\n");
-            await File.WriteAllTextAsync(filePath, json);
+            await store.SaveAsync(metadata).ConfigureAwait(false);
         }
 
         // ── Migration ───────────────────────────────────────────────────
@@ -378,52 +370,61 @@ namespace Spritely.Managers
         public static string GetMetadataPath(string projectPath)
             => Path.Combine(GetFeaturesDir(projectPath), FeatureConstants.MetadataFileName);
 
-        // ── JSONL Primitives ────────────────────────────────────────────
+        // ── DataStore Integration ──────────────────────────────────────
 
-        /// <summary>Reads a JSONL file, deserializing each line as T.</summary>
-        private static async Task<List<T>> LoadJsonlAsync<T>(string filePath)
+        private static readonly ConcurrentDictionary<string, IJsonlDataStore<FeatureEntry>> _featureStores = new();
+        private static readonly ConcurrentDictionary<string, IJsonlDataStore<ModuleEntry>> _moduleStores = new();
+        private static readonly ConcurrentDictionary<string, IDataStore<FeatureMetadata>> _metadataStores = new();
+
+        private static readonly DataStoreOptions _jsonlStoreOptions = new()
         {
-            if (!File.Exists(filePath))
-                return new List<T>();
+            SchemaVersion = 1,
+            AtomicWrite = false, // Feature files are in-repo, direct write is fine
+            CallerName = "FeatureDatabase",
+            JsonOptions = CompactOptions
+        };
 
-            var results = new List<T>();
-            await foreach (var line in ReadLinesAsync(filePath))
-            {
-                if (string.IsNullOrWhiteSpace(line))
-                    continue;
+        private static readonly DataStoreOptions _metadataStoreOptions = new()
+        {
+            SchemaVersion = 1,
+            AtomicWrite = false,
+            CallerName = "FeatureDatabase",
+            JsonOptions = PrettyOptions
+        };
 
-                try
-                {
-                    var item = JsonSerializer.Deserialize<T>(line, CompactOptions);
-                    if (item != null)
-                        results.Add(item);
-                }
-                catch
-                {
-                    // Skip malformed lines — graceful degradation
-                }
-            }
-
-            return results;
+        internal static IJsonlDataStore<FeatureEntry> GetFeatureStore(string projectPath)
+        {
+            return _featureStores.GetOrAdd(GetFeaturesPath(projectPath),
+                path => new JsonlDataStore<FeatureEntry>(path, _jsonlStoreOptions));
         }
 
-        /// <summary>Writes a list of items as JSONL, one compact JSON per line, LF line endings.</summary>
-        private static async Task SaveJsonlAsync<T>(string filePath, List<T> items)
+        internal static IJsonlDataStore<ModuleEntry> GetModuleStore(string projectPath)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-
-            var sb = new StringBuilder();
-            foreach (var item in items)
-            {
-                var line = JsonSerializer.Serialize(item, CompactOptions);
-                sb.Append(line);
-                sb.Append('\n');
-            }
-
-            await File.WriteAllTextAsync(filePath, sb.ToString());
+            return _moduleStores.GetOrAdd(GetModulesPath(projectPath),
+                path => new JsonlDataStore<ModuleEntry>(path, _jsonlStoreOptions));
         }
 
-        /// <summary>Async line reader for JSONL files.</summary>
+        internal static IDataStore<FeatureMetadata> GetMetadataStore(string projectPath)
+        {
+            return _metadataStores.GetOrAdd(GetMetadataPath(projectPath),
+                path => new JsonDataStore<FeatureMetadata>(path, _metadataStoreOptions));
+        }
+
+        // ── JSONL Primitives (kept for migration code) ──────────────────
+
+        private static async Task<List<T>> LoadJsonlAsync<T>(string filePath) where T : class
+        {
+            var store = new JsonlDataStore<T>(filePath, _jsonlStoreOptions);
+            return await store.LoadAsync();
+        }
+
+        private static async Task SaveJsonlAsync<T>(string filePath, List<T> items) where T : class
+        {
+            var store = new JsonlDataStore<T>(filePath, _jsonlStoreOptions);
+            await store.SaveAsync(items);
+        }
+
+        /// <summary>Async line reader for JSONL files (used by LoadFeatureByIdAsync for streaming).</summary>
         private static async IAsyncEnumerable<string> ReadLinesAsync(string filePath)
         {
             using var reader = new StreamReader(filePath, Encoding.UTF8);

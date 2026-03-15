@@ -69,49 +69,53 @@ namespace Spritely.Managers
         // ── Constants ────────────────────────────────────────────────
         // Prompt text is loaded from embedded Prompts/*.md files at startup.
 
-        public static readonly string DefaultSystemPrompt = PromptLoader.Load("DefaultSystemPrompt.md");
-        public static readonly string McpPromptBlock = PromptLoader.Load("McpPromptBlock.md");
-        public static readonly string NoGitWriteBlock = PromptLoader.Load("NoGitWriteBlock.md");
-        public static readonly string NoPushBlock = PromptLoader.Load("NoPushBlock.md");
-        public static readonly string GameRulesBlock = PromptLoader.Load("GameRulesBlock.md");
-        public static readonly string PlanOnlyBlock = PromptLoader.Load("PlanOnlyBlock.md");
-        public static readonly string ExtendedPlanningBlock = PromptLoader.Load("ExtendedPlanningBlock.md");
-        public static readonly string MessageBusBlockTemplate = PromptLoader.Load("MessageBusBlockTemplate.md");
-        public static readonly string SubtaskCoordinatorBlock = PromptLoader.Load("SubtaskCoordinatorBlock.md");
-        public static readonly string DecompositionPromptBlock = PromptLoader.Load("DecompositionPromptBlock.md");
-        public static readonly string TeamDecompositionPromptBlock = PromptLoader.Load("TeamDecompositionPromptBlock.md");
-        public static readonly string ApplyFixBlock = PromptLoader.Load("ApplyFixBlock.md");
-        public static readonly string ConfirmBeforeChangesBlock = PromptLoader.Load("ConfirmBeforeChangesBlock.md");
-        public static readonly string AutonomousExecutionBlock = PromptLoader.Load("AutonomousExecutionBlock.md");
-        public static readonly string OutputEfficiencyBlock = PromptLoader.Load("OutputEfficiencyBlock.md");
-        public static readonly string PlanningTeamMemberBlock = PromptLoader.Load("PlanningTeamMemberBlock.md");
-        public static readonly string TeamsModeInitialTemplate = PromptLoader.Load("TeamsModeInitialTemplate.md");
-        public static readonly string TeamsModePlanConsolidationTemplate = PromptLoader.Load("TeamsModePlanConsolidationTemplate.md");
-        public static readonly string TeamsModeEvaluationTemplate = PromptLoader.Load("TeamsModeEvaluationTemplate.md");
-        public static readonly string TeamsModeContinuationTemplate = PromptLoader.Load("TeamsModeContinuationTemplate.md");
+        // ── Core prompts ──
+        public static readonly string DefaultSystemPrompt = PromptLoader.Load("Core/DefaultSystemPrompt.md");
+        public static readonly string McpPromptBlock = PromptLoader.Load("Core/McpPromptBlock.md");
+        public static readonly string NoGitWriteBlock = PromptLoader.Load("Core/NoGitWriteBlock.md");
+        public static readonly string NoPushBlock = PromptLoader.Load("Core/NoPushBlock.md");
+        public static readonly string GameRulesBlock = PromptLoader.Load("Core/GameRulesBlock.md");
+        public static readonly string PlanOnlyBlock = PromptLoader.Load("Core/PlanOnlyBlock.md");
+        public static readonly string ExtendedPlanningBlock = PromptLoader.Load("Core/ExtendedPlanningBlock.md");
+        public static readonly string ApplyFixBlock = PromptLoader.Load("Core/ApplyFixBlock.md");
+        public static readonly string ConfirmBeforeChangesBlock = PromptLoader.Load("Core/ConfirmBeforeChangesBlock.md");
+        public static readonly string AutonomousExecutionBlock = PromptLoader.Load("Core/AutonomousExecutionBlock.md");
+        public static readonly string OutputEfficiencyBlock = PromptLoader.Load("Core/OutputEfficiencyBlock.md");
+
+        // ── Teams prompts ──
+        public static readonly string MessageBusBlockTemplate = PromptLoader.Load("Teams/MessageBusBlockTemplate.md");
+        public static readonly string SubtaskCoordinatorBlock = PromptLoader.Load("Teams/SubtaskCoordinatorBlock.md");
+        public static readonly string DecompositionPromptBlock = PromptLoader.Load("Teams/DecompositionPromptBlock.md");
+        public static readonly string TeamDecompositionPromptBlock = PromptLoader.Load("Teams/TeamDecompositionPromptBlock.md");
+        public static readonly string PlanningTeamMemberBlock = PromptLoader.Load("Teams/PlanningTeamMemberBlock.md");
+        public static readonly string TeamsModeInitialTemplate = PromptLoader.Load("Teams/TeamsModeInitialTemplate.md");
+        public static readonly string TeamsModePlanConsolidationTemplate = PromptLoader.Load("Teams/TeamsModePlanConsolidationTemplate.md");
+        public static readonly string TeamsModeEvaluationTemplate = PromptLoader.Load("Teams/TeamsModeEvaluationTemplate.md");
+        public static readonly string TeamsModeContinuationTemplate = PromptLoader.Load("Teams/TeamsModeContinuationTemplate.md");
 
         // ── Prompts formerly in other files (centralized) ────────────
 
-        public static readonly string GameProjectExplorationPrompt = PromptLoader.Load("GameProjectExplorationPrompt.md");
-        public static readonly string CodebaseExplorationPrompt = PromptLoader.Load("CodebaseExplorationPrompt.md");
-        public static readonly string ClaudeMdGenerationPrompt = PromptLoader.Load("ClaudeMdGenerationPrompt.md");
+        // ── Task prompts ──
+        public static readonly string GameProjectExplorationPrompt = PromptLoader.Load("Tasks/GameProjectExplorationPrompt.md");
+        public static readonly string CodebaseExplorationPrompt = PromptLoader.Load("Tasks/CodebaseExplorationPrompt.md");
+        public static readonly string ClaudeMdGenerationPrompt = PromptLoader.Load("Tasks/ClaudeMdGenerationPrompt.md");
 
         /// <summary>Template for project analysis suggestions. Use string.Format with {0} = categoryFilter.</summary>
-        public static readonly string ProjectSuggestionPromptTemplate = PromptLoader.Load("ProjectSuggestionPromptTemplate.md");
+        public static readonly string ProjectSuggestionPromptTemplate = PromptLoader.Load("Tasks/ProjectSuggestionPromptTemplate.md");
 
-        public static readonly string ChatAssistantSystemPrompt = PromptLoader.Load("ChatAssistantSystemPrompt.md");
-        public static readonly string WorkflowDecompositionSystemPrompt = PromptLoader.Load("WorkflowDecompositionSystemPrompt.md");
+        public static readonly string ChatAssistantSystemPrompt = PromptLoader.Load("Core/ChatAssistantSystemPrompt.md");
+        public static readonly string WorkflowDecompositionSystemPrompt = PromptLoader.Load("Teams/WorkflowDecompositionSystemPrompt.md");
 
         /// <summary>Template for result verification. Use string.Format with {0}=taskDescription, {1}=contextTail, {2}=summaryBlock.</summary>
-        public static readonly string ResultVerificationPromptTemplate = PromptLoader.Load("ResultVerificationPromptTemplate.md");
+        public static readonly string ResultVerificationPromptTemplate = PromptLoader.Load("Tasks/ResultVerificationPromptTemplate.md");
 
-        public static readonly string TokenLimitRetryContinuationPrompt = PromptLoader.Load("TokenLimitRetryContinuationPrompt.md");
-        public static readonly string TeamsModeIterationPlanningTemplate = PromptLoader.Load("TeamsModeIterationPlanningTemplate.md");
+        public static readonly string TokenLimitRetryContinuationPrompt = PromptLoader.Load("Core/TokenLimitRetryContinuationPrompt.md");
+        public static readonly string TeamsModeIterationPlanningTemplate = PromptLoader.Load("Teams/TeamsModeIterationPlanningTemplate.md");
 
         // Synthesis perspective prompts
-        public static readonly string SynthesisArchitecturePerspective = PromptLoader.Load("SynthesisArchitecturePerspective.md");
-        public static readonly string SynthesisTestingPerspective = PromptLoader.Load("SynthesisTestingPerspective.md");
-        public static readonly string SynthesisEdgeCasesPerspective = PromptLoader.Load("SynthesisEdgeCasesPerspective.md");
+        public static readonly string SynthesisArchitecturePerspective = PromptLoader.Load("Teams/SynthesisArchitecturePerspective.md");
+        public static readonly string SynthesisTestingPerspective = PromptLoader.Load("Teams/SynthesisTestingPerspective.md");
+        public static readonly string SynthesisEdgeCasesPerspective = PromptLoader.Load("Teams/SynthesisEdgeCasesPerspective.md");
 
         /// <summary>Perspective prompt blocks indexed by perspective (0=Architecture, 1=Testing, 2=EdgeCases).</summary>
         public static readonly string[] SynthesisPerspectives =

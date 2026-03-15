@@ -19,24 +19,48 @@ namespace Spritely
         private SavedPromptEntry? _currentLoadedPrompt = null;
         private bool _loadedPromptModified = false;
 
-        private string SavedPromptsFile => Path.Combine(
+        private static readonly string _globalSavedPromptsFile = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Spritely", "saved_prompts.json");
+
+        private string? SavedPromptsFile
+        {
+            get
+            {
+                var projectPath = _projectManager?.ProjectPath;
+                if (string.IsNullOrEmpty(projectPath)) return null;
+                return Path.Combine(projectPath, ".spritely", "saved_prompts.json");
+            }
+        }
 
         private async System.Threading.Tasks.Task LoadSavedPromptsAsync(System.Threading.CancellationToken ct = default)
         {
             SavedPromptsPanel.ItemsSource = _savedPrompts;
+            _savedPrompts.Clear();
+
+            var file = SavedPromptsFile;
+            if (file == null) return;
 
             try
             {
-                if (File.Exists(SavedPromptsFile))
+                // One-time migration: copy global saved prompts into current project
+                if (!File.Exists(file) && File.Exists(_globalSavedPromptsFile))
                 {
-                    var json = await System.Threading.Tasks.Task.Run(() => File.ReadAllText(SavedPromptsFile), ct);
+                    var dir = Path.GetDirectoryName(file)!;
+                    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                    var globalJson = await System.Threading.Tasks.Task.Run(() => File.ReadAllText(_globalSavedPromptsFile), ct);
+                    ct.ThrowIfCancellationRequested();
+                    await System.Threading.Tasks.Task.Run(() => File.WriteAllText(file, globalJson), ct);
+                    Managers.AppLogger.Info("MainWindow", $"Migrated global saved prompts to {file}");
+                }
+
+                if (File.Exists(file))
+                {
+                    var json = await System.Threading.Tasks.Task.Run(() => File.ReadAllText(file), ct);
                     ct.ThrowIfCancellationRequested();
                     var entries = System.Text.Json.JsonSerializer.Deserialize<List<SavedPromptEntry>>(json);
                     if (entries != null)
                     {
-                        _savedPrompts.Clear();
                         foreach (var entry in entries)
                             _savedPrompts.Add(entry);
                     }
@@ -48,11 +72,17 @@ namespace Spritely
 
         private void PersistSavedPrompts()
         {
+            var file = SavedPromptsFile;
+            if (file == null) return;
+
             try
             {
+                var dir = Path.GetDirectoryName(file)!;
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
                 var json = System.Text.Json.JsonSerializer.Serialize(_savedPrompts.ToList(),
                     new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                Managers.SafeFileWriter.WriteInBackground(SavedPromptsFile, json, "MainWindow");
+                Managers.SafeFileWriter.WriteInBackground(file, json, "MainWindow");
             }
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to persist saved prompts", ex); }
         }

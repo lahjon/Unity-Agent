@@ -13,7 +13,7 @@ namespace Spritely.Managers
     {
         private readonly ClaudeService _claudeService;
 
-        private static readonly string SynthesisTemplate = PromptLoader.Load("PlanSynthesisTemplate.md");
+        private static readonly string SynthesisTemplate = PromptLoader.Load("Teams/PlanSynthesisTemplate.md");
 
         private const string SynthesisSchema = """
             {

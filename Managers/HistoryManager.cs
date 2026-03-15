@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using Spritely.Managers.DataStore;
 using Spritely.Models;
 
 namespace Spritely.Managers
@@ -19,6 +20,10 @@ namespace Spritely.Managers
         private readonly object _historyLock;
         private readonly object _storedLock;
 
+        private readonly IDataStore<List<TaskHistoryEntry>> _historyStore;
+        private readonly IDataStore<List<TaskHistoryEntry>> _activeQueueStore;
+        private readonly IDataStore<List<StoredTaskEntry>> _storedTasksStore;
+
         public HistoryManager(string appDataDir, object historyLock, object storedLock)
         {
             _historyFile = Path.Combine(appDataDir, "task_history.json");
@@ -26,15 +31,26 @@ namespace Spritely.Managers
             _activeQueueFile = Path.Combine(appDataDir, "active_queue.json");
             _historyLock = historyLock;
             _storedLock = storedLock;
+
+            var bgOptions = new DataStoreOptions
+            {
+                SchemaVersion = 1,
+                BackgroundWrite = true,
+                CallerName = "HistoryManager"
+            };
+            _historyStore = new JsonDataStore<List<TaskHistoryEntry>>(_historyFile, bgOptions);
+            _activeQueueStore = new JsonDataStore<List<TaskHistoryEntry>>(_activeQueueFile, new DataStoreOptions
+            {
+                SchemaVersion = 1,
+                CallerName = "HistoryManager"
+            });
+            _storedTasksStore = new JsonDataStore<List<StoredTaskEntry>>(_storedTasksFile, bgOptions);
         }
 
         public void SaveHistory(ObservableCollection<AgentTask> historyTasks)
         {
             try
             {
-                var dir = Path.GetDirectoryName(_historyFile)!;
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-
                 // Snapshot under lock so background writes never race with collection changes
                 List<TaskHistoryEntry> entries;
                 lock (_historyLock)
@@ -67,8 +83,7 @@ namespace Spritely.Managers
                     }).ToList();
                 }
 
-                var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
-                SafeFileWriter.WriteInBackground(_historyFile, json, "HistoryManager");
+                _ = _historyStore.SaveAsync(entries);
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save task history", ex); }
         }
@@ -78,10 +93,8 @@ namespace Spritely.Managers
             var results = new List<AgentTask>();
             try
             {
-                if (!File.Exists(_historyFile)) return results;
-                var json = await File.ReadAllTextAsync(_historyFile).ConfigureAwait(false);
-                var entries = JsonSerializer.Deserialize<List<TaskHistoryEntry>>(json);
-                if (entries == null) return results;
+                var entries = await _historyStore.LoadAsync().ConfigureAwait(false);
+                if (entries == null || entries.Count == 0) return results;
 
                 var cutoff = DateTime.Now.AddHours(-retentionHours);
                 foreach (var entry in entries.Where(e => e.StartTime > cutoff))
@@ -161,9 +174,6 @@ namespace Spritely.Managers
         {
             try
             {
-                var dir = Path.GetDirectoryName(_activeQueueFile)!;
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-
                 List<TaskHistoryEntry> entries;
                 lock (activeTasksLock)
                 {
@@ -199,7 +209,6 @@ namespace Spritely.Managers
                             OutputTokens = t.OutputTokens,
                             CacheReadTokens = t.CacheReadTokens,
                             CacheCreationTokens = t.CacheCreationTokens,
-                            // Task configuration for relaunch
                             Model = t.Model.ToString(),
                             Headless = t.Headless,
                             IgnoreFileLocks = t.IgnoreFileLocks,
@@ -218,22 +227,26 @@ namespace Spritely.Managers
 
                 if (entries.Count == 0)
                 {
-                    // No queued tasks — remove any stale queue file
-                    if (File.Exists(_activeQueueFile))
-                        File.Delete(_activeQueueFile);
+                    _ = _activeQueueStore.DeleteAsync();
                     return;
                 }
 
-                var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
-
                 if (useBackgroundWrite)
                 {
-                    // Use background write for periodic saves during normal operation
-                    SafeFileWriter.WriteInBackground(_activeQueueFile, json, "HistoryManager");
+                    SafeFileWriter.WriteInBackground(_activeQueueFile,
+                        JsonSerializer.Serialize(new VersionedEnvelope<List<TaskHistoryEntry>>
+                        {
+                            Version = 1, Data = entries
+                        }, DataStoreOptions.DefaultJsonOptions),
+                        "HistoryManager");
                 }
                 else
                 {
-                    // Write synchronously during Dispose/shutdown, so background writes don't get cut off
+                    // Synchronous during shutdown — bypass the store's async path
+                    var json = JsonSerializer.Serialize(new VersionedEnvelope<List<TaskHistoryEntry>>
+                    {
+                        Version = 1, Data = entries
+                    }, DataStoreOptions.DefaultJsonOptions);
                     File.WriteAllText(_activeQueueFile, json);
                 }
             }
@@ -249,10 +262,8 @@ namespace Spritely.Managers
             var results = new List<AgentTask>();
             try
             {
-                if (!File.Exists(_activeQueueFile)) return results;
-                var json = await File.ReadAllTextAsync(_activeQueueFile).ConfigureAwait(false);
-                var entries = JsonSerializer.Deserialize<List<TaskHistoryEntry>>(json);
-                if (entries == null) return results;
+                var entries = await _activeQueueStore.LoadAsync().ConfigureAwait(false);
+                if (entries == null || entries.Count == 0) return results;
 
                 foreach (var entry in entries.Where(e => e.WasActive))
                 {
@@ -312,10 +323,6 @@ namespace Spritely.Managers
         {
             try
             {
-                var dir = Path.GetDirectoryName(_storedTasksFile)!;
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-
-                // Snapshot under lock so background writes never race with collection changes
                 List<StoredTaskEntry> entries;
                 lock (_storedLock)
                 {
@@ -334,8 +341,7 @@ namespace Spritely.Managers
                     }).ToList();
                 }
 
-                var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
-                SafeFileWriter.WriteInBackground(_storedTasksFile, json, "HistoryManager");
+                _ = _storedTasksStore.SaveAsync(entries);
             }
             catch (Exception ex) { AppLogger.Warn("HistoryManager", "Failed to save stored tasks", ex); }
         }
@@ -345,10 +351,8 @@ namespace Spritely.Managers
             var results = new List<AgentTask>();
             try
             {
-                if (!File.Exists(_storedTasksFile)) return results;
-                var json = await File.ReadAllTextAsync(_storedTasksFile).ConfigureAwait(false);
-                var entries = JsonSerializer.Deserialize<List<StoredTaskEntry>>(json);
-                if (entries == null) return results;
+                var entries = await _storedTasksStore.LoadAsync().ConfigureAwait(false);
+                if (entries == null || entries.Count == 0) return results;
 
                 foreach (var entry in entries)
                 {
