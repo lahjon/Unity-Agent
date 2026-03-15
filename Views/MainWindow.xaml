@@ -1450,6 +1450,53 @@
                     </DockPanel>
                 <TabControl x:Name="MainTabs" Style="{StaticResource SettingsTabControlStyle}"
                             Background="Transparent" BorderThickness="0">
+                    <!-- Build tab -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <TextBlock Text="Build" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                            <StackPanel MaxWidth="600">
+                                <!-- Build Tools section -->
+                                <TextBlock Text="BUILD TOOLS" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <TextBlock Text="Investigate build failures, crash logs, and verify project tests."
+                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Margin="0,0,0,16"/>
+                                <WrapPanel Orientation="Horizontal">
+                                    <Button x:Name="BuildInvestigationBtn" Content="Crash Log Investigation"
+                                            Click="BuildInvestigation_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4" Margin="0,0,8,6"/>
+                                    <Button x:Name="TestVerificationBtn" Content="Test Verification"
+                                            Click="TestVerification_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4" Margin="0,0,8,6"/>
+                                    <Button x:Name="BuildTestBtn" Content="Build Test"
+                                            Click="BuildTest_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4" Margin="0,0,8,6"/>
+                                    <Button x:Name="RestartProjectBtn" Content="Restart Project"
+                                            Click="RestartProject_Click"
+                                            Style="{StaticResource SecondaryBtn}"
+                                            FontSize="11" Padding="10,4" Margin="0,0,8,6"/>
+                                </WrapPanel>
+
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,12,0,12"/>
+
+                                <!-- Export Build section -->
+                                <TextBlock Text="BUILD EXPORT" Foreground="{StaticResource Accent}" FontWeight="Bold"
+                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                <TextBlock Text="Export your application for distribution." Foreground="{StaticResource TextMuted}"
+                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,16" TextWrapping="Wrap"/>
+                                <Button x:Name="ExportBuildBtn" Content="Export Build" Click="ExportBuild_Click"
+                                        Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
+                                        Padding="12,6" HorizontalAlignment="Left"/>
+                                <TextBlock x:Name="ExportStatusText" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                           FontFamily="Segoe UI" Margin="0,12,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
                     <!-- Automation tab -->
                     <TabItem x:Name="HelperTabItem">
                         <TabItem.Header>
@@ -1535,34 +1582,6 @@
                             </StackPanel>
 
                             <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,8"/>
-
-                            <!-- Build Tools section -->
-                            <StackPanel Margin="0,0,0,0">
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,8,0,8"/>
-                                <TextBlock Text="Build Tools" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
-                                <TextBlock Text="Investigate build failures, crash logs, and verify project tests."
-                                           Foreground="{StaticResource TextSubdued}" FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
-                                           Margin="0,0,0,8"/>
-                                <WrapPanel Orientation="Horizontal">
-                                    <Button x:Name="BuildInvestigationBtn" Content="Crash Log Investigation"
-                                            Click="BuildInvestigation_Click"
-                                            Style="{StaticResource SecondaryBtn}"
-                                            FontSize="11" Padding="10,4" Margin="0,0,8,6"/>
-                                    <Button x:Name="TestVerificationBtn" Content="Test Verification"
-                                            Click="TestVerification_Click"
-                                            Style="{StaticResource SecondaryBtn}"
-                                            FontSize="11" Padding="10,4" Margin="0,0,8,6"/>
-                                    <Button x:Name="BuildTestBtn" Content="Build Test"
-                                            Click="BuildTest_Click"
-                                            Style="{StaticResource SecondaryBtn}"
-                                            FontSize="11" Padding="10,4" Margin="0,0,8,6"/>
-                                    <Button x:Name="RestartProjectBtn" Content="Restart Project"
-                                            Click="RestartProject_Click"
-                                            Style="{StaticResource SecondaryBtn}"
-                                            FontSize="11" Padding="10,4" Margin="0,0,8,6"/>
-                                </WrapPanel>
-                            </StackPanel>
 
                             <!-- Suggestions list -->
                                 <ItemsControl x:Name="SuggestionsListView">
@@ -2008,29 +2027,6 @@
                                 <StackPanel x:Name="ChatMessagesPanel"/>
                             </ScrollViewer>
                         </DockPanel>
-                    </TabItem>
-                    <!-- Export tab -->
-                    <TabItem>
-                        <TabItem.Header>
-                            <TextBlock Text="Export" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
-                        </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                            <StackPanel MaxWidth="600">
-                                <TextBlock Text="BUILD EXPORT" Foreground="{StaticResource Accent}" FontWeight="Bold"
-                                           FontSize="13" FontFamily="Segoe UI" Margin="0,0,0,8"/>
-                                <TextBlock Text="Export your application for distribution." Foreground="{StaticResource TextMuted}"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,16" TextWrapping="Wrap"/>
-
-                                <!-- Export Build button -->
-                                <Button x:Name="ExportBuildBtn" Content="Export Build" Click="ExportBuild_Click"
-                                        Background="{StaticResource Accent}" Style="{StaticResource SmallBtn}"
-                                        Padding="12,6" HorizontalAlignment="Left"/>
-
-                                <!-- Build output -->
-                                <TextBlock x:Name="ExportStatusText" Foreground="{StaticResource TextMuted}" FontSize="11"
-                                           FontFamily="Segoe UI" Margin="0,12,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                            </StackPanel>
-                        </ScrollViewer>
                     </TabItem>
                     <!-- Remote tab -->
                     <TabItem x:Name="RemoteTabItem">
