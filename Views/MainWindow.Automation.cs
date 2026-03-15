@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Spritely.Constants;
 using Spritely.Managers;
 using Spritely.Models;
 
@@ -169,10 +170,21 @@ namespace Spritely
                 Enum.TryParse(tag, out category);
             }
 
+            var model = AppConstants.ClaudeSonnet;
+            if (SuggestionModelCombo.SelectedItem is ComboBoxItem modelItem)
+            {
+                model = modelItem.Tag?.ToString() switch
+                {
+                    "Haiku" => AppConstants.ClaudeHaiku,
+                    "Opus" => AppConstants.ClaudeOpus,
+                    _ => AppConstants.ClaudeSonnet
+                };
+            }
+
             var guidance = SuggestionGuidanceInput.Text?.Trim();
             if (!string.IsNullOrEmpty(guidance))
                 SuggestionGuidanceInput.Clear();
-            await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance, _windowCts.Token);
+            await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance, model, _windowCts.Token);
         }
 
         private void SuggestionGuidanceInput_PreviewKeyDown(object sender, KeyEventArgs e)

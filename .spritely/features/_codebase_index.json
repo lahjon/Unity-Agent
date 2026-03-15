@@ -309,7 +309,7 @@
     },
     "mainwindow": {
       "featureId": "main-window-ui",
-      "filePath": "Views/MainWindow.Synthesis.cs",
+      "filePath": "Views/MainWindow.Automation.cs",
       "kind": "Class",
       "shortSignature": "class MainWindow"
     },

@@ -396,6 +396,8 @@ namespace Spritely
 
             MainTabs.SelectionChanged += MainTabs_SelectionChanged;
             StatisticsTabs.SelectionChanged += StatisticsTabs_SelectionChanged;
+
+            // Overflow setup deferred to Window_Loaded (templates not ready in ctor)
         }
 
         protected override void OnActivated(EventArgs e)
@@ -549,6 +551,7 @@ namespace Spritely
             if (_settingsManager.LeftPanelCollapsed)
                 ApplyLeftPanelCollapsed(true);
 
+            TabOverflowHelper.SetupOverflow(StatisticsTabs);
             SetupMainTabsOverflow();
 
             await CheckClaudeCliAsync(ct);

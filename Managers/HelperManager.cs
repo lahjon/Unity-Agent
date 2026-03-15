@@ -111,7 +111,7 @@ namespace Spritely.Managers
             return Convert.ToHexString(bytes)[..12].ToLowerInvariant();
         }
 
-        public async Task GenerateSuggestionsAsync(string projectPath, SuggestionCategory category, string? guidance = null, CancellationToken externalToken = default)
+        public async Task GenerateSuggestionsAsync(string projectPath, SuggestionCategory category, string? guidance = null, string? model = null, CancellationToken externalToken = default)
         {
             if (IsGenerating) return;
 
@@ -147,7 +147,7 @@ namespace Spritely.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --max-turns 12 --output-format json --model {AppConstants.ClaudeSonnet} --json-schema \"{SuggestionJsonSchema.Replace("\"", "\\\"")}\"",
+                    Arguments = $"-p --max-turns 12 --output-format json --model {model ?? AppConstants.ClaudeSonnet} --json-schema \"{SuggestionJsonSchema.Replace("\"", "\\\"")}\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,

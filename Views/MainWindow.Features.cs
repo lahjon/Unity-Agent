@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using Spritely.Dialogs;
 using Spritely.Managers;
 using Spritely.Models;
 
@@ -403,12 +404,10 @@ namespace Spritely
                 return;
             }
 
-            var confirm = MessageBox.Show(
+            if (!DarkDialog.ShowConfirm(
                 "Re-indexing scans all source files and rebuilds the symbol index.\n" +
                 "This may take a while for large projects.\n\nProceed?",
-                "Re-index Symbols", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-            if (confirm != MessageBoxResult.Yes) return;
+                "Re-index Symbols")) return;
 
             try
             {
@@ -454,12 +453,10 @@ namespace Spritely
             var project = _projectManager.GetCurrentProject();
             if (project == null) return;
 
-            var confirm = MessageBox.Show(
+            if (!DarkDialog.ShowConfirm(
                 "This will re-scan all source files and use AI to re-analyze and reassign features.\n" +
                 "Existing task-discovered metadata will be merged, but the process uses LLM calls and may take several minutes.\n\nProceed?",
-                "Re-assign Features", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-
-            if (confirm != MessageBoxResult.Yes) return;
+                "Re-assign Features")) return;
 
             try
             {

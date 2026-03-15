@@ -213,7 +213,7 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
                                                        Foreground="{StaticResource TextLight}"/>
-                                            <TextBlock Text="Feature" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Teams" Foreground="{StaticResource TextLight}" FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </ToggleButton>
                                     <StackPanel x:Name="TeamsModeIterationsPanel" Orientation="Horizontal" Margin="0,0,4,4" Visibility="Collapsed">
@@ -315,7 +315,7 @@
                             </ToggleButton>
                             <ToggleButton x:Name="AutoTeamsModeToggle" IsChecked="True"
                                           Style="{StaticResource ToggleChip}" VerticalAlignment="Center" Margin="4,0,0,0"
-                                          ToolTip="Allow preprocessor to infer teams mode"
+                                          ToolTip="Allow preprocessor to infer feature mode for task decomposition"
                                           Checked="AutoTeamsModeToggle_Changed" Unchecked="AutoTeamsModeToggle_Changed">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"
@@ -1308,25 +1308,108 @@
                             <TabItem.Header>
                                 <TextBlock Text="MCP" Foreground="{StaticResource TextTabHeader}" FontFamily="Segoe UI" FontSize="11"/>
                             </TabItem.Header>
-                            <DockPanel Margin="0,6,0,0">
-                                <TextBlock DockPanel.Dock="Top" Text="MCP Server Output"
-                                           Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Segoe UI"
-                                           Margin="0,0,0,8"/>
-                                <ScrollViewer x:Name="McpOutputScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                                    <TextBox x:Name="McpOutputTextBox"
-                                             IsReadOnly="True"
-                                             FontFamily="Consolas"
-                                             FontSize="11"
-                                             Background="{StaticResource BgDarkTerminal}"
-                                             Foreground="{StaticResource TextTerminal}"
-                                             BorderThickness="0"
-                                             Padding="8"
-                                             TextWrapping="NoWrap"
-                                             AcceptsReturn="True"
-                                             VerticalScrollBarVisibility="Hidden"
-                                             HorizontalScrollBarVisibility="Hidden"/>
-                                </ScrollViewer>
-                            </DockPanel>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10,6,10,10">
+                                <StackPanel MaxWidth="500">
+                                    <!-- Per-project MCP settings -->
+                                    <TextBlock Text="Server Settings" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="Server Name" Foreground="{StaticResource TextSubdued}"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="McpServerNameBox"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,8"
+                                             LostFocus="McpSettings_Changed"/>
+
+                                    <TextBlock Text="Server Address" Foreground="{StaticResource TextSubdued}"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="McpAddressBox"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,8"
+                                             LostFocus="McpSettings_Changed"/>
+
+                                    <TextBlock Text="Start Command" Foreground="{StaticResource TextSubdued}"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="McpStartCommandBox"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="11" FontFamily="Consolas" Padding="6,4" Margin="0,0,0,8"
+                                             TextWrapping="Wrap" AcceptsReturn="False"
+                                             LostFocus="McpSettings_Changed"/>
+
+                                    <!-- Connection test -->
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Button x:Name="McpTestConnectionBtn" Content="Test Connection"
+                                                Click="McpTestConnection_Click"
+                                                Style="{StaticResource SecondaryBtn}"
+                                                FontSize="11" Padding="10,4"
+                                                DockPanel.Dock="Left"/>
+                                        <TextBlock x:Name="McpConnectionStatus"
+                                                   Foreground="{StaticResource TextMuted}"
+                                                   FontSize="11" FontFamily="Segoe UI"
+                                                   VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                    </DockPanel>
+
+                                    <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,4,0,10"/>
+
+                                    <!-- MCP Defaults -->
+                                    <TextBlock Text="Defaults for New Projects" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="Default Server Name" Foreground="{StaticResource TextSubdued}"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="DefaultMcpServerNameBox" Text="UnityMCP"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,8"
+                                             LostFocus="DefaultMcpSettings_Changed"/>
+
+                                    <TextBlock Text="Default Server Address" Foreground="{StaticResource TextSubdued}"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="DefaultMcpAddressBox" Text="http://127.0.0.1:8080/mcp"
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,8"
+                                             LostFocus="DefaultMcpSettings_Changed"/>
+
+                                    <TextBlock Text="Default Start Command" Foreground="{StaticResource TextSubdued}"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="DefaultMcpStartCommandBox"
+                                             Text='%USERPROFILE%\.local\bin\uvx.exe --from "mcpforunityserver==9.4.7" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools'
+                                             Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
+                                             CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                                             FontSize="11" FontFamily="Consolas" Padding="6,4" Margin="0,0,0,4"
+                                             TextWrapping="Wrap" AcceptsReturn="False"
+                                             LostFocus="DefaultMcpSettings_Changed"/>
+                                    <TextBlock Text="These values auto-populate when creating new projects."
+                                               Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
+                                               TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                    <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,0,0,10"/>
+
+                                    <!-- Server Output -->
+                                    <TextBlock Text="Server Output" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
+                                               FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,8"/>
+                                    <Border CornerRadius="4" Background="{StaticResource BgDarkTerminal}" MinHeight="100" MaxHeight="300">
+                                        <ScrollViewer x:Name="McpOutputScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                                            <TextBox x:Name="McpOutputTextBox"
+                                                     IsReadOnly="True"
+                                                     FontFamily="Consolas"
+                                                     FontSize="11"
+                                                     Background="{StaticResource BgDarkTerminal}"
+                                                     Foreground="{StaticResource TextTerminal}"
+                                                     BorderThickness="0"
+                                                     Padding="8"
+                                                     TextWrapping="NoWrap"
+                                                     AcceptsReturn="True"
+                                                     VerticalScrollBarVisibility="Hidden"
+                                                     HorizontalScrollBarVisibility="Hidden"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
                         </TabItem>
                     </TabControl>
                 </DockPanel>
@@ -1424,6 +1507,18 @@
                                         <ComboBoxItem Content="New Features" Tag="NewFeatures"/>
                                         <ComboBoxItem Content="Extensions" Tag="Extensions"/>
                                         <ComboBoxItem Content="Rules" Tag="Rules"/>
+                                    </ComboBox>
+                                </DockPanel>
+
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Model" Foreground="{StaticResource TextLight}" FontSize="11"
+                                               FontFamily="Segoe UI" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" Width="52"/>
+                                    <ComboBox x:Name="SuggestionModelCombo" Width="160"
+                                              FontSize="11" Padding="6,3" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="Sonnet" Tag="Sonnet" IsSelected="True"/>
+                                        <ComboBoxItem Content="Haiku" Tag="Haiku"/>
+                                        <ComboBoxItem Content="Opus" Tag="Opus"/>
                                     </ComboBox>
                                 </DockPanel>
 
@@ -1627,7 +1722,7 @@
                                          FontSize="11" FontFamily="Consolas" Padding="10"
                                          IsReadOnly="True" Opacity="0.6"/>
                                 <DockPanel Margin="0,6,0,0">
-                                    <TextBlock Text="This prompt is prepended to every task. MCP instructions are added automatically when the MCP toggle is enabled."
+                                    <TextBlock Text="This prompt is prepended to every task."
                                                Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
                                                VerticalAlignment="Center"/>
                                     <StackPanel x:Name="PromptEditButtons" Orientation="Horizontal"
@@ -1678,43 +1773,7 @@
                                     </StackPanel>
                                 </StackPanel>
 
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20"/>
-
-
-                                <TextBlock Text="MCP Defaults" Foreground="{StaticResource Accent}" FontWeight="SemiBold"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,12"/>
-
-                                <TextBlock Text="Server Name" Foreground="{StaticResource TextLight}"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
-                                <TextBox x:Name="DefaultMcpServerNameBox" Text="UnityMCP"
-                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
-                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                         FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,10"
-                                         LostFocus="DefaultMcpSettings_Changed"/>
-
-                                <TextBlock Text="Server Address" Foreground="{StaticResource TextLight}"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
-                                <TextBox x:Name="DefaultMcpAddressBox" Text="http://127.0.0.1:8080/mcp"
-                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
-                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                         FontSize="11" FontFamily="Segoe UI" Padding="6,4" Margin="0,0,0,10"
-                                         LostFocus="DefaultMcpSettings_Changed"/>
-
-                                <TextBlock Text="Start Command" Foreground="{StaticResource TextLight}"
-                                           FontSize="11" FontFamily="Segoe UI" Margin="0,0,0,6"/>
-                                <TextBox x:Name="DefaultMcpStartCommandBox"
-                                         Text='%USERPROFILE%\.local\bin\uvx.exe --from "mcpforunityserver==9.4.7" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools'
-                                         Background="{StaticResource BgDeep}" Foreground="{StaticResource TextLight}"
-                                         CaretBrush="{StaticResource TextLight}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
-                                         FontSize="11" FontFamily="Consolas" Padding="6,4" Margin="0,0,0,10"
-                                         TextWrapping="Wrap" AcceptsReturn="False"
-                                         LostFocus="DefaultMcpSettings_Changed"/>
-
-                                <TextBlock Text="These values will auto-populate when creating new projects."
-                                           Foreground="{StaticResource TextDisabled}" FontSize="11" FontFamily="Segoe UI"
-                                           TextWrapping="Wrap" Margin="0,0,0,14"/>
-
-                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,10,0,10"/>
+                                <Border Height="1" Background="{StaticResource BgElevated}" Margin="0,20,0,10"/>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <TextBlock Text="Max concurrent tasks" Foreground="{StaticResource TextLight}"
@@ -2121,16 +2180,6 @@
                         </ScrollViewer>
                     </TabItem>
 
-                    <!-- MCP controls (hidden, managed via ProjectSettingsDialog gear icon) -->
-                    <TabItem x:Name="McpTabItem" Visibility="Collapsed">
-                        <StackPanel Visibility="Collapsed">
-                            <TextBox x:Name="McpServerNameBox"/>
-                            <TextBox x:Name="McpAddressBox"/>
-                            <TextBox x:Name="McpStartCommandBox"/>
-                            <TextBlock x:Name="McpConnectionStatus"/>
-                            <Button x:Name="McpTestConnectionBtn" Click="McpTestConnection_Click" Style="{StaticResource SmallBtn}" Background="{StaticResource Accent}"/>
-                        </StackPanel>
-                    </TabItem>
                 </TabControl>
                 </DockPanel>
             </Border>

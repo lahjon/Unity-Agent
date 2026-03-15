@@ -20,7 +20,7 @@ namespace Spritely.Managers
         private int _tokenLimitRetryMinutes = 30;
         private int _taskTimeoutMinutes = 120;
         private bool _autoVerify;
-        private bool _autoCommit;
+        private bool _autoCommit = true;
         private string _defaultMcpServerName = "UnityMCP";
         private string _defaultMcpAddress = "http://127.0.0.1:8080/mcp";
         private string _defaultMcpStartCommand = @"%USERPROFILE%\.local\bin\uvx.exe --from ""mcpforunityserver==9.4.7"" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools";
