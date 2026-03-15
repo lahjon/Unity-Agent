@@ -358,8 +358,6 @@ namespace Spritely
         public int DependencyTaskIdCount => Runtime.DependencyTaskIdCount;
         public void ClearDependencyTaskIds() => Runtime.ClearDependencyTaskIds();
         public List<int> DependencyTaskNumbers { get => Runtime.DependencyTaskNumbers; set => Runtime.DependencyTaskNumbers = value; }
-        public bool IsPlanningBeforeQueue { get => Runtime.IsPlanningBeforeQueue; set => Runtime.IsPlanningBeforeQueue = value; }
-        public bool NeedsPlanRestart { get => Runtime.NeedsPlanRestart; set => Runtime.NeedsPlanRestart = value; }
         public string? PendingFileLockPath { get => Runtime.PendingFileLockPath; set => Runtime.PendingFileLockPath = value; }
         public string? PendingFileLockBlocker { get => Runtime.PendingFileLockBlocker; set => Runtime.PendingFileLockBlocker = value; }
         public int SubTaskCounter { get => Runtime.SubTaskCounter; set => Runtime.SubTaskCounter = value; }

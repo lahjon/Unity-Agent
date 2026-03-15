@@ -86,8 +86,6 @@ namespace Spritely.Managers
         /// <summary>Fires when a subtask is spawned (parent, child). MainWindow subscribes to wire the subtask into _activeTasks and create its output tab.</summary>
         public event Action<AgentTask, AgentTask>? SubTaskSpawned;
 
-        /// <summary>Fires when a task transitions to Queued with unresolved dependencies after planning, so the orchestrator can track it.</summary>
-        public event Action<AgentTask, List<string>>? TaskNeedsOrchestratorRegistration;
 
         /// <summary>Fires when 3 perspective agents are spawned for synthesis (parentTaskId, perspectiveTaskIds[3]).</summary>
         public event Action<string, string[]>? SynthesisPerspectivesSpawned;
@@ -448,26 +446,6 @@ namespace Spritely.Managers
             var process = _processLauncher.CreateManagedProcess(ps1File, task.Id, activeTasks, historyTasks, exitCode =>
             {
                 _processLauncher.CleanupScripts(task.Id);
-
-                // Plan-before-queue: killed process needs to restart in plan mode
-                if (task.NeedsPlanRestart)
-                {
-                    task.NeedsPlanRestart = false;
-                    task.IsPlanningBeforeQueue = true;
-                    task.Status = AgentTaskStatus.Planning;
-                    task.StartTime = DateTime.Now;
-                    _outputProcessor.AppendOutput(task.Id, "\nRestarting in plan mode...\n\n", activeTasks, historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                    _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
-                    return;
-                }
-
-                // Plan-before-queue: planning phase complete
-                if (task.IsPlanningBeforeQueue)
-                {
-                    HandlePlanBeforeQueueCompletion(task, activeTasks, historyTasks, moveToHistory);
-                    return;
-                }
 
                 // Auto-decompose: decomposition phase complete — spawn subtasks
                 if (task.AutoDecompose && task.Status == AgentTaskStatus.Running)
@@ -1187,65 +1165,6 @@ namespace Spritely.Managers
         public void ResumeTask(AgentTask task,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks)
             => _processLauncher.ResumeTask(task, activeTasks, historyTasks);
-
-        // ── Plan-before-queue completion ─────────────────────────────
-
-        private void HandlePlanBeforeQueueCompletion(AgentTask task,
-            ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
-            Action<AgentTask> moveToHistory)
-        {
-            task.IsPlanningBeforeQueue = false;
-            task.PlanOnly = false;
-
-            // Extract execution prompt from plan output
-            var output = task.OutputBuilder.ToString();
-            var executionPrompt = FormatHelpers.ExtractExecutionPrompt(output);
-            if (!string.IsNullOrEmpty(executionPrompt))
-                task.StoredPrompt = executionPrompt;
-
-            // Check dependency-based queue
-            var depSnapshot = task.DependencyTaskIds;
-            if (depSnapshot.Count > 0)
-            {
-                var allResolved = depSnapshot.All(depId =>
-                {
-                    var dep = activeTasks.FirstOrDefault(t => t.Id == depId);
-                    return dep == null || dep.IsFinished;
-                });
-
-                if (!allResolved)
-                {
-                    task.Status = AgentTaskStatus.Queued;
-                    task.QueuedReason = "Plan complete, waiting for dependencies";
-                    var blocker = activeTasks.FirstOrDefault(t =>
-                        depSnapshot.Contains(t.Id) && !t.IsFinished);
-                    task.BlockedByTaskId = blocker?.Id;
-                    task.BlockedByTaskNumber = blocker?.TaskNumber;
-                    _outputProcessor.AppendOutput(task.Id,
-                        $"\nPlanning complete. Queued — waiting for dependencies: " +
-                        $"{string.Join(", ", task.DependencyTaskNumbers.Select(n => $"#{n}"))}\n",
-                        activeTasks, historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-
-                    // Re-add task to orchestrator to ensure it's properly tracked
-                    // after transitioning from Planning to Queued state
-                    TaskNeedsOrchestratorRegistration?.Invoke(task, task.DependencyTaskIds.ToList());
-                    return;
-                }
-                // Dependencies resolved during planning — gather context before clearing
-                task.DependencyContext = _promptBuilder.BuildDependencyContext(
-                    depSnapshot, activeTasks, historyTasks);
-                task.ClearDependencyTaskIds();
-                task.DependencyTaskNumbers.Clear();
-            }
-
-            // No more blockers — start execution
-            task.Status = AgentTaskStatus.Stored;
-            task.StartTime = DateTime.Now;
-            _outputProcessor.AppendOutput(task.Id, "\nPlanning complete. Starting execution...\n\n", activeTasks, historyTasks);
-            _outputTabManager.UpdateTabHeader(task);
-            _ = StartProcess(task, activeTasks, historyTasks, moveToHistory);
-        }
 
         // ── Subtask spawning ─────────────────────────────────────────
 

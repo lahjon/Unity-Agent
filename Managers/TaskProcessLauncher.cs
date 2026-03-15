@@ -414,7 +414,7 @@ namespace Spritely.Managers
                 return;
             }
 
-            task.Status = task.IsPlanningBeforeQueue ? AgentTaskStatus.Planning : AgentTaskStatus.Running;
+            task.Status = AgentTaskStatus.Running;
 
             // Restart teams mode timers if applicable
             if (task.IsTeamsMode)
@@ -566,25 +566,6 @@ namespace Spritely.Managers
                                     var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
                                     actionTask?.AddToolActivity(actionText);
 
-                                    if (toolName == "ExitPlanMode" && actionTask != null && actionTask.IsPlanningBeforeQueue)
-                                    {
-                                        AppLogger.Info("TaskExecution", $"[{taskId}] ExitPlanMode detected, marking plan phase as ready to complete");
-                                        actionTask.Runtime.PlanPhaseReady = true;
-
-                                        try
-                                        {
-                                            if (actionTask.Process?.StandardInput != null && !actionTask.Process.HasExited)
-                                            {
-                                                AppLogger.Info("TaskExecution", $"[{taskId}] Closing stdin to complete plan phase");
-                                                actionTask.Process.StandardInput.Close();
-                                            }
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            AppLogger.Warn("TaskExecution", $"[{taskId}] Failed to close stdin: {ex.Message}");
-                                        }
-                                    }
-
                                     if (FormatHelpers.IsFileModifyTool(toolName) && toolInput != null)
                                     {
                                         var fp = FileLockManager.ExtractFilePath(toolInput.Value);
@@ -611,27 +592,6 @@ namespace Spritely.Managers
                                 _outputProcessor.AppendOutput(taskId, $"{actionText}...\n", activeTasks, historyTasks);
                                 var actionTask = activeTasks.FirstOrDefault(t => t.Id == taskId);
                                 actionTask?.AddToolActivity(actionText);
-
-                                // Handle ExitPlanMode - mark task as ready to complete planning phase
-                                if (toolName == "ExitPlanMode" && actionTask != null && actionTask.IsPlanningBeforeQueue)
-                                {
-                                    AppLogger.Info("TaskExecution", $"[{taskId}] ExitPlanMode detected (streaming), marking plan phase as ready to complete");
-                                    actionTask.Runtime.PlanPhaseReady = true;
-
-                                    // Close stdin to signal process completion after current response
-                                    try
-                                    {
-                                        if (actionTask.Process?.StandardInput != null && !actionTask.Process.HasExited)
-                                        {
-                                            AppLogger.Info("TaskExecution", $"[{taskId}] Closing stdin to complete plan phase");
-                                            actionTask.Process.StandardInput.Close();
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        AppLogger.Warn("TaskExecution", $"[{taskId}] Failed to close stdin: {ex.Message}");
-                                    }
-                                }
 
                                 _streamingToolState[taskId] = new StreamingToolState
                                 {
@@ -786,15 +746,6 @@ namespace Spritely.Managers
                         {
                             readyTask.Runtime.IsProcessingMessage = false;
                             readyTask.ClearToolActivity();
-
-                            // Check if planning phase is complete and should exit
-                            if (readyTask.Runtime.PlanPhaseReady && readyTask.IsPlanningBeforeQueue)
-                            {
-                                AppLogger.Info("TaskExecution", $"[{taskId}] Plan phase complete (ExitPlanMode used), closing process to transition to execution");
-                                // Do not process queued messages, let the process exit naturally
-                                // The HandlePlanBeforeQueueCompletion will be called on process exit
-                                break;
-                            }
 
                             // Process any queued messages
                             if (readyTask.Runtime.PendingMessageCount > 0 && ProcessQueuedMessagesCallback != null)

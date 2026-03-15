@@ -743,30 +743,14 @@ namespace Spritely
                 // Register with orchestrator so it tracks the DAG edges
                 _taskOrchestrator.AddTask(task, task.DependencyTaskIds.ToList());
 
-                if (!task.PlanOnly)
-                {
-                    // Start in plan mode first, then queue when planning completes
-                    task.IsPlanningBeforeQueue = true;
-                    task.PlanOnly = true;
-                    task.Status = AgentTaskStatus.Planning;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"Dependencies pending ({string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}) — starting in plan mode...\n",
-                        _activeTasks, _historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
-                }
-                else
-                {
-                    // User explicitly wants plan-only — queue as before
-                    task.Status = AgentTaskStatus.Queued;
-                    task.QueuedReason = "Waiting for dependencies";
-                    task.BlockedByTaskId = activeDeps[0].Id;
-                    task.BlockedByTaskNumber = activeDeps[0].TaskNumber;
-                    _outputTabManager.AppendOutput(task.Id,
-                        $"Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
-                        _activeTasks, _historyTasks);
-                    _outputTabManager.UpdateTabHeader(task);
-                }
+                task.Status = AgentTaskStatus.Queued;
+                task.QueuedReason = "Waiting for dependencies";
+                task.BlockedByTaskId = activeDeps[0].Id;
+                task.BlockedByTaskNumber = activeDeps[0].TaskNumber;
+                _outputTabManager.AppendOutput(task.Id,
+                    $"Task queued — waiting for dependencies: {string.Join(", ", activeDeps.Select(d => $"#{d.TaskNumber}"))}\n",
+                    _activeTasks, _historyTasks);
+                _outputTabManager.UpdateTabHeader(task);
             }
             else if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
             {

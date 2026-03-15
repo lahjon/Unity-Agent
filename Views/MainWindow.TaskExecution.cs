@@ -243,14 +243,14 @@ namespace Spritely
                     task.DependencyTaskNumbers = depNumbers;
                     _taskOrchestrator.AddTask(task, depIds);
 
-                    task.IsPlanningBeforeQueue = true;
-                    task.PlanOnly = true;
-                    task.Status = AgentTaskStatus.Planning;
+                    task.Status = AgentTaskStatus.Queued;
+                    task.QueuedReason = $"Waiting for dependencies: {string.Join(", ", step.DependsOn)}";
+                    task.BlockedByTaskId = depIds[0];
+                    task.BlockedByTaskNumber = depNumbers[0];
                     _outputTabManager.AppendOutput(task.Id,
-                        $"Workflow task \"{step.TaskName}\" — waiting for dependencies: {string.Join(", ", step.DependsOn)}\n",
+                        $"Workflow task \"{step.TaskName}\" — queued, waiting for dependencies: {string.Join(", ", step.DependsOn)}\n",
                         _activeTasks, _historyTasks);
                     _outputTabManager.UpdateTabHeader(task);
-                    _ = _taskExecutionManager.StartProcess(task, _activeTasks, _historyTasks, MoveToHistory);
                 }
                 else if (CountActiveSessionTasks() >= _settingsManager.MaxConcurrentTasks)
                 {

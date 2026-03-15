@@ -560,7 +560,7 @@ namespace Spritely.Tests
                 var taskB = MakeTask();
                 taskB.TaskNumber = 1002; // Set task number for test
                 taskB.StoredPrompt = null; // No plan
-                taskB.IsPlanningBeforeQueue = false;
+
                 var activeTasks = new ObservableCollection<AgentTask> { taskA, taskB };
                 var output = new List<string>();
 
@@ -1461,7 +1461,7 @@ namespace Spritely.Tests
                 var taskB = MakeTask();
                 taskB.TaskNumber = 1002; // Set task number for test
                 taskB.StoredPrompt = null;
-                taskB.IsPlanningBeforeQueue = false;
+
                 var activeTasks = new ObservableCollection<AgentTask> { taskA, taskB };
 
                 flm.TryAcquireFileLock(taskA.Id, "src/file.cs", "Edit", activeTasks);

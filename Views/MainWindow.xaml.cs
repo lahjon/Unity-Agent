@@ -293,7 +293,6 @@ namespace Spritely
 
             _taskOrchestrator = new TaskOrchestrator();
             _taskOrchestrator.TaskReady += OnOrchestratorTaskReady;
-            _taskExecutionManager.TaskNeedsOrchestratorRegistration += (task, deps) => _taskOrchestrator.AddTask(task, deps);
 
             _taskGroupTracker = new TaskGroupTracker();
             _taskGroupTracker.GroupCompleted += OnTaskGroupCompleted;

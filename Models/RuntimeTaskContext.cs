@@ -83,10 +83,6 @@ namespace Spritely
         public int SubTaskCounter { get; set; }
         public int SubTaskIndex { get; set; }
 
-        // Plan-before-queue workflow
-        public bool IsPlanningBeforeQueue { get; set; }
-        public bool NeedsPlanRestart { get; set; }
-        public bool PlanPhaseReady { get; set; }  // Set when ExitPlanMode is detected
         public string? PendingFileLockPath { get; set; }
         public string? PendingFileLockBlocker { get; set; }
 
