@@ -168,15 +168,31 @@ namespace Spritely.Managers
                 await process.StandardInput.WriteAsync(prompt);
                 process.StandardInput.Close();
 
-                // Drain stderr concurrently to prevent deadlock (max-turns 20 can produce large stderr)
-                var stderrTask = process.StandardError.ReadToEndAsync(ct);
-                var output = await process.StandardOutput.ReadToEndAsync(ct);
-                var stderr = await stderrTask;
-                await process.WaitForExitAsync(ct);
+                // Read stdout/stderr without cancellation token so we capture partial output on timeout
+                var stderrTask = process.StandardError.ReadToEndAsync();
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
 
+                var timedOut = false;
+                try
+                {
+                    await process.WaitForExitAsync(ct);
+                }
+                catch (OperationCanceledException) when (!externalToken.IsCancellationRequested)
+                {
+                    timedOut = true;
+                    try { if (!process.HasExited) process.Kill(true); } catch { }
+                    // Give streams a moment to flush after kill
+                    await Task.WhenAll(
+                        stdoutTask.WaitAsync(TimeSpan.FromSeconds(5)).ContinueWith(_ => { }),
+                        stderrTask.WaitAsync(TimeSpan.FromSeconds(5)).ContinueWith(_ => { })
+                    );
+                }
+
+                var output = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "";
+                var stderr = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "";
                 var text = StripAnsi(output).Trim();
 
-                if (string.IsNullOrWhiteSpace(text) && process.ExitCode != 0)
+                if (string.IsNullOrWhiteSpace(text) && !timedOut && process.ExitCode != 0)
                 {
                     var errPreview = stderr.Length > 200 ? stderr[..200] + "..." : stderr;
                     AppLogger.Warn("HelperManager", $"Claude process exited with code {process.ExitCode}. stderr: {errPreview}");
@@ -184,11 +200,15 @@ namespace Spritely.Managers
                     return;
                 }
 
-                // Parse suggestions — handle CLI JSON envelope, structured output, and legacy formats
-                List<SuggestionJson>? items = null;
-                var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                if (string.IsNullOrWhiteSpace(text) && timedOut)
+                {
+                    GenerationFailed?.Invoke("Suggestion generation timed out with no output.");
+                    return;
+                }
 
-                items = TryParseSuggestions(text, jsonOpts);
+                // Parse suggestions — handle CLI JSON envelope, structured output, and legacy formats
+                var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var items = TryParseSuggestions(text, jsonOpts);
 
                 if (items == null || items.Count == 0)
                 {
@@ -214,13 +234,15 @@ namespace Spritely.Managers
 
                 FilterSuggestionsAgainstActiveTasks();
                 SaveSuggestions();
+
+                if (timedOut && Suggestions.Count > 0)
+                    AppLogger.Info("HelperManager", $"Suggestion generation timed out but recovered {Suggestions.Count} suggestion(s) from partial output.");
+
                 GenerationCompleted?.Invoke();
             }
             catch (OperationCanceledException)
             {
-                try { if (process is { HasExited: false }) process.Kill(true); } catch (Exception ex) { AppLogger.Debug("HelperManager", $"Failed to kill process on cancellation: {ex.Message}"); }
-                if (!externalToken.IsCancellationRequested)
-                    GenerationFailed?.Invoke("Suggestion generation timed out.");
+                try { if (process is { HasExited: false }) process.Kill(true); } catch { }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
