@@ -118,7 +118,7 @@ namespace Spritely.Managers
 
             _cts?.Dispose();
             _cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
-            _cts.CancelAfter(TimeSpan.FromMinutes(3));
+            _cts.CancelAfter(TimeSpan.FromMinutes(6));
             var ct = _cts.Token;
             IsGenerating = true;
             Suggestions.Clear();
@@ -148,7 +148,7 @@ namespace Spritely.Managers
                 var psi = new ProcessStartInfo
                 {
                     FileName = "claude",
-                    Arguments = $"-p --max-turns 12 --output-format json --model {model ?? AppConstants.ClaudeSonnet} --json-schema \"{SuggestionJsonSchema.Replace("\"", "\\\"")}\"",
+                    Arguments = $"-p --max-turns 20 --output-format json --model {model ?? AppConstants.ClaudeSonnet} --json-schema \"{SuggestionJsonSchema.Replace("\"", "\\\"")}\"",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -168,7 +168,7 @@ namespace Spritely.Managers
                 await process.StandardInput.WriteAsync(prompt);
                 process.StandardInput.Close();
 
-                // Drain stderr concurrently to prevent deadlock (max-turns 15 can produce large stderr)
+                // Drain stderr concurrently to prevent deadlock (max-turns 20 can produce large stderr)
                 var stderrTask = process.StandardError.ReadToEndAsync(ct);
                 var output = await process.StandardOutput.ReadToEndAsync(ct);
                 var stderr = await stderrTask;
