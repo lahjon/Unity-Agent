@@ -190,7 +190,7 @@ namespace Spritely
 
             // Check if we should enter the Committing phase for Auto-Commit
             var shouldAutoCommit = _settingsManager.AutoCommit &&
-                                   task.Status == AgentTaskStatus.Completed &&
+                                   task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Recommendation &&
                                    !task.IsCommitted;
 
             if (shouldAutoCommit)
@@ -504,7 +504,7 @@ namespace Spritely
             // Tasks are only moved to history when the user manually dismisses the card.
             if (task is { IsFinished: true })
             {
-                if (_settingsManager.AutoCommit && task.Status == AgentTaskStatus.Completed && !task.IsCommitted)
+                if (_settingsManager.AutoCommit && task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Recommendation && !task.IsCommitted)
                 {
                     // Trigger auto-commit flow but keep task in active list afterwards
                     FinalizeTask(task, closeTab: false);

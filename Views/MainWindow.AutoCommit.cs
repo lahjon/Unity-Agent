@@ -43,8 +43,8 @@ namespace Spritely
             if (string.IsNullOrEmpty(task.FullOutput) && task.OutputBuilder.Length > 0)
                 task.FullOutput = task.OutputBuilder.ToString();
 
-            // Transition from Committing to Completed
-            task.Status = AgentTaskStatus.Completed;
+            // Transition from Committing to final status (preserve Recommendation if applicable)
+            task.Status = task.HasRecommendations ? AgentTaskStatus.Recommendation : AgentTaskStatus.Completed;
             task.EndTime ??= DateTime.Now;
             _outputTabManager.UpdateTabHeader(task);
 
