@@ -820,6 +820,10 @@ namespace Spritely
                 SystemPromptBox.Text = SystemPrompt;
             }
 
+            // Clear additional instructions from the previous project
+            AdditionalInstructionsInput.Clear();
+            SetAdditionalInstructionsExpanded(false);
+
             UpdateStatus();
             UpdateFileLocks();
             UpdateNoProjectState();
