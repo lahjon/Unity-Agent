@@ -136,7 +136,7 @@ namespace Spritely.Managers
             CancellationToken cancellationToken = default)
         {
             var diffRef = gitStartHash ?? "HEAD";
-            var result = await RunGitCommandAsync(projectPath, $"diff {diffRef} --numstat", cancellationToken).ConfigureAwait(false);
+            var result = await RunGitCommandAsync(projectPath, $"diff --relative {diffRef} --numstat", cancellationToken).ConfigureAwait(false);
             if (!result.IsSuccess || string.IsNullOrEmpty(result.Output)) return null;
 
             var files = new List<(string name, int added, int removed)>();
@@ -163,8 +163,10 @@ namespace Spritely.Managers
             if (string.IsNullOrEmpty(gitStartHash)) return null;
 
             // Get modified/deleted tracked files since the start hash
+            // --relative makes paths relative to the working directory (projectPath)
+            // instead of the repo root, which matters when projectPath is a subdirectory
             var diffResult = await RunGitCommandAsync(
-                projectPath, $"diff {gitStartHash} --name-only", cancellationToken).ConfigureAwait(false);
+                projectPath, $"diff --relative {gitStartHash} --name-only", cancellationToken).ConfigureAwait(false);
 
             // Also get untracked files that the task may have created
             var untrackedResult = await RunGitCommandAsync(
@@ -243,7 +245,7 @@ namespace Spritely.Managers
             CancellationToken cancellationToken = default)
         {
             var diffRef = gitStartHash ?? "HEAD";
-            var result = await RunGitCommandAsync(projectPath, $"diff {diffRef}", cancellationToken)
+            var result = await RunGitCommandAsync(projectPath, $"diff --relative {diffRef}", cancellationToken)
                 .ConfigureAwait(false);
 
             if (!result.IsSuccess || string.IsNullOrWhiteSpace(result.Output))

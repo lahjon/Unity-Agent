@@ -190,7 +190,7 @@ namespace Spritely
 
             // Check if we should enter the Committing phase for Auto-Commit
             var shouldAutoCommit = _settingsManager.AutoCommit &&
-                                   task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Recommendation &&
+                                   task.Status == AgentTaskStatus.Completed &&
                                    !task.IsCommitted;
 
             if (shouldAutoCommit)
@@ -209,6 +209,7 @@ namespace Spritely
                 // Even without file locks, attempt commit if the task has a valid GitStartHash —
                 // file locks may be empty when changes are made via Bash or if streaming parser missed tools
                 bool hasChangesToCommit = lockedFiles.Count > 0 || !string.IsNullOrEmpty(task.GitStartHash);
+                AppLogger.Info("AutoCommit", $"Task #{task.TaskNumber} auto-commit check: lockedFiles={lockedFiles.Count}, GitStartHash={task.GitStartHash ?? "(null)"}, hasChangesToCommit={hasChangesToCommit}");
 
                 if (hasChangesToCommit)
                 {
@@ -230,6 +231,10 @@ namespace Spritely
                                 if (!success)
                                 {
                                     task.CommitError = errorMessage ?? "Failed to commit changes";
+                                    AppLogger.Warn("AutoCommit", $"Task #{task.TaskNumber} auto-commit failed: {task.CommitError}");
+                                    _outputTabManager.AppendOutput(task.Id,
+                                        $"\n⚠ Auto-commit failed: {task.CommitError}\n",
+                                        _activeTasks, _historyTasks);
                                 }
                                 // Whether commit succeeded or failed, finish the task
                                 FinishTaskAfterCommit(task, closeTab);
@@ -237,10 +242,13 @@ namespace Spritely
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"Auto-commit failed for task {task.Id}: {ex.Message}");
+                            AppLogger.Error("AutoCommit", $"Task #{task.TaskNumber} auto-commit exception", ex);
                             await Dispatcher.InvokeAsync(() =>
                             {
                                 task.CommitError = $"Commit error: {ex.Message}";
+                                _outputTabManager.AppendOutput(task.Id,
+                                    $"\n⚠ Auto-commit error: {ex.Message}\n",
+                                    _activeTasks, _historyTasks);
                                 FinishTaskAfterCommit(task, closeTab);
                             });
                         }
@@ -504,13 +512,19 @@ namespace Spritely
             // Tasks are only moved to history when the user manually dismisses the card.
             if (task is { IsFinished: true })
             {
-                if (_settingsManager.AutoCommit && task.Status is AgentTaskStatus.Completed or AgentTaskStatus.Recommendation && !task.IsCommitted)
+                var lockedFileCount = _fileLockManager.GetTaskLockedFiles(task.Id).Count;
+                AppLogger.Info("AutoCommit", $"Task #{task.TaskNumber} completed. Status={task.Status}, AutoCommit={_settingsManager.AutoCommit}, IsCommitted={task.IsCommitted}, GitStartHash={task.GitStartHash ?? "(null)"}, LockedFiles={lockedFileCount}, Project={task.ProjectPath}");
+
+                if (_settingsManager.AutoCommit && task.Status == AgentTaskStatus.Completed && !task.IsCommitted)
                 {
                     // Trigger auto-commit flow but keep task in active list afterwards
                     FinalizeTask(task, closeTab: false);
                 }
                 else
                 {
+                    if (_settingsManager.AutoCommit && !task.IsCommitted)
+                        AppLogger.Warn("AutoCommit", $"Task #{task.TaskNumber} skipped auto-commit: Status={task.Status} (expected Completed)");
+
                     // Release file locks so queued tasks can proceed.
                     // The task card stays in the active list for follow-up.
                     _fileLockManager.ReleaseTaskLocks(task.Id);
@@ -522,6 +536,10 @@ namespace Spritely
                     _fileLockManager.CheckQueuedTasks(_activeTasks);
                     DrainInitQueue();
                 }
+            }
+            else
+            {
+                AppLogger.Warn("AutoCommit", $"OnTaskProcessCompleted: task {taskId} not found in active list or not finished (task={task?.Status.ToString() ?? "null"})");
             }
 
             _taskOrchestrator.OnTaskCompleted(taskId);

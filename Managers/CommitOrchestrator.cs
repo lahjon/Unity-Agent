@@ -54,10 +54,16 @@ namespace Spritely.Managers
             if (!task.IsFinished && !task.IsCommitting)
                 return (false, "Task is not in a committable state");
 
+            AppLogger.Info("AutoCommit", $"CommitTaskAsync started for task #{task.TaskNumber} in {task.ProjectPath}");
+
             try
             {
                 var commitMessage = ResolveCommitMessage(task);
                 var relativePaths = await ResolveFilePaths(task);
+
+                AppLogger.Info("AutoCommit", $"Task #{task.TaskNumber} resolved {relativePaths.Count} file(s) to commit");
+                if (relativePaths.Count > 0 && relativePaths.Count <= 20)
+                    AppLogger.Debug("AutoCommit", $"Task #{task.TaskNumber} files: {string.Join(", ", relativePaths)}");
 
                 if (relativePaths.Count == 0)
                     return (false, "No files were modified by this task to commit");
@@ -70,7 +76,7 @@ namespace Spritely.Managers
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CommitTaskAsync failed: {ex.Message}");
+                AppLogger.Error("AutoCommit", $"CommitTaskAsync failed for task #{task.TaskNumber}", ex);
                 return (false, $"Unexpected error during commit: {ex.Message}");
             }
         }
@@ -154,12 +160,14 @@ namespace Spritely.Managers
         {
             var lockedFiles = ResolveLockedFiles(task);
             var relativePaths = new List<string>();
+            AppLogger.Debug("AutoCommit", $"Task #{task.TaskNumber} ResolveFilePaths: lockedFiles={lockedFiles?.Count ?? 0}, GitStartHash={task.GitStartHash ?? "(null)"}, ChangedFiles={task.ChangedFiles.Count}");
 
             // Prefer git diff paths — they have correct casing unlike normalized file lock paths
             if (!string.IsNullOrEmpty(task.GitStartHash))
             {
                 var gitChangedFiles = await _gitHelper.GetChangedFileNamesAsync(
                     task.ProjectPath, task.GitStartHash);
+                AppLogger.Debug("AutoCommit", $"Task #{task.TaskNumber} git diff found {gitChangedFiles?.Count ?? 0} changed file(s)");
                 if (gitChangedFiles != null && gitChangedFiles.Count > 0)
                 {
                     if (lockedFiles != null && lockedFiles.Count > 0)
@@ -281,20 +289,25 @@ namespace Spritely.Managers
             return await _gitOperationGuard.ExecuteGitOperationAsync(async () =>
             {
                 var pathArgs = string.Join(" ", relativePaths.Select(GitHelper.EscapeGitPath));
+                AppLogger.Info("AutoCommit", $"Task #{task.TaskNumber} staging files in {task.ProjectPath}: {pathArgs}");
 
                 // Stage only the locked files
                 var addResult = await _gitHelper.RunGitCommandAsync(task.ProjectPath, $"add -- {pathArgs}");
                 if (addResult == null)
                 {
-                    Debug.WriteLine("CommitTaskAsync failed: Failed to stage files");
+                    AppLogger.Error("AutoCommit", $"Task #{task.TaskNumber} git add returned null");
                     return (false, (string?)$"Failed to stage files for commit. Git add command failed for paths: {pathArgs}");
                 }
+                if (!addResult.IsSuccess)
+                    AppLogger.Warn("AutoCommit", $"Task #{task.TaskNumber} git add non-zero exit: {addResult.GetErrorMessage()}");
 
                 // Capture diff summary before committing
                 var diffResult = await _gitHelper.RunGitCommandAsync(
                     task.ProjectPath, $"diff --cached --stat -- {pathArgs}");
                 if (diffResult.IsSuccess && !string.IsNullOrWhiteSpace(diffResult.Output))
                     task.CommitDiff = diffResult.Output.Trim();
+                else
+                    AppLogger.Warn("AutoCommit", $"Task #{task.TaskNumber} no cached diff found (nothing staged?)");
 
                 // Commit with pathspec to prevent leaking other staged changes
                 var result = await _gitHelper.CommitSecureAsync(
@@ -307,6 +320,7 @@ namespace Spritely.Managers
                     {
                         task.IsCommitted = true;
                         task.CommitHash = hash;
+                        AppLogger.Info("AutoCommit", $"Task #{task.TaskNumber} committed successfully: {hash}");
                         _historyManager.SaveHistory(_getHistoryTasks());
                         _onGitPanelDirty?.Invoke();
 
@@ -317,6 +331,8 @@ namespace Spritely.Managers
                     }
                     return (false, (string?)"Git commit succeeded but failed to capture commit hash");
                 }
+
+                AppLogger.Error("AutoCommit", $"Task #{task.TaskNumber} git commit failed: {result.GetErrorMessage()}");
                 return (false, (string?)$"Git commit failed: {result.GetErrorMessage()}");
             }, $"commit for task #{task.TaskNumber}");
         }
