@@ -285,6 +285,7 @@ namespace Spritely
                 SkillDiscoveryAgent = new SkillDiscoveryAgent(_claudeService, _skillManager, Dispatcher),
                 ContextPrefetchPipeline = _contextPrefetchPipeline,
                 PromptEvolutionManager = promptEvolutionManager,
+                IsPromptEvolutionEnabled = path => _projectManager.SavedProjects.FirstOrDefault(p => p.Path == path)?.PromptEvolutionEnabled ?? false,
                 CrossProjectInsightsManager = crossProjectInsightsManager,
             });
             _taskExecutionManager.TaskCompleted += OnTaskProcessCompleted;
@@ -645,6 +646,7 @@ namespace Spritely
                 _projectManager.UpdateMcpToggleForProject();
                 var activeEntry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
                 ProjectTypeGameToggle.IsChecked = activeEntry?.IsGame == true;
+                PromptEvolutionToggle.IsChecked = activeEntry?.PromptEvolutionEnabled == true;
                 UpdateMcpVisibility(activeEntry?.IsGame == true);
                 SyncMcpSettingsFields();
 
@@ -806,6 +808,7 @@ namespace Spritely
             _projectManager.UpdateMcpToggleForProject();
             var activeEntry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
             ProjectTypeGameToggle.IsChecked = activeEntry?.IsGame == true;
+            PromptEvolutionToggle.IsChecked = activeEntry?.PromptEvolutionEnabled == true;
             UpdateMcpVisibility(activeEntry?.IsGame == true);
             SyncMcpSettingsFields();
 

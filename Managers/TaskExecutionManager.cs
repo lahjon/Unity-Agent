@@ -67,6 +67,7 @@ namespace Spritely.Managers
 
         // ── Prompt Evolution ──────────────────────────────────────────────
         private readonly PromptEvolutionManager? _promptEvolutionManager;
+        private readonly Func<string, bool> _isPromptEvolutionEnabled;
 
         // ── Cross-Project Insights ──────────────────────────────────────────
         private readonly CrossProjectInsightsManager? _crossProjectInsightsManager;
@@ -131,6 +132,7 @@ namespace Spritely.Managers
             _contextPrefetchPipeline = services.ContextPrefetchPipeline;
             _feedbackCollector = services.FeedbackCollector;
             _promptEvolutionManager = services.PromptEvolutionManager;
+            _isPromptEvolutionEnabled = services.IsPromptEvolutionEnabled ?? (_ => false);
             _crossProjectInsightsManager = services.CrossProjectInsightsManager;
             _featureModeHandler = new TeamsModeHandler(services.ScriptDir, _processLauncher, _outputProcessor, services.MessageBusManager, services.OutputTabManager, services.CompletionAnalyzer, services.PromptBuilder, services.TaskFactory, retryMinutesFunc, earlyTerminationManager: _earlyTerminationManager);
             if (services.ClaudeService != null)
@@ -163,7 +165,7 @@ namespace Spritely.Managers
         {
             // Check for active prompt evolution variant (A/B test assignment)
             PromptVariant? evolutionVariant = null;
-            if (_promptEvolutionManager != null && !task.IsSubTask)
+            if (_promptEvolutionManager != null && _isPromptEvolutionEnabled(task.ProjectPath) && !task.IsSubTask)
                 evolutionVariant = _promptEvolutionManager.GetActiveVariant(task.ProjectPath, task.Id);
 
             // Inject cross-project insights (globally-successful patterns from other projects)
@@ -683,7 +685,7 @@ namespace Spritely.Managers
             }
 
             // Prompt Evolution: record task outcome for A/B testing
-            if (_promptEvolutionManager != null && !task.IsSubTask)
+            if (_promptEvolutionManager != null && _isPromptEvolutionEnabled(task.ProjectPath) && !task.IsSubTask)
             {
                 var success = exitCode == 0 &&
                     (expectedStatus == AgentTaskStatus.Completed || task.Status == AgentTaskStatus.Completed);

@@ -119,6 +119,16 @@ namespace Spritely
             }
         }
 
+        private void PromptEvolutionToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            var entry = _projectManager.SavedProjects.FirstOrDefault(p => p.Path == _projectManager.ProjectPath);
+            if (entry != null)
+            {
+                entry.PromptEvolutionEnabled = PromptEvolutionToggle.IsChecked == true;
+                _projectManager.SaveProjects();
+            }
+        }
+
         private void UpdateMcpVisibility(bool isGame)
         {
             UseMcpToggle.Visibility = isGame ? Visibility.Visible : Visibility.Collapsed;

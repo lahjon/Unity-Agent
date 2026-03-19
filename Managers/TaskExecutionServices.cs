@@ -49,6 +49,7 @@ namespace Spritely.Managers
         public SkillDiscoveryAgent? SkillDiscoveryAgent { get; init; }
         public ContextPrefetchPipeline? ContextPrefetchPipeline { get; init; }
         public PromptEvolutionManager? PromptEvolutionManager { get; init; }
+        public Func<string, bool>? IsPromptEvolutionEnabled { get; init; }
         public CrossProjectInsightsManager? CrossProjectInsightsManager { get; init; }
     }
 }

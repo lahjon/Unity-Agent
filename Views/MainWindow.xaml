@@ -1749,6 +1749,13 @@
                                     <TextBox x:Name="NewRuleInput" KeyDown="NewRuleInput_KeyDown"/>
                                     <ToggleButton x:Name="ProjectTypeGameToggle" Style="{StaticResource ToggleSwitch}"
                                                   Checked="ProjectTypeGameToggle_Changed" Unchecked="ProjectTypeGameToggle_Changed"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <TextBlock Text="Prompt Evolution" Foreground="{StaticResource TextMuted}"
+                                                   FontSize="10" FontFamily="Segoe UI" VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"/>
+                                        <ToggleButton x:Name="PromptEvolutionToggle" Style="{StaticResource ToggleSwitch}"
+                                                      Checked="PromptEvolutionToggle_Changed" Unchecked="PromptEvolutionToggle_Changed"/>
+                                    </StackPanel>
                                     <ToggleButton x:Name="EditCrashLogPathsToggle" Style="{StaticResource ToggleSwitch}"
                                                   Checked="EditCrashLogPathsToggle_Changed" Unchecked="EditCrashLogPathsToggle_Changed"/>
                                     <TextBox x:Name="CrashLogPathBox"/>

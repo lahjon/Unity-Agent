@@ -147,5 +147,19 @@ namespace Spritely.Constants
 
         /// <summary>Maximum prompt variants to retain per project.</summary>
         public const int PromptEvolutionMaxVariants = 20;
+
+        /// <summary>Whether prompt evolution A/B testing is enabled by default for new projects.</summary>
+        public const bool PromptEvolutionEnabledByDefault = false;
+
+        // ── File Locks ──────────────────────────────────────────────
+
+        /// <summary>Maximum total lock count across all tasks.</summary>
+        public const int FileLockMaxLocks = 500;
+
+        /// <summary>Maximum lock count per individual task.</summary>
+        public const int FileLockMaxLocksPerTask = 100;
+
+        /// <summary>Percentage of max locks at which a warning is logged (0.9 = 90%).</summary>
+        public const double FileLockWarningThreshold = 0.9;
     }
 }

@@ -33,6 +33,7 @@ namespace Spritely.Models
         public string AppLogPath { get; set; } = "";
         public string HangLogPath { get; set; } = "";
         public bool AutoRegenerateClaudeMd { get; set; }
+        public bool PromptEvolutionEnabled { get; set; } = Spritely.Constants.AppConstants.PromptEvolutionEnabledByDefault;
 
         [JsonIgnore]
         public bool IsInitializing { get; set; }
