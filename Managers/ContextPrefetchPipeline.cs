@@ -66,14 +66,27 @@ namespace Spritely.Managers
         /// </summary>
         public FeatureContextResult? TryGetCached(string description)
         {
-            var hash = ComputeHash(description?.Trim() ?? "");
-            if (_cache.TryGetValue(hash, out var cached) &&
-                DateTime.UtcNow - cached.ResolvedAt < CacheFreshnessLimit)
+            try
             {
-                AppLogger.Debug("ContextPrefetch", "Cache hit — skipping feature resolution");
-                return cached.Result;
+                var hash = ComputeHash(description?.Trim() ?? "");
+                if (_cache.TryGetValue(hash, out var cached) &&
+                    DateTime.UtcNow - cached.ResolvedAt < CacheFreshnessLimit)
+                {
+                    AppLogger.Debug("ContextPrefetch", "Cache hit — skipping feature resolution");
+                    return cached.Result;
+                }
+                return null;
             }
-            return null;
+            catch (AggregateException ex)
+            {
+                AppLogger.Error("ContextPrefetch", $"Prefetch cache retrieval failed: {ex.InnerException?.Message ?? ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("ContextPrefetch", $"Prefetch cache retrieval failed: {ex.Message}");
+                return null;
+            }
         }
 
         /// <summary>Clears all cached results.</summary>
@@ -122,7 +135,7 @@ namespace Spritely.Managers
             catch (OperationCanceledException) { /* debounce superseded */ }
             catch (Exception ex)
             {
-                AppLogger.Debug("ContextPrefetch", $"Speculative resolve failed: {ex.Message}");
+                AppLogger.Error("ContextPrefetch", $"Speculative resolve failed: {ex.Message}", ex);
             }
         }
 
