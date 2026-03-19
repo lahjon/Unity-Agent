@@ -13,9 +13,11 @@ namespace Spritely.Managers
         List<ProjectEntry> SavedProjects { get; }
         string ProjectPath { get; }
         IProjectPanelView View { get; }
+        void SetProjectPath(string path);
         void SaveProjects();
         void RefreshProjectCombo();
         void RefreshProjectList(System.Action<string>? updateTerminalWorkingDirectory, System.Action? saveSettings, System.Action? syncSettings);
         ProjectEntry? GetCurrentProject();
+        void RemoveProject(string projectPath, System.Action<string> updateTerminalWorkingDirectory, System.Action saveSettings, System.Action syncSettings);
     }
 }
