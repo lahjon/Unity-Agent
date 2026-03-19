@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace Spritely.Managers
@@ -11,6 +12,7 @@ namespace Spritely.Managers
     /// <summary>
     /// Streams task output chunks to per-task log files on disk, enabling full output
     /// recovery without keeping everything in memory. Thread-safe for concurrent appends.
+    /// Uses Channel-based async consumers to avoid thread pool starvation.
     /// </summary>
     public sealed class StreamingOutputWriter : IDisposable
     {
@@ -24,8 +26,20 @@ namespace Spritely.Managers
         /// <summary>Per-file locks to serialize writes to the same task log.</summary>
         private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
 
+        /// <summary>Per-task write channels with dedicated async consumer loops.</summary>
+        private readonly ConcurrentDictionary<string, TaskWriteChannel> _channels = new();
+
         /// <summary>Tracks total bytes written per task for diagnostics.</summary>
         private readonly ConcurrentDictionary<string, long> _bytesWritten = new();
+
+        private sealed record WriteItem(string Text);
+
+        private sealed class TaskWriteChannel
+        {
+            public Channel<WriteItem> Channel { get; } = System.Threading.Channels.Channel.CreateUnbounded<WriteItem>(
+                new UnboundedChannelOptions { SingleReader = true });
+            public Task ConsumerTask { get; set; } = Task.CompletedTask;
+        }
 
         public StreamingOutputWriter()
         {
@@ -42,24 +56,37 @@ namespace Spritely.Managers
 
         /// <summary>
         /// Appends a text chunk to the task's log file on disk.
-        /// Thread-safe; serializes writes per task.
+        /// Thread-safe; queues into a per-task Channel with an async consumer.
         /// </summary>
         public void WriteChunk(string taskId, string text)
         {
             if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(text)) return;
 
+            var channel = _channels.GetOrAdd(taskId, id =>
+            {
+                var twc = new TaskWriteChannel();
+                twc.ConsumerTask = ConsumeWritesAsync(id, twc.Channel);
+                return twc;
+            });
+
+            // TryWrite on unbounded channel always succeeds
+            channel.Channel.Writer.TryWrite(new WriteItem(text));
+        }
+
+        private async Task ConsumeWritesAsync(string taskId, Channel<WriteItem> channel)
+        {
             var sem = _locks.GetOrAdd(taskId, _ => new SemaphoreSlim(1, 1));
-            // Fire-and-forget on thread pool to avoid blocking callers
-            ThreadPool.QueueUserWorkItem(_ =>
+            var filePath = GetLogPath(taskId);
+
+            await foreach (var item in channel.Reader.ReadAllAsync())
             {
                 try
                 {
-                    sem.Wait();
+                    await sem.WaitAsync();
                     try
                     {
-                        var filePath = GetLogPath(taskId);
-                        File.AppendAllText(filePath, text);
-                        _bytesWritten.AddOrUpdate(taskId, text.Length, (_, prev) => prev + text.Length);
+                        await File.AppendAllTextAsync(filePath, item.Text);
+                        _bytesWritten.AddOrUpdate(taskId, item.Text.Length, (_, prev) => prev + item.Text.Length);
                     }
                     finally
                     {
@@ -70,7 +97,7 @@ namespace Spritely.Managers
                 {
                     AppLogger.Debug("StreamingOutputWriter", $"Failed to write chunk for task {taskId}: {ex.Message}");
                 }
-            });
+            }
         }
 
         /// <summary>
@@ -151,6 +178,14 @@ namespace Spritely.Managers
         {
             try
             {
+                // Complete the channel so the consumer drains and stops
+                if (_channels.TryRemove(taskId, out var twc))
+                {
+                    twc.Channel.Writer.TryComplete();
+                    // Best-effort wait for consumer to finish flushing
+                    twc.ConsumerTask.Wait(TimeSpan.FromSeconds(2));
+                }
+
                 var filePath = GetLogPath(taskId);
                 if (File.Exists(filePath))
                     File.Delete(filePath);
@@ -169,6 +204,18 @@ namespace Spritely.Managers
 
         public void Dispose()
         {
+            // Complete all channels so consumers stop
+            foreach (var kvp in _channels)
+                kvp.Value.Channel.Writer.TryComplete();
+
+            // Wait briefly for consumers to drain
+            foreach (var kvp in _channels)
+            {
+                try { kvp.Value.ConsumerTask.Wait(TimeSpan.FromSeconds(2)); }
+                catch { /* best effort */ }
+            }
+            _channels.Clear();
+
             foreach (var kvp in _locks)
                 kvp.Value.Dispose();
             _locks.Clear();
