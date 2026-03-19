@@ -116,6 +116,10 @@ namespace Spritely
         private bool _isSplitterDragging;
         private bool _restoreStarRowsPending;
 
+        // Saved terminal row state during splitter drag to restore afterwards
+        private GridLength _terminalRowHeightBeforeDrag;
+        private double _terminalRowMinHeightBeforeDrag;
+
 
         // IProjectPanelView — expose named XAML controls to ProjectManager
         ComboBox IProjectPanelView.PromptProjectLabel => PromptProjectLabel;
@@ -1051,6 +1055,10 @@ namespace Spritely
         /// </summary>
         private void CheckAutoExpandGraph()
         {
+            // Don't auto-expand graph during splitter drag — it changes Row 0's
+            // inner layout which shifts the divider mid-drag.
+            if (_isSplitterDragging) return;
+
             bool hasFeatureModeTasks = _activeTasks.Any(t => t.IsTeamsMode && !t.IsFinished);
             bool hasDependencyTasks = _activeTasks.Any(t => t.DependencyTaskIdCount > 0 || t.BlockedByTaskId != null);
 

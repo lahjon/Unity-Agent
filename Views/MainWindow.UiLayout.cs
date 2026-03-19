@@ -29,6 +29,22 @@ namespace Spritely
             // Pin inner task list row to prevent star sizing from causing re-proportion during drag
             if (TaskListRow.ActualHeight > 0)
                 TaskListRow.Height = new GridLength(TaskListRow.ActualHeight);
+
+            // Pin terminal-area rows so background layout passes (status timer, task
+            // completions, graph auto-expand) can't shift the available space mid-drag.
+            _terminalRowHeightBeforeDrag = TerminalRow.Height;
+            _terminalRowMinHeightBeforeDrag = TerminalRow.MinHeight;
+            if (TerminalRow.ActualHeight > 0)
+                TerminalRow.Height = new GridLength(TerminalRow.ActualHeight);
+            else
+            {
+                TerminalRow.MinHeight = 0;
+                TerminalRow.Height = new GridLength(0);
+            }
+
+            // Pause the status timer to prevent _activeView.Refresh() from
+            // triggering layout recalculations during the drag.
+            _statusTimer.Stop();
         }
 
         private void TopMiddleSplitter_DragDelta(object sender, DragDeltaEventArgs e)
@@ -70,6 +86,13 @@ namespace Spritely
 
             // Restore inner task list row to star sizing
             TaskListRow.Height = new GridLength(1, GridUnitType.Star);
+
+            // Restore terminal row to its pre-drag state
+            TerminalRow.MinHeight = _terminalRowMinHeightBeforeDrag;
+            TerminalRow.Height = _terminalRowHeightBeforeDrag;
+
+            // Resume the status timer
+            _statusTimer.Start();
         }
 
         // ── Right splitter drag ──
