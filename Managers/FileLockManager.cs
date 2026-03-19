@@ -442,6 +442,9 @@ namespace Spritely.Managers
             if (task.Status != AgentTaskStatus.Queued)
                 return;
 
+            // Auto-bypass future file lock conflicts for force-started tasks
+            task.IgnoreFileLocks = true;
+
             task.QueuedReason = null;
             task.BlockedByTaskId = null;
             QueuedTaskResumed?.Invoke(task.Id);

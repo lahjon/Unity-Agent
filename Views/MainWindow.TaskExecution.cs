@@ -428,6 +428,7 @@ namespace Spritely
 
             if (task.Status == AgentTaskStatus.InitQueued)
             {
+                task.IgnoreFileLocks = true;
                 task.QueuedReason = null;
                 LaunchTaskProcess(task, $"\nForce-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
                 UpdateQueuePositions();
@@ -439,6 +440,7 @@ namespace Spritely
             if (task.DependencyTaskIdCount > 0)
             {
                 _taskOrchestrator.MarkResolved(task.Id);
+                task.IgnoreFileLocks = true;
                 task.QueuedReason = null;
                 task.BlockedByTaskId = null;
                 task.BlockedByTaskNumber = null;
@@ -511,6 +513,7 @@ namespace Spritely
             if (task.Status == AgentTaskStatus.InitQueued)
             {
                 // Force-start an init-queued task (bypass max concurrent limit)
+                task.IgnoreFileLocks = true;
                 task.QueuedReason = null;
                 LaunchTaskProcess(task, $"\nForce-starting task #{task.TaskNumber} (limit bypassed)...\n\n");
                 UpdateQueuePositions();
@@ -524,6 +527,7 @@ namespace Spritely
                 {
                     // Force-start a dependency-queued task — remove from orchestrator tracking
                     _taskOrchestrator.MarkResolved(task.Id);
+                    task.IgnoreFileLocks = true;
                     task.QueuedReason = null;
                     task.BlockedByTaskId = null;
                     task.BlockedByTaskNumber = null;

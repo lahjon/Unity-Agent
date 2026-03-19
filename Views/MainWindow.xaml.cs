@@ -884,6 +884,7 @@ namespace Spritely
             {
                 if (task.Status == AgentTaskStatus.InitQueued)
                 {
+                    task.IgnoreFileLocks = true;
                     task.Status = AgentTaskStatus.Stored;
                     task.QueuedReason = null;
                     task.StartTime = DateTime.Now;
@@ -899,6 +900,7 @@ namespace Spritely
                     if (task.DependencyTaskIdCount > 0)
                     {
                         _taskOrchestrator.MarkResolved(task.Id);
+                        task.IgnoreFileLocks = true;
                         task.QueuedReason = null;
                         task.BlockedByTaskId = null;
                         task.BlockedByTaskNumber = null;
