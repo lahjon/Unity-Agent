@@ -626,10 +626,16 @@ namespace Spritely
 
                 PinRowHeights();
 
-                foreach (var item in historyItems)
-                    _historyTasks.Add(item);
-                foreach (var item in storedItems)
-                    _storedTasks.Add(item);
+                lock (_historyTasksLock)
+                {
+                    foreach (var item in historyItems)
+                        _historyTasks.Add(item);
+                }
+                lock (_storedTasksLock)
+                {
+                    foreach (var item in storedItems)
+                        _storedTasks.Add(item);
+                }
 
                 RestoreStarRows();
                 RefreshFilterCombos();
@@ -1516,7 +1522,8 @@ namespace Spritely
             if (sender is not FrameworkElement el || el.DataContext is not AgentTask task) return;
             AnimateRemoval(el, () =>
             {
-                _storedTasks.Remove(task);
+                lock (_storedTasksLock)
+                    _storedTasks.Remove(task);
                 _historyManager.SaveStoredTasks(_storedTasks);
                 RefreshFilterCombos();
                 UpdateStatus();
@@ -1530,7 +1537,8 @@ namespace Spritely
                 $"Are you sure you want to clear all {_storedTasks.Count} stored tasks? This cannot be undone.",
                 "Clear Stored Tasks")) return;
 
-            _storedTasks.Clear();
+            lock (_storedTasksLock)
+                _storedTasks.Clear();
             _historyManager.SaveStoredTasks(_storedTasks);
             RefreshFilterCombos();
             UpdateStatus();
@@ -1573,7 +1581,8 @@ namespace Spritely
 
             newTask.TimeoutMinutes = _settingsManager.TaskTimeoutMinutes;
 
-            _storedTasks.Remove(task);
+            lock (_storedTasksLock)
+                _storedTasks.Remove(task);
             _historyManager.SaveStoredTasks(_storedTasks);
 
             ResetPerTaskToggles();
@@ -1684,7 +1693,8 @@ namespace Spritely
                 ? planTask.Summary : planTask.ShortDescription;
             storedTask.Status = AgentTaskStatus.Completed;
 
-            _storedTasks.Insert(0, storedTask);
+            lock (_storedTasksLock)
+                _storedTasks.Insert(0, storedTask);
             _historyManager.SaveStoredTasks(_storedTasks);
             RefreshFilterCombos();
         }
@@ -1705,7 +1715,8 @@ namespace Spritely
                 storedTask.Summary = $"[Feedback] {entry.Title}";
                 storedTask.Status = AgentTaskStatus.Completed;
 
-                _storedTasks.Insert(0, storedTask);
+                lock (_storedTasksLock)
+                    _storedTasks.Insert(0, storedTask);
                 _historyManager.SaveStoredTasks(_storedTasks);
                 _improvementTaskGenerator.MarkLaunched(entry.Id);
 
