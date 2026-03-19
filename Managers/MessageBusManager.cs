@@ -184,7 +184,7 @@ namespace Spritely.Managers
             }
 
             var poll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(AppConstants.MessageBusActivePollSeconds) };
-            poll.Tick += (_, _) => PollForNewMessages(projectPath);
+            poll.Tick += (_, _) => AsyncHelper.FireAndForget(() => PollForNewMessagesAsync(projectPath), "MessageBus.Poll");
             poll.Start();
             ctx.PollTimer = poll;
 
@@ -339,7 +339,7 @@ namespace Spritely.Managers
             MessageReceived?.Invoke(projectPath, message);
         }
 
-        private async void PollForNewMessages(string projectPath)
+        private async Task PollForNewMessagesAsync(string projectPath)
         {
             if (!_buses.TryGetValue(projectPath, out var ctx)) return;
             if (!Directory.Exists(ctx.InboxDir)) return;

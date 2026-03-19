@@ -80,59 +80,62 @@ namespace Spritely.Managers
             shutdownToken.Register(() => _retryTimer?.Change(Timeout.Infinite, Timeout.Infinite));
         }
 
-        private async void OnRetryTimerTick(object? state)
+        private void OnRetryTimerTick(object? state)
         {
-            if (_shutdownToken.IsCancellationRequested)
-                return;
-
-            if (_isBusy?.Invoke() == true)
-                return;
-
-            // Prevent overlapping ticks
-            if (Interlocked.CompareExchange(ref _retryWorkerRunning, 1, 0) != 0)
-                return;
-
-            try
+            AsyncHelper.FireAndForget(async () =>
             {
-                var projectPaths = _getProjectPaths?.Invoke();
-                if (projectPaths is null or { Count: 0 })
+                if (_shutdownToken.IsCancellationRequested)
                     return;
 
-                foreach (var projectPath in projectPaths)
+                if (_isBusy?.Invoke() == true)
+                    return;
+
+                // Prevent overlapping ticks
+                if (Interlocked.CompareExchange(ref _retryWorkerRunning, 1, 0) != 0)
+                    return;
+
+                try
                 {
-                    if (_shutdownToken.IsCancellationRequested)
+                    var projectPaths = _getProjectPaths?.Invoke();
+                    if (projectPaths is null or { Count: 0 })
                         return;
 
-                    var pendingPath = GetPendingUpdatesPath(projectPath);
-                    if (!File.Exists(pendingPath))
-                        continue;
-
-                    try
+                    foreach (var projectPath in projectPaths)
                     {
-                        var queue = await LoadPendingQueueAsync(pendingPath);
-                        if (queue.Count == 0)
+                        if (_shutdownToken.IsCancellationRequested)
+                            return;
+
+                        var pendingPath = GetPendingUpdatesPath(projectPath);
+                        if (!File.Exists(pendingPath))
                             continue;
 
-                        AppLogger.Info("FeatureUpdateAgent",
-                            $"Background retry: draining {queue.Count} pending update(s) for {Path.GetFileName(projectPath)}");
+                        try
+                        {
+                            var queue = await LoadPendingQueueAsync(pendingPath);
+                            if (queue.Count == 0)
+                                continue;
 
-                        await DrainPendingUpdatesAsync(projectPath, _shutdownToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Debug("FeatureUpdateAgent",
-                            $"Background retry failed for {Path.GetFileName(projectPath)}: {ex.Message}");
+                            AppLogger.Info("FeatureUpdateAgent",
+                                $"Background retry: draining {queue.Count} pending update(s) for {Path.GetFileName(projectPath)}");
+
+                            await DrainPendingUpdatesAsync(projectPath, _shutdownToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("FeatureUpdateAgent",
+                                $"Background retry failed for {Path.GetFileName(projectPath)}: {ex.Message}");
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("FeatureUpdateAgent", $"Background retry tick failed: {ex.Message}");
-            }
-            finally
-            {
-                Interlocked.Exchange(ref _retryWorkerRunning, 0);
-            }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("FeatureUpdateAgent", $"Background retry tick failed: {ex.Message}");
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _retryWorkerRunning, 0);
+                }
+            }, "FeatureUpdateAgent.OnRetryTimerTick");
         }
 
         private async Task<JsonElement?> CallHaikuWithFallbackAsync(

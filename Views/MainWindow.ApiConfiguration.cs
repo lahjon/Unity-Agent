@@ -105,14 +105,14 @@ namespace Spritely
             catch (Exception ex) { Managers.AppLogger.Warn("MainWindow", "Failed to open Claude API link", ex); }
         }
 
-        private async void RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
+        private void RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
         {
-            await RefreshModelsFromApi(geminiOnly: true);
+            Managers.AsyncHelper.FireAndForget(() => RefreshModelsFromApi(geminiOnly: true), "MainWindow.RefreshGeminiModels_Click");
         }
 
-        private async void RefreshClaudeModels_Click(object sender, RoutedEventArgs e)
+        private void RefreshClaudeModels_Click(object sender, RoutedEventArgs e)
         {
-            await RefreshModelsFromApi(claudeOnly: true);
+            Managers.AsyncHelper.FireAndForget(() => RefreshModelsFromApi(claudeOnly: true), "MainWindow.RefreshClaudeModels_Click");
         }
 
         private async Task RefreshModelsFromApi(bool geminiOnly = false, bool claudeOnly = false)

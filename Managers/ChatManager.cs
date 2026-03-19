@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -99,7 +100,7 @@ namespace Spritely.Managers
 
         public void HandleSendClick()
         {
-            SendChatMessage();
+            AsyncHelper.FireAndForget(SendChatMessageAsync, "ChatManager.SendChatMessage");
         }
 
         public void HandleInputKeyDown(KeyEventArgs e)
@@ -107,7 +108,7 @@ namespace Spritely.Managers
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
             {
                 e.Handled = true;
-                SendChatMessage();
+                AsyncHelper.FireAndForget(SendChatMessageAsync, "ChatManager.SendChatMessage");
             }
         }
 
@@ -283,7 +284,7 @@ namespace Spritely.Managers
             return startIndex == 0 ? history : history.GetRange(startIndex, history.Count - startIndex);
         }
 
-        private async void SendChatMessage()
+        private async Task SendChatMessageAsync()
         {
             var text = _input.Text?.Trim();
             if (string.IsNullOrEmpty(text) && _pendingImages.Count == 0) return;

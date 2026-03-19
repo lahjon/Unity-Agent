@@ -158,7 +158,7 @@ namespace Spritely
 
         // ── Suggestions ─────────────────────────────────────────────
 
-        private async void GenerateSuggestions_Click(object sender, RoutedEventArgs e)
+        private void GenerateSuggestions_Click(object sender, RoutedEventArgs e)
         {
             if (!_projectManager.HasProjects) return;
             if (_helperManager.IsGenerating) return;
@@ -184,7 +184,9 @@ namespace Spritely
             var guidance = SuggestionGuidanceInput.Text?.Trim();
             if (!string.IsNullOrEmpty(guidance))
                 SuggestionGuidanceInput.Clear();
-            await _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance, model, _windowCts.Token);
+            Managers.AsyncHelper.FireAndForget(
+                () => _helperManager.GenerateSuggestionsAsync(_projectManager.ProjectPath, category, guidance, model, _windowCts.Token),
+                "MainWindow.GenerateSuggestions_Click");
         }
 
         private void SuggestionGuidanceInput_PreviewKeyDown(object sender, KeyEventArgs e)

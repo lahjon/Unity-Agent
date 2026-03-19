@@ -67,7 +67,7 @@ namespace Spritely
         public void ReleaseTaskLocksAfterCommit(AgentTask task)
             => _commitOrchestrator.ReleaseTaskLocksAfterCommit(task, RefreshActivityDashboard);
 
-        internal async void CommitTask_Click(object sender, RoutedEventArgs e)
+        internal void CommitTask_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button { DataContext: AgentTask task }) return;
             if (!task.IsFinished) return;
@@ -81,12 +81,14 @@ namespace Spritely
                 return;
             }
 
-            // Commit the task changes
-            var (success, errorMessage) = await CommitTaskAsync(task);
-            if (!success)
+            Managers.AsyncHelper.FireAndForget(async () =>
             {
-                Dialogs.DarkDialog.ShowAlert($"Failed to commit changes for task #{task.TaskNumber}\n\nError: {errorMessage}", "Commit Error");
-            }
+                var (success, errorMessage) = await CommitTaskAsync(task);
+                if (!success)
+                {
+                    Dialogs.DarkDialog.ShowAlert($"Failed to commit changes for task #{task.TaskNumber}\n\nError: {errorMessage}", "Commit Error");
+                }
+            }, "MainWindow.CommitTask_Click");
         }
 
         /// <summary>

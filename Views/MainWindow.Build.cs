@@ -12,13 +12,15 @@ namespace Spritely
     {
         // ── Export Build ─────────────────────────────────────────────
 
-        private async void ExportBuild_Click(object sender, RoutedEventArgs e)
+        private void ExportBuild_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
             if (button == null) return;
 
-            try
+            Managers.AsyncHelper.FireAndForget(async () =>
             {
+                try
+                {
                 button.IsEnabled = false;
                 ExportStatusText.Text = "Building application...";
                 ExportStatusText.Foreground = (Brush)Application.Current.FindResource("TextMuted");
@@ -99,17 +101,18 @@ namespace Spritely
                         ExportStatusText.Text += "\n\nBuild output:\n" + string.Join("\n", outputLines.GetRange(Math.Max(0, outputLines.Count - 10), Math.Min(10, outputLines.Count)));
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                ExportStatusText.Text = $"Export failed: {ex.Message}";
-                ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
-                ExportStatusText.Visibility = Visibility.Visible;
-            }
-            finally
-            {
-                button.IsEnabled = true;
-            }
+                }
+                catch (Exception ex)
+                {
+                    ExportStatusText.Text = $"Export failed: {ex.Message}";
+                    ExportStatusText.Foreground = (Brush)Application.Current.FindResource("Danger");
+                    ExportStatusText.Visibility = Visibility.Visible;
+                }
+                finally
+                {
+                    button.IsEnabled = true;
+                }
+            }, "MainWindow.ExportBuild_Click");
         }
 
         private string? FindProjectFile(string startDirectory)

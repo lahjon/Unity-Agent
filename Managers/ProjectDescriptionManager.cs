@@ -107,27 +107,30 @@ namespace Spritely.Managers
             }
         }
 
-        public async void RegenerateDescriptions()
+        public void RegenerateDescriptions()
         {
-            var entry = _data.SavedProjects.FirstOrDefault(p => p.Path == _data.ProjectPath);
-            if (entry == null) return;
+            AsyncHelper.FireAndForget(async () =>
+            {
+                var entry = _data.SavedProjects.FirstOrDefault(p => p.Path == _data.ProjectPath);
+                if (entry == null) return;
 
-            entry.IsInitializing = true;
-            entry.ShortDescription = "";
-            entry.LongDescription = "";
-            _data.SaveProjects();
-            _data.RefreshProjectCombo();
-            _data.RefreshProjectList(null, null, null);
-            RefreshDescriptionBoxes();
+                entry.IsInitializing = true;
+                entry.ShortDescription = "";
+                entry.LongDescription = "";
+                _data.SaveProjects();
+                _data.RefreshProjectCombo();
+                _data.RefreshProjectList(null, null, null);
+                RefreshDescriptionBoxes();
 
-            _data.View.RegenerateDescBtn.IsEnabled = false;
-            _data.View.RegenerateDescBtn.Content = "Regenerating...";
+                _data.View.RegenerateDescBtn.IsEnabled = false;
+                _data.View.RegenerateDescBtn.Content = "Regenerating...";
 
-            await GenerateProjectDescriptionInBackground(entry);
+                await GenerateProjectDescriptionInBackground(entry);
 
-            _data.View.RegenerateDescBtn.Content = "Regenerate Descriptions";
-            _data.View.RegenerateDescBtn.IsEnabled = true;
-            RefreshDescriptionBoxes();
+                _data.View.RegenerateDescBtn.Content = "Regenerate Descriptions";
+                _data.View.RegenerateDescBtn.IsEnabled = true;
+                RefreshDescriptionBoxes();
+            }, "ProjectDescriptionManager.RegenerateDescriptions");
         }
 
         public void SaveShortDesc()
