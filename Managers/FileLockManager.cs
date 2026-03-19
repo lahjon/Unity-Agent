@@ -94,19 +94,6 @@ namespace Spritely.Managers
 
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
             var basePath = task?.ProjectPath;
-
-            // If task not found in activeTasks, try to recover basePath from an existing
-            // lock owned by this task to ensure consistent path normalization
-            if (basePath == null && _taskLockedFiles.TryGetValue(taskId, out var existingFiles) && existingFiles.Count > 0)
-            {
-                var existingKey = existingFiles.First();
-                if (_fileLocks.TryGetValue(existingKey, out var existingLock) && Path.IsPathRooted(existingLock.NormalizedPath))
-                {
-                    // Derive basePath from an existing lock's full path
-                    try { basePath = Path.GetDirectoryName(existingLock.NormalizedPath); } catch { }
-                }
-            }
-
             var normalized = Helpers.FormatHelpers.NormalizePath(filePath, basePath);
 
             if (_fileLocks.TryGetValue(normalized, out var existing))
