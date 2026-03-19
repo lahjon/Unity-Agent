@@ -782,11 +782,9 @@ namespace Spritely.Managers
 
             var expectedStatus = exitCode == 0 ? AgentTaskStatus.Completed : AgentTaskStatus.Failed;
 
-            // Follow-ups skip the Recommendation status and don't re-enter the
-            // FinalizeTask → Committing flow, so locks must be released here for
-            // both success and failure. Without this, successful follow-up locks
-            // stay held until the task is manually removed from the active tab.
-            _fileLockManager.ReleaseTaskLocks(task.Id);
+            // File locks are NOT released here — they are held so that
+            // OnTaskProcessCompleted → FinalizeTask can use them for auto-commit.
+            // If auto-commit is disabled, OnTaskProcessCompleted releases locks directly.
 
             // Always handle message bus cleanup
             if (task.UseMessageBus)
@@ -823,9 +821,9 @@ namespace Spritely.Managers
                 }
             }
 
-            // Always check queued tasks and fire TaskCompleted event,
-            // even if status changed during verification
-            _fileLockManager.CheckQueuedTasks(activeTasks);
+            // Fire TaskCompleted so OnTaskProcessCompleted can handle auto-commit
+            // and queued task resumption. Don't call CheckQueuedTasks here — locks
+            // may still be needed for auto-commit; downstream handlers release them.
             TaskCompleted?.Invoke(task.Id);
         }
 
@@ -1011,6 +1009,21 @@ namespace Spritely.Managers
             task.Recommendations = "";
             task.Cts?.Dispose();
             task.Cts = new System.Threading.CancellationTokenSource();
+
+            // Reset auto-commit state so follow-up changes get their own commit
+            task.IsCommitted = false;
+            task.CommitError = null;
+            task.CommitHash = null;
+
+            // Capture new git baseline for the follow-up so auto-commit can diff against it.
+            // Fire-and-forget is safe: git rev-parse completes in milliseconds, long before
+            // the follow-up process finishes and the exit handler needs the hash.
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                task.GitStartHash = await _gitHelper.CaptureGitHeadAsync(task.ProjectPath, task.Cts.Token);
+                AppLogger.Info("FollowUp", $"[{task.Id}] Captured new GitStartHash for follow-up: {task.GitStartHash ?? "(null)"}");
+            });
+
             _outputTabManager.UpdateTabHeader(task);
 
             // Process any queued messages before starting the follow-up

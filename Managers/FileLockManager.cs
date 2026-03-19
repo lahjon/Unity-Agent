@@ -94,6 +94,19 @@ namespace Spritely.Managers
 
             var task = activeTasks.FirstOrDefault(t => t.Id == taskId);
             var basePath = task?.ProjectPath;
+
+            // If task not found in activeTasks, try to recover basePath from an existing
+            // lock owned by this task to ensure consistent path normalization
+            if (basePath == null && _taskLockedFiles.TryGetValue(taskId, out var existingFiles) && existingFiles.Count > 0)
+            {
+                var existingKey = existingFiles.First();
+                if (_fileLocks.TryGetValue(existingKey, out var existingLock) && Path.IsPathRooted(existingLock.NormalizedPath))
+                {
+                    // Derive basePath from an existing lock's full path
+                    try { basePath = Path.GetDirectoryName(existingLock.NormalizedPath); } catch { }
+                }
+            }
+
             var normalized = Helpers.FormatHelpers.NormalizePath(filePath, basePath);
 
             if (_fileLocks.TryGetValue(normalized, out var existing))
@@ -279,8 +292,19 @@ namespace Spritely.Managers
             var normalized = Helpers.FormatHelpers.NormalizePath(filePath, task.ProjectPath);
             var blockingLock = _fileLocks.GetValueOrDefault(normalized);
             var blockingTaskId = blockingLock?.OwnerTaskId ?? "unknown";
+
+            // Detect self-blocking: if the task is conflicting with its own lock, skip queuing
+            if (blockingTaskId == taskId)
+            {
+                AppLogger.Warn("FileLockManager", $"Task {taskId} attempted to self-block on {filePath} - skipping conflict");
+                return;
+            }
+
             var blockerTask = activeTasks.FirstOrDefault(t => t.Id == blockingTaskId);
-            var blockerNum = blockerTask?.TaskNumber;
+            // Use the task number stored on the lock as fallback when the blocking task
+            // is no longer in activeTasks (already completed/removed)
+            var blockerNum = blockerTask?.TaskNumber
+                ?? (blockingLock?.OwnerTaskNumber is > 0 ? blockingLock.OwnerTaskNumber : (int?)null);
 
             // Important: Do NOT kill the process - we want to preserve the conversation state
             // The process will be paused/suspended so it can resume later
