@@ -7,15 +7,16 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using Spritely.Constants;
 using Spritely.Helpers;
 
 namespace Spritely.Managers
 {
     public class FileLockManager
     {
-        // Constants for lock count limits
-        private const int MaxLocks = 500; // Maximum total lock count across all tasks
-        private const int MaxLocksPerTask = 100; // Maximum lock count per individual task
+        private static readonly int MaxLocks = AppConstants.FileLockMaxLocks;
+        private static readonly int MaxLocksPerTask = AppConstants.FileLockMaxLocksPerTask;
+        private static readonly int LockWarningThreshold = (int)(AppConstants.FileLockMaxLocks * AppConstants.FileLockWarningThreshold);
 
         private readonly Dictionary<string, FileLock> _fileLocks = new();
         private readonly ObservableCollection<FileLock> _fileLocksView = new();
@@ -151,6 +152,12 @@ namespace Spritely.Managers
                 IsIgnored = isIgnored
             };
             _fileLocks[normalized] = fileLock;
+
+            // Warn when approaching the total lock limit
+            if (_fileLocks.Count >= LockWarningThreshold)
+            {
+                AppLogger.Warn("FileLockManager", $"Lock count {_fileLocks.Count}/{MaxLocks} is above {AppConstants.FileLockWarningThreshold:P0} capacity");
+            }
 
             if (!_taskLockedFiles.TryGetValue(taskId, out var files))
             {
