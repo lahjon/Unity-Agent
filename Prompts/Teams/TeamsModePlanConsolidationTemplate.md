@@ -14,10 +14,12 @@
 - Scale dynamically: use as many steps as the feature requires (no artificial limits).
 - Small features may need 2-3 steps; large features may need 10+.
 
-## OUTPUT
+## REQUIRED OUTPUT — MANDATORY
+Your ONLY job is to produce the ```TEAM_STEPS``` block below. This is machine-parsed. Without it, the orchestrator cannot proceed.
 ```TEAM_STEPS
 [{{"description": "Self-contained prompt: what to do, files to modify, acceptance criteria", "depends_on": []}}]
 ```
+You MUST output this block. Do NOT output just a status marker — the TEAM_STEPS block IS the deliverable.
 
 ## PARALLELISM — CRITICAL
 Maximize parallel execution. Use a **layered** approach:

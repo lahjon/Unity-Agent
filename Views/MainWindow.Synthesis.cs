@@ -20,6 +20,7 @@ namespace Spritely
             _taskExecutionManager.SynthesisPerspectivesSpawned += OnSynthesisPerspectivesSpawned;
             _taskExecutionManager.SynthesisPerspectiveCompleted += OnSynthesisPerspectiveCompleted;
             _taskExecutionManager.SynthesisComplete += OnSynthesisComplete;
+            _taskExecutionManager.TeamsModeFinished += OnTeamsModeFinished;
         }
 
         private void EnsureSynthesisPanel()
@@ -110,6 +111,17 @@ namespace Spritely
                     _synthesisPanel.StopPolling();
                     _synthesisPanel.SetSynthesisComplete();
                 }
+            });
+        }
+
+        private void OnTeamsModeFinished(string taskId, AgentTaskStatus status)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                // Stop polling and collapse the synthesis board when teams mode ends
+                _synthesisPanel?.StopPolling();
+                if (_synthesisExpander != null)
+                    _synthesisExpander.IsExpanded = false;
             });
         }
     }

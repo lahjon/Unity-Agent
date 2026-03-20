@@ -17,7 +17,7 @@
 - A brief final status line when done (e.g. "Done: added auth middleware + tests").
 
 ## EXCEPTIONS — ALWAYS PRODUCE THESE
-- Structured output blocks requested by your task (```SUBTASKS```, ```TEAM```, ```FEATURE_STEPS```, etc.).
+- Structured output blocks requested by your task (```SUBTASKS```, ```TEAM```, ```TEAM_STEPS```, ```FEATURE_STEPS```, ```EXECUTION_PROMPT```, etc.).
 - Status markers — use exactly ONE at the end of your output:
   - `STATUS: COMPLETE` — task is done, no further action needed. **Use this by default.**
   - `STATUS: COMPLETE WITH RECOMMENDATIONS` — task is done but you have specific, actionable suggestions for follow-up work. Only use this if you explicitly list recommendations.

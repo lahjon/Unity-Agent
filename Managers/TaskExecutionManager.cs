@@ -97,6 +97,9 @@ namespace Spritely.Managers
         /// <summary>Fires when plan synthesis completes (parentTaskId, synthesisResult).</summary>
         public event Action<string, string>? SynthesisComplete;
 
+        /// <summary>Fires when teams mode finishes (parentTaskId, finalStatus). Used to reset synthesis board.</summary>
+        public event Action<string, AgentTaskStatus>? TeamsModeFinished;
+
         public TaskExecutionManager(TaskExecutionServices services)
         {
             _scriptDir = services.ScriptDir;
@@ -152,6 +155,7 @@ namespace Spritely.Managers
             _featureModeHandler.SynthesisPerspectivesSpawned += (parentId, ids) => SynthesisPerspectivesSpawned?.Invoke(parentId, ids);
             _featureModeHandler.SynthesisPerspectiveCompleted += (parentId, idx) => SynthesisPerspectiveCompleted?.Invoke(parentId, idx);
             _featureModeHandler.SynthesisComplete += (parentId, result) => SynthesisComplete?.Invoke(parentId, result);
+            _featureModeHandler.TeamsModeFinished += (taskId, status) => TeamsModeFinished?.Invoke(taskId, status);
         }
 
         // ── Prompt preparation ────────────────────────────────────────

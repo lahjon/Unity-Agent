@@ -899,8 +899,14 @@ namespace Spritely.Managers
             var json = Helpers.FormatHelpers.ExtractCodeBlockContent(output, "TEAM_STEPS");
             if (json == null)
             {
-                AppLogger.Warn("TeamsMode", "No ```TEAM_STEPS``` block found in output");
-                return null;
+                // Fallback: try to find any JSON array in a generic code block
+                json = TryExtractJsonArrayFallback(output);
+                if (json == null)
+                {
+                    AppLogger.Warn("TeamsMode", "No ```TEAM_STEPS``` block found in output");
+                    return null;
+                }
+                AppLogger.Info("TeamsMode", "Found TEAM_STEPS via JSON array fallback extraction");
             }
 
             try
@@ -916,6 +922,33 @@ namespace Spritely.Managers
                 AppLogger.Warn("TeamsMode", "Failed to deserialize TEAM_STEPS JSON", ex);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Fallback: tries to extract a JSON array from any code block or raw text
+        /// when the agent doesn't use the exact ```TEAM_STEPS``` label.
+        /// </summary>
+        private static string? TryExtractJsonArrayFallback(string output)
+        {
+            // Try any code block containing a JSON array with "description" fields
+            var match = Regex.Match(output, @"```\w*\s*\n(\[[\s\S]*?\])\s*```", RegexOptions.Multiline);
+            if (match.Success)
+            {
+                var candidate = match.Groups[1].Value.Trim();
+                if (candidate.Contains("\"description\""))
+                    return candidate;
+            }
+
+            // Try bare JSON array in the output
+            var bareMatch = Regex.Match(output, @"(\[\s*\{[\s\S]*?\}\s*\])", RegexOptions.Multiline);
+            if (bareMatch.Success)
+            {
+                var candidate = bareMatch.Groups[1].Value.Trim();
+                if (candidate.Contains("\"description\""))
+                    return candidate;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -1383,6 +1416,9 @@ namespace Spritely.Managers
 
             if (task.UseMessageBus)
                 _messageBusManager.LeaveBus(task.ProjectPath, task.Id);
+
+            // Clean up perspective agent tracking so the synthesis board can reset
+            _perspectiveAgents.TryRemove(task.Id, out _);
 
             var duration = DateTime.Now - task.StartTime;
             var finishTokenInfo = task.HasTokenData
