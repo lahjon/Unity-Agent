@@ -1,4 +1,8 @@
 {
-  "version": 2,
-  "lastUpdatedAt": "2026-03-13T09:35:05.8831425Z"
+  "v": 1,
+  "data": {
+    "version": 2,
+    "symbolIndexVersion": "e39c91f683bb48c5a179109ded9af4d6bd3a485e2625cf04925a97cf31828202",
+    "lastUpdatedAt": "2026-03-27T07:42:02.3917447Z"
+  }
 }

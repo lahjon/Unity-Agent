@@ -15,11 +15,12 @@
 - Small features may need 2-3 steps; large features may need 10+.
 
 ## REQUIRED OUTPUT — MANDATORY
-Your ONLY job is to produce the ```TEAM_STEPS``` block below. This is machine-parsed. Without it, the orchestrator cannot proceed.
+Your ONLY job is to produce the ```TEAM_STEPS``` block below. This is machine-parsed. Without it, the orchestrator cannot proceed and the entire pipeline fails.
 ```TEAM_STEPS
 [{{"description": "Self-contained prompt: what to do, files to modify, acceptance criteria", "depends_on": []}}]
 ```
 You MUST output this block. Do NOT output just a status marker — the TEAM_STEPS block IS the deliverable.
+**CRITICAL**: Do NOT output `STATUS: COMPLETE` or any `STATUS:` marker. Those are for other phases. This phase's ONLY deliverable is the ```TEAM_STEPS``` block above. If you output a STATUS marker without TEAM_STEPS, the orchestrator will fail.
 
 ## PARALLELISM — CRITICAL
 Maximize parallel execution. Use a **layered** approach:
@@ -46,6 +47,13 @@ Maximize parallel execution. Use a **layered** approach:
 - Each step focused, achievable by single agent. Include acceptance criteria.
 - Add "Execute autonomously" to each step.
 - Prefer more granular parallel steps over fewer sequential ones.
+
+## PROGRESSIVE IMPROVEMENT (iteration {0})
+- If iteration > 1, previous iteration history is provided above.
+- **DO NOT** create steps for work already completed in previous iterations.
+- **FOCUS** steps on remaining gaps and unresolved issues from previous evaluations.
+- Each step description MUST reference what it's fixing/improving from prior work if applicable.
+- Verify existing work first before re-implementing — add verification checks to steps.
 
 # FEATURE REQUEST
 {3}

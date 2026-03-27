@@ -168,7 +168,9 @@ namespace Spritely.Managers
             var efficiencyBlock = suppressOutputEfficiency ? "" : OutputEfficiencyBlock;
 
             if (isTeamsMode)
-                return descBlock + projectRulesBlock + featureBlock + crossBlock + skillsBlock + gameBlock + efficiencyBlock + TeamsModeInitialTemplate + description;
+                // No OutputEfficiencyBlock — its STATUS markers conflict with the TEAM block
+                // requirement, causing the agent to output STATUS: COMPLETE instead.
+                return descBlock + projectRulesBlock + featureBlock + crossBlock + skillsBlock + gameBlock + TeamsModeInitialTemplate + description;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -322,14 +324,19 @@ namespace Spritely.Managers
             return OutputEfficiencyBlock + InjectFeatureModeLogFilename(prompt, taskId);
         }
 
-        public string BuildTeamsModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription)
+        public string BuildTeamsModePlanConsolidationPrompt(int iteration, int maxIterations, string teamResults, string featureDescription, string iterationContext = "")
         {
-            return OutputEfficiencyBlock + string.Format(TeamsModePlanConsolidationTemplate, iteration, maxIterations, teamResults, featureDescription);
+            var ctx = !string.IsNullOrWhiteSpace(iterationContext) ? "\n" + iterationContext + "\n" : "";
+            // No OutputEfficiencyBlock here — it contains STATUS markers that conflict with
+            // the consolidation template's TEAM_STEPS requirement, causing the agent to
+            // output STATUS: COMPLETE instead of the required structured block.
+            return ctx + string.Format(TeamsModePlanConsolidationTemplate, iteration, maxIterations, teamResults, featureDescription);
         }
 
-        public string BuildTeamsModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults)
+        public string BuildTeamsModeEvaluationPrompt(int iteration, int maxIterations, string featureDescription, string implementationResults, string iterationContext = "")
         {
-            return OutputEfficiencyBlock + string.Format(TeamsModeEvaluationTemplate, iteration, maxIterations, featureDescription, implementationResults);
+            var ctx = !string.IsNullOrWhiteSpace(iterationContext) ? "\n" + iterationContext + "\n" : "";
+            return OutputEfficiencyBlock + ctx + string.Format(TeamsModeEvaluationTemplate, iteration, maxIterations, featureDescription, implementationResults);
         }
 
         public string BuildDependencyContext(List<string> depIds,

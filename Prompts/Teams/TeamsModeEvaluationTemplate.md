@@ -15,8 +15,10 @@
 ## TASK
 1. Review all step results and examine actual code changes.
 2. Check: missing functionality, bugs, integration issues, unhandled edge cases, build errors.
-3. Fix issues directly if found (minor fixes only).
-4. Produce a **structured gap analysis** for any remaining work.
+3. Run `dotnet build` to verify the project compiles. Build errors = NEEDS_MORE_WORK.
+4. Fix issues directly if found (minor fixes only).
+5. Produce a **structured gap analysis** for any remaining work.
+6. If previous iteration history is provided above, compare: did this iteration make measurable progress? Were previous gaps addressed?
 
 ## GAP ANALYSIS FORMAT (required if NEEDS_MORE_WORK)
 When outputting NEEDS_MORE_WORK, include this structured section:
@@ -34,8 +36,13 @@ For each gap, specify:
 ### RECOMMENDED FOCUS
 - Prioritized list of what the next iteration should tackle first
 
-## STATUS OUTPUT
+## STATUS OUTPUT — CRITICAL
+You MUST carefully evaluate the actual state of the implementation before choosing a status.
+Do NOT default to COMPLETE. Only output COMPLETE if you have verified all requirements are met.
+
 End with exactly ONE of:
-- `STATUS: COMPLETE` — fully implemented and working, no issues found.
-- `STATUS: COMPLETE WITH RECOMMENDATIONS` — fully implemented and working, minor improvements possible.
-- `STATUS: NEEDS_MORE_WORK` — include gap analysis above with specific remaining issues.
+- `STATUS: COMPLETE` — ALL requirements fully implemented and verified working. No gaps found.
+- `STATUS: COMPLETE WITH RECOMMENDATIONS` — ALL requirements implemented and working, only minor optional improvements possible.
+- `STATUS: NEEDS_MORE_WORK` — ANY missing functionality, bugs, integration issues, or unverified requirements exist. Include gap analysis above with specific remaining issues.
+
+**Default to `STATUS: NEEDS_MORE_WORK`** unless you can confirm every aspect of the feature request is fully implemented and working. If in doubt, choose NEEDS_MORE_WORK.

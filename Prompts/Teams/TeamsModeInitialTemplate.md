@@ -26,9 +26,11 @@
   3. "FULLY AUTONOMOUS — never ask for user input."
   4. "Complete analysis and exit. No confirmation prompts."
 
-## OUTPUT
+## OUTPUT — MANDATORY
+Your ONLY deliverable is the ```TEAM``` block below. This is machine-parsed. Without it, the orchestrator cannot proceed.
 ```TEAM
 [{"role": "Architect", "description": "Explore codebase and design...", "depends_on": []}]
 ```
+**CRITICAL**: Do NOT output `STATUS: COMPLETE` or any `STATUS:` marker. Those are for other phases. This phase's ONLY deliverable is the ```TEAM``` block above.
 
 # USER PROMPT / TASK

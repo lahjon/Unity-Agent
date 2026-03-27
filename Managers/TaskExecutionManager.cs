@@ -465,6 +465,13 @@ namespace Spritely.Managers
                 // Feature mode: multi-phase orchestration — always handle before SpawnTeam
                 if (task.IsTeamsMode && task.Status == AgentTaskStatus.Running)
                 {
+                    // The coordinator task's Claude process just exited. Release any file locks
+                    // it acquired during this phase (planning/consolidation/evaluation) so that
+                    // child tasks spawned in the next phase aren't blocked by the coordinator.
+                    // Without this, children get queued on the coordinator's locks and deadlock
+                    // because the coordinator (still Running) waits for children to complete.
+                    _fileLockManager.ReleaseTaskLocksAndUnblock(task.Id, activeTasks);
+
                     _featureModeHandler.HandleTeamsModeIteration(task, exitCode, activeTasks, historyTasks, moveToHistory);
                     _fileLockManager.CheckQueuedTasks(activeTasks);
                     TaskCompleted?.Invoke(task.Id);
@@ -505,6 +512,26 @@ namespace Spritely.Managers
 
                     _fileLockManager.CheckQueuedTasks(activeTasks);
                     TaskCompleted?.Invoke(task.Id);
+
+                    // If this is a teams mode child still stuck as Queued after CheckQueuedTasks
+                    // (e.g. its process was killed by phase timeout while paused for a file lock),
+                    // check whether the parent phase can advance. Without this, the child stays
+                    // Queued with no process and the phase never completes.
+                    if (task.Status == AgentTaskStatus.Queued && !string.IsNullOrEmpty(task.ParentTaskId))
+                    {
+                        var parent = activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
+                        if (parent is { IsTeamsMode: true })
+                        {
+                            // Fail the stranded child so the phase can advance
+                            task.Status = AgentTaskStatus.Failed;
+                            task.EndTime = DateTime.Now;
+                            _outputProcessor.AppendOutput(task.Id,
+                                $"\nTask #{task.TaskNumber} failed: process exited while queued for file lock.\n",
+                                activeTasks, historyTasks);
+                            _outputTabManager.UpdateTabHeader(task);
+                            CheckTeamsModePhaseCompletion(parent, activeTasks, historyTasks, moveToHistory);
+                        }
+                    }
                     return;
                 }
 

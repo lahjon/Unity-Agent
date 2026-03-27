@@ -41,10 +41,10 @@ namespace Spritely.Managers
         string BuildTeamsModeContinuationPrompt(int iteration, int maxIterations, string taskId = "");
 
         string BuildTeamsModePlanConsolidationPrompt(int iteration, int maxIterations,
-            string teamResults, string featureDescription);
+            string teamResults, string featureDescription, string iterationContext = "");
 
         string BuildTeamsModeEvaluationPrompt(int iteration, int maxIterations,
-            string featureDescription, string implementationResults);
+            string featureDescription, string implementationResults, string iterationContext = "");
 
         string BuildDependencyContext(List<string> depIds,
             IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks);

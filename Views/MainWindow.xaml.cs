@@ -390,11 +390,12 @@ namespace Spritely
 
             Closing += OnWindowClosing;
 
-            _terminalManager = new TerminalTabManager(
-                TerminalTabBar, TerminalOutput, TerminalInput,
-                TerminalSendBtn, TerminalInterruptBtn, TerminalRootPath,
-                Dispatcher, _projectManager.ProjectPath);
-            _terminalManager.AddTerminal();
+            // Terminal panel hidden — skip initialization
+            // _terminalManager = new TerminalTabManager(
+            //     TerminalTabBar, TerminalOutput, TerminalInput,
+            //     TerminalSendBtn, TerminalInterruptBtn, TerminalRootPath,
+            //     Dispatcher, _projectManager.ProjectPath);
+            // _terminalManager.AddTerminal();
 
             // Saved prompts loaded async in Window_Loaded
 

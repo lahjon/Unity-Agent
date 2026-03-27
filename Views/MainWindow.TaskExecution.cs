@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Spritely.Dialogs;
 using Spritely.Managers;
+using Spritely.Helpers;
 using Spritely.Models;
 
 namespace Spritely
@@ -316,7 +317,8 @@ namespace Spritely
                 ? task.Summary : task.ShortDescription;
             storedTask.Status = AgentTaskStatus.Completed;
 
-            _storedTasks.Insert(0, storedTask);
+            lock (_storedTasksLock)
+                _storedTasks.Insert(0, storedTask);
             _historyManager.SaveStoredTasks(_storedTasks);
             RefreshFilterCombos();
 
@@ -331,9 +333,11 @@ namespace Spritely
         {
             if (_historyTasks.Contains(task) && !_activeTasks.Contains(task))
             {
-                _historyTasks.Remove(task);
+                lock (_historyTasksLock)
+                    _historyTasks.Remove(task);
                 PinRowHeights();
-                _activeTasks.Insert(0, task);
+                lock (_activeTasksLock)
+                    _activeTasks.Insert(0, task);
                 RestoreStarRows();
             }
         }
@@ -853,7 +857,8 @@ namespace Spritely
             AnimateRemoval(el, () =>
             {
                 _outputTabManager.CloseTab(task);
-                _historyTasks.Remove(task);
+                lock (_historyTasksLock)
+                    _historyTasks.Remove(task);
                 _historyManager.SaveHistory(_historyTasks);
                 RefreshFilterCombos();
                 _outputTabManager.UpdateOutputTabWidths();
@@ -882,7 +887,8 @@ namespace Spritely
 
             foreach (var task in _historyTasks.ToList())
                 _outputTabManager.CloseTab(task);
-            _historyTasks.Clear();
+            lock (_historyTasksLock)
+                _historyTasks.Clear();
             _historyManager.SaveHistory(_historyTasks);
             RefreshFilterCombos();
             _outputTabManager.UpdateOutputTabWidths();
@@ -988,7 +994,8 @@ namespace Spritely
                 ? task.Summary : task.ShortDescription;
             storedTask.Status = AgentTaskStatus.Completed;
 
-            _storedTasks.Insert(0, storedTask);
+            lock (_storedTasksLock)
+                _storedTasks.Insert(0, storedTask);
             _historyManager.SaveStoredTasks(_storedTasks);
             RefreshFilterCombos();
         }

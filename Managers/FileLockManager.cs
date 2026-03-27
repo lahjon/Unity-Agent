@@ -196,6 +196,76 @@ namespace Spritely.Managers
             }
         }
 
+        /// <summary>
+        /// Releases all file locks held by a task AND unblocks any queued tasks that were
+        /// blocked specifically by this task. Use this for coordinator tasks (e.g. teams mode
+        /// main task) that stay in Running status but whose process has exited — the normal
+        /// CheckQueuedTasks won't unblock children because it sees the blocker as still Running.
+        /// </summary>
+        public void ReleaseTaskLocksAndUnblock(string taskId, ObservableCollection<AgentTask> activeTasks)
+        {
+            List<(string taskId, AgentTask task)> toResume;
+            lock (_lockSync)
+            {
+                ReleaseTaskLocksInternal(taskId);
+
+                // Find queued tasks that were blocked by this task and unblock them
+                toResume = new List<(string, AgentTask)>();
+                var toRemoveFromQueue = new List<string>();
+
+                foreach (var kvp in _queuedTaskInfo)
+                {
+                    var qi = kvp.Value;
+                    if (!qi.BlockedByTaskIds.Contains(taskId)) continue;
+
+                    // Remove this task from the blocker set
+                    qi.BlockedByTaskIds.Remove(taskId);
+
+                    // If no more blockers and the conflicting file is now free, resume
+                    var stillBlocked = false;
+                    foreach (var remainingBlocker in qi.BlockedByTaskIds)
+                    {
+                        var blocker = activeTasks.FirstOrDefault(t => t.Id == remainingBlocker);
+                        if (blocker != null && blocker.Status is AgentTaskStatus.Running or AgentTaskStatus.Stored
+                            or AgentTaskStatus.Planning or AgentTaskStatus.Paused or AgentTaskStatus.Committing)
+                        {
+                            stillBlocked = true;
+                            break;
+                        }
+                    }
+
+                    if (!stillBlocked && !_fileLocks.ContainsKey(qi.ConflictingFilePath))
+                    {
+                        toResume.Add((kvp.Key, qi.Task));
+                        toRemoveFromQueue.Add(kvp.Key);
+                    }
+                }
+
+                foreach (var id in toRemoveFromQueue)
+                {
+                    _queuedTaskInfo.Remove(id);
+                    if (_waitingLocks.TryGetValue(id, out var waitingLock))
+                    {
+                        _waitingLocks.Remove(id);
+                        _dispatcher.BeginInvoke(() =>
+                        {
+                            _fileLocksView.Remove(waitingLock);
+                            LocksChanged?.Invoke();
+                        });
+                    }
+                }
+            }
+
+            foreach (var (resumeTaskId, task) in toResume)
+            {
+                if (task.Status != AgentTaskStatus.Queued) continue;
+                task.QueuedReason = null;
+                task.BlockedByTaskId = null;
+                task.BlockedByTaskNumber = null;
+                QueuedTaskResumed?.Invoke(resumeTaskId);
+            }
+        }
+
         private void ReleaseTaskLocksInternal(string taskId)
         {
             if (!_taskLockedFiles.TryGetValue(taskId, out var files))

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -55,6 +56,19 @@ namespace Spritely
             _fileLockManager.CheckQueuedTasks(_activeTasks);
             _taskOrchestrator.OnTaskCompleted(task.Id);
             DrainInitQueue();
+
+            // If this was a teams mode child, re-check phase completion.
+            // The child's earlier exit handler check may have returned false because this
+            // task was still in Committing status. Now that it's Completed, the phase may advance.
+            if (!string.IsNullOrEmpty(task.ParentTaskId))
+            {
+                var parent = _activeTasks.FirstOrDefault(t => t.Id == task.ParentTaskId);
+                if (parent is { IsTeamsMode: true })
+                {
+                    _taskExecutionManager.CheckTeamsModePhaseCompletion(
+                        parent, _activeTasks, _historyTasks, MoveToHistory);
+                }
+            }
 
             // Increment tray badge if app is not focused
             if (!IsActive)

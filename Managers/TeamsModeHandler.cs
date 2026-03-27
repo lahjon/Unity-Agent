@@ -265,6 +265,8 @@ namespace Spritely.Managers
 
             if (children == null || children.Count == 0)
             {
+                var outputTail = output.Length > 500 ? output[^500..] : output;
+                AppLogger.Warn("TeamsMode", $"[{task.Id}] TEAM extraction failed. Output tail:\n{outputTail}");
                 _outputProcessor.AppendOutput(task.Id,
                     "\n[Teams Mode] No team produced — falling back to direct plan consolidation.\n",
                     activeTasks, historyTasks);
@@ -572,15 +574,22 @@ namespace Spritely.Managers
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
         {
+            // Inject iteration history so consolidation knows what was already done
+            var iterationContext = BuildSafeIterationContext(task);
+
             var prompt = _promptBuilder.BuildTeamsModePlanConsolidationPrompt(
-                task.CurrentIteration, task.MaxIterations, teamResults, task.OriginalTeamsDescription);
+                task.CurrentIteration, task.MaxIterations, teamResults, task.OriginalTeamsDescription, iterationContext);
 
             StartTeamsModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
         }
 
         /// <summary>
         /// Phase 2 complete: Parse TEAM_STEPS and create execution tasks.
+        /// Retries once if TEAM_STEPS extraction fails (the agent may have output STATUS markers instead).
         /// </summary>
+        private readonly ConcurrentDictionary<string, int> _consolidationRetries = new();
+        private const int MaxConsolidationRetries = 1;
+
         private void HandleConsolidationComplete(AgentTask task, string output,
             ObservableCollection<AgentTask> activeTasks, ObservableCollection<AgentTask> historyTasks,
             Action<AgentTask> moveToHistory)
@@ -589,12 +598,34 @@ namespace Spritely.Managers
 
             if (steps == null || steps.Count == 0)
             {
+                // Log output tail for debugging
+                var outputTail = output.Length > 500 ? output[^500..] : output;
+                AppLogger.Warn("TeamsMode", $"[{task.Id}] TEAM_STEPS extraction failed. Output tail:\n{outputTail}");
+
+                var retryCount = _consolidationRetries.AddOrUpdate(task.Id, 1, (_, c) => c + 1);
+
+                // Retry once — the agent may have output STATUS markers instead of TEAM_STEPS
+                if (retryCount <= MaxConsolidationRetries)
+                {
+                    _outputProcessor.AppendOutput(task.Id,
+                        $"\n[Teams Mode] No TEAM_STEPS found in consolidation output. Retrying ({retryCount}/{MaxConsolidationRetries})...\n",
+                        activeTasks, historyTasks);
+
+                    // Re-run consolidation with the same team results
+                    var teamResults = CollectChildResults(task, activeTasks, historyTasks);
+                    StartPlanConsolidationProcess(task, teamResults, activeTasks, historyTasks, moveToHistory);
+                    return;
+                }
+
+                _consolidationRetries.TryRemove(task.Id, out _);
                 _outputProcessor.AppendOutput(task.Id,
-                    "\n[Teams Mode] No TEAM_STEPS found in consolidation output. Finishing.\n",
+                    "\n[Teams Mode] No TEAM_STEPS found in consolidation output after retry. Finishing.\n",
                     activeTasks, historyTasks);
                 FinishTeamsModeTask(task, AgentTaskStatus.Failed, activeTasks, historyTasks, moveToHistory);
                 return;
             }
+
+            _consolidationRetries.TryRemove(task.Id, out _);
 
             _outputProcessor.AppendOutput(task.Id,
                 $"\n[Teams Mode] Plan consolidated: {steps.Count} step(s). Creating execution tasks...\n",
@@ -698,8 +729,11 @@ namespace Spritely.Managers
             task.TeamsModePhase = TeamsModePhase.Evaluation;
             task.ClearTeamsPhaseChildIds();
 
+            // Inject iteration history so evaluation can compare progress across iterations
+            var iterationContext = BuildSafeIterationContext(task);
+
             var prompt = _promptBuilder.BuildTeamsModeEvaluationPrompt(
-                task.CurrentIteration, task.MaxIterations, task.OriginalTeamsDescription, executionResults);
+                task.CurrentIteration, task.MaxIterations, task.OriginalTeamsDescription, executionResults, iterationContext);
 
             StartTeamsModeProcess(task, prompt, activeTasks, historyTasks, moveToHistory);
         }
@@ -1023,6 +1057,28 @@ namespace Spritely.Managers
             return children;
         }
 
+        // ── Iteration context helper ────────────────────────────────────
+
+        /// <summary>
+        /// Builds iteration context for the current task, catching errors gracefully.
+        /// </summary>
+        private string BuildSafeIterationContext(AgentTask task)
+        {
+            if (task.CurrentIteration <= 1) return "";
+            try
+            {
+                var ctx = _iterationMemoryManager.BuildIterationContext(task.Id, task.CurrentIteration);
+                if (!string.IsNullOrEmpty(ctx))
+                    AppLogger.Debug("TeamsMode", $"[{task.Id}] Injecting iteration context ({ctx.Length} chars) into {task.TeamsModePhase}");
+                return ctx;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("TeamsMode", $"[{task.Id}] Failed to build iteration context for {task.TeamsModePhase}", ex);
+                return "";
+            }
+        }
+
         // ── Result collection ───────────────────────────────────────────
 
         /// <summary>
@@ -1136,11 +1192,14 @@ namespace Spritely.Managers
                     $"\n[Teams Mode] Phase timeout ({timeoutMinutes}min). Killing stuck child tasks...\n",
                     activeTasks, historyTasks);
 
-                // Kill any still-running children
+                // Kill any still-running children and cancel queued ones without processes
+                var cancelledQueued = false;
                 foreach (var childId in task.TeamsPhaseChildIds)
                 {
                     var child = activeTasks.FirstOrDefault(t => t.Id == childId);
-                    if (child is { IsFinished: false, Process: { HasExited: false } })
+                    if (child == null || child.IsFinished) continue;
+
+                    if (child.Process is { HasExited: false })
                     {
                         _outputProcessor.AppendOutput(task.Id,
                             $"[Teams Mode] Killing stuck child #{child.TaskNumber}: {child.Summary}\n",
@@ -1148,6 +1207,30 @@ namespace Spritely.Managers
                         try { child.Process.Kill(true); }
                         catch (Exception ex) { AppLogger.Warn("TeamsMode", $"Failed to kill stuck child {child.Id}", ex); }
                     }
+                    else if (child.Status == AgentTaskStatus.Queued)
+                    {
+                        // Queued children without processes (e.g. waiting on dependencies)
+                        // won't be killed by Process.Kill — cancel them directly so the phase can advance
+                        _outputProcessor.AppendOutput(task.Id,
+                            $"[Teams Mode] Cancelling queued child #{child.TaskNumber}: {child.Summary}\n",
+                            activeTasks, historyTasks);
+                        child.Status = AgentTaskStatus.Cancelled;
+                        child.EndTime = DateTime.Now;
+                        cancelledQueued = true;
+                    }
+                }
+
+                // If we cancelled queued children directly (no process exit to trigger),
+                // check if ALL children are now finished. Killed children will re-check via
+                // their exit handlers, but cancelled queued children have no exit handler.
+                if (cancelledQueued)
+                {
+                    var allDone = task.TeamsPhaseChildIds
+                        .Select(id => activeTasks.FirstOrDefault(t => t.Id == id)
+                                   ?? historyTasks.FirstOrDefault(t => t.Id == id))
+                        .All(c => c == null || c.IsFinished);
+                    if (allDone)
+                        OnTeamsModePhaseComplete(task, activeTasks, historyTasks, moveToHistory);
                 }
             };
             timer.Start();
@@ -1197,8 +1280,9 @@ namespace Spritely.Managers
                         break;
                     case TeamsModePhase.Evaluation:
                         var execResults = CollectChildResults(task, activeTasks, historyTasks);
+                        var retryIterCtx = BuildSafeIterationContext(task);
                         var evalPrompt = _promptBuilder.BuildTeamsModeEvaluationPrompt(
-                            task.CurrentIteration, task.MaxIterations, task.OriginalTeamsDescription, execResults);
+                            task.CurrentIteration, task.MaxIterations, task.OriginalTeamsDescription, execResults, retryIterCtx);
                         StartTeamsModeProcess(task, evalPrompt, activeTasks, historyTasks, moveToHistory);
                         break;
                 }
@@ -1263,10 +1347,9 @@ namespace Spritely.Managers
             // Log the optimization
             if (messageBusEnabledCount < tasks.Count)
             {
-                _outputProcessor.AppendOutput(parent.Id,
-                    $"[Token Optimization] Message bus selectively enabled for {messageBusEnabledCount}/{tasks.Count} execution tasks " +
-                    $"(saved {tasks.Count - messageBusEnabledCount} unnecessary bus connections)\n",
-                    null!, null!);
+                AppLogger.Info("TeamsMode",
+                    $"Message bus selectively enabled for {messageBusEnabledCount}/{tasks.Count} execution tasks " +
+                    $"(saved {tasks.Count - messageBusEnabledCount} unnecessary bus connections)");
             }
         }
 

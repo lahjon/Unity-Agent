@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Spritely.Helpers;
 using Spritely.Models;
 
 namespace Spritely
@@ -138,7 +139,8 @@ namespace Spritely
             storedTask.Summary = text.Length > 80 ? text[..80] + "..." : text;
             storedTask.Status = AgentTaskStatus.Completed;
 
-            _storedTasks.Insert(0, storedTask);
+            lock (_storedTasksLock)
+                _storedTasks.Insert(0, storedTask);
             _historyManager.SaveStoredTasks(_storedTasks);
             RefreshFilterCombos();
 

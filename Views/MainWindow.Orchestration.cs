@@ -10,6 +10,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Spritely.Dialogs;
 using Spritely.Managers;
+using Spritely.Helpers;
 using Spritely.Models;
 
 namespace Spritely
@@ -21,59 +22,59 @@ namespace Spritely
         private void AddActiveTask(AgentTask task)
         {
             // Guard against duplicate insertions (can happen during concurrent spawning)
-            if (_activeTasks.Any(t => t.Id == task.Id))
-                return;
-
-            PinRowHeights();
-
-            task.TaskNumber = _nextTaskNumber;
-            _nextTaskNumber = _nextTaskNumber >= 9999 ? 1 : _nextTaskNumber + 1;
-
-            // Register with group tracker if this task belongs to a group
-            _taskGroupTracker.RegisterTask(task);
-
-            if (task.IsSubTask)
+            lock (_activeTasksLock)
             {
-                // Find the parent and insert immediately after it (and its existing children)
-                var parentIndex = -1;
-                for (int i = 0; i < _activeTasks.Count; i++)
+                if (_activeTasks.Any(t => t.Id == task.Id))
+                    return;
+
+                PinRowHeights();
+
+                task.TaskNumber = _nextTaskNumber;
+                _nextTaskNumber = _nextTaskNumber >= 9999 ? 1 : _nextTaskNumber + 1;
+
+                // Register with group tracker if this task belongs to a group
+                _taskGroupTracker.RegisterTask(task);
+
+                if (task.IsSubTask)
                 {
-                    if (_activeTasks[i].Id == task.ParentTaskId)
+                    // Find the parent and insert immediately after it (and its existing children)
+                    var parentIndex = -1;
+                    for (int i = 0; i < _activeTasks.Count; i++)
                     {
-                        parentIndex = i;
-                        // SpawnSubtask already increments SubTaskCounter and adds to ChildTaskIds;
-                        // only do it here for children created outside SpawnSubtask (e.g. teams mode execution tasks).
-                        if (!_activeTasks[i].ChildTaskIds.Contains(task.Id))
+                        if (_activeTasks[i].Id == task.ParentTaskId)
                         {
-                            _activeTasks[i].SubTaskCounter++;
-                            _activeTasks[i].ChildTaskIds.Add(task.Id);
+                            parentIndex = i;
+                            if (!_activeTasks[i].ChildTaskIds.Contains(task.Id))
+                            {
+                                _activeTasks[i].SubTaskCounter++;
+                                _activeTasks[i].ChildTaskIds.Add(task.Id);
+                            }
+                            task.Runtime.SubTaskIndex = _activeTasks[i].SubTaskCounter;
+                            break;
                         }
-                        task.Runtime.SubTaskIndex = _activeTasks[i].SubTaskCounter;
-                        break;
+                    }
+
+                    if (parentIndex >= 0)
+                    {
+                        int insertAfter = parentIndex + 1;
+                        while (insertAfter < _activeTasks.Count &&
+                               _activeTasks[insertAfter].ParentTaskId == task.ParentTaskId)
+                            insertAfter++;
+                        _activeTasks.Insert(insertAfter, task);
+                        RefreshActivityDashboard();
+                        RestoreStarRows();
+                        if (task.IsTeamsMode || task.DependencyTaskIdCount > 0)
+                            CheckAutoExpandGraph();
+                        return;
                     }
                 }
 
-                if (parentIndex >= 0)
-                {
-                    // Insert after parent and all its existing children
-                    int insertAfter = parentIndex + 1;
-                    while (insertAfter < _activeTasks.Count &&
-                           _activeTasks[insertAfter].ParentTaskId == task.ParentTaskId)
-                        insertAfter++;
-                    _activeTasks.Insert(insertAfter, task);
-                    RefreshActivityDashboard();
-                    RestoreStarRows();
-                    if (task.IsTeamsMode || task.DependencyTaskIdCount > 0)
-                        CheckAutoExpandGraph();
-                    return;
-                }
+                // Insert below all finished tasks so finished stay on top
+                int insertIndex = 0;
+                while (insertIndex < _activeTasks.Count && _activeTasks[insertIndex].IsFinished)
+                    insertIndex++;
+                _activeTasks.Insert(insertIndex, task);
             }
-
-            // Insert below all finished tasks so finished stay on top
-            int insertIndex = 0;
-            while (insertIndex < _activeTasks.Count && _activeTasks[insertIndex].IsFinished)
-                insertIndex++;
-            _activeTasks.Insert(insertIndex, task);
             RefreshActivityDashboard();
             RestoreStarRows();
 
@@ -301,9 +302,13 @@ namespace Spritely
                 App.IncrementTrayBadge();
 
             // Move from active to history (skip if already present to avoid duplicates)
-            _activeTasks.Remove(task);
-            if (!_historyTasks.Contains(task))
-                _historyTasks.Insert(0, task);
+            lock (_activeTasksLock)
+                _activeTasks.Remove(task);
+            lock (_historyTasksLock)
+            {
+                if (!_historyTasks.Contains(task))
+                    _historyTasks.Insert(0, task);
+            }
 
             _historyManager.SaveHistory(_historyTasks);
             RefreshActivityDashboard();

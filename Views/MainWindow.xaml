@@ -2159,8 +2159,8 @@
         <GridSplitter x:Name="TerminalSplitter" Grid.Row="3" Grid.Column="2" Style="{StaticResource HorizontalSplitter}" Visibility="Collapsed"/>
 
         <!-- ═══ TERMINAL (6) ═══ -->
-        <Border Grid.Row="4" Grid.Column="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
-                BorderThickness="1" Margin="0,6,0,0">
+        <Border x:Name="TerminalPanel" Grid.Row="4" Grid.Column="2" Background="{StaticResource BgSurface}" CornerRadius="8" Padding="4"
+                BorderThickness="1" Margin="0,6,0,0" Visibility="Collapsed">
             <Border.BorderBrush>
                 <SolidColorBrush x:Name="TerminalPanelBorder" Color="#2C2C2C"/>
             </Border.BorderBrush>
