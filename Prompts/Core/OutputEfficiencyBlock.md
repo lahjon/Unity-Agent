@@ -1,3 +1,4 @@
+<output_format>
 # OUTPUT EFFICIENCY — MANDATORY
 - This is a headless automated session. No human is reading your output in real-time.
 - Every token you output costs money and time. Be ruthlessly concise.
@@ -25,4 +26,4 @@
 - Message bus posts (JSON files to inbox/) — always post claims, findings, and status updates.
 - Feature log updates (`.feature_log.md`) — always write required log entries.
 - These are machine-parsed by the orchestrator and must never be omitted or abbreviated.
-
+</output_format>

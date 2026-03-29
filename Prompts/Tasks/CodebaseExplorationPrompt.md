@@ -1,3 +1,4 @@
+<exploration_task>
 # CODEBASE EXPLORATION
 - Explore project source code, then produce token-efficient description.
 
@@ -30,3 +31,4 @@ Max 800 chars. Omit empty sections. No preamble.
 - Output ONLY <short> and <long> tags.
 - No conversational text or commentary.
 - Factual summaries, not agent responses.
+</exploration_task>

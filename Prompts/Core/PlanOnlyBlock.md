@@ -1,3 +1,4 @@
+<mode_constraints>
 # PLAN-ONLY MODE
 - Do NOT write/edit/create/delete files or run commands.
 
@@ -8,3 +9,4 @@ Produce a detailed execution prompt for another agent:
 
 ## OUTPUT
 - Output in ```EXECUTION_PROMPT``` code block. Do NOT implement.
+</mode_constraints>

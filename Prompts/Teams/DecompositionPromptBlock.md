@@ -1,3 +1,4 @@
+<decomposition_mode>
 # TASK DECOMPOSITION
 - Break task into 2-5 independent subtasks. Explore codebase first.
 - Do NOT implement or modify files.
@@ -10,3 +11,4 @@ Output JSON in ```SUBTASKS``` block: `description` (self-contained prompt), `dep
 
 ## RULES
 - Prefer parallel. Minimize dependencies.
+</decomposition_mode>

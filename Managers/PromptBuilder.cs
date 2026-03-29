@@ -160,17 +160,20 @@ namespace Spritely.Managers
         {
             var descBlock = "";
             if (!string.IsNullOrWhiteSpace(projectDescription))
-                descBlock = $"# PROJECT CONTEXT\n{projectDescription}\n\n";
+                descBlock = $"<project_context>\n{projectDescription}\n</project_context>\n\n";
 
-            var featureBlock = !string.IsNullOrWhiteSpace(featureContextBlock) ? featureContextBlock + "\n" : "";
-            var crossBlock = !string.IsNullOrWhiteSpace(crossProjectHintsBlock) ? crossProjectHintsBlock + "\n" : "";
+            var rulesBlock = !string.IsNullOrWhiteSpace(projectRulesBlock) ? $"<project_rules>\n{projectRulesBlock}</project_rules>\n\n" : "";
+            var featureBlock = !string.IsNullOrWhiteSpace(featureContextBlock) ? $"<feature_context>\n{featureContextBlock}\n</feature_context>\n\n" : "";
+            var crossBlock = !string.IsNullOrWhiteSpace(crossProjectHintsBlock) ? $"<cross_project_hints>\n{crossProjectHintsBlock}\n</cross_project_hints>\n\n" : "";
+            var skillsWrapped = !string.IsNullOrWhiteSpace(skillsBlock) ? $"<skills>\n{skillsBlock}\n</skills>\n\n" : "";
             var gameBlock = isGameProject ? GameRulesBlock : "";
             var efficiencyBlock = suppressOutputEfficiency ? "" : OutputEfficiencyBlock;
+            var taskBlock = $"<task>\n{description}\n</task>";
 
             if (isTeamsMode)
                 // No OutputEfficiencyBlock — its STATUS markers conflict with the TEAM block
                 // requirement, causing the agent to output STATUS: COMPLETE instead.
-                return descBlock + projectRulesBlock + featureBlock + crossBlock + skillsBlock + gameBlock + TeamsModeInitialTemplate + description;
+                return descBlock + rulesBlock + featureBlock + crossBlock + skillsWrapped + gameBlock + TeamsModeInitialTemplate + "\n" + taskBlock;
 
             var mcpBlock = useMcp ? McpPromptBlock : "";
             var planningBlock = extendedPlanning ? ExtendedPlanningBlock : "";
@@ -181,8 +184,8 @@ namespace Spritely.Managers
             var decomposeBlock = autoDecompose ? DecompositionPromptBlock : "";
             var teamBlock = spawnTeam ? TeamDecompositionPromptBlock : "";
             var applyFixBlock = applyFix ? ApplyFixBlock : ConfirmBeforeChangesBlock;
-            return descBlock + systemPrompt + gitBlock + projectRulesBlock + featureBlock + crossBlock + skillsBlock + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
-                "# USER PROMPT / TASK\n" + description;
+            return descBlock + systemPrompt + gitBlock + rulesBlock + featureBlock + crossBlock + skillsWrapped + gameBlock + mcpBlock + applyFixBlock + efficiencyBlock + planningBlock + planOnlyBlock + decomposeBlock + teamBlock +
+                taskBlock;
         }
 
         public string BuildFullPrompt(string systemPrompt, AgentTask task,
@@ -213,7 +216,7 @@ namespace Spritely.Managers
             // Inject pending changes block before the task description so the AI
             // is aware of in-progress uncommitted work in the repository.
             if (!string.IsNullOrWhiteSpace(pendingChangesBlock))
-                basePrompt = $"{basePrompt}\n\n{pendingChangesBlock}";
+                basePrompt = $"{basePrompt}\n\n<pending_changes>\n{pendingChangesBlock}\n</pending_changes>";
 
             if (!string.IsNullOrWhiteSpace(task.DependencyContext))
                 basePrompt = $"{basePrompt}\n\n{task.DependencyContext}";
@@ -343,7 +346,7 @@ namespace Spritely.Managers
             IEnumerable<AgentTask> activeTasks, IEnumerable<AgentTask> historyTasks)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("# DEPENDENCY CONTEXT");
+            sb.AppendLine("<dependency_context>");
             sb.AppendLine("Completed prerequisite tasks — use these cached results directly instead of re-reading the files:\n");
 
             var depIndex = 0;
@@ -385,7 +388,12 @@ namespace Spritely.Managers
                 sb.AppendLine();
             }
 
-            return depIndex > 0 ? sb.ToString() : "";
+            if (depIndex > 0)
+            {
+                sb.AppendLine("</dependency_context>");
+                return sb.ToString();
+            }
+            return "";
         }
     }
 }

@@ -1,3 +1,4 @@
+<workflow_decomposition>
 # WORKFLOW DECOMPOSITION
 - User describes a multi-step workflow in plain English. Break it into discrete tasks with dependency relationships.
 
@@ -17,3 +18,4 @@
 
 ## EXAMPLE
 [{"taskName":"Refactor auth module","description":"Refactor auth to use JWT instead of session cookies","dependsOn":[]},{"taskName":"Update API endpoints","description":"Update all endpoints for new JWT auth","dependsOn":["Refactor auth module"]},{"taskName":"Run integration tests","description":"Run full integration suite to verify endpoints with new auth","dependsOn":["Update API endpoints"]}]
+</workflow_decomposition>

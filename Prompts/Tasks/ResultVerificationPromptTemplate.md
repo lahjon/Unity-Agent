@@ -1,3 +1,4 @@
+<verification_task>
 # RESULT VERIFICATION
 - Verify AI coding agent's work against requested task.
 
@@ -31,3 +32,4 @@ PASS|Auth endpoint added with JWT validation and error handling|Add rate limitin
 FAIL|Migration created but API endpoint not updated for new schema|Update API endpoint to use new schema fields
 
 - Output ONLY the PASS/FAIL line. Nothing else.
+</verification_task>

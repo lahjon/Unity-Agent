@@ -1,3 +1,4 @@
+<iteration_planning>
 # ITERATIVE REFINEMENT — DO NOT REPEAT PREVIOUS WORK
 
 ## REFINEMENT STRATEGY
@@ -17,3 +18,4 @@ This is iteration {0}. Your goal is to **improve and complete** the existing imp
 - Prioritize: critical gaps > important gaps > minor gaps.
 
 # PREVIOUS EVALUATION RESULTS
+</iteration_planning>

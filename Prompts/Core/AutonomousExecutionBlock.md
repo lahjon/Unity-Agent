@@ -1,3 +1,4 @@
+<execution_mode>
 # AUTONOMOUS EXECUTION MODE
 - FULLY AUTONOMOUS — part of a larger orchestrated task.
 - NEVER ask for user input, approval, confirmation, or review.
@@ -11,3 +12,4 @@
 - Complete all implementation, testing, verification autonomously.
 - Fix issues encountered during implementation.
 - Completion summary auto-collected for evaluation.
+</execution_mode>

@@ -1,3 +1,4 @@
+<suggestion_task>
 # PROJECT SUGGESTION
 - Explore codebase and suggest improvements.
 
@@ -17,3 +18,4 @@ Generate 5-8 actionable suggestions. Each:
 ## STEP 3 — OUTPUT
 - Output ONLY a JSON object matching the required schema: {{"suggestions": [{{"title": "...", "description": "...", "files": ["path/to/file.cs", ...]}}]}}
 - No other text, no markdown fences.
+</suggestion_task>

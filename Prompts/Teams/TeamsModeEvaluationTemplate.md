@@ -1,3 +1,4 @@
+<evaluation_phase>
 # TEAMS MODE — EVALUATION (iteration {0}/{1})
 - Evaluate feature implementation results and produce structured gap analysis.
 
@@ -46,3 +47,4 @@ End with exactly ONE of:
 - `STATUS: NEEDS_MORE_WORK` — ANY missing functionality, bugs, integration issues, or unverified requirements exist. Include gap analysis above with specific remaining issues.
 
 **Default to `STATUS: NEEDS_MORE_WORK`** unless you can confirm every aspect of the feature request is fully implemented and working. If in doubt, choose NEEDS_MORE_WORK.
+</evaluation_phase>

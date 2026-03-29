@@ -1,3 +1,4 @@
+<team_member_constraints>
 # PLANNING-ONLY RESTRICTIONS
 - Planning team member. Post all findings to message bus only.
 - Output auto-collected — do not write to files.
@@ -9,3 +10,4 @@
 ## AUTO-COMPLETION
 - After posting findings to bus, stop immediately. Brief final summary, then exit.
 - Results auto-collected by orchestrator.
+</team_member_constraints>

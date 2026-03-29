@@ -1,3 +1,4 @@
+<continuation_phase>
 # TEAMS MODE CONTINUATION (iteration {0}/{1})
 
 ## RESTRICTIONS
@@ -12,3 +13,4 @@
 6. End with: `STATUS: COMPLETE`, `STATUS: COMPLETE WITH RECOMMENDATIONS`, or `STATUS: NEEDS_MORE_WORK`
 
 Continue working now.
+</continuation_phase>

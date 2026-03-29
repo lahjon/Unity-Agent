@@ -1,3 +1,4 @@
+<feature_update>
 # FEATURE REGISTRY UPDATE
 - Update feature registry after task completion based on what changed.
 
@@ -30,3 +31,4 @@
 - Only create a new feature when the task introduced a distinct, self-contained capability.
 - Omit empty arrays. Only include features that actually changed.
 - Output ONLY valid JSON matching the required schema. No other text.
+</feature_update>

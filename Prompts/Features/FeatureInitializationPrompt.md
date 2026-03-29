@@ -1,3 +1,4 @@
+<feature_initialization>
 # FEATURE REGISTRY INITIALIZATION
 - Analyze a project and produce a comprehensive feature registry.
 
@@ -41,3 +42,4 @@ For each feature provide:
 - Aim for 8-30 features depending on project size. Small projects may have fewer.
 - Use relative file paths as they appear in the directory tree.
 - Output ONLY valid JSON matching the required schema. No other text.
+</feature_initialization>

@@ -1,3 +1,4 @@
+<generation_task>
 # CLAUDE.MD GENERATION
 Generate a CLAUDE.md file for this project based on actual codebase exploration.
 
@@ -41,3 +42,4 @@ One paragraph: what it is, what it does, tech stack.
 - Do NOT include instructions about how to use Claude or AI tools.
 - Do NOT include boilerplate or placeholder text.
 - Output raw markdown only — no wrapping, no code fences.
+</generation_task>

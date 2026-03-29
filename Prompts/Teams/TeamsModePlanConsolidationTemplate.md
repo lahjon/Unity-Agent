@@ -1,3 +1,4 @@
+<consolidation_phase>
 # TEAMS MODE — PLAN CONSOLIDATION (iteration {0}/{1})
 - Consolidate planning team findings into actionable step-by-step implementation plan.
 
@@ -57,3 +58,4 @@ Maximize parallel execution. Use a **layered** approach:
 
 # FEATURE REQUEST
 {3}
+</consolidation_phase>

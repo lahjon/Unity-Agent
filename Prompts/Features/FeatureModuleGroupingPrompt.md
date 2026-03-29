@@ -1,3 +1,4 @@
+<feature_module_grouping>
 # MODULE GROUPING
 
 You are given a list of features extracted from a codebase. Group them into logical **modules** — high-level architectural areas that encompass related features.
@@ -23,3 +24,4 @@ For each module provide:
 
 ## RULES
 - Output ONLY valid JSON matching the required schema. No other text.
+</feature_module_grouping>

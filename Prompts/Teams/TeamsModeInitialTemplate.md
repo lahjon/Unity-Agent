@@ -1,3 +1,4 @@
+<teams_initial_phase>
 # TEAMS MODE — PLANNING PHASE
 - Planning coordinator for iterative feature implementation.
 
@@ -32,5 +33,4 @@ Your ONLY deliverable is the ```TEAM``` block below. This is machine-parsed. Wit
 [{"role": "Architect", "description": "Explore codebase and design...", "depends_on": []}]
 ```
 **CRITICAL**: Do NOT output `STATUS: COMPLETE` or any `STATUS:` marker. Those are for other phases. This phase's ONLY deliverable is the ```TEAM``` block above.
-
-# USER PROMPT / TASK
+</teams_initial_phase>

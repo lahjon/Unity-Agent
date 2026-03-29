@@ -1,3 +1,4 @@
+<exploration_task>
 # GAME PROJECT EXPLORATION
 - Explore game project, then produce token-efficient description.
 
@@ -31,3 +32,4 @@ Max 800 chars. Omit empty sections. No preamble.
 - Skip binary folders (Library/, Temp/, Builds/).
 - Output ONLY <short> and <long> tags.
 - Factual summaries, not agent responses.
+</exploration_task>

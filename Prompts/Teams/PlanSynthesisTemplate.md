@@ -1,3 +1,4 @@
+<synthesis_phase>
 You are merging findings from 3 parallel analysis agents into a single consolidated plan.
 
 # FEATURE DESCRIPTION
@@ -21,3 +22,4 @@ The synthesis should:
 4. Flag critical risks that must be addressed
 
 Return a structured synthesis covering: approach, key files, risks, and test requirements.
+</synthesis_phase>

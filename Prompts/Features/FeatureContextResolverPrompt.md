@@ -1,3 +1,4 @@
+<feature_context_resolver>
 # FEATURE CONTEXT RESOLVER
 - Match a task description to relevant features from a project registry.
 
@@ -22,3 +23,4 @@
 - Use `primaryFiles` (base filenames) as a strong matching signal — if the task mentions a filename, boost confidence for features whose primaryFiles include it.
 - Confidence reflects how much the feature will be read or modified, not general relatedness.
 - Output ONLY valid JSON matching the required schema. No other text.
+</feature_context_resolver>

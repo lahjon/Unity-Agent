@@ -1,3 +1,4 @@
+<message_bus>
 # MESSAGE BUS
 - Concurrent agent team. Bus: `{BUS_PATH}`. Your ID: **{TASK_ID}**
 
@@ -9,3 +10,4 @@
 ```
 - Post **claim** before extensive file modifications. Post **finding** for discoveries affecting others.
 - Do NOT modify `_scratchpad.md`.
+</message_bus>

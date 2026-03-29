@@ -1,3 +1,4 @@
+<commit_message_task>
 You are generating a git commit message for an automated coding task.
 
 TASK DESCRIPTION:
@@ -24,3 +25,4 @@ Rules:
 - Do NOT include token counts, duration, cost, or other metrics
 - Do NOT use markdown headers (#) — only bold (**) for the summary line
 - Output ONLY the commit message, nothing else
+</commit_message_task>
